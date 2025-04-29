@@ -1,0 +1,23 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/paymentdb
+    username: postgres
+    password: password
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8082/realms/ecommerce-platform
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+payment-service:
+  api-key: secretpaymentapikey12345

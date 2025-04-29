@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<modelVersion>4.0.0</modelVersion>
+
+<groupId>com.dogancaglar</groupId>
+<artifactId>ecommerce-platform-kotlin</artifactId>
+<version>1.0-SNAPSHOT</version>
+<packaging>pom</packaging>
+
+<modules>
+    <module>payment-service</module>
+    <module>common</module>
+</modules>
+
+    <properties>
+        <java.version>17</java.version> <!-- or 21 if you want -->
+        <spring.boot.version>3.2.4</spring.boot.version>
+        <kotlin.version>2.1.20</kotlin.version>
+
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring.boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+<dependencies>
+    <dependency>
+        <groupId>org.jetbrains.kotlin</groupId>
+        <artifactId>kotlin-stdlib</artifactId>
+        <version>${kotlin.version}</version>
+    </dependency>
+    <!-- Common dependencies, if any -->
+</dependencies>
+    <build>
+        <pluginManagement>
+            <plugins>
+                <!-- Kotlin Plugin Configuration -->
+                <plugin>
+                    <groupId>org.jetbrains.kotlin</groupId>
+                    <artifactId>kotlin-maven-plugin</artifactId>
+                    <version>${kotlin.version}</version>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>compile</goal> <!-- Compile Kotlin -->
+                                <goal>test-compile</goal> <!-- Compile test Kotlin code -->
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>
