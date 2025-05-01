@@ -1,24 +1,28 @@
-<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-<modelVersion>4.0.0</modelVersion>
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
 
-<groupId>com.dogancaglar</groupId>
-<artifactId>ecommerce-platform-kotlin</artifactId>
-<version>1.0-SNAPSHOT</version>
-<packaging>pom</packaging>
+    <groupId>com.dogancaglar</groupId>
+    <artifactId>ecommerce-platform-kotlin</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>Ecommerce Platform Kotlin</name>
 
-<modules>
-    <module>payment-service</module>
-    <module>common</module>
-</modules>
+
+    <modules>
+        <module>common</module>
+        <module>payment-service</module>
+        <module>order-service</module>
+        <module>wallet-service</module>
+        <module>shipment-service</module>
+    </modules>
 
     <properties>
-        <java.version>17</java.version> <!-- or 21 if you want -->
+        <java.version>17</java.version>
+        <kotlin.version>1.9.22</kotlin.version>
         <spring.boot.version>3.2.5</spring.boot.version>
-        <kotlin.version>2.1.20</kotlin.version>
-
     </properties>
 
     <dependencyManagement>
@@ -33,23 +37,22 @@
         </dependencies>
     </dependencyManagement>
 
-<dependencies>
-    <!-- Common dependencies, if any -->
-</dependencies>
     <build>
         <pluginManagement>
             <plugins>
-                <!-- Kotlin Plugin Configuration -->
+                <!-- Kotlin Plugin -->
                 <plugin>
                     <groupId>org.jetbrains.kotlin</groupId>
                     <artifactId>kotlin-maven-plugin</artifactId>
                     <version>${kotlin.version}</version>
                     <executions>
                         <execution>
-                            <goals>
-                                <goal>compile</goal> <!-- Compile Kotlin -->
-                                <goal>test-compile</goal> <!-- Compile test Kotlin code -->
-                            </goals>
+                            <id>compile</id>
+                            <goals><goal>compile</goal></goals>
+                        </execution>
+                        <execution>
+                            <id>test-compile</id>
+                            <goals><goal>test-compile</goal></goals>
                         </execution>
                     </executions>
                 </plugin>

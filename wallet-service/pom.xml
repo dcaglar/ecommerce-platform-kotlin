@@ -5,18 +5,14 @@
     <parent>
         <groupId>com.dogancaglar</groupId>
         <artifactId>ecommerce-platform-kotlin</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <version>1.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
-    <artifactId>common</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <artifactId>wallet-service</artifactId>
 
     <dependencies>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
         <!-- Common dependencies (e.g., DTOs, utils) -->
     </dependencies>
 </project>
