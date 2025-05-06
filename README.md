@@ -175,22 +175,26 @@ Location: /customers/{uuid}
 
 ## 📋 What’s Done
 
-- ✅ Kotlin multi-module setup (Gradle)
+- ✅ Kotlin multi-module setup (Maven)
 - ✅ PostgreSQL with Liquibase migrations
 - ✅ Domain + DTO separation (records)
-- ✅ Validations + Global error handler
 - ✅ OAuth2 integration with Keycloak
-- ✅ Outbox pattern for event storage
 
 ---
 
 ## ⏭️ Next Steps / TODOs
+
+-Add liquibase scripts
 
 - [ ] 🔁 Implement Kafka OutboxPublisher (scheduled job)
 - Separate DTO and Domain and Entity se[eration]
 - [ ] 🪦 Add Dead Letter Topic support
 - [ ] 🧪 Add integration tests with Testcontainers
 - performance test
+-  Domain + DTO separation (records)
+- ✅ Validations + Global error handler
+- - ✅ Outbox pattern for event storage
+
 
 ---
 
