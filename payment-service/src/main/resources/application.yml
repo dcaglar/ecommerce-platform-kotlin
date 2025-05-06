@@ -2,14 +2,16 @@ server:
   port: 8080
 
 spring:
+  liquibase:
+    change-log: classpath:db/changelog/changelog-master.xml
   datasource:
     url: jdbc:postgresql://localhost:5432/paymentdb
     username: postgres
     password: password
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: none  # ❌ Disable automatic table creation
+      open-in-view: false
   security:
     oauth2:
       resourceserver:

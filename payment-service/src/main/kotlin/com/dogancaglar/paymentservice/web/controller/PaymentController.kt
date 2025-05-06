@@ -18,6 +18,7 @@ class PaymentController(
 ) {
 
     @PostMapping
+    @PreAuthorize("hasAuthority('payment:write')")
     fun createPayment(@RequestBody request: PaymentRequestDTO): ResponseEntity<PaymentResponseDTO> {
         val payment = PaymentMapper.toDomain(request)           // ✅ Transform here
         val result = paymentService.createPayment(payment)      // Pass domain to service
