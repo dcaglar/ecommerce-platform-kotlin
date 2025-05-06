@@ -1,4 +1,4 @@
-package com.dogancaglar.ecommerceplatform.payment.config
+package com.dogancaglar.paymentservice.config
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration

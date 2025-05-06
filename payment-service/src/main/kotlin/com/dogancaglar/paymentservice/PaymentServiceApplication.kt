@@ -1,4 +1,4 @@
-package com.dogancaglar
+package com.dogancaglar.paymentservice
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication

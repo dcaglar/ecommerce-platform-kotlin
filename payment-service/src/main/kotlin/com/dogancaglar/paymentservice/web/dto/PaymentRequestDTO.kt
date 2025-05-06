@@ -1,4 +1,4 @@
-package com.dogancaglar.ecommerceplatform.payment.api.dto
+package com.dogancaglar.paymentservice.web.dto
 
 data class PaymentRequestDTO(
     val buyerId: String,
