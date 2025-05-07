@@ -4,8 +4,7 @@
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
 
-    <changeSet id="20240507-create-payments" author="dogancaglar">
-        <createTable tableName="payments">
+    <changeSet id="20240507-create-outbox-event" author="dogancaglar">        <createTable tableName="payments">
             <column name="payment_id" type="VARCHAR(255)">
                 <constraints primaryKey="true" nullable="false"/>
             </column>

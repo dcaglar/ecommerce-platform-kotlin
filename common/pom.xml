@@ -15,6 +15,11 @@
     <artifactId>common</artifactId>
     <name>common</name>
     <version>1.0.0-SNAPSHOT</version>
+    <packaging>jar</packaging> <!-- ✅ Explicitly mark this as a library -->
+
+    <properties>
+        <kotlin.version>1.9.22</kotlin.version> <!-- ✅ Required for kotlin-maven-plugin -->
+    </properties>
 
     <dependencies>
         <!-- Kotlin standard library -->
@@ -23,17 +28,46 @@
             <artifactId>kotlin-stdlib-jdk8</artifactId>
         </dependency>
 
-        <!-- Jackson Kotlin module (if you're serializing/deserializing DTOs) -->
+        <!-- Jackson Kotlin module -->
         <dependency>
             <groupId>com.fasterxml.jackson.module</groupId>
             <artifactId>jackson-module-kotlin</artifactId>
         </dependency>
 
-        <!-- Optional: JSR-305 for nullability annotations -->
+        <!-- Optional: JSR-305 for @Nullable annotations -->
         <dependency>
             <groupId>com.google.code.findbugs</groupId>
             <artifactId>jsr305</artifactId>
             <version>3.0.2</version>
         </dependency>
     </dependencies>
+
+    <build>
+        <sourceDirectory>src/main/kotlin</sourceDirectory>
+        <testSourceDirectory>src/test/kotlin</testSourceDirectory>
+
+        <plugins>
+            <plugin>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-maven-plugin</artifactId>
+                <version>${kotlin.version}</version>
+                <executions>
+                    <execution>
+                        <id>compile</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>test-compile</id>
+                        <phase>test-compile</phase>
+                        <goals>
+                            <goal>test-compile</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

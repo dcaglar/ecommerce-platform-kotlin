@@ -103,9 +103,6 @@
                             </goals>
                             <configuration>
                                 <jvmTarget>17</jvmTarget>
-                                <compilerPlugins>
-                                    <plugin>spring</plugin>
-                                </compilerPlugins>
                             </configuration>
                         </execution>
                     </executions>

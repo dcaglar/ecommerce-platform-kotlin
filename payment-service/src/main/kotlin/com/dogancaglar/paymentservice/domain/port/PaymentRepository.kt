@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.domain.port
 
 import com.dogancaglar.paymentservice.domain.model.Payment
+import com.dogancaglar.paymentservice.domain.model.PaymentRequestDto
 
 
 interface PaymentRepository {

@@ -7,6 +7,8 @@
 
     <include file="payment-changelog.xml" relativeToChangelogFile="true"/>
     <include file="payment-order-changelog.xml" relativeToChangelogFile="true"/>
+    <include file="db/changelog/uuid-extension-changelog.xml"/>
+    <include file="payment-outbox-changelog.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>
 

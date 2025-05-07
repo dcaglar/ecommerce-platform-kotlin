@@ -7,12 +7,12 @@ import org.springframework.stereotype.Repository
 
 @Repository
 class JpaPaymentAdapter(
-    private val jpaRepository: SpringPaymentJpaRepository
+    private val jpaRepository: SpringDataPaymentJpaRepository
 ) : PaymentRepository {
 
+
     override fun save(payment: Payment): Payment {
-        val entity = PaymentEntityMapper.toEntity(payment)
-        return PaymentEntityMapper.toDomain(jpaRepository.save(entity))
+       return  PaymentEntityMapper.toDomain(jpaRepository.save(PaymentEntityMapper.toEntity(payment)))
     }
 
     override fun findById(id: String): Payment? {
