@@ -4,6 +4,7 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreatedEvent
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryEvent
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceededEvent
+import com.dogancaglar.paymentservice.domain.event.toDomain
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.port.PaymentOrderRepository
@@ -15,6 +16,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
@@ -27,15 +29,20 @@ class PaymentOrderExecutor(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
+
+
     @KafkaListener(topics = ["payment_order_created"], groupId = "payment-executor-group")
     @Transactional
     fun processInitialPayment(record: ConsumerRecord<String, String>) {
-        try {
-            val envelope = objectMapper.readValue(record.value(), EventEnvelope::class.java)
-            val event = objectMapper.convertValue(envelope.data, PaymentOrderCreatedEvent::class.java)
+        val envelopeType = objectMapper
+            .typeFactory
+            .constructParametricType(EventEnvelope::class.java, PaymentOrderCreatedEvent::class.java)
 
-            val order = paymentOrderRepository.findById(event.paymentOrderId)
-                ?: throw IllegalArgumentException("PaymentOrder not found: ${event.paymentOrderId}")
+        val envelope: EventEnvelope<PaymentOrderCreatedEvent> =
+            objectMapper.readValue(record.value(), envelopeType)
+        val event: PaymentOrderCreatedEvent = envelope.data
+        val order = event.toDomain()
+        try {
 
             if (order.status != PaymentOrderStatus.INITIATED) return
 
@@ -57,6 +64,8 @@ class PaymentOrderExecutor(
                     )
                 )
             } else {
+                val updatedOrder = order.markAsFailed();
+                paymentOrderRepository.saveAll(listOf(updatedOrder))
                 paymentEventPublisher.publish(
                     topic = "payment_order_retry",
                     aggregateId = order.paymentOrderId,
@@ -67,13 +76,34 @@ class PaymentOrderExecutor(
                         sellerId = order.sellerId,
                         amountValue = order.amount.value,
                         currency = order.amount.currency,
-                        attempt = 1
+                        retryCount = 0,
+                        status = PaymentOrderStatus.FAILED.name,
+                        createdAt = LocalDateTime.now(),
+                        updatedAt = LocalDateTime.now(),
                     )
                 )
             }
 
         } catch (e: Exception) {
-            logger.error("Failed to process payment_order_created: ${e.message}", e)
+            logger.error("Failed to process payment_order_created:,retrying ${e.message}", e)
+            val updatedOrder = order.markAsFailed();
+            paymentOrderRepository.saveAll(listOf(updatedOrder))
+            paymentEventPublisher.publish(
+                topic = "payment_order_retry",
+                aggregateId = order.paymentOrderId,
+                eventType = "payment_order_retry",
+                data = PaymentOrderRetryEvent(
+                    paymentOrderId = order.paymentOrderId,
+                    paymentId = order.paymentId,
+                    sellerId = order.sellerId,
+                    amountValue = order.amount.value,
+                    currency = order.amount.currency,
+                    retryCount = 0,
+                    status = PaymentOrderStatus.FAILED.name,
+                    createdAt = LocalDateTime.now(),
+                    updatedAt = LocalDateTime.now(),
+                )
+            )
         }
     }
 

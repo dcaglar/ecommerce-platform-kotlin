@@ -26,51 +26,46 @@ class PaymentService(
 
     @Transactional
     fun createPayment(payment: Payment): Payment {
+        // Persist the payment entity
         paymentRepository.save(payment)
 
-        val (successfulOrders, failedOrders) = payment.paymentOrders.map { order ->
+        val paymentOrderList = mutableListOf<PaymentOrder>()
+        val failedOrders = mutableListOf<PaymentOrder>()
+
+        // Attempt PSP calls for each order
+        for (order in payment.paymentOrders) {
             try {
-                if (callPsp(order)) order.markAsPaid() to null
-                else null to order
+                paymentOrderList.add(order);
             } catch (ex: Exception) {
                 logger.warn("PSP call failed for PaymentOrder ${order.paymentOrderId}, falling back to async", ex)
-                null to order
             }
-        }.unzip()
 
-        val persistedOrders = (successfulOrders.filterNotNull() + failedOrders.filterNotNull())
-        paymentOrderRepository.saveAll(persistedOrders)
-
-        val outboxEvents = buildOutboxEvents(failedOrders.filterNotNull())
+        }
+        paymentOrderRepository.saveAll(paymentOrderList)
+        // Save outbox events for failed orders
+        val outboxEvents = buildOutboxEvents(paymentOrderList)
         if (outboxEvents.isNotEmpty()) {
             outboxEventRepository.saveAll(outboxEvents)
         }
-
-        logger.info("Processed payment ${payment.id}: ${successfulOrders.count { it != null }} succeeded, ${failedOrders.count { it != null }} will be retried")
-
         return payment
     }
 
-    private fun buildOutboxEvents(failedOrders: List<PaymentOrder>): List<OutboxEvent> {
-        return failedOrders.map {
-            val eventPayload = EventEnvelope.wrap(
-                eventType = "payment_order_created",
-                aggregateId = it.paymentOrderId,
-                data = it.toCreatedEvent()
-            )
-            val payload = objectMapper.writeValueAsString(eventPayload)
 
-            OutboxEvent(
-                id = null,
-                eventType = eventPayload.eventType,
-                aggregateId = eventPayload.aggregateId,
-                payload = payload,
-                status = "NEW",
-                createdAt = LocalDateTime.now()
-            )
+    private fun buildOutboxEvents(paymentOrders: List<PaymentOrder>): List<OutboxEvent> {
+        val outboxEvents = mutableListOf<OutboxEvent>()
+        for (order in paymentOrders) {
+            outboxEvents.add(createOutBoxEvent(order))
         }
+        return outboxEvents
     }
 
+    fun createOutBoxEvent( paymentOrder: PaymentOrder) : OutboxEvent{
+        // first create PaymentOrderCreatedEvent then make it in an envelop wrap to generic it
+        val event = paymentOrder.toCreatedEvent()
+        val eventPayLoad = EventEnvelope.wrap(eventType = "payment_order_created", aggregateId = event.paymentOrderId, data = event)
+        val json = objectMapper.writeValueAsString(eventPayLoad);
+        return OutboxEvent(eventType = "payment_order_created", createdAt = LocalDateTime.now(), status = "NEW", aggregateId = event.paymentOrderId, payload = json)
+    }
     // This should be replaced with your actual PSP integration
     private fun callPsp(order: PaymentOrder): Boolean {
         return UUID.randomUUID().leastSignificantBits % 2 == 0L

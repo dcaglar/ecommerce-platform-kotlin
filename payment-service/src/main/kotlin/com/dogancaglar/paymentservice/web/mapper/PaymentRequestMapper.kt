@@ -24,8 +24,7 @@ object PaymentRequestMapper {
                 sellerId = it.sellerId,
                 amount = AmountMapper.toDomain(it.amount),
                 status = PaymentOrderStatus.INITIATED,
-                retryCount = 0,
-                createdAt = now
+                createdAt = LocalDateTime.now()
             )
         }
 

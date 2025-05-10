@@ -2,15 +2,14 @@ package com.dogancaglar.paymentservice.adapter.persistance
 
 import jakarta.persistence.*
 import java.math.BigDecimal
+import java.util.UUID
 
+@Table(name = "payment_orders")
 @Entity
 data class PaymentOrderEntity(
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: String? = null,
-
-    @Column(nullable = false, unique = true)
-    val paymentOrderId: String,
+    @Column(name = "payment_order_id")
+    val paymentOrderId: String = UUID.randomUUID().toString(),
 
     @Column(nullable = false)
     val sellerId: String,
@@ -24,8 +23,6 @@ data class PaymentOrderEntity(
     @Column(nullable = false)
     val status: String,
 
-    @Column(nullable = false)
-    val retryCount: Int,
 
     @Column(nullable = false)
     val createdAt: java.time.LocalDateTime,

@@ -9,6 +9,7 @@
     <include file="payment-order-changelog.xml" relativeToChangelogFile="true"/>
     <include file="db/changelog/uuid-extension-changelog.xml"/>
     <include file="payment-outbox-changelog.xml" relativeToChangelogFile="true"/>
-
+    <include file="20240508-add-columns-to-payment-orders.xml" relativeToChangelogFile="true"/>
+    <include file="20240509-add-updatedAt-to-payment-orders.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>
 

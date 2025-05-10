@@ -7,7 +7,7 @@ import org.springframework.data.repository.query.Param
 interface SpringDataPaymentOrderJpaRepository : JpaRepository<PaymentOrderEntity, String> {
 
     @Query(
-        value = "SELECT COUNT(*) FROM payment_order WHERE payment_id = :paymentId",
+        value = "SELECT COUNT(*) FROM payment_orders WHERE payment_id = :paymentId",
         nativeQuery = true
     )
     fun countByPaymentId(@Param("paymentId") paymentId: String): Long
@@ -15,7 +15,7 @@ interface SpringDataPaymentOrderJpaRepository : JpaRepository<PaymentOrderEntity
     @Query(
         value = """
             SELECT COUNT(*) 
-            FROM payment_order 
+            FROM payment_orders 
             WHERE payment_id = :paymentId 
               AND status IN (:statuses)
         """,
@@ -30,7 +30,7 @@ interface SpringDataPaymentOrderJpaRepository : JpaRepository<PaymentOrderEntity
         value = """
             SELECT EXISTS(
                 SELECT 1 
-                FROM payment_order 
+                FROM payment_orders 
                 WHERE payment_id = :paymentId 
                   AND status = :status
             )

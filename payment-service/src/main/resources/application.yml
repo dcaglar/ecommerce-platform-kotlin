@@ -4,10 +4,11 @@ server:
 spring:
   liquibase:
     change-log: classpath:db/changelog/changelog-master.xml
-  datasource:
-    url: jdbc:postgresql://localhost:5432/paymentdb
-    username: postgres
-    password: password
+  -datasource:
+    url: jdbc:postgresql://localhost:5432/payment
+    username: payment
+    password: payment
+
   jpa:
     hibernate:
       ddl-auto: none  # ❌ Disable automatic table creation

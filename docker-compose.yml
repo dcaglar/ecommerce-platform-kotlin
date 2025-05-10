@@ -1,16 +1,57 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:14
-    container_name: postgres
+  # Keycloak PostgreSQL DB
+  keycloak-db:
+    image: postgres:15
+    container_name: keycloak-db
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    networks:
+      - keycloak-net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U keycloak" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - keycloak_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432" # avoid clashing with payment DB
+  payment-db:
+    image: postgres:15
+    container_name: payment-postgres
+    environment:
+      POSTGRES_DB: payment
+      POSTGRES_USER: payment
+      POSTGRES_PASSWORD: payment
+    volumes:
+      - payment_postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    # Keycloak itself
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.3
+    container_name: keycloak
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    ports:
+      - "8082:8080"
+    networks:
+      - keycloak-net
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: paymentdb
-    restart: unless-stopped
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    command: start-dev
+
+
 
   redis:
     image: redis:7
@@ -55,3 +96,9 @@ services:
       - KAFKA_CLUSTERS_0_NAME=local
       - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
     restart: unless-stopped
+
+volumes:
+  keycloak_postgres_data:
+  payment_postgres_data:
+networks:
+  keycloak-net:

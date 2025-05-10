@@ -8,8 +8,9 @@ data class PaymentOrder(
     val sellerId: String,
     val amount: Amount,
     val status: PaymentOrderStatus,
-    val retryCount: Int,
-    val createdAt: LocalDateTime
+    val createdAt: LocalDateTime,
+    val updatedAt: LocalDateTime? = LocalDateTime.now()
+
 ) {
     fun markAsPaid(): PaymentOrder =
         this.copy(status = PaymentOrderStatus.SUCCESS)
@@ -17,6 +18,8 @@ data class PaymentOrder(
     fun markAsFailed(): PaymentOrder =
         this.copy(status = PaymentOrderStatus.FAILED)
 
-    fun incrementRetry(): PaymentOrder =
-        this.copy(retryCount = this.retryCount + 1)
+
+
+    fun markAsFinalizedFailed(): PaymentOrder =
+        this.copy(status = PaymentOrderStatus.FAILED_FINAL)
 }

@@ -17,7 +17,24 @@ class PSPClient {
 
         return when {
             roll < 0.1 -> throw RuntimeException("PSP service unavailable")
-            roll < 0.2 -> {
+            roll < 0.8 -> {
+                Thread.sleep(5000) // simulate timeout
+                PSPResponse("FAILED")
+            }
+            roll < 0.9 -> PSPResponse("SUCCESS")
+            else -> PSPResponse("FAILED")
+        }
+    }
+
+
+    fun chargeRetry(paymentOrder: PaymentOrder): PSPResponse {
+        simulateDelay()
+
+        val roll = random.nextDouble()
+
+        return when {
+            roll < 0.1 -> throw RuntimeException("PSP service unavailable")
+            roll < 0.7 -> {
                 Thread.sleep(5000) // simulate timeout
                 PSPResponse("FAILED")
             }

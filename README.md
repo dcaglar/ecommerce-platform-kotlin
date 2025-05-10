@@ -11,7 +11,7 @@ This project is a **modular, secure, event-driven microservice** built with **Sp
     - Authenticated via Keycloak (JWT)
     - Accepts a payment reqiest
     - Emits events
-
+s
 ### `OutboxEvent`
 - Stores serialized customer creation events
 - To be processed by a Kafka publisher (in a scheduled background job)
@@ -91,15 +91,49 @@ Log in with:
 	•	Go to Role Mappings
 	•	Select customer:write and click Add selected
  curl -X POST http://localhost:8082/realms/ecommerce-platform/protocol/openid-connect/token \
- 
- 
-#  to get the access token
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "client_id=payment-service" \
-  -d "client_secret=rCdBBSxTe7w6P5Ts7CssmvVX37YM9wkf" \
+  -d "client_secret=OvX9LSkmwLr1ewOV5X1k5JUsSH7R7HxE" \
   -d "grant_type=password" \
   -d "username=dogan" \
-  -d "password=password"
+  -d "password=dogan"
+  
+  
+  
+  curl -i POST http://localhost:8080/payments \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJHNWVXMkZrZXJOWk85MU5NQlE1dk5rQXcyNFVIT09NbHBJUzJrMDFKSnZJIn0.eyJleHAiOjE3NDY4NTAwMjYsImlhdCI6MTc0NjgxNDAyNiwianRpIjoiNGZlMDU1YWYtZTZkMy00MjhlLWJiZmQtMjQ4NjI5ZGMxOGY4IiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgyL3JlYWxtcy9lY29tbWVyY2UtcGxhdGZvcm0iLCJhdWQiOiJhY2NvdW50Iiwic3ViIjoiODAwMmEyMGMtMTRhZi00N2NmLWEzOTQtMjYzODIzZTIwNDk5IiwidHlwIjoiQmVhcmVyIiwiYXpwIjoicGF5bWVudC1zZXJ2aWNlIiwic2Vzc2lvbl9zdGF0ZSI6IjZmMTBjMjk4LTlmZDAtNDY5Ni1iMWM0LWE4NTgwZTBiNWE4ZiIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiLyoiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbInBheW1lbnQ6d3JpdGUiLCJvZmZsaW5lX2FjY2VzcyIsImRlZmF1bHQtcm9sZXMtZWNvbW1lcmNlLXBsYXRmb3JtIiwidW1hX2F1dGhvcml6YXRpb24iXX0sInJlc291cmNlX2FjY2VzcyI6eyJhY2NvdW50Ijp7InJvbGVzIjpbIm1hbmFnZS1hY2NvdW50IiwibWFuYWdlLWFjY291bnQtbGlua3MiLCJ2aWV3LXByb2ZpbGUiXX19LCJzY29wZSI6ImVtYWlsIHByb2ZpbGUiLCJzaWQiOiI2ZjEwYzI5OC05ZmQwLTQ2OTYtYjFjNC1hODU4MGUwYjVhOGYiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibmFtZSI6IkRvZ2FuIENhZ2xhciIsInByZWZlcnJlZF91c2VybmFtZSI6ImRvZ2FuIiwiZ2l2ZW5fbmFtZSI6IkRvZ2FuIiwiZmFtaWx5X25hbWUiOiJDYWdsYXIiLCJlbWFpbCI6ImRjYWdsYXIxOTg3QGdtYWlsLmNvbSJ9.eyrTRQu959qGAiCcIRWuDrucVY8ooos4nZbiq__6-An5YrrJfbGxBqjZtiQuvVwKqRc4KPTip7FSOlV3DQ5XgPyTShDlWpSx2jXUyjSzSk-bhfdXNiliEfS-OB-__zOmQyBUSkY0U3ah3sFuraRb1ullhzJ4VPqArEePKuT3GHcv08ShXCowPPaeZ9rO4PQn2zyP6FEFP1y4gfTX--DnxWEu1IR6u4tCzldk20ij1ucEfH29rnwdKcFeloJ4FeAcsN57cg0P1IDI3ZzJPYCJE2RXwj-8Mt1hzEHo5LEkZf7ngOnZV55Alsp4uNSRYffwl8xZcP58LoJ6Isdpezwlmw" \
+  -d '{
+  "orderId": "ORDER-20240508-XYZ",
+  "buyerId": "BUYER-123",
+  "totalAmount": {
+    "value": 199.49,
+    "currency": "EUR"
+  },
+  "paymentOrders": [
+    {
+      "sellerId": "SELLER-001",
+      "amount": {
+        "value": 49.99,
+        "currency": "EUR"
+      }
+    },
+    {
+      "sellerId": "SELLER-002",
+      "amount": {
+        "value": 29.50,
+        "currency": "EUR"
+      }
+    },
+    {
+      "sellerId": "SELLER-003",
+      "amount": {
+        "value": 120.00,
+        "currency": "EUR"
+      }
+    }
+  ]
+}'
 
 
 
@@ -169,6 +203,11 @@ Location: /customers/{uuid}
   "email": "ada@example.com",
   "status": "PENDING"
 }
+
+DATABASE ACCESS
+This connects inside the running payment-postgres container and opens a psql session using the payment user and database without having anything postgre
+docker exec -it payment-postgres psql -U payment -d payment
+
 ```
 
 ---
