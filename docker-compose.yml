@@ -1,25 +1,56 @@
-version: '3.8'
-
 services:
-  # Keycloak PostgreSQL DB
-  keycloak-db:
-    image: postgres:15
-    container_name: keycloak-db
+  postgresql:
+    container_name: temporal-postgresql
     environment:
-      POSTGRES_DB: keycloak
-      POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: keycloak
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_USER: temporal
+    image: postgres:15
     networks:
-      - keycloak-net
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U keycloak" ]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    volumes:
-      - keycloak_postgres_data:/var/lib/postgresql/data
+      - temporal-network
     ports:
-      - "5433:5432" # avoid clashing with payment DB
+      - 5432:5432
+    volumes:
+      - /var/lib/postgresql/data
+  temporal:
+    container_name: temporal
+    depends_on:
+      - postgresql
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=postgresql
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CLI_ADDRESS=temporal:7233
+    image: temporalio/auto-setup:1.27.0
+    networks:
+      - temporal-network
+    ports:
+      - 7233:7233
+    volumes:
+      - ./dynamicconfig:/etc/temporal/config/dynamicconfig
+
+    # Keycloak PostgreSQL DB
+  keycloak-db:
+      image: postgres:15
+      container_name: keycloak-db
+      environment:
+        POSTGRES_DB: keycloak
+        POSTGRES_USER: keycloak
+        POSTGRES_PASSWORD: keycloak
+      networks:
+        - keycloak-net
+      healthcheck:
+        test: [ "CMD-SHELL", "pg_isready -U keycloak" ]
+        interval: 5s
+        timeout: 5s
+        retries: 10
+      volumes:
+        - keycloak_postgres_data:/var/lib/postgresql/data
+      ports:
+        - 5433:5432 # avoid clashing with payment DB
   payment-db:
     image: postgres:15
     container_name: payment-postgres
@@ -30,75 +61,78 @@ services:
     volumes:
       - payment_postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - 5434:5432
     # Keycloak itself
   keycloak:
-    image: quay.io/keycloak/keycloak:24.0.3
-    container_name: keycloak
-    depends_on:
-      keycloak-db:
-        condition: service_healthy
-    ports:
-      - "8082:8080"
-    networks:
-      - keycloak-net
-    environment:
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
-      KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: keycloak
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-    command: start-dev
+      image: quay.io/keycloak/keycloak:24.0.3
+      container_name: keycloak
+      depends_on:
+        keycloak-db:
+          condition: service_healthy
+      ports:
+        - "8082:8080"
+      networks:
+        - keycloak-net
+      environment:
+        KC_DB: postgres
+        KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+        KC_DB_USERNAME: keycloak
+        KC_DB_PASSWORD: keycloak
+        KEYCLOAK_ADMIN: admin
+        KEYCLOAK_ADMIN_PASSWORD: admin
+      command: start-dev
 
 
 
   redis:
-    image: redis:7
-    container_name: redis
-    ports:
-      - "6379:6379"
-    restart: unless-stopped
+      image: redis:7
+      container_name: redis
+      ports:
+        - "6379:6379"
+      restart: unless-stopped
 
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.2.1
-    container_name: zookeeper
-    ports:
-      - "2181:2181"
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    restart: unless-stopped
+      image: confluentinc/cp-zookeeper:7.2.1
+      container_name: zookeeper
+      ports:
+        - "2181:2181"
+      environment:
+        ZOOKEEPER_CLIENT_PORT: 2181
+        ZOOKEEPER_TICK_TIME: 2000
+      restart: unless-stopped
 
   kafka:
-    image: confluentinc/cp-kafka:7.2.1
-    container_name: kafka
-    ports:
-      - "9092:9092"
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    depends_on:
-      - zookeeper
-    restart: unless-stopped
+      image: confluentinc/cp-kafka:7.2.1
+      container_name: kafka
+      ports:
+        - "9092:9092"
+      environment:
+        KAFKA_BROKER_ID: 1
+        KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+        KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+        KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+        KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      depends_on:
+        - zookeeper
+      restart: unless-stopped
 
   kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui
-    ports:
-      - "8081:8080"
-    depends_on:
-      - kafka
-    environment:
-      - KAFKA_CLUSTERS_0_NAME=local
-      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
-    restart: unless-stopped
+      image: provectuslabs/kafka-ui:latest
+      container_name: kafka-ui
+      ports:
+        - "8081:8080"
+      depends_on:
+        - kafka
+      environment:
+        - KAFKA_CLUSTERS_0_NAME=local
+        - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      restart: unless-stopped
 
 volumes:
   keycloak_postgres_data:
   payment_postgres_data:
+  temporal_postgres_data:
+
 networks:
   keycloak-net:
+  temporal-network:

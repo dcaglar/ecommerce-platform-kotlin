@@ -26,10 +26,17 @@ class PSPClient {
 
     private fun simulateRandomStatus(): String {
         return listOf(
-            "SUCCESS", "DECLINED", "INSUFFICIENT_FUNDS", "PENDING",
+            "SUCCESS",  "PENDING",
             "AUTH_NEEDED", "CAPTURE_PENDING", "UNKNOWN"
         ).random()
     }
+    fun checkPaymentStatus(paymentOrderId:String): PSPResponse {
+        val simulatedStatusCode = simulateRandomStatus()
+        val mappedStatus = PSPStatusMapper.fromPspStatus(simulatedStatusCode)
+
+        return PSPResponse(simulatedStatusCode)
+    }
+
 
     private fun maybeSimulateTimeout() {
         val timeoutProbability = 0.2 // 20% chance

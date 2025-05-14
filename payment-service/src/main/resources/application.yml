@@ -4,7 +4,7 @@ spring:
   liquibase:
     change-log: classpath:db/changelog/changelog-master.xml
   -datasource:
-    url: jdbc:postgresql://localhost:5432/payment
+    url: jdbc:postgresql://localhost:5434/payment
     username: payment
     password: payment
   redis:
