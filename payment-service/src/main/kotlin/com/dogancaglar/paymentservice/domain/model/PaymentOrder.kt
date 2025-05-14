@@ -9,17 +9,42 @@ data class PaymentOrder(
     val amount: Amount,
     val status: PaymentOrderStatus,
     val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime? = LocalDateTime.now()
+    val updatedAt: LocalDateTime? = LocalDateTime.now(),
+    var retryCount: Int=0,
+    var retryReason :String?="",
+    var lastErrorMessage :String?=""
 
 ) {
+
+
+
+
     fun markAsPaid(): PaymentOrder =
-        this.copy(status = PaymentOrderStatus.SUCCESS)
+        this.copy(status = PaymentOrderStatus.SUCCESSFUL)
 
     fun markAsFailed(): PaymentOrder =
-        this.copy(status = PaymentOrderStatus.FAILED)
-
-
+        this.copy(status = PaymentOrderStatus.DECLINED)
 
     fun markAsFinalizedFailed(): PaymentOrder =
-        this.copy(status = PaymentOrderStatus.FAILED_FINAL)
+        this.copy(status = PaymentOrderStatus.DECLINED)
+
+
+
+    fun incrementRetry(): PaymentOrder =
+        this.copy(retryCount = retryCount+1)
+
+    fun withLastError(message: String?): PaymentOrder {
+        this.lastErrorMessage = message
+        return this
+    }
+
+    fun withRetryReason(message: String?): PaymentOrder {
+        this.retryReason = message
+        return this
+    }
+
+
+    fun hasExceededMaxRetries(  maxRetries :Int = 5): Boolean =  this.retryCount>=5
+
 }
+

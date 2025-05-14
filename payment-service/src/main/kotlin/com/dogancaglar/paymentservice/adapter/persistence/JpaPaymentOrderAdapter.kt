@@ -1,6 +1,7 @@
-package com.dogancaglar.paymentservice.adapter.persistance
+package com.dogancaglar.paymentservice.adapter.persistence
 
-import com.dogancaglar.paymentservice.adapter.persistance.mapper.PaymentOrderEntityMapper
+import com.dogancaglar.paymentservice.adapter.persistence.mapper.PaymentEntityMapper
+import com.dogancaglar.paymentservice.adapter.persistence.mapper.PaymentOrderEntityMapper
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.port.PaymentOrderRepository
 import org.springframework.stereotype.Repository
@@ -9,6 +10,9 @@ import org.springframework.stereotype.Repository
 class JpaPaymentOrderAdapter(
     private val springRepo: SpringDataPaymentOrderJpaRepository
 ) : PaymentOrderRepository {
+    override fun save(paymentOrder: PaymentOrder) {
+        springRepo.save(PaymentOrderEntityMapper.toEntity(paymentOrder))
+    }
 
     override fun saveAll(orders: List<PaymentOrder>) {
         val entities = orders.map(PaymentOrderEntityMapper::toEntity)

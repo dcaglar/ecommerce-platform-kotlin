@@ -1,7 +1,8 @@
-package com.dogancaglar.paymentservice.adapter.persistance
+package com.dogancaglar.paymentservice.adapter.persistence
 
 import jakarta.persistence.*
 import java.math.BigDecimal
+import java.time.LocalDateTime
 import java.util.UUID
 
 @Table(name = "payment_orders")
@@ -23,9 +24,14 @@ data class PaymentOrderEntity(
     @Column(nullable = false)
     val status: String,
 
+    @Column(name = "retry_count", nullable = false)
+    var retryCount: Int = 0,
 
     @Column(nullable = false)
     val createdAt: java.time.LocalDateTime,
+
+    @Column(nullable = false)
+    val updatedAt: java.time.LocalDateTime?= LocalDateTime.now(),
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "payment_id", referencedColumnName = "payment_id", nullable = false)

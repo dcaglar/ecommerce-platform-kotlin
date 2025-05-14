@@ -1,6 +1,6 @@
-package com.dogancaglar.paymentservice.adapter.persistance.mapper
+package com.dogancaglar.paymentservice.adapter.persistence.mapper
 
-import com.dogancaglar.paymentservice.adapter.persistance.OutboxEventEntity
+import com.dogancaglar.paymentservice.adapter.persistence.OutboxEventEntity
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 
 object OutboxEventEntityMapper {

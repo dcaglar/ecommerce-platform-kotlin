@@ -4,6 +4,7 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 
 
 interface PaymentOrderRepository {
+    fun save(paymentOrder: PaymentOrder)
     fun saveAll(orders: List<PaymentOrder>)
     fun findById(id: String): PaymentOrder?
     fun countByPaymentId(paymentId: String): Long

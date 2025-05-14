@@ -2,52 +2,39 @@ package com.dogancaglar.paymentservice.psp
 
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import org.springframework.stereotype.Component
-import java.util.*
-import kotlin.concurrent.thread
+import java.util.concurrent.TimeoutException
+import kotlin.random.Random
 
 @Component
 class PSPClient {
 
-    private val random = Random()
+    fun charge(order: PaymentOrder): PSPResponse {
+        maybeSimulateTimeout()
+        val simulatedStatusCode = simulateRandomStatus()
+        val mappedStatus = PSPStatusMapper.fromPspStatus(simulatedStatusCode)
 
-    fun charge(paymentOrder: PaymentOrder): PSPResponse {
-        simulateDelay()
-
-        val roll = random.nextDouble()
-
-        return when {
-            roll < 0.1 -> throw RuntimeException("PSP service unavailable")
-            roll < 0.8 -> {
-                Thread.sleep(5000) // simulate timeout
-                PSPResponse("FAILED")
-            }
-            roll < 0.9 -> PSPResponse("SUCCESS")
-            else -> PSPResponse("FAILED")
-        }
+        return PSPResponse(simulatedStatusCode)
     }
 
+    fun chargeRetry(order: PaymentOrder): PSPResponse {
+        maybeSimulateTimeout()
+        val simulatedStatusCode = simulateRandomStatus()
+        val mappedStatus = PSPStatusMapper.fromPspStatus(simulatedStatusCode)
 
-    fun chargeRetry(paymentOrder: PaymentOrder): PSPResponse {
-        simulateDelay()
-
-        val roll = random.nextDouble()
-
-        return when {
-            roll < 0.1 -> throw RuntimeException("PSP service unavailable")
-            roll < 0.7 -> {
-                Thread.sleep(5000) // simulate timeout
-                PSPResponse("FAILED")
-            }
-            roll < 0.9 -> PSPResponse("SUCCESS")
-            else -> PSPResponse("FAILED")
-        }
+        return PSPResponse(simulatedStatusCode)
     }
 
-    private fun simulateDelay() {
-        try {
-            Thread.sleep((300 + random.nextInt(700)).toLong()) // Random delay between 300ms and 1s
-        } catch (e: InterruptedException) {
-            Thread.currentThread().interrupt()
+    private fun simulateRandomStatus(): String {
+        return listOf(
+            "SUCCESS", "DECLINED", "INSUFFICIENT_FUNDS", "PENDING",
+            "AUTH_NEEDED", "CAPTURE_PENDING", "UNKNOWN"
+        ).random()
+    }
+
+    private fun maybeSimulateTimeout() {
+        val timeoutProbability = 0.2 // 20% chance
+        if (Random.nextDouble() < timeoutProbability) {
+            throw TimeoutException("Simulated PSP timeout")
         }
     }
 }

@@ -1,6 +1,6 @@
-package com.dogancaglar.paymentservice.adapter.persistance
+package com.dogancaglar.paymentservice.adapter.persistence
 
-import com.dogancaglar.paymentservice.adapter.persistance.mapper.OutboxEventEntityMapper
+import com.dogancaglar.paymentservice.adapter.persistence.mapper.OutboxEventEntityMapper
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.domain.port.OutboxEventRepository
 import org.springframework.stereotype.Repository

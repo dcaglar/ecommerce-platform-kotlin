@@ -1,4 +1,4 @@
-x# Payment Platform (Java + Spring Boot)
+# Payment Platform (Java + Spring Boot)
 
 This project is a **modular, secure, event-driven microservice** built with **Spring Boot**, **Java**, **Kafka**, **Liquibase**, **PostgreSQL**, and **Keycloak** for OAuth2-based authentication.
 
@@ -9,12 +9,17 @@ This project is a **modular, secure, event-driven microservice** built with **Sp
 ### `payment-service`
 - `POST /payments`
     - Authenticated via Keycloak (JWT)
-    - Accepts a payment reqiest
-    - Emits events
-s
+    - Accepts a payment request with multiple paymentOrder from different seller, and send those requests ascyncronosly to queue
+    - Outbox Pattern and Hexa architecture is used
+    - Paymentflow starts with calling create method in Controller, and payment service immediately persists payment and payment orders and also serialized OrderCreatedEventoutboxevents in Transactional Block
+    - OutboxDispatcherService retrieves and push  EnvelopeWrap<WPAYMENTORDERREATED> events  to payment_order_created topic with via
+    - Then PAymentOrderExecutor indepently consumes from this queue and call PSP, this way we  are not blocking shopper,if payment fails or get timeout our exception,we emit payment_retry_event to another queue
+      Use a Redis sorted set to delay actual Kafka re-send based on retry count
+
 ### `OutboxEvent`
-- Stores serialized customer creation events
+- Stores serialized  and paymentorderevent
 - To be processed by a Kafka publisher (in a scheduled background job)
+- 
 
 ### `Validation & Error Handling`
 - DTOs are validated with annotations (`@NotBlank`, `@Email`)
@@ -26,10 +31,17 @@ s
 ## 🚀 Getting Started
 
 ### Prerequisites
+- Kotlin
 - JDK 17+
 - Maven
 - Docker + Docker Compose
 - IntelliJ IDEA (recommended)
+- Reddis
+- Postgre
+
+
+## 🚀 Docker redis connect
+	•	Use a Redis sorted set or in-memory scheduler to delay actual Kafka re-send based on retry count
 
 ### 🔧 Setup Steps
 
@@ -90,7 +102,39 @@ Log in with:
 	4.	Assign role:
 	•	Go to Role Mappings
 	•	Select customer:write and click Add selected
- curl -X POST http://localhost:8082/realms/ecommerce-platform/protocol/openid-connect/token \
+
+
+# 3. Run DB migrations via Liquibase (done automatically)
+# OR apply manually by connecting to the DB if needed
+
+# 4. Start the Spring Boot app
+$ ./gradlew :customer-service:bootRun
+```
+
+---
+
+## 🐳 Docker Compose Services
+
+- PostgreSQL (port 5432)
+- Kafka (port 9092) + Zookeeper (2181)
+- Keycloak (port 8082)
+
+### 🗝️ Keycloak Setup
+1. Visit: `http://localhost:8081`
+2. Create Realm: `ecommerce-platform`
+3. Create Client: `payment-service`
+    - Type: `confidential`
+    - Auth flow: `standard` with Direct Access Grants enabled
+    - Add `payment:write` role under client
+    - 
+4. Create User:
+    - Username: dogan / password: password
+    - Assign `payment:write` role
+    - Ensure `email_verified = true`
+
+### 🧪 Get Token
+```bash
+  curl -X POST http://localhost:8082/realms/ecommerce-platform/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "client_id=payment-service" \
   -d "client_secret=OvX9LSkmwLr1ewOV5X1k5JUsSH7R7HxE" \
@@ -99,10 +143,9 @@ Log in with:
   -d "password=dogan"
   
   
-  
   curl -i POST http://localhost:8080/payments \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJHNWVXMkZrZXJOWk85MU5NQlE1dk5rQXcyNFVIT09NbHBJUzJrMDFKSnZJIn0.eyJleHAiOjE3NDY4NTAwMjYsImlhdCI6MTc0NjgxNDAyNiwianRpIjoiNGZlMDU1YWYtZTZkMy00MjhlLWJiZmQtMjQ4NjI5ZGMxOGY4IiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgyL3JlYWxtcy9lY29tbWVyY2UtcGxhdGZvcm0iLCJhdWQiOiJhY2NvdW50Iiwic3ViIjoiODAwMmEyMGMtMTRhZi00N2NmLWEzOTQtMjYzODIzZTIwNDk5IiwidHlwIjoiQmVhcmVyIiwiYXpwIjoicGF5bWVudC1zZXJ2aWNlIiwic2Vzc2lvbl9zdGF0ZSI6IjZmMTBjMjk4LTlmZDAtNDY5Ni1iMWM0LWE4NTgwZTBiNWE4ZiIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiLyoiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbInBheW1lbnQ6d3JpdGUiLCJvZmZsaW5lX2FjY2VzcyIsImRlZmF1bHQtcm9sZXMtZWNvbW1lcmNlLXBsYXRmb3JtIiwidW1hX2F1dGhvcml6YXRpb24iXX0sInJlc291cmNlX2FjY2VzcyI6eyJhY2NvdW50Ijp7InJvbGVzIjpbIm1hbmFnZS1hY2NvdW50IiwibWFuYWdlLWFjY291bnQtbGlua3MiLCJ2aWV3LXByb2ZpbGUiXX19LCJzY29wZSI6ImVtYWlsIHByb2ZpbGUiLCJzaWQiOiI2ZjEwYzI5OC05ZmQwLTQ2OTYtYjFjNC1hODU4MGUwYjVhOGYiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibmFtZSI6IkRvZ2FuIENhZ2xhciIsInByZWZlcnJlZF91c2VybmFtZSI6ImRvZ2FuIiwiZ2l2ZW5fbmFtZSI6IkRvZ2FuIiwiZmFtaWx5X25hbWUiOiJDYWdsYXIiLCJlbWFpbCI6ImRjYWdsYXIxOTg3QGdtYWlsLmNvbSJ9.eyrTRQu959qGAiCcIRWuDrucVY8ooos4nZbiq__6-An5YrrJfbGxBqjZtiQuvVwKqRc4KPTip7FSOlV3DQ5XgPyTShDlWpSx2jXUyjSzSk-bhfdXNiliEfS-OB-__zOmQyBUSkY0U3ah3sFuraRb1ullhzJ4VPqArEePKuT3GHcv08ShXCowPPaeZ9rO4PQn2zyP6FEFP1y4gfTX--DnxWEu1IR6u4tCzldk20ij1ucEfH29rnwdKcFeloJ4FeAcsN57cg0P1IDI3ZzJPYCJE2RXwj-8Mt1hzEHo5LEkZf7ngOnZV55Alsp4uNSRYffwl8xZcP58LoJ6Isdpezwlmw" \
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJHNWVXMkZrZXJOWk85MU5NQlE1dk5rQXcyNFVIT09NbHBJUzJrMDFKSnZJIn0.eyJleHAiOjE3NDcyMTcxNzksImlhdCI6MTc0NzE4MTE3OSwianRpIjoiZGQ3NTEzZTQtM2FmOC00YjRmLWIwMjktNGY0NDc2ZTNjMmM2IiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgyL3JlYWxtcy9lY29tbWVyY2UtcGxhdGZvcm0iLCJhdWQiOiJhY2NvdW50Iiwic3ViIjoiODAwMmEyMGMtMTRhZi00N2NmLWEzOTQtMjYzODIzZTIwNDk5IiwidHlwIjoiQmVhcmVyIiwiYXpwIjoicGF5bWVudC1zZXJ2aWNlIiwic2Vzc2lvbl9zdGF0ZSI6IjA4ZTdmYmVlLTM4OTgtNGZmNC1iNDhiLTk3YWYyMDVmZjcyZiIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiLyoiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbInBheW1lbnQ6d3JpdGUiLCJvZmZsaW5lX2FjY2VzcyIsImRlZmF1bHQtcm9sZXMtZWNvbW1lcmNlLXBsYXRmb3JtIiwidW1hX2F1dGhvcml6YXRpb24iXX0sInJlc291cmNlX2FjY2VzcyI6eyJhY2NvdW50Ijp7InJvbGVzIjpbIm1hbmFnZS1hY2NvdW50IiwibWFuYWdlLWFjY291bnQtbGlua3MiLCJ2aWV3LXByb2ZpbGUiXX19LCJzY29wZSI6ImVtYWlsIHByb2ZpbGUiLCJzaWQiOiIwOGU3ZmJlZS0zODk4LTRmZjQtYjQ4Yi05N2FmMjA1ZmY3MmYiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibmFtZSI6IkRvZ2FuIENhZ2xhciIsInByZWZlcnJlZF91c2VybmFtZSI6ImRvZ2FuIiwiZ2l2ZW5fbmFtZSI6IkRvZ2FuIiwiZmFtaWx5X25hbWUiOiJDYWdsYXIiLCJlbWFpbCI6ImRjYWdsYXIxOTg3QGdtYWlsLmNvbSJ9.dlQemSwXd3GK8aYes8_fEBSDeymbXnBticpawD-1lkFjccu9cvV-VoilU_iyLzVvVodvYHZTwJunRBANR7S7MoL-FS9X12dsryf036h-D3Pi2AyDSziDWItb2joclw41Vn1HAQFKKh3HqPJlc78ezCJNhrhWsGAED2I3Qcz-Wa8j1THzZgGmTPef5wK8dLGOAISAVvLB_m9XwncP6zpXN8V13-jptO2k6lYiOoysJjnOYFSF5YJpKLqZa1brXSyxrdodfZp8ViX-a6CConTUThe_CK8vWsHXRWVYmGiJ7vLDHMH9IUVCZd8NQoEyJ-3CsUW4Vxfg-PvYcN1UpSPW9w" \
   -d '{
   "orderId": "ORDER-20240508-XYZ",
   "buyerId": "BUYER-123",
@@ -134,62 +177,18 @@ Log in with:
     }
   ]
 }'
+  
+  
 
-
-
-
-
-# 3. Run DB migrations via Liquibase (done automatically)
-# OR apply manually by connecting to the DB if needed
-
-# 4. Start the Spring Boot app
-$ ./gradlew :customer-service:bootRun
+  
 ```
-
----
-
-## 🐳 Docker Compose Services
-
-- PostgreSQL (port 5432)
-- Kafka (port 9092) + Zookeeper (2181)
-- Keycloak (port 8082)
-
-### 🗝️ Keycloak Setup
-1. Visit: `http://localhost:8081`
-2. Create Realm: `ecommerce-platform`
-3. Create Client: `payment-service`
-    - Type: `confidential`
-    - Auth flow: `standard` with Direct Access Grants enabled
-    - Add `payment:write` role under client
-4. Create User:
-    - Username: dogan / password: password
-    - Assign `payment:write` role
-    - Ensure `email_verified = true`
-
-### 🧪 Get Token
-```bash
- curl -X POST http://localhost:8082/realms/ecommerce-platform/protocol/openid-connect/token \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "client_id=payment-service" \
-  -d "client_secret=rCdBBSxTe7w6P5Ts7CssmvVX37YM9wkf" \
-  -d "grant_type=password" \
-  -d "username=dogan" \
-  -d "password=password"
-```
-
+eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJHNWVXMkZrZXJOWk85MU5NQlE1dk5rQXcyNFVIT09NbHBJUzJrMDFKSnZJIn0.eyJleHAiOjE3NDcxMjMyOTgsImlhdCI6MTc0NzA4NzI5OCwianRpIjoiNjYzYThmYjEtMTNiNi00Zjc1LWJhY2EtODllNWEyZDMzNTg4IiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgyL3JlYWxtcy9lY29tbWVyY2UtcGxhdGZvcm0iLCJhdWQiOiJhY2NvdW50Iiwic3ViIjoiODAwMmEyMGMtMTRhZi00N2NmLWEzOTQtMjYzODIzZTIwNDk5IiwidHlwIjoiQmVhcmVyIiwiYXpwIjoicGF5bWVudC1zZXJ2aWNlIiwic2Vzc2lvbl9zdGF0ZSI6IjFjMDFmNWQ4LTk5OTEtNDAxYi1hMmFhLWQwM2JlZGYzNmMyNyIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiLyoiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbInBheW1lbnQ6d3JpdGUiLCJvZmZsaW5lX2FjY2VzcyIsImRlZmF1bHQtcm9sZXMtZWNvbW1lcmNlLXBsYXRmb3JtIiwidW1hX2F1dGhvcml6YXRpb24iXX0sInJlc291cmNlX2FjY2VzcyI6eyJhY2NvdW50Ijp7InJvbGVzIjpbIm1hbmFnZS1hY2NvdW50IiwibWFuYWdlLWFjY291bnQtbGlua3MiLCJ2aWV3LXByb2ZpbGUiXX19LCJzY29wZSI6ImVtYWlsIHByb2ZpbGUiLCJzaWQiOiIxYzAxZjVkOC05OTkxLTQwMWItYTJhYS1kMDNiZWRmMzZjMjciLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibmFtZSI6IkRvZ2FuIENhZ2xhciIsInByZWZlcnJlZF91c2VybmFtZSI6ImRvZ2FuIiwiZ2l2ZW5fbmFtZSI6IkRvZ2FuIiwiZmFtaWx5X25hbWUiOiJDYWdsYXIiLCJlbWFpbCI6ImRjYWdsYXIxOTg3QGdtYWlsLmNvbSJ9.1wV0YH2d_8Ms1kW-3VSy_5VN3QHQfrz2fhwjf7YJuBmu7YtGXZQN8h4hLIBHeCJVREJJjR5SSsBjjbT7Rj_T8_q-2Mbou8T166tYnvLC-E3DtGO88zyMfxayYu90EwGwRQM32F822kBEumpFxAwv07F7B_SCbEPbU4bE2LxfXlUOKdtR9YJfn2eOwA73dJblE15NZBUBBECDyoFs0u1YBlK30xoM1naM_G32kI0pNWdwqWIlTzUDiLcE7AzSCPbISmfOu6qKYDp4_AD8zzDNlhiiEttz1oOwaii1JA3FjgYJQR9XA6G9h6q1Kw9bvtkICq3DypgdqtxGQwMgfddvBg
 ---
 
 ## 📦 Example API Request
 
 ```bash
-curl -X POST http://localhost:8080/customers \
-  -H "Authorization: Bearer <your_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "firstName": "Ada",
-        "lastName": "Lovelace",
-        "email": "ada@example.com"
-      }'
+
 ```
 
 Returns:

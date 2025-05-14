@@ -5,47 +5,63 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDateTime
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-
 data class PaymentOrderRetryEvent @JsonCreator constructor(
     val paymentOrderId: String,
     val paymentId: String,
     val sellerId: String,
-    val amountValue: java.math.BigDecimal,
+    val amountValue: BigDecimal,
     val currency: String,
     val retryCount: Int,
     val status : String,
     val createdAt: LocalDateTime,
-    val updatedAt : LocalDateTime? = LocalDateTime.now()
+    val updatedAt : LocalDateTime? = LocalDateTime.now(),
+    val retryReason: String? = null,
+    val lastErrorMessage: String? = null
 )
 
 
+
 fun PaymentOrderRetryEvent.toDomain(): PaymentOrder {
-    return PaymentOrder(
+    return toPaymentOrderDomain(
         paymentOrderId = this.paymentOrderId,
         paymentId = this.paymentId,
         sellerId = this.sellerId,
-        amount = Amount(this.amountValue, this.currency),
-        status = PaymentOrderStatus.valueOf(this.status),
+        amountValue = amountValue.setScale(2, RoundingMode.HALF_DOWN),
+        currency = this.currency,
+        status = this.status,
         createdAt=  this.createdAt,
-        updatedAt = LocalDateTime.now()
+        updatedAt = LocalDateTime.now(),
+        retryCount = retryCount
+
     )
 }
 
-fun PaymentOrderRetryEvent.toIncremented(): PaymentOrderRetryEvent {
-    return PaymentOrderRetryEvent(
-        paymentOrderId = this.paymentOrderId,
-        paymentId = this.paymentId,
-        sellerId = this.sellerId,
-        amountValue=this.amountValue,
-        currency = this.currency,
-        createdAt=  this.createdAt,
-        retryCount = this.retryCount+1,
-        status = "FAILED",
 
 
-
+fun toPaymentOrderDomain(
+    paymentOrderId: String,
+    paymentId: String,
+    sellerId: String,
+    amountValue: BigDecimal,
+    currency: String,
+    status: String,
+    createdAt: LocalDateTime,
+    updatedAt: LocalDateTime = LocalDateTime.now(),
+    retryCount: Int
+): PaymentOrder {
+    return PaymentOrder(
+        paymentOrderId = paymentOrderId,
+        paymentId = paymentId,
+        sellerId = sellerId,
+        amount = Amount(amountValue,currency),
+        status = PaymentOrderStatus.valueOf(status),
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        retryCount = retryCount
     )
 }

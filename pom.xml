@@ -19,6 +19,7 @@
         <spring.boot.version>3.2.5</spring.boot.version>
         <spring.kafka.version>3.1.2</spring.kafka.version>
         <postgresql.version>42.7.3</postgresql.version>
+        <redisson.version>3.23.5</redisson.version>
         <liquibase.version>4.26.0</liquibase.version>
     </properties>
 

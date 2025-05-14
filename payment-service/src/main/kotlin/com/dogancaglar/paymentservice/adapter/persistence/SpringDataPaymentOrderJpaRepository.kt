@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.adapter.persistance
+package com.dogancaglar.paymentservice.adapter.persistence
 
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
@@ -41,4 +41,7 @@ interface SpringDataPaymentOrderJpaRepository : JpaRepository<PaymentOrderEntity
         @Param("paymentId") paymentId: String,
         @Param("status") status: String
     ): Boolean
+
+
+    fun save(entity: PaymentOrderEntity): PaymentOrderEntity
 }

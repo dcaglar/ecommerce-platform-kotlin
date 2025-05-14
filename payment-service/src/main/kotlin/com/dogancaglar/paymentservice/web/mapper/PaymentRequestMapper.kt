@@ -1,14 +1,14 @@
 package com.dogancaglar.paymentservice.web.mapper
 
 import com.dogancaglar.paymentservice.domain.model.*
+import com.dogancaglar.paymentservice.web.dto.AmountDto
+import com.dogancaglar.paymentservice.web.dto.CurrencyEnum
 import com.dogancaglar.paymentservice.web.dto.PaymentOrderRequestDTO
 import com.dogancaglar.paymentservice.web.dto.PaymentOrderResponseDTO
 import com.dogancaglar.paymentservice.web.dto.PaymentRequestDTO
 import com.dogancaglar.paymentservice.web.dto.PaymentResponseDTO
-import java.time.Clock
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.util.Currency
 import java.util.UUID
 
 object PaymentRequestMapper {
@@ -54,7 +54,7 @@ object PaymentRequestMapper {
     private fun toDto(order: PaymentOrder): PaymentOrderResponseDTO {
         return PaymentOrderResponseDTO(
             sellerId = order.sellerId,
-            amount = AmountMapper.toDto(order.amount),
+            amount = AmountDto(order.amount.value, CurrencyEnum.valueOf(order.amount.currency))
         )
     }
 

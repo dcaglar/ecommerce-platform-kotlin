@@ -7,7 +7,7 @@ import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.domain.port.OutboxEventRepository
 import com.dogancaglar.paymentservice.domain.port.PaymentOrderRepository
 import com.dogancaglar.paymentservice.domain.port.PaymentRepository
-import com.dogancaglar.paymentservice.domain.event.toCreatedEvent
+import com.dogancaglar.paymentservice.domain.event.mapper.toCreatedEvent
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -30,7 +30,6 @@ class PaymentService(
         paymentRepository.save(payment)
 
         val paymentOrderList = mutableListOf<PaymentOrder>()
-        val failedOrders = mutableListOf<PaymentOrder>()
 
         // Attempt PSP calls for each order
         for (order in payment.paymentOrders) {
@@ -65,9 +64,5 @@ class PaymentService(
         val eventPayLoad = EventEnvelope.wrap(eventType = "payment_order_created", aggregateId = event.paymentOrderId, data = event)
         val json = objectMapper.writeValueAsString(eventPayLoad);
         return OutboxEvent(eventType = "payment_order_created", createdAt = LocalDateTime.now(), status = "NEW", aggregateId = event.paymentOrderId, payload = json)
-    }
-    // This should be replaced with your actual PSP integration
-    private fun callPsp(order: PaymentOrder): Boolean {
-        return UUID.randomUUID().leastSignificantBits % 2 == 0L
     }
 }

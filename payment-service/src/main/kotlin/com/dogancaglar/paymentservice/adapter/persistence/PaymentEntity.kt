@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.adapter.persistance
+package com.dogancaglar.paymentservice.adapter.persistence
 
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import jakarta.persistence.Column

@@ -1,7 +1,7 @@
-package com.dogancaglar.paymentservice.adapter.persistance.mapper
+package com.dogancaglar.paymentservice.adapter.persistence.mapper
 
-import com.dogancaglar.paymentservice.adapter.persistance.PaymentEntity
-import com.dogancaglar.paymentservice.adapter.persistance.PaymentOrderEntity
+import com.dogancaglar.paymentservice.adapter.persistence.PaymentEntity
+import com.dogancaglar.paymentservice.adapter.persistence.PaymentOrderEntity
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus

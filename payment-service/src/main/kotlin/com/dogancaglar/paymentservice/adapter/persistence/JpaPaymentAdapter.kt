@@ -1,6 +1,6 @@
-package com.dogancaglar.paymentservice.adapter.persistance
+package com.dogancaglar.paymentservice.adapter.persistence
 
-import com.dogancaglar.paymentservice.adapter.persistance.mapper.PaymentEntityMapper
+import com.dogancaglar.paymentservice.adapter.persistence.mapper.PaymentEntityMapper
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.port.PaymentRepository
 import org.springframework.stereotype.Repository

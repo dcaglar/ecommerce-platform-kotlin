@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.adapter.persistance
+package com.dogancaglar.paymentservice.adapter.persistence
 
 import jakarta.persistence.*
 import java.time.LocalDateTime
