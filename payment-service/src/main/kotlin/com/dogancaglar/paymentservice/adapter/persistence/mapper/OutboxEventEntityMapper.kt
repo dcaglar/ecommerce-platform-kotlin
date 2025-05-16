@@ -7,7 +7,7 @@ object OutboxEventEntityMapper {
 
     fun toEntity(event: OutboxEvent): OutboxEventEntity {
         return OutboxEventEntity(
-            id = event.id,
+            eventId = event.eventId,
             eventType = event.eventType,
             aggregateId = event.aggregateId,
             payload = event.payload,
@@ -18,7 +18,7 @@ object OutboxEventEntityMapper {
 
     fun toDomain(entity: OutboxEventEntity): OutboxEvent {
         return OutboxEvent(
-            id = entity.id,
+            eventId = entity.eventId,
             eventType = entity.eventType,
             aggregateId = entity.aggregateId,
             payload = entity.payload,

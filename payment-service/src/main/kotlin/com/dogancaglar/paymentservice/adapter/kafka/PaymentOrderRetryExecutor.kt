@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.kafka
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryEvent
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceededEvent
 import com.dogancaglar.paymentservice.domain.event.toDomain
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
@@ -33,16 +33,16 @@ class PaymentOrderRetryExecutor(
     ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    @KafkaListener(topics = ["payment_order_retry"], groupId = "payment-retry-executor-group")
-    @Transactional
-    fun retryProcessPayment(record: ConsumerRecord<String, String>) {
+    @KafkaListener(
+        topics = ["\${kafka.topics.payment-order-retry}"],
+        groupId = "\${kafka.consumer.groupIds.payment-order-retry-requested}",
+        containerFactory = "paymentOrderRetryRequestedKafkaListenerContainerFactory"
+    )
+        @Transactional
+    fun retryProcessPayment(record: ConsumerRecord<String, EventEnvelope<PaymentOrderRetryRequested>>) {
         try {
-            val envelopeType = objectMapper
-                .typeFactory
-                .constructParametricType(EventEnvelope::class.java, PaymentOrderRetryEvent::class.java)
-            val envelope: EventEnvelope<PaymentOrderRetryEvent> =
-                objectMapper.readValue(record.value(), envelopeType)
-
+            val eventId = record.key()
+            val envelope = record.value()
             val event = envelope.data
             val paymentOrder = event.toDomain()
             val response = safePspStatusCall(paymentOrder)
@@ -50,7 +50,7 @@ class PaymentOrderRetryExecutor(
             when (PaymentOrderStatus.valueOf(response.status)) {
                 PaymentOrderStatus.SUCCESSFUL -> {
                     logger.info("${paymentOrder.paymentOrderId} processed successfully")
-                    val successfulOrder = paymentOrder.markAsPaid().incrementRetry()
+                    val successfulOrder = paymentOrder.markAsPaid().withRetryReason(null)
                     paymentOrderRepository.save(successfulOrder)
 
                     paymentEventPublisher.publish(
@@ -101,21 +101,10 @@ class PaymentOrderRetryExecutor(
         } catch (e: Exception) {
             val topic = record.topic()
             val partition = record.partition()
-            logger.error("Exception occurred when consuming record from topic $topic, partition = $partition", e)
-            try {
-                val envelopeType = objectMapper
-                    .typeFactory
-                    .constructParametricType(EventEnvelope::class.java, PaymentOrderRetryEvent::class.java)
-                val envelope: EventEnvelope<PaymentOrderRetryEvent> =
-                     objectMapper.readValue(record.value(), envelopeType)
+            val key = record.key()
+            logger.error("Failed to process payment retry for eventId=$key from topic=$topic partition=$partition", e)
 
-                paymentRetryQueue .scheduleRetry(
-                    envelope.data.paymentOrderId,
-                    calculateBackoffMillis(envelope.data.retryCount)
-                )
-            } catch (ex: Exception) {
-                logger.error("Failed to schedule retry after deserialization failure", ex)
-            }
+            // Optional: add to DLQ, monitoring queue, or emit an alert metric
         }
     }
 

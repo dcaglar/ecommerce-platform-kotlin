@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.adapter.outbox
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.adapter.kafka.PaymentEventPublisher
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreatedEvent
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.port.OutboxEventRepository
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -29,9 +29,9 @@ class OutboxDispatcherScheduler(
             try {
                 val envelopeType = objectMapper
                     .typeFactory
-                    .constructParametricType(EventEnvelope::class.java, PaymentOrderCreatedEvent::class.java)
+                    .constructParametricType(EventEnvelope::class.java, PaymentOrderCreated::class.java)
 
-                val envelope: EventEnvelope<PaymentOrderCreatedEvent> = objectMapper.readValue(outboxEvent.payload,envelopeType)
+                val envelope: EventEnvelope<PaymentOrderCreated> = objectMapper.readValue(outboxEvent.payload,envelopeType)
 
 
                 val event = envelope.data

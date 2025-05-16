@@ -9,7 +9,7 @@ import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class PaymentOrderCreatedEvent @JsonCreator constructor(
+data class PaymentOrderCreated @JsonCreator constructor(
     val paymentOrderId: String = "",
     val paymentId: String = "",
     val sellerId: String = "",
@@ -22,7 +22,7 @@ data class PaymentOrderCreatedEvent @JsonCreator constructor(
 
 )
 
-fun PaymentOrderCreatedEvent.toDomain(): PaymentOrder {
+fun PaymentOrderCreated.toDomain(): PaymentOrder {
     return PaymentOrder(
         paymentOrderId = this.paymentOrderId,
         paymentId = this.paymentId,

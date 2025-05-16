@@ -10,7 +10,7 @@ import java.math.RoundingMode
 import java.time.LocalDateTime
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class PaymentOrderRetryEvent @JsonCreator constructor(
+data class PaymentOrderRetryRequested @JsonCreator constructor(
     val paymentOrderId: String,
     val paymentId: String,
     val sellerId: String,
@@ -26,12 +26,12 @@ data class PaymentOrderRetryEvent @JsonCreator constructor(
 
 
 
-fun PaymentOrderRetryEvent.toDomain(): PaymentOrder {
+fun PaymentOrderRetryRequested.toDomain(): PaymentOrder {
     return toPaymentOrderDomain(
         paymentOrderId = this.paymentOrderId,
         paymentId = this.paymentId,
         sellerId = this.sellerId,
-        amountValue = amountValue.setScale(2, RoundingMode.HALF_DOWN),
+        amountValue = this.amountValue.setScale(2, RoundingMode.HALF_DOWN),
         currency = this.currency,
         status = this.status,
         createdAt=  this.createdAt,

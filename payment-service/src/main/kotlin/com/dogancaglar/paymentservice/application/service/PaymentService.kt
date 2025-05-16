@@ -13,7 +13,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
-import java.util.*
 
 @Service
 class PaymentService(
@@ -31,7 +30,7 @@ class PaymentService(
 
         val paymentOrderList = mutableListOf<PaymentOrder>()
 
-        // Attempt PSP calls for each order
+        // each order is represent on payment request to PSP
         for (order in payment.paymentOrders) {
             try {
                 paymentOrderList.add(order);
@@ -41,7 +40,6 @@ class PaymentService(
 
         }
         paymentOrderRepository.saveAll(paymentOrderList)
-        // Save outbox events for failed orders
         val outboxEvents = buildOutboxEvents(paymentOrderList)
         if (outboxEvents.isNotEmpty()) {
             outboxEventRepository.saveAll(outboxEvents)
@@ -53,16 +51,17 @@ class PaymentService(
     private fun buildOutboxEvents(paymentOrders: List<PaymentOrder>): List<OutboxEvent> {
         val outboxEvents = mutableListOf<OutboxEvent>()
         for (order in paymentOrders) {
-            outboxEvents.add(createOutBoxEvent(order))
+            outboxEvents.add(toOutBoxEvent(order))
         }
         return outboxEvents
     }
 
-    fun createOutBoxEvent( paymentOrder: PaymentOrder) : OutboxEvent{
+    fun toOutBoxEvent(paymentOrder: PaymentOrder) : OutboxEvent{
         // first create PaymentOrderCreatedEvent then make it in an envelop wrap to generic it
         val event = paymentOrder.toCreatedEvent()
         val eventPayLoad = EventEnvelope.wrap(eventType = "payment_order_created", aggregateId = event.paymentOrderId, data = event)
         val json = objectMapper.writeValueAsString(eventPayLoad);
-        return OutboxEvent(eventType = "payment_order_created", createdAt = LocalDateTime.now(), status = "NEW", aggregateId = event.paymentOrderId, payload = json)
+        return OutboxEvent(eventId = eventPayLoad.eventId, eventType = "payment_order_created", createdAt = LocalDateTime.now(), status = "NEW", aggregateId = eventPayLoad.aggregateId, payload = json)
     }
+
 }

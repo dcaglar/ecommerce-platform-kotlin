@@ -1,9 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.kafka
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryQueueAdapter
-import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryStatusAdapter
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreatedEvent
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceededEvent
 import com.dogancaglar.paymentservice.domain.event.toDomain
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
@@ -30,23 +28,25 @@ class PaymentOrderExecutor(
     private val paymentEventPublisher: PaymentEventPublisher,
     @Qualifier("paymentRetryQueue")
     private val paymentRetryQueue: RetryQueuePort,
-    @Qualifier("paymentStatusQueue")
-    private val paymentStatusQueue: RetryQueuePort,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     private val MAX_RETRIES = 5
 
-    @KafkaListener(topics = ["payment_order_created"], groupId = "payment-executor-group")
+    @KafkaListener(
+        topics = ["\${kafka.topics.payment-order-created}"],
+        groupId = "\${kafka.consumer.groupIds.payment-order-created}",
+        containerFactory = "paymentOrderCreatedKafkaListenerContainerFactory"
+    )
     @Transactional
     fun onPaymentOrderCreated(record: ConsumerRecord<String, String>) {
         val envelopeType = objectMapper.typeFactory
-            .constructParametricType(EventEnvelope::class.java, PaymentOrderCreatedEvent::class.java)
+            .constructParametricType(EventEnvelope::class.java, PaymentOrderCreated::class.java)
 
-        val paymentOrderCreatedEvent: EventEnvelope<PaymentOrderCreatedEvent> =
+        val paymentOrderCreatedEvent: EventEnvelope<PaymentOrderCreated> =
             objectMapper.readValue(record.value(), envelopeType)
-        val event: PaymentOrderCreatedEvent = paymentOrderCreatedEvent.data
+        val event: PaymentOrderCreated = paymentOrderCreatedEvent.data
         val order = event.toDomain()
 
         if (order.status != PaymentOrderStatus.INITIATED) return
@@ -98,7 +98,7 @@ class PaymentOrderExecutor(
         paymentOrderRepository.save(failedOrder)
 
         if (failedOrder.retryCount < MAX_RETRIES) {
-            paymentStatusQueue.scheduleRetry(
+            paymentRetryQueue.scheduleRetry(
                 paymentOrderId = failedOrder.paymentOrderId,
                 delayMillis = calculateBackoffMillis(retryCount = failedOrder.retryCount)
             )

@@ -4,7 +4,7 @@ import java.time.LocalDateTime
 import java.util.*
 
 data class OutboxEvent(
-    val id: UUID? = null,
+    val eventId: UUID? = null,
     val eventType: String,
     val aggregateId: String,
     val payload: String,

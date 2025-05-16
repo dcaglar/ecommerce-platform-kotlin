@@ -26,9 +26,23 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: http://localhost:8082/realms/ecommerce-platform
-
   kafka:
     bootstrap-servers: localhost:9092
+    topics:
+      payment-order-created: payment_order_created_topic
+      payment-order-retry-requested: payment_order_retry_topic
+      delay-scheduling: delay_scheduling_topic
+      payment-status-check-requested: payment_status_check_topic
+      payment-succeeded: payment_succeeded_topic
+
+    consumer:
+      groupIds:
+        payment-order-created: payment-order-executor
+        payment-order-retry-requested: payment-order-retry-executor
+        payment-status-check-requested: payment-status-check-executor
+        payment-succeeded: payment-successful-processor
+
+
 
 payment-service:
   api-key: secretpaymentapikey12345

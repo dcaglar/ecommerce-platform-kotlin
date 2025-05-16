@@ -1,14 +1,12 @@
 package com.dogancaglar.paymentservice.domain.event.mapper
 
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreatedEvent
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryEvent
-import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import java.time.LocalDateTime
 
-fun PaymentOrder.toCreatedEvent(): PaymentOrderCreatedEvent {
-    return PaymentOrderCreatedEvent(
+fun PaymentOrder.toCreatedEvent(): PaymentOrderCreated {
+    return PaymentOrderCreated(
         paymentOrderId = this.paymentOrderId,
         paymentId = this.paymentId,
         sellerId = this.sellerId,
@@ -20,8 +18,8 @@ fun PaymentOrder.toCreatedEvent(): PaymentOrderCreatedEvent {
     )
 }
 
-    fun PaymentOrder.toRetryEvent(retryReason:String?="Unknown reason",lastErrorMessage:String?="no error message"): PaymentOrderRetryEvent {
-        return PaymentOrderRetryEvent(
+    fun PaymentOrder.toRetryEvent(retryReason:String?="Unknown reason",lastErrorMessage:String?="no error message"): PaymentOrderRetryRequested {
+        return PaymentOrderRetryRequested(
             paymentOrderId = this.paymentOrderId,
             paymentId = this.paymentId,
             sellerId = this.sellerId,

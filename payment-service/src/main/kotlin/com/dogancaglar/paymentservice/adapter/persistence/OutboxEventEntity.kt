@@ -8,8 +8,7 @@ import java.util.*
 @Table(name = "outbox_event")
 class OutboxEventEntity(
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    val id: UUID? = null,
+    val eventId: UUID? = null,
 
     @Column(name = "event_type", nullable = false)
     val eventType: String,

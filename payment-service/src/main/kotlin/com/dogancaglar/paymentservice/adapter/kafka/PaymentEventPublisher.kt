@@ -28,5 +28,25 @@ class PaymentEventPublisher(
             throw RuntimeException("Failed to publish event to Kafka", e)
         }
     }
+/*
+    fun <T> publish(topic: String, aggregateId: String, eventType: String, data: T): EventEnvelope<T> {
+        val envelope = EventEnvelope.wrap(
+            eventType = eventType,
+            aggregateId = aggregateId,
+            data = data
+        )
 
+        try {
+            val json = objectMapper.writeValueAsString(envelope)
+            kafkaTemplate.send(topic, aggregateId, json)
+            logger.info("Published event to topic=$topic, key=$aggregateId, eventId=${envelope.eventId}, type=$eventType")
+        } catch (e: Exception) {
+            logger.error("Failed to publish event to topic=$topic, key=$aggregateId", e)
+            throw RuntimeException("Failed to publish event to Kafka", e)
+        }
+
+        return envelope
+    }
+*/
 }
+
