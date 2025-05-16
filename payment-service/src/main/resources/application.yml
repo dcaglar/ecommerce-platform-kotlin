@@ -1,9 +1,13 @@
 server:
   port: 8080
 spring:
+  kafka:
+      consumer:
+          key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+          value-deserializer: com.dogancaglar.paymentservice.adapter.kafka.EventEnvelopeDeserializer
   liquibase:
     change-log: classpath:db/changelog/changelog-master.xml
-  -datasource:
+  datasource:
     url: jdbc:postgresql://localhost:5434/payment
     username: payment
     password: payment
@@ -26,23 +30,21 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: http://localhost:8082/realms/ecommerce-platform
-  kafka:
-    bootstrap-servers: localhost:9092
-    topics:
-      payment-order-created: payment_order_created_topic
-      payment-order-retry-requested: payment_order_retry_topic
-      delay-scheduling: delay_scheduling_topic
-      payment-status-check-requested: payment_status_check_topic
-      payment-succeeded: payment_succeeded_topic
-
-    consumer:
-      groupIds:
-        payment-order-created: payment-order-executor
-        payment-order-retry-requested: payment-order-retry-executor
-        payment-status-check-requested: payment-status-check-executor
-        payment-succeeded: payment-successful-processor
-
-
+kafka:
+  bootstrap-servers: localhost:9092
+  dynamic-consumers:
+    - id: payment-retry-executor
+      topic: payment_order_retry_request_topic
+      group-id: payment-retry-executor-group
+      class-name: com.dogancaglar.paymentservice.adapter.kafka.PaymentRetryExecutor
+    - id: payment-order-executor
+      topic: payment_order_created
+      group-id: payment-order-group
+      class-name: com.dogancaglar.paymentservice.adapter.kafka.PaymentOrderExecutor
+    - id: payment-status-executor
+      topic: delay_scheduling_topic
+      group-id: payment-status-executor-group
+      class-name: com.dogancaglar.paymentservice.adapter.kafka.PaymentStatusDelayedQueueExecutor
 
 payment-service:
   api-key: secretpaymentapikey12345

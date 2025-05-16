@@ -8,6 +8,7 @@ import java.util.*
 @Table(name = "outbox_event")
 class OutboxEventEntity(
     @Id
+    @Column(name = "id", columnDefinition = "UUID", nullable = false)
     val eventId: UUID? = null,
 
     @Column(name = "event_type", nullable = false)

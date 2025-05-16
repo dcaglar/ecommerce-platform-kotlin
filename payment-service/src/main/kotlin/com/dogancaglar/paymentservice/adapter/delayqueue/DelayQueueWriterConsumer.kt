@@ -1,7 +1,7 @@
+
 package com.dogancaglar.paymentservice.adapter.delayqueue
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.config.KafkaTopicsProperties
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderStatusCheckRequested
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -13,10 +13,9 @@ import org.springframework.stereotype.Component
 class DelayQueueWriterConsumer(
     private val objectMapper: ObjectMapper,
     private val delayQueueAdapter: JpaDelayQueueAdapter,
-    private val kafkaTopics: KafkaTopicsProperties
 ) {
 
-    @KafkaListener(topics = ["delay-scheduling-topic"])
+    //@KafkaListener(topics = ["delay-scheduling-topic"])
     fun onDelayEvent(record: ConsumerRecord<String, String>) {
         val payload = record.value()
         //paymentORderId
@@ -33,13 +32,11 @@ class DelayQueueWriterConsumer(
         }
 
         delayQueueAdapter.persist(
-            topic = "payment-status-check-topic",
+            topic = "delay_scheduling_topic",
             key = key,
             payload = payload,
             sendAfterMillis = delayMillis
         )
     }
 }
-
-
 

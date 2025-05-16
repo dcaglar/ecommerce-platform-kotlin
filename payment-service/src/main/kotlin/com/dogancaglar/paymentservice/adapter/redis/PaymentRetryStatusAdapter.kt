@@ -5,7 +5,7 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
 
-@Component("paymentStatusQueue")
+@Component("paymentRetryStatusAdapter")
 open class PaymentRetryStatusAdapter(private val redisTemplate: StringRedisTemplate) : RetryQueuePort {
     private val queue = "payment_status_queue"
 

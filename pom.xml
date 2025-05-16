@@ -21,7 +21,6 @@
         <postgresql.version>42.7.3</postgresql.version>
         <redisson.version>3.23.5</redisson.version>
         <liquibase.version>4.26.0</liquibase.version>
-        <temporal.version>1.23.0</temporal.version>
     </properties>
 
     <dependencyManagement>
@@ -38,17 +37,6 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-starter-security</artifactId>
                 <version>${spring.boot.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>io.temporal</groupId>
-                <artifactId>temporal-spring-boot-starter-alpha</artifactId>
-                <version>${temporal.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.temporal</groupId>
-                <artifactId>temporal-sdk</artifactId>
-                <version>1.23.0</version>
             </dependency>
 
             <!-- Spring Kafka -->

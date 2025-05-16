@@ -18,7 +18,6 @@ class PaymentEventPublisher(
             aggregateId = aggregateId,
             data = data // <-- keep this as the raw object
         )
-          envelope.data
         try {
             logger.info("Event JSON: $envelope")
             kafkaTemplate.send(topic, aggregateId, objectMapper.writeValueAsString(envelope))

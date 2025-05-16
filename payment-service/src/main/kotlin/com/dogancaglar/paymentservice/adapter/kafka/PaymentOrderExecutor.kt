@@ -1,8 +1,7 @@
-package com.dogancaglar.paymentservice.adapter.kafka
-
 import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.paymentservice.adapter.kafka.PaymentEventPublisher
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceededEvent
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
 import com.dogancaglar.paymentservice.domain.event.toDomain
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
@@ -11,44 +10,29 @@ import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import com.dogancaglar.paymentservice.psp.PSPClient
 import com.dogancaglar.paymentservice.psp.PSPResponse
 import com.dogancaglar.paymentservice.psp.PSPStatusMapper
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.kafka.annotation.KafkaListener
-import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
-@Service
+@Component
 class PaymentOrderExecutor(
-    private val paymentOrderRepository: PaymentOrderRepository,
-    private val pspClient: PSPClient,
-    private val paymentEventPublisher: PaymentEventPublisher,
-    @Qualifier("paymentRetryQueue")
-    private val paymentRetryQueue: RetryQueuePort,
-    private val objectMapper: ObjectMapper,
-) {
+            private val paymentOrderRepository: PaymentOrderRepository,
+          @Qualifier("paymentRetryQueueAdapter") val paymentRetryQueueAdapter:RetryQueuePort,
+            val pspClient: PSPClient,
+            val paymentEventPublisher: PaymentEventPublisher){
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    private val MAX_RETRIES = 5
+    fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderCreated>>) {
+        val event = record.value()
+        logger.info("Received payment order created request: $event")
 
-    @KafkaListener(
-        topics = ["\${kafka.topics.payment-order-created}"],
-        groupId = "\${kafka.consumer.groupIds.payment-order-created}",
-        containerFactory = "paymentOrderCreatedKafkaListenerContainerFactory"
-    )
-    @Transactional
-    fun onPaymentOrderCreated(record: ConsumerRecord<String, String>) {
-        val envelopeType = objectMapper.typeFactory
-            .constructParametricType(EventEnvelope::class.java, PaymentOrderCreated::class.java)
-
-        val paymentOrderCreatedEvent: EventEnvelope<PaymentOrderCreated> =
-            objectMapper.readValue(record.value(), envelopeType)
-        val event: PaymentOrderCreated = paymentOrderCreatedEvent.data
-        val order = event.toDomain()
-
+        val key = record.key()
+        val envelope : EventEnvelope<PaymentOrderCreated> = record.value()
+        val paymentOrderCreatedEvent = envelope.data
+        val order = paymentOrderCreatedEvent.toDomain()
         if (order.status != PaymentOrderStatus.INITIATED) return
         try {
             val response = safePspCall(order)
@@ -61,22 +45,21 @@ class PaymentOrderExecutor(
                 PSPStatusMapper.isRetryable(mappedStatus) -> {
                     handleFailure(order, "Retryable status from PSP: $mappedStatus")
                 } else -> {
-                    handleNonRetryable(order,mappedStatus)
-                }
+                handleNonRetryable(order,mappedStatus)
+            }
 
             }
         } catch (e: Exception) {
             logger.error("Failed to process payment_order_created:,retrying ${e.message}", e)
             val updatedOrder = order.markAsFailed().incrementRetry();
             paymentOrderRepository.save(updatedOrder)
-            paymentRetryQueue.scheduleRetry(
+            paymentRetryQueueAdapter.scheduleRetry(
                 paymentOrderId = updatedOrder.paymentOrderId,
                 calculateBackoffMillis(updatedOrder.retryCount)
             )
         }
-
+        // handle logic...
     }
-
     private fun handleSuccess(order: PaymentOrder) {
         val updatedOrder = order.markAsPaid()
         paymentOrderRepository.save(updatedOrder)
@@ -84,7 +67,7 @@ class PaymentOrderExecutor(
             topic = "payment_order_success",
             aggregateId = updatedOrder.paymentOrderId,
             eventType = "payment_order_success",
-            data = PaymentOrderSucceededEvent(
+            data = PaymentOrderSucceeded(
                 paymentOrderId = updatedOrder.paymentOrderId,
                 sellerId = updatedOrder.sellerId,
                 amountValue = updatedOrder.amount.value,
@@ -97,8 +80,8 @@ class PaymentOrderExecutor(
         val failedOrder = order.markAsFailed().incrementRetry().withRetryReason(reason)
         paymentOrderRepository.save(failedOrder)
 
-        if (failedOrder.retryCount < MAX_RETRIES) {
-            paymentRetryQueue.scheduleRetry(
+        if (failedOrder.retryCount < 5) {
+            paymentRetryQueueAdapter.scheduleRetry(
                 paymentOrderId = failedOrder.paymentOrderId,
                 delayMillis = calculateBackoffMillis(retryCount = failedOrder.retryCount)
             )
@@ -127,5 +110,4 @@ class PaymentOrderExecutor(
         }.get(3, TimeUnit.SECONDS)
         // This should be replaced with your actual PSP integration
     }
-
 }

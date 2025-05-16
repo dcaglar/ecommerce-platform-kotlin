@@ -5,7 +5,7 @@ import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
 
 
-@Component("paymentRetryQueue")
+@Component("paymentRetryQueueAdapter")
 open class PaymentRetryQueueAdapter(private val redisTemplate: StringRedisTemplate) : RetryQueuePort {
     private val queue = "payment_retry_queue"
     override fun scheduleRetry(paymentOrderId: String, delayMillis: Long) {

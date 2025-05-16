@@ -11,7 +11,7 @@ import org.springframework.security.web.SecurityFilterChain
 @Configuration
 @EnableWebSecurity
 class SecurityConfig {
-
+/*
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         http
@@ -23,7 +23,20 @@ class SecurityConfig {
             }
 
         return http.build()
+    }*/
+
+    @Bean
+    fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
+        http
+            .authorizeHttpRequests { it.anyRequest().permitAll() }
+            .csrf { it.disable() }
+            .cors { it.disable() }
+            .httpBasic { it.disable() }
+            .formLogin { it.disable() }
+            .oauth2ResourceServer { it.disable() } // If you use Bearer tokens
+        return http.build()
     }
+
 
     private fun keycloakJwtAuthenticationConverter(): JwtAuthenticationConverter {
         val converter = JwtAuthenticationConverter()
