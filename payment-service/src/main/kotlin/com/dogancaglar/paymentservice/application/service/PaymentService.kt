@@ -10,6 +10,7 @@ import com.dogancaglar.paymentservice.domain.port.PaymentRepository
 import com.dogancaglar.paymentservice.domain.event.mapper.toCreatedEvent
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
@@ -19,6 +20,7 @@ class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val paymentOrderRepository: PaymentOrderRepository,
     private val outboxEventRepository: OutboxEventRepository,
+    @Qualifier("myObjectMapper")
     private val objectMapper: ObjectMapper
 ) {
     private val logger = LoggerFactory.getLogger(PaymentService::class.java)

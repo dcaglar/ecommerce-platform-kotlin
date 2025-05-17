@@ -1,41 +1,29 @@
 package com.dogancaglar.paymentservice.adapter.kafka
 
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryRequested
-
-
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderStatusCheckRequested
+import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import org.apache.kafka.common.header.Headers
 import org.apache.kafka.common.serialization.Deserializer
+import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.stereotype.Component
 
 class EventEnvelopeDeserializer : Deserializer<EventEnvelope<*>> {
 
-    private val objectMapper = ObjectMapper()
 
-    private val topicTypeMap = mapOf(
-        "payment_order_created" to object : TypeReference<EventEnvelope<PaymentOrderCreated>>() {},
-        "payment_order_retry_request_topic" to object : TypeReference<EventEnvelope<PaymentOrderRetryRequested>>() {},
-        "delay_scheduling_topic" to object : TypeReference<EventEnvelope<PaymentOrderStatusCheckRequested>>() {},
-        )
-    /*
-    dynamic-consumers:
-    - id: payment-retry-executor
-      topic: payment_order_retry_request_topic
-      group-id: payment-retry-executor-group
-      class-name: com.dogancaglar.paymentservice.adapter.kafka.PaymentRetryExecutor
-    - id: payment-order-executor
-      topic: payment_order_created
-      group-id: payment-order-group
-      class-name: com.dogancaglar.paymentservice.adapter.kafka.PaymentOrderExecutor
-    - id: payment-status-executor
-      topic: delay_scheduling_topic
-      group-id: payment-status-executor-group
-      class-name: com.dogancaglar.paymentservice.adapter.kafka.PaymentStatusDelayedQueueExecutor
-payment-service:
-     */
+    val objectMapper = ObjectMapper()
+        .registerModule(JavaTimeModule()).registerKotlinModule()
+        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+
+    private val topicTypeMap: Map<String, TypeReference<out EventEnvelope<*>>> =
+        EventMetadatas.all.associate { it.topic to it.typeRef }
+
 
     override fun deserialize(topic: String?, data: ByteArray?): EventEnvelope<*>? {
         return deserialize(topic, null, data)
@@ -45,12 +33,10 @@ payment-service:
         if (data == null || data.isEmpty()) return null
 
         val typeRef = topicTypeMap[topic]
-            ?: throw IllegalArgumentException("No type mapping found for topic: $topic")
+            ?: throw IllegalArgumentException("No EventMetadata mapping found for topic: $topic")
 
         return objectMapper.readValue(data, typeRef)
     }
 
-    override fun close() {
-        // no-op
-    }
+    override fun close() {}
 }

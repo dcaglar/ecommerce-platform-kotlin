@@ -36,15 +36,27 @@ kafka:
     - id: payment-retry-executor
       topic: payment_order_retry_request_topic
       group-id: payment-retry-executor-group
-      class-name: com.dogancaglar.paymentservice.adapter.kafka.PaymentRetryExecutor
+      class-name: com.dogancaglar.paymentservice.adapter.kafka.PaymentOrderRetryCommandExecutor
     - id: payment-order-executor
       topic: payment_order_created
       group-id: payment-order-group
       class-name: com.dogancaglar.paymentservice.adapter.kafka.PaymentOrderExecutor
     - id: payment-status-executor
-      topic: delay_scheduling_topic
+      topic: scheduled_status_check
       group-id: payment-status-executor-group
-      class-name: com.dogancaglar.paymentservice.adapter.kafka.PaymentStatusDelayedQueueExecutor
-
+      class-name: com.dogancaglar.paymentservice.adapter.kafka.PaymentOrderStatusCheckScheduler
+    - id: payment-status-checker
+      topic: payment_status_check
+      group-id: payment-status-check-executor-group
+      class-name: com.dogancaglar.paymentservice.adapter.kafka.ScheduledPaymentStatusCheckExecutor
+psp:
+  simulation:
+    timeouts:
+      enabled: true
+      probability: 30 # in percent
+    latency:
+      fast: 30       # % 500–1500ms
+      moderate: 40   # % 1500–3000ms
+      slow: 30       # % 3000–6000ms
 payment-service:
   api-key: secretpaymentapikey12345

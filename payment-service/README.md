@@ -185,25 +185,64 @@ $ ./gradlew :customer-service:bootRun
 eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJHNWVXMkZrZXJOWk85MU5NQlE1dk5rQXcyNFVIT09NbHBJUzJrMDFKSnZJIn0.eyJleHAiOjE3NDcxMjMyOTgsImlhdCI6MTc0NzA4NzI5OCwianRpIjoiNjYzYThmYjEtMTNiNi00Zjc1LWJhY2EtODllNWEyZDMzNTg4IiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgyL3JlYWxtcy9lY29tbWVyY2UtcGxhdGZvcm0iLCJhdWQiOiJhY2NvdW50Iiwic3ViIjoiODAwMmEyMGMtMTRhZi00N2NmLWEzOTQtMjYzODIzZTIwNDk5IiwidHlwIjoiQmVhcmVyIiwiYXpwIjoicGF5bWVudC1zZXJ2aWNlIiwic2Vzc2lvbl9zdGF0ZSI6IjFjMDFmNWQ4LTk5OTEtNDAxYi1hMmFhLWQwM2JlZGYzNmMyNyIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiLyoiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbInBheW1lbnQ6d3JpdGUiLCJvZmZsaW5lX2FjY2VzcyIsImRlZmF1bHQtcm9sZXMtZWNvbW1lcmNlLXBsYXRmb3JtIiwidW1hX2F1dGhvcml6YXRpb24iXX0sInJlc291cmNlX2FjY2VzcyI6eyJhY2NvdW50Ijp7InJvbGVzIjpbIm1hbmFnZS1hY2NvdW50IiwibWFuYWdlLWFjY291bnQtbGlua3MiLCJ2aWV3LXByb2ZpbGUiXX19LCJzY29wZSI6ImVtYWlsIHByb2ZpbGUiLCJzaWQiOiIxYzAxZjVkOC05OTkxLTQwMWItYTJhYS1kMDNiZWRmMzZjMjciLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibmFtZSI6IkRvZ2FuIENhZ2xhciIsInByZWZlcnJlZF91c2VybmFtZSI6ImRvZ2FuIiwiZ2l2ZW5fbmFtZSI6IkRvZ2FuIiwiZmFtaWx5X25hbWUiOiJDYWdsYXIiLCJlbWFpbCI6ImRjYWdsYXIxOTg3QGdtYWlsLmNvbSJ9.1wV0YH2d_8Ms1kW-3VSy_5VN3QHQfrz2fhwjf7YJuBmu7YtGXZQN8h4hLIBHeCJVREJJjR5SSsBjjbT7Rj_T8_q-2Mbou8T166tYnvLC-E3DtGO88zyMfxayYu90EwGwRQM32F822kBEumpFxAwv07F7B_SCbEPbU4bE2LxfXlUOKdtR9YJfn2eOwA73dJblE15NZBUBBECDyoFs0u1YBlK30xoM1naM_G32kI0pNWdwqWIlTzUDiLcE7AzSCPbISmfOu6qKYDp4_AD8zzDNlhiiEttz1oOwaii1JA3FjgYJQR9XA6G9h6q1Kw9bvtkICq3DypgdqtxGQwMgfddvBg
 ---
 
-## 📦 Example API Request
-
+## 📦 Connect kafka and see the consumer
+if you want to see currentofset and last offset
+```bash
+kafka-consumer-groups \
+  --bootstrap-server localhost:9092 \
+  --describe \
+  --group payment-status-check-executor-group
+  
+  
+  kafka-consumer-groups \
+  --bootstrap-server localhost:9092 \
+  --describe \
+  --group payment-order-group
+  
+    kafka-consumer-groups \
+  --bootstrap-server localhost:9092 \
+  --describe \
+  --group payment-retry-executor-group
+  
+      kafka-consumer-groups \
+  --bootstrap-server localhost:9092 \
+  --describe \
+  --group payment-status-executor-group
+  
+```
+if you want to skip corrupt messages
 ```bash
 
+kafka-consumer-groups \
+--bootstrap-server localhost:9092 \
+--group payment-order-group \
+--topic payment_order_created \
+--reset-offsets --to-latest --execute
+
+kafka-consumer-groups \
+--bootstrap-server localhost:9092 \
+--group payment-retry-executor-group \
+--topic payment_order_retry_request_topic \
+--reset-offsets --to-latest --execute
+
+
+kafka-consumer-groups \
+--bootstrap-server localhost:9092 \
+--group payment-status-executor-group \
+--topic scheduled_status_check \
+--reset-offsets --to-latest --execute
+
+
+
+kafka-consumer-groups \
+--bootstrap-server localhost:9092 \
+--group payment-status-check-executor-group \
+--topic payment_status_check \
+--reset-offsets --to-latest --execute
 ```
-
 Returns:
-```json
-HTTP/1.1 201 Created
-Location: /customers/{uuid}
-{
-  "id": "...",
-  "firstName": "Ada",
-  "lastName": "Lovelace",
-  "email": "ada@example.com",
-  "status": "PENDING"
-}
 
-DATABASE ACCESS
+DATABASE ACCESSE
 This connects inside the running payment-postgres container and opens a psql session using the payment user and database without having anything postgre
 docker exec -it payment-postgres psql -U payment -d payment
 

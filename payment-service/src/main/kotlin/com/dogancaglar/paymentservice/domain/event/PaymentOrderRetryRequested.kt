@@ -41,9 +41,7 @@ fun PaymentOrderRetryRequested.toDomain(): PaymentOrder {
     )
 }
 
-
-
-fun toPaymentOrderDomain(
+private fun toPaymentOrderDomain(
     paymentOrderId: String,
     paymentId: String,
     sellerId: String,

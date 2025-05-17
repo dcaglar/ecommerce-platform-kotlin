@@ -1,7 +1,10 @@
 package com.dogancaglar.paymentservice.adapter.redis
 
 import com.dogancaglar.paymentservice.adapter.kafka.PaymentEventPublisher
+import com.dogancaglar.paymentservice.domain.event.EventMetadatas
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderStatusCheckRequested
 import com.dogancaglar.paymentservice.domain.event.mapper.toRetryEvent
+import com.dogancaglar.paymentservice.domain.event.toRetryStatusEvent
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.port.PaymentOrderRepository
 import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
@@ -13,12 +16,13 @@ import org.springframework.stereotype.Component
 
 @Component
 class RetryDispatcherScheduler(
-    @Qualifier("paymentRetryQueue")
+    @Qualifier("paymentRetryAdapter")
     private val paymentRetryQueue: RetryQueuePort,
-    @Qualifier("paymentStatusQueue")
+    @Qualifier("paymentRetryStatusAdapter")
     private val  paymentStatusQueue: RetryQueuePort,
     private val paymentOrderRepository: PaymentOrderRepository,
     private val paymentEventPublisher: PaymentEventPublisher,
+    @Qualifier("myObjectMapper")
     private val objectMapper: ObjectMapper
 ) {
 
@@ -31,12 +35,11 @@ class RetryDispatcherScheduler(
         for (paymentOrderId in dueOrderIds) {
             val order = paymentOrderRepository.findById(paymentOrderId)
             if (!shouldRetry(order!!)) continue
-
+            logger.info("Will deserialize the ${objectMapper.writeValueAsString(order)}")
             val paymentOrderRetryEvent = order.toRetryEvent()
             paymentEventPublisher.publish(
-                topic = "payment_order_retry",
                 aggregateId = paymentOrderId,
-                eventType = "payment_order_retry",
+                event = EventMetadatas.PaymentOrderRetryRequestedMetadata,
                 data = paymentOrderRetryEvent
             )
         }
@@ -45,12 +48,11 @@ class RetryDispatcherScheduler(
             val order = paymentOrderRepository.findById(paymentOrderId)
             if (!shouldRetry(order!!)) continue
 
-            val paymentOrderRetryEvent = order.toRetryEvent()
+            val paymentOrderStatusCheckRequested = order.toRetryStatusEvent()
             paymentEventPublisher.publish(
-                topic = "payment_order_retry",
                 aggregateId = paymentOrderId,
-                eventType = "payment_order_retry",
-                data = paymentOrderRetryEvent
+                event = EventMetadatas.PaymentOrderStatusCheckRequestedMetadata,
+                data = paymentOrderStatusCheckRequested
             )
         }
     }

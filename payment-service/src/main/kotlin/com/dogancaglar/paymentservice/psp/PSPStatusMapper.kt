@@ -12,18 +12,23 @@ object PSPStatusMapper {
         "DECLINED"           -> PaymentOrderStatus.DECLINED
         "INSUFFICIENT_FUNDS" -> PaymentOrderStatus.DECLINED
         "PENDING"            -> PaymentOrderStatus.PENDING
-        "SUCCESS"            -> PaymentOrderStatus.SUCCESSFUL
+        "SUCCESSFUL"            -> PaymentOrderStatus.SUCCESSFUL
         else                 -> PaymentOrderStatus.UNKNOWN
     }
+    fun requiresRetryPayment(status: PaymentOrderStatus): Boolean { return status in retryPaymentStatus}
 
-    private val retryableStatuses = setOf(
+    fun requiresStatusCheck(status: PaymentOrderStatus): Boolean {
+        return status in scheduleCheckPaymentStatus
+    }
+}
+
+private val retryPaymentStatus = setOf(
         PaymentOrderStatus.DECLINED,
-        PaymentOrderStatus.PENDING,
-        PaymentOrderStatus.AUTH_NEEDED
     )
 
-    fun isRetryable(status: PaymentOrderStatus): Boolean = status in retryableStatuses
-
-    fun requiresStatusCheck(status: PaymentOrderStatus): Boolean =
-        status == PaymentOrderStatus.CAPTURE_PENDING
-}
+private val scheduleCheckPaymentStatus = setOf(
+    PaymentOrderStatus.INSUFFICIENT_FUNDS,
+    PaymentOrderStatus.AUTH_NEEDED,
+    PaymentOrderStatus.CAPTURE_PENDING,
+    PaymentOrderStatus.PENDING
+)

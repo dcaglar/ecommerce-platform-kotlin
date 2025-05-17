@@ -25,23 +25,25 @@ data class PaymentOrder(
     fun markAsFailed(): PaymentOrder =
         this.copy(status = PaymentOrderStatus.DECLINED)
 
+    fun markAsPending(): PaymentOrder =
+        this.copy(status = PaymentOrderStatus.PENDING)
+
     fun markAsFinalizedFailed(): PaymentOrder =
-        this.copy(status = PaymentOrderStatus.DECLINED)
+        this.copy(status = PaymentOrderStatus.FINALIZE_FAILED)
 
 
 
     fun incrementRetry(): PaymentOrder =
         this.copy(retryCount = retryCount+1)
 
-    fun withLastError(message: String?): PaymentOrder {
-        this.lastErrorMessage = message
-        return this
-    }
+    fun withLastError(message: String?): PaymentOrder =
+        this.copy(lastErrorMessage = message)
 
-    fun withRetryReason(message: String?): PaymentOrder {
-        this.retryReason = message
-        return this
-    }
+    fun withRetryReason(message: String?): PaymentOrder =
+        this.copy(retryReason = message)
+
+    fun updatedAt(updateAt : LocalDateTime): PaymentOrder =
+        this.copy(updatedAt = updateAt)
 
 
     fun hasExceededMaxRetries(  maxRetries :Int = 5): Boolean =  this.retryCount>=5

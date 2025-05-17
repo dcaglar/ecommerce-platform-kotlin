@@ -34,8 +34,17 @@ class KafkaTypedConsumerFactoryConfig(
         return createTypedFactory(PaymentOrderRetryRequested::class.java)
     }
 
+    @Bean("scheduled_status_check-factory")
+    fun paymentScheduledStatusFactory(): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderStatusCheckRequested>> {
+        return createTypedFactory(PaymentOrderStatusCheckRequested::class.java)
+    }
     @Bean("delay_scheduling_topic-factory")
     fun paymentStatusScheduledFactory(): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderStatusCheckRequested>> {
+        return createTypedFactory(PaymentOrderStatusCheckRequested::class.java)
+    }
+
+    @Bean("payment_status_check-factory")
+    fun paymenttatuscCheckFactory(): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderStatusCheckRequested>> {
         return createTypedFactory(PaymentOrderStatusCheckRequested::class.java)
     }
 
