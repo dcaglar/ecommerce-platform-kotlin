@@ -1,10 +1,10 @@
-package com.dogancaglar.paymentservice.config
+package com.dogancaglar.paymentservice.config.messaging
 
 import org.springframework.boot.context.properties.ConfigurationProperties
 
 @ConfigurationProperties(prefix = "kafka")
-class KafkaProperties { // ✅ <-- Add this line
-    lateinit var bootstrapServers: String // ✅ Add this line
+class KafkaProperties {
+    lateinit var bootstrapServers: String
     var dynamicConsumers: List<DynamicConsumer> = emptyList()
     class DynamicConsumer {
         lateinit var id: String

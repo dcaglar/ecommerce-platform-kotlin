@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.redis
 
-import com.dogancaglar.paymentservice.adapter.kafka.PaymentEventPublisher
+import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderStatusCheckRequested
 import com.dogancaglar.paymentservice.domain.event.mapper.toRetryEvent
@@ -35,7 +35,7 @@ class RetryDispatcherScheduler(
         for (paymentOrderId in dueOrderIds) {
             val order = paymentOrderRepository.findById(paymentOrderId)
             if (!shouldRetry(order!!)) continue
-            logger.info("Will deserialize the ${objectMapper.writeValueAsString(order)}")
+            logger.info("Dispatcher alize the ${objectMapper.writeValueAsString(order)}")
             val paymentOrderRetryEvent = order.toRetryEvent()
             paymentEventPublisher.publish(
                 aggregateId = paymentOrderId,

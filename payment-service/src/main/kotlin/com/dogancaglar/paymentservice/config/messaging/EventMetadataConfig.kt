@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.config
+package com.dogancaglar.paymentservice.config.messaging
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas

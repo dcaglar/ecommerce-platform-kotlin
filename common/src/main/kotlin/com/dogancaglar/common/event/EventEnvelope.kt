@@ -19,14 +19,22 @@ data class EventEnvelope<T> @JsonCreator(mode = JsonCreator.Mode.PROPERTIES) con
     val data: T,
 
     @JsonProperty("timestamp")
-    val timestamp: LocalDateTime = LocalDateTime.now()
+    val timestamp: LocalDateTime = LocalDateTime.now(),
+
+    @JsonProperty("traceId")
+    val traceId : String?=null,
+
+    @JsonProperty("traceId")
+    val parentEventId : UUID?=null
 ) {
     companion object {
-        fun <T> wrap(eventType: String, aggregateId: String, data: T): EventEnvelope<T> {
+        fun <T> wrap(eventType: String, aggregateId: String, data: T,traceId: String?=null,parentEventId: UUID?=null): EventEnvelope<T> {
             return EventEnvelope(
                 eventType = eventType,
                 aggregateId = aggregateId,
-                data = data
+                data = data,
+                traceId = traceId ?: UUID.randomUUID().toString(),
+                parentEventId = parentEventId
             )
         }
     }

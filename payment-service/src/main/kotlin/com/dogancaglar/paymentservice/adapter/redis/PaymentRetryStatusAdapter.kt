@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.redis
 
-import com.dogancaglar.paymentservice.adapter.kafka.PaymentEventPublisher
+import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
 import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.data.redis.core.StringRedisTemplate

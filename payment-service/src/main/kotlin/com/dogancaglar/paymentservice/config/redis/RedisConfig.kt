@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.config
+package com.dogancaglar.paymentservice.config.redis
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration

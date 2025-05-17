@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.adapter.kafka
+package com.dogancaglar.paymentservice.config.serialization
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
@@ -9,10 +9,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import org.apache.kafka.common.header.Headers
 import org.apache.kafka.common.serialization.Deserializer
-import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.stereotype.Component
+import kotlin.collections.get
 
 class EventEnvelopeDeserializer : Deserializer<EventEnvelope<*>> {
 

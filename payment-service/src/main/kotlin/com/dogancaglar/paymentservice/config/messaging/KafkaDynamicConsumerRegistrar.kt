@@ -1,14 +1,12 @@
-package com.dogancaglar.paymentservice.adapter.kafka.config
+package com.dogancaglar.paymentservice.config.messaging
 
-
-import com.dogancaglar.paymentservice.config.KafkaProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Configuration
 import org.springframework.kafka.annotation.KafkaListenerConfigurer
+import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.kafka.config.KafkaListenerEndpointRegistrar
 import org.springframework.kafka.config.MethodKafkaListenerEndpoint
-import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.messaging.handler.annotation.support.DefaultMessageHandlerMethodFactory
 
 @Configuration

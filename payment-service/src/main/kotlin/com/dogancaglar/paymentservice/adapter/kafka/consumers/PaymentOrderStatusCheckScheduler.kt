@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.adapter.kafka
+package com.dogancaglar.paymentservice.adapter.kafka.consumers
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.adapter.delayqueue.JpaDelayQueueAdapter
@@ -7,6 +7,7 @@ import com.dogancaglar.paymentservice.domain.event.toDomain
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
+import org.slf4j.MDC
 import org.springframework.stereotype.Component
 
 @Component
@@ -29,6 +30,6 @@ class PaymentOrderStatusCheckScheduler(private val delayQueueAdapter: JpaDelayQu
             payload =objectMapper.writeValueAsString(envelope),
             sendAfterMillis = delayMillis
         )
-        // handle logic...
+        MDC.put("traceId", record.value().traceId)
     }
 }

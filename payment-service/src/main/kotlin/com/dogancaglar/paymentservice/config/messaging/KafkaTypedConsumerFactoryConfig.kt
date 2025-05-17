@@ -1,8 +1,7 @@
-package com.dogancaglar.paymentservice.adapter.kafka.config
+package com.dogancaglar.paymentservice.config.messaging
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.adapter.kafka.EventEnvelopeDeserializer
-import com.dogancaglar.paymentservice.config.KafkaProperties
+import com.dogancaglar.paymentservice.config.serialization.EventEnvelopeDeserializer
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderStatusCheckRequested

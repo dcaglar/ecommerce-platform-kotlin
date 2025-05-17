@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.delayqueue
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.adapter.kafka.PaymentEventPublisher
+import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderStatusCheckRequested
 import com.fasterxml.jackson.databind.ObjectMapper

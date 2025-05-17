@@ -4,7 +4,7 @@ spring:
   kafka:
       consumer:
           key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-          value-deserializer: com.dogancaglar.paymentservice.adapter.kafka.EventEnvelopeDeserializer
+          value-deserializer: com.dogancaglar.paymentservice.config.serialization.EventEnvelopeDeserializer
   liquibase:
     change-log: classpath:db/changelog/changelog-master.xml
   datasource:
@@ -36,19 +36,19 @@ kafka:
     - id: payment-retry-executor
       topic: payment_order_retry_request_topic
       group-id: payment-retry-executor-group
-      class-name: com.dogancaglar.paymentservice.adapter.kafka.PaymentOrderRetryCommandExecutor
+      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderRetryCommandExecutor
     - id: payment-order-executor
       topic: payment_order_created
       group-id: payment-order-group
-      class-name: com.dogancaglar.paymentservice.adapter.kafka.PaymentOrderExecutor
+      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderExecutor
     - id: payment-status-executor
       topic: scheduled_status_check
       group-id: payment-status-executor-group
-      class-name: com.dogancaglar.paymentservice.adapter.kafka.PaymentOrderStatusCheckScheduler
+      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderStatusCheckScheduler
     - id: payment-status-checker
       topic: payment_status_check
       group-id: payment-status-check-executor-group
-      class-name: com.dogancaglar.paymentservice.adapter.kafka.ScheduledPaymentStatusCheckExecutor
+      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.ScheduledPaymentStatusCheckExecutor
 psp:
   simulation:
     timeouts:

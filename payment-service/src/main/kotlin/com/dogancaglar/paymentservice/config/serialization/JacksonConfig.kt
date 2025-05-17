@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.config
+package com.dogancaglar.paymentservice.config.serialization
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
@@ -7,6 +7,7 @@ import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+
 @Configuration
 class JacksonConfig {
     private val logger = LoggerFactory.getLogger(javaClass)
