@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="2025-05-17T2230-add-retry-fields" author="dogancaglar">
+        <addColumn tableName="payment_orders">
+            <column name="retry_reason" type="varchar(255)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="last_error_message" type="varchar(255)" defaultValue="">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <rollback>
+            <dropColumn tableName="payment_orders" columnName="retry_reason"/>
+            <dropColumn tableName="payment_orders" columnName="last_error_message"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

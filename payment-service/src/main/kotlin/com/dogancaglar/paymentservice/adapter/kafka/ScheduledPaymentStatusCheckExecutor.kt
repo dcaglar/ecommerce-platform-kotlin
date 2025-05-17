@@ -44,7 +44,7 @@ class ScheduledPaymentStatusCheckExecutor(
                 PaymentOrderStatus.PENDING,
                 PaymentOrderStatus.CAPTURE_PENDING -> {
                     paymentOrder.markAsPending().incrementRetry().updatedAt(LocalDateTime.now())
-                    logger.info("${paymentOrderStatusCheck.paymentOrderId} still pending, consider re-scheduling (not done here)")
+                    logger.info("${paymentOrderStatusCheck.paymentOrderId} still pending, re-scheduling")
                     paymentRetryStatusAdapter.scheduleRetry(paymentOrder.paymentOrderId,0)
                 }
 

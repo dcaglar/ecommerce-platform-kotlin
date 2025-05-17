@@ -10,19 +10,23 @@ object PaymentOrderEntityMapper {
 
     fun toEntity(domain: PaymentOrder): PaymentOrderEntity {
         return PaymentOrderEntity(
+            paymentOrderId = domain.paymentOrderId,
             sellerId = domain.sellerId,
             amountValue = domain.amount.value,
             amountCurrency = domain.amount.currency,
             status = domain.status.name,
+            retryCount = domain.retryCount,
+            retryReason = domain.retryReason,
+            lastErrorMessage = domain.lastErrorMessage ?: "",
             createdAt = domain.createdAt,
-            payment =  PaymentEntity(paymentId = domain.paymentId),
-            paymentOrderId = domain.paymentOrderId
+            updatedAt = domain.updatedAt,
+            payment = PaymentEntity(paymentId = domain.paymentId)
         )
     }
 
     fun toDomain(entity: PaymentOrderEntity): PaymentOrder {
         return PaymentOrder(
-            paymentOrderId = entity.paymentOrderId ?: throw IllegalStateException("PaymentOrderEntity ID is null"),
+            paymentOrderId = entity.paymentOrderId,
             paymentId = entity.payment.paymentId,
             sellerId = entity.sellerId,
             amount = Amount(
@@ -30,7 +34,11 @@ object PaymentOrderEntityMapper {
                 currency = entity.amountCurrency
             ),
             status = PaymentOrderStatus.valueOf(entity.status),
-            createdAt = entity.createdAt
+            createdAt = entity.createdAt,
+            updatedAt = entity.updatedAt,
+            retryCount = entity.retryCount,
+            retryReason = entity.retryReason,
+            lastErrorMessage = entity.lastErrorMessage
         )
     }
 }

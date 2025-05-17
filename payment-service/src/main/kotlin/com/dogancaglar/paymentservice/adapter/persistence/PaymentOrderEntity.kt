@@ -33,6 +33,11 @@ data class PaymentOrderEntity(
     @Column(nullable = false)
     val updatedAt: java.time.LocalDateTime?= LocalDateTime.now(),
 
+    @Column(name = "retry_reason")
+    val retryReason :String?="",
+    @Column(name = "last_error_message")
+    val lastErrorMessage :String="",
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "payment_id", referencedColumnName = "payment_id", nullable = false)
     val payment: PaymentEntity
