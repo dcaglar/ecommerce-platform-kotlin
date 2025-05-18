@@ -26,4 +26,18 @@
         <dropTable tableName="scheduled_payment_order_request_repository"/>
     </rollback>
 </changeSet>
+
+    <changeSet id="20240519-change-payload-to-text" author="dogancaglar">
+        <modifyDataType
+                tableName="scheduled_payment_order_request_repository"
+                columnName="payload"
+                newDataType="text"/>
+
+        <rollback>
+            <modifyDataType
+                    tableName="scheduled_payment_order_request_repository"
+                    columnName="payload"
+                    newDataType="jsonb"/>
+        </rollback>
+    </changeSet>
 </databaseChangeLog>

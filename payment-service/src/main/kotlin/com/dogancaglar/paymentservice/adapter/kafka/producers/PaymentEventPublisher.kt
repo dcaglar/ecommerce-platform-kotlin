@@ -51,7 +51,7 @@ class PaymentEventPublisher(
             val json = objectMapper.writeValueAsString(envelope)
             kafkaTemplate.send(event.topic, aggregateId, json)
             logger.info(
-                "📦 Published event to topic='${event.topic}', key='$aggregateId', type='${event.eventType}', traceId='${envelope.traceId}'"
+                "📦 Published event to topic='${event.topic}', key='$aggregateId', type='${event.eventType}', traceId='${envelope.traceId}', parentEventId=${envelope.parentEventId}"
             )
             return envelope;
         } catch (e: Exception) {

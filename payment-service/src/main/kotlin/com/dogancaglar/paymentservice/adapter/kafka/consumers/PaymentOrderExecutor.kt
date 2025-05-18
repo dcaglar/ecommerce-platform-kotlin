@@ -118,14 +118,14 @@ class PaymentOrderExecutor(
             LocalDateTime.now()
         )
         paymentOrderRepository.save(failedOrder)
-            paymentRetryStatusAdapter.scheduleRetry(failedOrder)
-            val paymentOrderStatusScheduled = failedOrder.toPaymentOrderStatusScheduled(reason,error)
-            paymentEventPublisher.publish(event = EventMetadatas.PaymentOrderStatusCheckScheduledMetadata,
-                aggregateId = failedOrder.paymentOrderId,
-                data = paymentOrderStatusScheduled,
-                parentEnvelope =parentEventEnvelope
-            )
-            logger.warn("🔁 Rescheduling order=${failedOrder.paymentOrderId} (retry=${failedOrder.retryCount}) reason=$reason, lastError=$error")
+        paymentRetryStatusAdapter.scheduleRetry(failedOrder)
+        val paymentOrderStatusScheduled = failedOrder.toPaymentOrderStatusScheduled(reason, error)
+        paymentEventPublisher.publish(
+            event = EventMetadatas.PaymentOrderStatusCheckScheduledMetadata,
+            aggregateId = failedOrder.paymentOrderId,
+            data = paymentOrderStatusScheduled,
+            parentEnvelope = parentEventEnvelope
+        )
     }
 
 

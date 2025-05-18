@@ -41,21 +41,23 @@ open class PaymentRetryStatusAdapter(private val redisTemplate: StringRedisTempl
 
 
     override fun pollDueRetries(): List<EventEnvelope<ScheduledPaymentOrderStatusRequest>> {
-        val now = System.currentTimeMillis().toDouble()
-        val dueItems = redisTemplate.opsForZSet().rangeByScore(queue, 0.0, now)
+        val envelopes = mutableListOf<EventEnvelope<ScheduledPaymentOrderStatusRequest>>()
 
-        val dueEnvelops = dueItems?.mapNotNull { json ->
-            try {
-                // Deserializing the full EventEnvelope
-                val envelope: EventEnvelope<ScheduledPaymentOrderStatusRequest> =
-                    objectMapper.readValue(json, object : TypeReference<EventEnvelope<ScheduledPaymentOrderStatusRequest>>() {})
-                redisTemplate.opsForZSet().remove(queue, json)
-                envelope // You return only the domain event
-            } catch (e: Exception) {
-                // Optionally log and skip corrupted entries
-                null
+        repeat(50) {
+            val json = redisTemplate.opsForList().rightPop(queue)
+            if (json != null) {
+                try {
+                    val envelope: EventEnvelope<ScheduledPaymentOrderStatusRequest> =
+                        objectMapper.readValue(json, object : TypeReference<EventEnvelope<ScheduledPaymentOrderStatusRequest>>() {})
+                    envelopes.add(envelope)
+                } catch (e: Exception) {
+                    logger.warn("❌ Failed to parse ScheduledPaymentOrderStatusRequest envelope: ${e.message}")
+                }
+            } else {
+                return@repeat // no more items
             }
-        } ?: emptyList()
-        return dueEnvelops
+        }
+
+        return envelopes
     }
 }

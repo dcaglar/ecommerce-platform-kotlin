@@ -22,9 +22,12 @@ class ScheduledPaymentOrderStatusService(
 
 
     fun persist(scheduledPaymentStatusEnvelopeList: List<EventEnvelope<ScheduledPaymentOrderStatusRequest>>, delayMillis: Long) {
-
-        val result = scheduledPaymentStatusEnvelopeList.map { e -> scheduledPaymentOrderRequestMapper.toEntity(objectMapper.writeValueAsString(e),1800) }
-
+        val result = scheduledPaymentStatusEnvelopeList.map { e -> e.data
+            scheduledPaymentOrderRequestMapper.toEntity(objectMapper.writeValueAsString(e),900)
+        }
+        result.stream().map {
+            System.out.println("$it.createdAt +  $it.sendAfter" )
+        }
         scheduledPaymentOrderRequestRepository.saveAll(result)
     }
 }

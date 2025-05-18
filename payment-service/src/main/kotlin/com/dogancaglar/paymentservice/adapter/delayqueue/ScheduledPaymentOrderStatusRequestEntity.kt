@@ -12,7 +12,7 @@ data class ScheduledPaymentOrderStatusRequestEntity(
     val id: String=UUID.randomUUID().toString(),
 
 
-    @Column(columnDefinition = "jsonb")
+    @Column(name = "payload",columnDefinition = "TEXT")
     val payload: String,
 
     @Column(name = "send_after")

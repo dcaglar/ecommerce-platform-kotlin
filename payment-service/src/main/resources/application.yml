@@ -60,3 +60,5 @@ psp:
       slow: 30       # % 3000–6000ms
 payment-service:
   api-key: secretpaymentapikey12345
+spring.jackson.time-zone: Europe/Amsterdam
+spring.jpa.properties.hibernate.jdbc.time_zone: UTC

@@ -10,6 +10,7 @@ import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.Deserializer
 import org.apache.kafka.common.serialization.StringDeserializer
+import org.springframework.boot.CommandLineRunner
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -17,6 +18,7 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory
 import org.springframework.messaging.converter.MappingJackson2MessageConverter
 import org.springframework.messaging.handler.annotation.support.DefaultMessageHandlerMethodFactory
+import java.util.TimeZone
 import java.util.function.Supplier
 
 @Configuration
@@ -28,6 +30,11 @@ class KafkaTypedConsumerFactoryConfig(
     @Bean("payment_order_created_queue-factory")
     fun paymentOrderCreatedFactory(): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderCreated>> {
         return createTypedFactory(PaymentOrderCreated::class.java)
+    }
+
+    @Bean
+    fun timeZoneConfigurer(): CommandLineRunner = CommandLineRunner {
+        TimeZone.setDefault(TimeZone.getTimeZone("Europe/Amsterdam"))
     }
 
     @Bean("payment_order_retry_request_topic-factory")
