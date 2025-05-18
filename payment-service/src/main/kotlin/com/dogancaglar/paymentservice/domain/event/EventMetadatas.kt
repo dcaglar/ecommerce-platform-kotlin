@@ -37,6 +37,13 @@ object EventMetadatas {
         override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderStatusCheckRequested>>() {}
     }
 
+    object PaymentOrderSuccededMetaData : EventMetadata<PaymentOrderSucceeded> {
+        override val topic = "payment_order_created"
+        override val eventType = "payment_order_created"
+        override val clazz = PaymentOrderSucceeded::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderSucceeded>>() {}
+    }
+
     val all: List<EventMetadata<*>> = listOf(
         PaymentOrderCreatedMetadata,
         PaymentOrderRetryRequestedMetadata,

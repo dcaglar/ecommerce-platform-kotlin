@@ -4,7 +4,9 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
+import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
 import com.dogancaglar.paymentservice.domain.event.toDomain
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
@@ -37,9 +39,7 @@ class PaymentOrderExecutor(
         val envelope = record.value()
         LogContext.with(envelope){
             MDC.put(LogFields.TOPIC_NAME,record.topic())
-            MDC.put(LogFields.CONSUMER_GROUP,record.topic())
             MDC.put(LogFields.PAYMENT_ORDER_ID,envelope.data.paymentOrderId)
-
             logger.info("▶️ [Handle Start] Processing PaymentOrderCreated")
             val paymentOrderCreatedEvent = envelope.data
             val order = paymentOrderCreatedEvent.toDomain()
@@ -52,7 +52,7 @@ class PaymentOrderExecutor(
                     logger.info("✅ PSP call returned status=$response for paymentOrderId=${order.paymentOrderId}")
                     when {
                         response == PaymentOrderStatus.SUCCESSFUL -> {
-                            handleSuccess(order.markAsPaid())
+                            handleSuccess(envelope,order.markAsPaid())
                         }
 
                         PSPStatusMapper.requiresRetryPayment(response) -> {
@@ -77,14 +77,29 @@ class PaymentOrderExecutor(
                 } catch (e: Exception) {
                     logger.error("❌ Unexpected error processing orderId=${order.paymentOrderId}, retrying...: ${e.message}", e)
                     handleRetryPayment(order, e.message, e.message)
+                } finally {
+                MDC.clear()
                 }
             }
 
     }
 
-    private fun handleSuccess(order: PaymentOrder) {
-        val updatedOrder = order.markAsPaid()
-        paymentOrderRepository.save(updatedOrder)
+    private fun handleSuccess(envelope: EventEnvelope<PaymentOrderCreated>, order: PaymentOrder) {
+            val updatedOrder = order.markAsPaid()
+            paymentOrderRepository.save(updatedOrder)
+            paymentEventPublisher.publish(
+                event = EventMetadatas.PaymentOrderSuccededMetaData,
+                aggregateId = updatedOrder.paymentOrderId,
+                data = PaymentOrderSucceeded(
+                    paymentOrderId = updatedOrder.paymentOrderId,
+                    sellerId = updatedOrder.sellerId,
+                    amountValue = updatedOrder.amount.value,
+                    currency = updatedOrder.amount.currency
+                ),
+                parentEnvelope = envelope
+            )
+
+
         logger.info("🎉 Payment succeeded and saved: paymentOrderId=${order.paymentOrderId}")
         //todo do not push yet.then weiwill add eventmetatada
     }

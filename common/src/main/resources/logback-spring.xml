@@ -1,35 +1,30 @@
-<configuration scan="true">
-    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
-    <property name="LOG_PATH" value="logs"/>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
 
-    <appender name="JSON_FILE" class="net.logstash.logback.appender.LoggingEventCompositeJsonEncoderAppender">
-        <file>${LOG_PATH}/payment-service.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_PATH}/payment-service.%d{yyyy-MM-dd}.log</fileNamePattern>
-            <maxHistory>30</maxHistory>
-        </rollingPolicy>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
             <providers>
                 <timestamp>
-                    <timeZone>UTC</timeZone>
+                    <fieldName>timestamp</fieldName>
+                    <pattern>yyyy-MM-dd'T'HH:mm:ss.SSSZ</pattern>
                 </timestamp>
-                <pattern>
-                    <pattern>
-                        {
-                          "level": "%level",
-                          "thread": "%thread",
-                          "logger": "%logger",
-                          "message": "%message",
-                          "context": "%mdc",
-                          "stack_trace": "%exception"
-                        }
-                    </pattern>
-                </pattern>
+                <logLevel>
+                    <fieldName>level</fieldName>
+                </logLevel>
+                <loggerName>
+                    <fieldName>logger</fieldName>
+                </loggerName>
+                <threadName>
+                    <fieldName>thread</fieldName>
+                </threadName>
+                <message/>
+                <mdc/>
+                <stackTrace/>
             </providers>
         </encoder>
     </appender>
 
     <root level="INFO">
-        <appender-ref ref="JSON_FILE"/>
+        <appender-ref ref="CONSOLE"/>
     </root>
 </configuration>

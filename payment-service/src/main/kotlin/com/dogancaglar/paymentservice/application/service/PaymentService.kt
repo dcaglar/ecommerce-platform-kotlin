@@ -61,7 +61,14 @@ class PaymentService(
     fun toOutBoxEvent(paymentOrder: PaymentOrder) : OutboxEvent{
         // first create PaymentOrderCreatedEvent then make it in an envelop wrap to generic it
         val event = paymentOrder.toCreatedEvent()
-        val eventPayLoad = EventEnvelope.wrap(eventType = "payment_order_created", aggregateId = event.paymentOrderId, data = event)
+        /*
+         eventType: String,
+        aggregateId: String,
+        data: T,
+        traceId: String? = null,
+        parentEventId: UUID? = null
+         */
+        val eventPayLoad = EventEnvelope.wrap(eventType = "payment_order_created", aggregateId = paymentOrder.paymentOrderId, data = event)
         val json = objectMapper.writeValueAsString(eventPayLoad);
         return OutboxEvent(eventId = eventPayLoad.eventId, eventType = "payment_order_created", createdAt = LocalDateTime.now(), status = "NEW", aggregateId = eventPayLoad.aggregateId, payload = json)
     }

@@ -25,8 +25,8 @@ data class PaymentOrderCreated @JsonCreator constructor(
 
 fun PaymentOrderCreated.toDomain(): PaymentOrder {
     return PaymentOrder(
-        paymentOrderId = this.paymentOrderId,
-        paymentId = this.paymentId,
+        paymentOrderId = this.paymentOrderId!!,
+        paymentId = this.paymentId!!,
         sellerId = this.sellerId,
         amount = Amount(this.amountValue, this.currency),
         status = PaymentOrderStatus.INITIATED,

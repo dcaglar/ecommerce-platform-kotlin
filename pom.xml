@@ -21,6 +21,8 @@
         <postgresql.version>42.7.3</postgresql.version>
         <redisson.version>3.23.5</redisson.version>
         <liquibase.version>4.26.0</liquibase.version>
+        <logstash.version>7.4</logstash.version>
+        <spring.logging>7.4</spring.logging>
     </properties>
 
     <dependencyManagement>
@@ -86,6 +88,16 @@
                 <groupId>org.jetbrains.kotlin</groupId>
                 <artifactId>kotlin-spring</artifactId>
                 <version>${kotlin.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.logstash.logback</groupId>
+                <artifactId>logstash-logback-encoder</artifactId>
+                <version>${logstash.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-logging</artifactId>
+                <version>3.2.1</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

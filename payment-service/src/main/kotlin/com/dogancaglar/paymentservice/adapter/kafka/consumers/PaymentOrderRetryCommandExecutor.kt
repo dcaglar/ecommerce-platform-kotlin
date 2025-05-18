@@ -76,6 +76,8 @@ class PaymentOrderRetryCommandExecutor(private val paymentOrderRepository: Payme
                     )
 
                     // Optional: add to DLQ, monitoring queue, or emit an alert metric
+                } finally {
+                    MDC.clear()
                 }
 
             }
