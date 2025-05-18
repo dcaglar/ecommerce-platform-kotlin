@@ -98,7 +98,7 @@ class PaymentOrderExecutor(
             paymentOrderRepository.save(updatedOrder)
         val publishedEvent = paymentEventPublisher.publish(
                 event = EventMetadatas.PaymentOrderSuccededMetaData,
-                aggregateId = MDC.get(LogFields.AGGREGATE_ID),
+                aggregateId = updatedOrder.paymentOrderId,
                 data = PaymentOrderSucceeded(
                     paymentOrderId = updatedOrder.paymentOrderId,
                     sellerId = updatedOrder.sellerId,
@@ -118,7 +118,6 @@ class PaymentOrderExecutor(
             LocalDateTime.now()
         )
         paymentOrderRepository.save(failedOrder)
-        if (failedOrder.retryCount < 5) {
             paymentRetryStatusAdapter.scheduleRetry(failedOrder)
             val paymentOrderStatusScheduled = failedOrder.toPaymentOrderStatusScheduled(reason,error)
             paymentEventPublisher.publish(event = EventMetadatas.PaymentOrderStatusCheckScheduledMetadata,
@@ -126,12 +125,7 @@ class PaymentOrderExecutor(
                 data = paymentOrderStatusScheduled,
                 parentEnvelope =parentEventEnvelope
             )
-            //publish payment_not_succesful_event
-
-            logger.warn("🔁 Retrying order=${failedOrder.paymentOrderId} (retry=${failedOrder.retryCount}): reason=$reason")
-        } else {
-            logger.error("🚫 Max retries exceeded during retry payment for order=${failedOrder.paymentOrderId}")
-        }
+            logger.warn("🔁 Rescheduling order=${failedOrder.paymentOrderId} (retry=${failedOrder.retryCount}) reason=$reason, lastError=$error")
     }
 
 
@@ -149,8 +143,9 @@ class PaymentOrderExecutor(
                 data = retryPaymentEvent,
                 parentEnvelope =parentEnvelope
             )
-            logger.warn("Scheduled retry for ${failedOrder.paymentOrderId} (retry ${failedOrder.retryCount}): $reason")
-        } else {
+            logger.warn("🔁 Retrry payment  order=${failedOrder.paymentOrderId} (retry=${failedOrder.retryCount}) reason=$reason, lastError=$error")
+        }
+        else {
             logger.error("Max retries exceeded for ${failedOrder.paymentOrderId}. Marking as failed permanently.")
         }
     }
