@@ -11,6 +11,7 @@ import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
 import com.dogancaglar.paymentservice.domain.event.ScheduledPaymentOrderStatusRequest
+import com.dogancaglar.paymentservice.domain.event.mapper.toRetryEvent
 import com.dogancaglar.paymentservice.domain.event.toDomain
 import com.dogancaglar.paymentservice.domain.event.toPaymentOrderStatusScheduled
 import com.dogancaglar.paymentservice.domain.event.toSchedulePaymentOrderStatusEvent
@@ -65,7 +66,7 @@ class PaymentOrderExecutor(
                         }
                         //TODO PAYMENT_NOT__SCUCESFUL_EVENT PUBLISH
                         PSPStatusMapper.requiresRetryPayment(response) -> {
-                            handleRetryPayment(order, reason = "Retryable status from PSP: $response")
+                            handleRetryPayment(envelope,order, reason = "Retryable status from PSP: $response")
 
                         }
 
@@ -83,10 +84,10 @@ class PaymentOrderExecutor(
                     }
                 } catch (e: TimeoutException) {
                     logger.error("⏱️ PSP call timed out for orderId=${order.paymentOrderId}, retrying...", e)
-                    handleRetryPayment(order, "TIMEOUT", e.message)
+                    handleRetryPayment(envelope,order, "TIMEOUT", e.message)
                 } catch (e: Exception) {
                     logger.error("❌ Unexpected error processing orderId=${order.paymentOrderId}, retrying...: ${e.message}", e)
-                    handleRetryPayment(order, e.message, e.message)
+                    handleRetryPayment(envelope,order, e.message, e.message)
                 }
             }
 
@@ -134,7 +135,7 @@ class PaymentOrderExecutor(
     }
 
 
-    private fun handleRetryPayment(order: PaymentOrder, reason: String? = "", error: String? = "") {
+    private fun handleRetryPayment(parentEnvelope : EventEnvelope<PaymentOrderCreated> ,order: PaymentOrder, reason: String? = "", error: String? = "") {
         val failedOrder = order.markAsFailed().incrementRetry().withRetryReason(reason).withLastError(error).updatedAt(
             LocalDateTime.now()
         )
@@ -142,7 +143,12 @@ class PaymentOrderExecutor(
         if (failedOrder.retryCount < 5) {
             paymentRetryPaymentAdapter.scheduleRetry(failedOrder)
             //publish payment_not_succesful_event or retried event
-            val schedulePaymentEvent = failedOrder.toSchedulePaymentOrderStatusEvent()
+            val retryPaymentEvent = failedOrder.toRetryEvent()
+            paymentEventPublisher.publish(event = EventMetadatas.PaymentOrderRetryRequestedMetadata,
+                aggregateId = failedOrder.paymentOrderId,
+                data = retryPaymentEvent,
+                parentEnvelope =parentEnvelope
+            )
             logger.warn("Scheduled retry for ${failedOrder.paymentOrderId} (retry ${failedOrder.retryCount}): $reason")
         } else {
             logger.error("Max retries exceeded for ${failedOrder.paymentOrderId}. Marking as failed permanently.")
