@@ -4,10 +4,16 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
+import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryPaymentAdapter
+import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryStatusAdapter
+import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
+import com.dogancaglar.paymentservice.domain.event.ScheduledPaymentOrderStatusRequest
 import com.dogancaglar.paymentservice.domain.event.toDomain
+import com.dogancaglar.paymentservice.domain.event.toPaymentOrderStatusScheduled
+import com.dogancaglar.paymentservice.domain.event.toSchedulePaymentOrderStatusEvent
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.port.PaymentOrderRepository
@@ -28,7 +34,9 @@ import java.util.concurrent.TimeoutException
 @Component
 class PaymentOrderExecutor(
     private val paymentOrderRepository: PaymentOrderRepository,
-    @Qualifier("paymentRetryAdapter") val paymentRetryQueueAdapter: RetryQueuePort,
+    @Qualifier("paymentRetryStatusAdapter")
+    val paymentRetryStatusAdapter: RetryQueuePort<ScheduledPaymentOrderStatusRequest>,
+    @Qualifier("paymentRetryPaymentAdapter") val paymentRetryPaymentAdapter: RetryQueuePort<PaymentOrderRetryRequested>,
     val pspClient: PSPClient,
     val paymentEventPublisher: PaymentEventPublisher
 ) {
@@ -40,6 +48,7 @@ class PaymentOrderExecutor(
         LogContext.with(envelope){
             MDC.put(LogFields.TOPIC_NAME,record.topic())
             MDC.put(LogFields.PAYMENT_ORDER_ID,envelope.data.paymentOrderId)
+            MDC.put(LogFields.CONSUMER_GROUP,"payment-order-executor")
             logger.info("▶️ [Handle Start] Processing PaymentOrderCreated")
             val paymentOrderCreatedEvent = envelope.data
             val order = paymentOrderCreatedEvent.toDomain()
@@ -54,14 +63,15 @@ class PaymentOrderExecutor(
                         response == PaymentOrderStatus.SUCCESSFUL -> {
                             handleSuccess(envelope,order.markAsPaid())
                         }
-
+                        //TODO PAYMENT_NOT__SCUCESFUL_EVENT PUBLISH
                         PSPStatusMapper.requiresRetryPayment(response) -> {
                             handleRetryPayment(order, reason = "Retryable status from PSP: $response")
+
                         }
 
                         PSPStatusMapper.requiresStatusCheck(response) -> {
-                            handleSchedulePaymentStatusCheck(
-                                order,
+                            handleSchedulePaymentStatusCheck(parentEventEnvelope = envelope,
+                                order=order,
                                 reason = "Scheduling a   status check from PSP: $response"
                             )
                         }
@@ -77,8 +87,6 @@ class PaymentOrderExecutor(
                 } catch (e: Exception) {
                     logger.error("❌ Unexpected error processing orderId=${order.paymentOrderId}, retrying...: ${e.message}", e)
                     handleRetryPayment(order, e.message, e.message)
-                } finally {
-                MDC.clear()
                 }
             }
 
@@ -87,30 +95,38 @@ class PaymentOrderExecutor(
     private fun handleSuccess(envelope: EventEnvelope<PaymentOrderCreated>, order: PaymentOrder) {
             val updatedOrder = order.markAsPaid()
             paymentOrderRepository.save(updatedOrder)
-            paymentEventPublisher.publish(
+        val publishedEvent = paymentEventPublisher.publish(
                 event = EventMetadatas.PaymentOrderSuccededMetaData,
-                aggregateId = updatedOrder.paymentOrderId,
+                aggregateId = MDC.get(LogFields.AGGREGATE_ID),
                 data = PaymentOrderSucceeded(
                     paymentOrderId = updatedOrder.paymentOrderId,
                     sellerId = updatedOrder.sellerId,
                     amountValue = updatedOrder.amount.value,
                     currency = updatedOrder.amount.currency
                 ),
-                parentEnvelope = envelope
+                parentEnvelope = envelope,
             )
 
 
-        logger.info("🎉 Payment succeeded and saved: paymentOrderId=${order.paymentOrderId}")
-        //todo do not push yet.then weiwill add eventmetatada
+        logger.info("📨 Emitted follow-up event with ID=${publishedEvent.eventId}")        //todo do not push yet.then weiwill add eventmetatada
     }
 
-    private fun handleSchedulePaymentStatusCheck(order: PaymentOrder, reason: String? = "", error: String? = "") {
+    private fun handleSchedulePaymentStatusCheck(parentEventEnvelope: EventEnvelope<PaymentOrderCreated>,order: PaymentOrder, reason: String? = "", error: String? = "") {
+        //prepre schedul request for future but emit PAyment_Scheduled with parent payment_request
         val failedOrder = order.markAsFailed().incrementRetry().withRetryReason(reason).withLastError(error).updatedAt(
             LocalDateTime.now()
         )
         paymentOrderRepository.save(failedOrder)
         if (failedOrder.retryCount < 5) {
-            paymentRetryQueueAdapter.scheduleRetry(order.paymentOrderId, order.retryCount)
+            paymentRetryStatusAdapter.scheduleRetry(failedOrder)
+            val paymentOrderStatusScheduled = failedOrder.toPaymentOrderStatusScheduled(reason,error)
+            paymentEventPublisher.publish(event = EventMetadatas.PaymentOrderStatusCheckScheduledMetadata,
+                aggregateId = failedOrder.paymentOrderId,
+                data = paymentOrderStatusScheduled,
+                parentEnvelope =parentEventEnvelope
+            )
+            //publish payment_not_succesful_event
+
             logger.warn("🔁 Retrying order=${failedOrder.paymentOrderId} (retry=${failedOrder.retryCount}): reason=$reason")
         } else {
             logger.error("🚫 Max retries exceeded during retry payment for order=${failedOrder.paymentOrderId}")
@@ -124,7 +140,9 @@ class PaymentOrderExecutor(
         )
         paymentOrderRepository.save(failedOrder)
         if (failedOrder.retryCount < 5) {
-            paymentRetryQueueAdapter.scheduleRetry(order.paymentOrderId, order.retryCount)
+            paymentRetryPaymentAdapter.scheduleRetry(failedOrder)
+            //publish payment_not_succesful_event or retried event
+            val schedulePaymentEvent = failedOrder.toSchedulePaymentOrderStatusEvent()
             logger.warn("Scheduled retry for ${failedOrder.paymentOrderId} (retry ${failedOrder.retryCount}): $reason")
         } else {
             logger.error("Max retries exceeded for ${failedOrder.paymentOrderId}. Marking as failed permanently.")

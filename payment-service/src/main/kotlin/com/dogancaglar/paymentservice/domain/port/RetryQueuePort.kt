@@ -1,7 +1,11 @@
 package com.dogancaglar.paymentservice.domain.port
 
-interface RetryQueuePort {
-    fun scheduleRetry(paymentOrderId: String, retryCount: Int)
-    fun pollDueRetries(): List<String>
+import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryRequested
+import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+
+interface RetryQueuePort<T> {
+    fun scheduleRetry(paymentOrder: PaymentOrder)
+    fun pollDueRetries(): List<EventEnvelope<T>>
 
 }

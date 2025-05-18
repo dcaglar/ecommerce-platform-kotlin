@@ -38,15 +38,15 @@ kafka:
       group-id: payment-retry-executor-group
       class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderRetryCommandExecutor
     - id: payment-order-executor
-      topic: payment_order_created
+      topic: payment_order_created_queue
       group-id: payment-order-group
       class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderExecutor
-    - id: payment-status-executor
-      topic: scheduled_status_check
-      group-id: payment-status-executor-group
-      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderStatusCheckScheduler
-    - id: payment-status-checker
-      topic: payment_status_check
+#    - id: payment-status-check-scheduler
+#      topic: payment_status_check_scheduler_topic
+#      group-id: payment-status-check-scheduler-group
+#      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderStatusCheckScheduler
+    - id: payment-status-check-executor-scheduler
+      topic: due_payment_status_check_topic
       group-id: payment-status-check-executor-group
       class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.ScheduledPaymentStatusCheckExecutor
 psp:

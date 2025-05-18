@@ -34,7 +34,7 @@ class PaymentEventPublisher(
         aggregateId: String,
         data: T,
         parentEnvelope: EventEnvelope<*>? = null // optional parent context
-    ) {
+    ) : EventEnvelope<T>{
         MDC.put("traceId", parentEnvelope?.traceId ?: "generated-${System.currentTimeMillis()}")
         MDC.put("eventType", event.eventType)
         MDC.put("aggregateId", aggregateId)
@@ -53,6 +53,7 @@ class PaymentEventPublisher(
             logger.info(
                 "📦 Published event to topic='${event.topic}', key='$aggregateId', type='${event.eventType}', traceId='${envelope.traceId}'"
             )
+            return envelope;
         } catch (e: Exception) {
             logger.error("❌ Failed to publish event to topic=${event.topic}, key=$aggregateId", e)
             throw RuntimeException("Failed to publish event to Kafka", e)

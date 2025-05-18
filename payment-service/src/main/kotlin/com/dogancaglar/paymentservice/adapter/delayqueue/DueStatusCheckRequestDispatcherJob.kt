@@ -2,8 +2,10 @@ package com.dogancaglar.paymentservice.adapter.delayqueue
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderStatusCheckRequested
+import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderStatusScheduled
+import com.dogancaglar.paymentservice.domain.event.toDomain
+import com.dogancaglar.paymentservice.domain.event.toDuePaymentOrderStatusCheck
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
@@ -13,8 +15,8 @@ import java.time.Instant
 
 
 @Component
-class DelayQueueDispatcher(
-    private val repository: DelayedKafkaMessageRepository,
+class DueStatusCheckRequestDispatcherJob(
+    private val repository: ScheduledPaymentOrderRequestRepository,
     private val paymentEventPublisher: PaymentEventPublisher,
     private val objectMapper: ObjectMapper
 ) {
@@ -31,21 +33,22 @@ class DelayQueueDispatcher(
             try {
                 val envelopeType = objectMapper
                     .typeFactory
-                    .constructParametricType(EventEnvelope::class.java, PaymentOrderStatusCheckRequested::class.java)
-                val envelope: EventEnvelope<PaymentOrderStatusCheckRequested> = objectMapper.readValue(it.payload,envelopeType)
-
-
+                    .constructParametricType(EventEnvelope::class.java, PaymentOrderStatusScheduled::class.java)
+                //schedule due status check event
+                val envelope: EventEnvelope<PaymentOrderStatusScheduled> = objectMapper.readValue(it.payload,envelopeType)
+                val dueRequestEvent = envelope.data.toDuePaymentOrderStatusCheck()
                 paymentEventPublisher.publish(
-                    event = EventMetadatas.PaymentOrderStatusCheckRequestedMetadata,
+                    event = EventMetadatas.PaymentOrderStatusCheckExecutorMetadata,
                     aggregateId = envelope.data.paymentOrderId,
-                    data = envelope.data
+                    data = dueRequestEvent,
+                    parentEnvelope = envelope
                 )
-
                 repository.deleteById(it.id)
 
 
+
             } catch (e: Exception){
-                logger.error("${it.key} error occured $e")
+                logger.error("${it.payload} error occured $e")
 
             }
         }

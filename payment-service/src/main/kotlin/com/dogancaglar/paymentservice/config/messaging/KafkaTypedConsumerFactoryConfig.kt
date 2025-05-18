@@ -2,9 +2,11 @@ package com.dogancaglar.paymentservice.config.messaging
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.config.serialization.EventEnvelopeDeserializer
+import com.dogancaglar.paymentservice.domain.event.DuePaymentOrderStatusCheck
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryRequested
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderStatusCheckRequested
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderStatusScheduled
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.Deserializer
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -23,7 +25,7 @@ class KafkaTypedConsumerFactoryConfig(
     private val kafkaProperties: KafkaProperties
 ) {
 
-    @Bean("payment_order_created-factory")
+    @Bean("payment_order_created_queue-factory")
     fun paymentOrderCreatedFactory(): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderCreated>> {
         return createTypedFactory(PaymentOrderCreated::class.java)
     }
@@ -33,18 +35,18 @@ class KafkaTypedConsumerFactoryConfig(
         return createTypedFactory(PaymentOrderRetryRequested::class.java)
     }
 
-    @Bean("scheduled_status_check-factory")
-    fun paymentScheduledStatusFactory(): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderStatusCheckRequested>> {
-        return createTypedFactory(PaymentOrderStatusCheckRequested::class.java)
+    @Bean("payment_status_check_scheduler_topic-factory")
+    fun paymentScheduledStatusFactory(): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderStatusScheduled>> {
+        return createTypedFactory(PaymentOrderStatusScheduled::class.java)
     }
-    @Bean("delay_scheduling_topic-factory")
-    fun paymentStatusScheduledFactory(): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderStatusCheckRequested>> {
-        return createTypedFactory(PaymentOrderStatusCheckRequested::class.java)
+    @Bean("due_payment_status_check_topic-factory")
+    fun paymentStatusCheckExecutorFactory(): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<DuePaymentOrderStatusCheck>> {
+        return createTypedFactory(DuePaymentOrderStatusCheck::class.java)
     }
 
-    @Bean("payment_status_check-factory")
-    fun paymenttatuscCheckFactory(): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderStatusCheckRequested>> {
-        return createTypedFactory(PaymentOrderStatusCheckRequested::class.java)
+    @Bean("payment_order_succeded_topic-factory")
+    fun paymentOrderSuccededFactory(): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderSucceeded>> {
+        return createTypedFactory(PaymentOrderSucceeded::class.java)
     }
 
     private fun <T : Any> createTypedFactory(valueType: Class<T>): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>> {

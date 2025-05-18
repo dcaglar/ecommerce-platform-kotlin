@@ -1,29 +1,61 @@
 package com.dogancaglar.paymentservice.adapter.redis
 
+import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
+import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderStatusScheduled
+import com.dogancaglar.paymentservice.domain.event.ScheduledPaymentOrderStatusRequest
+import com.dogancaglar.paymentservice.domain.event.toPaymentOrderStatusScheduled
+import com.dogancaglar.paymentservice.domain.event.toSchedulePaymentOrderStatusEvent
+import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
+import com.fasterxml.jackson.core.type.TypeReference
+import com.fasterxml.jackson.databind.ObjectMapper
+import org.slf4j.LoggerFactory
+import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
 
 @Component("paymentRetryStatusAdapter")
-open class PaymentRetryStatusAdapter(private val redisTemplate: StringRedisTemplate, paymentEventPublisher: PaymentEventPublisher) : RetryQueuePort {
+open class PaymentRetryStatusAdapter(private val redisTemplate: StringRedisTemplate,
+                                     @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper,
+                                    val paymentEventPublisher: PaymentEventPublisher ) : RetryQueuePort<ScheduledPaymentOrderStatusRequest> {
     private val queue = "payment_status_queue"
+    private val logger = LoggerFactory.getLogger(javaClass)
 
-    override fun scheduleRetry(paymentOrderId: String, retryCount: Int) {
-        val delayMillis = calculateBackoffMillis(retryCount)
-        val retryAt = System.currentTimeMillis() + delayMillis
-        redisTemplate.opsForZSet().add(queue, paymentOrderId, retryAt.toDouble())
+    override fun scheduleRetry( paymentOrder: PaymentOrder) {
+        val paymentOrderStatusScheduled = paymentOrder.toPaymentOrderStatusScheduled()
+        val envelope = EventEnvelope.wrap(
+           eventType = EventMetadatas.PaymentOrderStatusCheckScheduledMetadata.eventType,
+            aggregateId = paymentOrderStatusScheduled.paymentOrderId,
+            data = paymentOrderStatusScheduled,
+            traceId = MDC.get(LogFields.TRACE_ID) // optional
+        )
+        val json = objectMapper.writeValueAsString(envelope);
+        //todo publish a PaymentOrderStatusCheckScheduledMetadata
+        redisTemplate.opsForList().leftPush(queue, json)
     }
 
-    override fun pollDueRetries(): List<String> {
-        val  now = System.currentTimeMillis().toDouble()
+
+
+    override fun pollDueRetries(): List<EventEnvelope<ScheduledPaymentOrderStatusRequest>> {
+        val now = System.currentTimeMillis().toDouble()
         val dueItems = redisTemplate.opsForZSet().rangeByScore(queue, 0.0, now)
-        dueItems?.forEach { redisTemplate.opsForZSet().remove(queue, it) }
-        return dueItems?.toList() ?: emptyList()
-    }
-    fun calculateBackoffMillis(retryCount: Int): Long {
-        val baseDelay = 5_000L // 5 seconds
-        return baseDelay * (retryCount + 1) // Linear or exponential backoff
+
+        val dueEnvelops = dueItems?.mapNotNull { json ->
+            try {
+                // Deserializing the full EventEnvelope
+                val envelope: EventEnvelope<ScheduledPaymentOrderStatusRequest> =
+                    objectMapper.readValue(json, object : TypeReference<EventEnvelope<ScheduledPaymentOrderStatusRequest>>() {})
+                redisTemplate.opsForZSet().remove(queue, json)
+                envelope // You return only the domain event
+            } catch (e: Exception) {
+                // Optionally log and skip corrupted entries
+                null
+            }
+        } ?: emptyList()
+        return dueEnvelops
     }
 }

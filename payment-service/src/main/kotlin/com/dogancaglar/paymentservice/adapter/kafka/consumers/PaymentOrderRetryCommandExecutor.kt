@@ -4,7 +4,10 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
+import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryPaymentAdapter
+import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryStatusAdapter
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryRequested
+import com.dogancaglar.paymentservice.domain.event.ScheduledPaymentOrderStatusRequest
 import com.dogancaglar.paymentservice.domain.event.toDomain
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
@@ -24,8 +27,9 @@ import java.util.concurrent.TimeoutException
 
 @Component
 class PaymentOrderRetryCommandExecutor(private val paymentOrderRepository: PaymentOrderRepository,
-                                       @Qualifier("paymentRetryStatusAdapter") val paymentRetryStatusAdapter:RetryQueuePort,
-                                       @Qualifier("paymentRetryAdapter") val paymentRetryQueueAdapter: RetryQueuePort,
+                                       @Qualifier("paymentRetryStatusAdapter")
+                                       val paymentRetryStatusAdapter: PaymentRetryStatusAdapter,
+                                       @Qualifier("paymentRetryPaymentAdapter") val paymentRetryPaymentAdapter: PaymentRetryPaymentAdapter,
                                        val pspClient: PSPClient,
                                        val paymentEventPublisher: PaymentEventPublisher
 ) {
@@ -46,7 +50,7 @@ class PaymentOrderRetryCommandExecutor(private val paymentOrderRepository: Payme
                         response == PaymentOrderStatus.SUCCESSFUL -> {
                             handleSuccess(order = paymentOrder)
                         }
-
+                        //TODO PAYMENT_NOT__SCUCESFUL_EVENT PUBLISH
                         PSPStatusMapper.requiresRetryPayment(response) -> {
                             handleRetryPayment(paymentOrder, reason = "Retryable status from PSP: $response")
                         }
@@ -99,7 +103,7 @@ class PaymentOrderRetryCommandExecutor(private val paymentOrderRepository: Payme
         else {
             val retryStatusOrder =failedOrder.markAsPending()
             paymentOrderRepository.save(retryStatusOrder)
-            paymentRetryStatusAdapter.scheduleRetry(retryStatusOrder.paymentOrderId,retryStatusOrder.retryCount)
+            paymentRetryStatusAdapter.scheduleRetry(retryStatusOrder)
             logger.warn("Scheduled retry status for ${retryStatusOrder.paymentOrderId} (retry ${retryStatusOrder.retryCount}): $reason")
         }
     }
@@ -110,7 +114,7 @@ class PaymentOrderRetryCommandExecutor(private val paymentOrderRepository: Payme
             LocalDateTime.now())
         paymentOrderRepository.save(failedOrder)
         if (failedOrder.retryCount < 5) {
-            paymentRetryQueueAdapter.scheduleRetry(order.paymentOrderId,order.retryCount)
+            paymentRetryPaymentAdapter.scheduleRetry(failedOrder)
             logger.warn("Scheduled retry for ${failedOrder.paymentOrderId} (retry ${failedOrder.retryCount}): $reason")
         } else {
             logger.error("Max retries exceeded for ${failedOrder.paymentOrderId}. Marking as failed permanently.")

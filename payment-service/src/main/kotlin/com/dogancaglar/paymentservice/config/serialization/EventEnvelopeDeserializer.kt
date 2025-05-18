@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.config.serialization
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
+import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature

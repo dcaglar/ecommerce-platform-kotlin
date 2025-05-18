@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.application.service
 
 import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
@@ -10,10 +11,12 @@ import com.dogancaglar.paymentservice.domain.port.PaymentRepository
 import com.dogancaglar.paymentservice.domain.event.mapper.toCreatedEvent
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
+import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
+import java.util.UUID
 
 @Service
 class PaymentService(
@@ -68,7 +71,11 @@ class PaymentService(
         traceId: String? = null,
         parentEventId: UUID? = null
          */
-        val eventPayLoad = EventEnvelope.wrap(eventType = "payment_order_created", aggregateId = paymentOrder.paymentOrderId, data = event)
+        val eventPayLoad = EventEnvelope.wrap(eventType = "payment_order_created",
+            aggregateId = paymentOrder.paymentOrderId,
+            data = event,
+            traceId = MDC.get(
+            LogFields.TRACE_ID)?: UUID.randomUUID().toString())
         val json = objectMapper.writeValueAsString(eventPayLoad);
         return OutboxEvent(eventId = eventPayLoad.eventId, eventType = "payment_order_created", createdAt = LocalDateTime.now(), status = "NEW", aggregateId = eventPayLoad.aggregateId, payload = json)
     }

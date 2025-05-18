@@ -2,17 +2,15 @@ package com.dogancaglar.paymentservice.adapter.delayqueue
 
 import jakarta.persistence.*
 import java.time.Instant
+import java.time.LocalDateTime
 import java.util.*
 
 @Entity
-@Table(name = "delayed_kafka_message")
-data class DelayedKafkaMessageEntity(
+@Table(name = "scheduled_payment_order_request_repository")
+data class ScheduledPaymentOrderStatusRequestEntity(
     @Id
-    val id: UUID,
+    val id: String=UUID.randomUUID().toString(),
 
-    val topic: String,
-
-    val key: String,
 
     @Column(columnDefinition = "jsonb")
     val payload: String,
@@ -21,5 +19,5 @@ data class DelayedKafkaMessageEntity(
     val sendAfter: Instant,
 
     @Column(name = "created_at")
-    val createdAt: Instant = Instant.now()
+    val createdAt: LocalDateTime = LocalDateTime.now()
 )

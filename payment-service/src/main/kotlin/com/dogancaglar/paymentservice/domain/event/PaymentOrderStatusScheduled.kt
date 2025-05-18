@@ -8,7 +8,7 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDateTime
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class PaymentOrderStatusCheckRequested constructor(
+data class PaymentOrderStatusScheduled constructor(
     val paymentOrderId: String,
     val paymentId: String,
     val sellerId: String,
@@ -23,23 +23,47 @@ data class PaymentOrderStatusCheckRequested constructor(
 )
 
 
-fun PaymentOrder.toRetryStatusEvent(retryReason:String?="Unknown reason",lastErrorMessage:String?="no error message"): PaymentOrderStatusCheckRequested {
-    return PaymentOrderStatusCheckRequested(
+fun PaymentOrder.toPaymentOrderStatusScheduled(retryReason:String?="Unknown reason", lastErrorMessage:String?="no error message"): PaymentOrderStatusScheduled {
+    return PaymentOrderStatusScheduled(
         paymentOrderId = this.paymentOrderId,
         paymentId = this.paymentId,
         sellerId = this.sellerId,
         amountValue = this.amount.value,
         currency = this.amount.currency,
         status = this.status.name,
-        createdAt = LocalDateTime.now(),
-        updatedAt = LocalDateTime.now(),
+        createdAt = this.createdAt,
+        updatedAt = this.updatedAt,
         retryCount = this.retryCount,
-        retryReason = this.retryReason,
-        lastErrorMessage = this.lastErrorMessage
+        retryReason = retryReason,
+        lastErrorMessage = lastErrorMessage
     )
 }
-fun PaymentOrderStatusCheckRequested.toDomain(): PaymentOrder {
+
+
+
+
+fun PaymentOrderStatusScheduled.toDomain(): PaymentOrder {
     return toPaymentOrderDomain(
+        paymentOrderId = this.paymentOrderId,
+        paymentId = this.paymentId,
+        sellerId = this.sellerId,
+        amountValue = this.amountValue.setScale(2, RoundingMode.HALF_DOWN),
+        currency = this.currency,
+        status = this.status,
+        createdAt = this.createdAt,
+        updatedAt = this.updatedAt!!,
+        retryCount = this.retryCount,
+        retryReason = this.retryReason!!,
+        lastErrorMessage = this.lastErrorMessage!!
+    )
+}
+
+
+
+
+
+fun PaymentOrderStatusScheduled.toDuePaymentOrderStatusCheck(): DuePaymentOrderStatusCheck {
+    return DuePaymentOrderStatusCheck(
         paymentOrderId = this.paymentOrderId,
         paymentId = this.paymentId,
         sellerId = this.sellerId,
