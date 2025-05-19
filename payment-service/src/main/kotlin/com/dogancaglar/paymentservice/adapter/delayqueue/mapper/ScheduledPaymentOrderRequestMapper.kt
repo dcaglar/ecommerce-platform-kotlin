@@ -15,13 +15,15 @@ class ScheduledPaymentOrderRequestMapper() {
 
     fun  toEntity(
         envelopeJson: String,
-        delaySecond: Long
+        delaySecond: Long,
+        paymentOrderId:String
     ): ScheduledPaymentOrderStatusRequestEntity {
         // Deserialize the envelope to extract the eventId
         return ScheduledPaymentOrderStatusRequestEntity(
             payload = envelopeJson,
             sendAfter = Instant.now(Clock.system(ZoneId.of("Europe/Amsterdam"))).plusSeconds(delaySecond ),
-            createdAt = LocalDateTime.now(ZoneId.of("Europe/Amsterdam"))
+            createdAt = LocalDateTime.now(ZoneId.of("Europe/Amsterdam")),
+            paymentOrderId = paymentOrderId
         )
     }
 }

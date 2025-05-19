@@ -71,6 +71,7 @@ class PaymentService(
         traceId: String? = null,
         parentEventId: UUID? = null
          */
+        logger.info("Generate outbox event paymentOrderId ${paymentOrder.paymentOrderId} and traceid=${MDC.get(LogFields.TRACE_ID)}")
         val eventPayLoad = EventEnvelope.wrap(eventType = "payment_order_created",
             aggregateId = paymentOrder.paymentOrderId,
             data = event,

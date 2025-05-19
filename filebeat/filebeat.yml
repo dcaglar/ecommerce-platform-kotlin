@@ -1,0 +1,8 @@
+filebeat.inputs:
+  - type: log
+    enabled: true
+    paths:
+      - /host_logs/payment-service.log
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]

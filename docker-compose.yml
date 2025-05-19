@@ -1,37 +1,4 @@
 services:
-  postgresql:
-    container_name: temporal-postgresql
-    environment:
-      POSTGRES_PASSWORD: temporal
-      POSTGRES_USER: temporal
-    image: postgres:15
-    networks:
-      - temporal-network
-    ports:
-      - 5432:5432
-    volumes:
-      - /var/lib/postgresql/data
-  temporal:
-    container_name: temporal
-    depends_on:
-      - postgresql
-    environment:
-      - DB=postgres12
-      - DB_PORT=5432
-      - POSTGRES_USER=temporal
-      - POSTGRES_PWD=temporal
-      - POSTGRES_SEEDS=postgresql
-      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
-      - TEMPORAL_ADDRESS=temporal:7233
-      - TEMPORAL_CLI_ADDRESS=temporal:7233
-    image: temporalio/auto-setup:1.27.0
-    networks:
-      - temporal-network
-    ports:
-      - 7233:7233
-    volumes:
-      - ./dynamicconfig:/etc/temporal/config/dynamicconfig
-
     # Keycloak PostgreSQL DB
   keycloak-db:
       image: postgres:15
@@ -128,11 +95,43 @@ services:
         - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
       restart: unless-stopped
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false  # disable auth for local use
+    ports:
+      - "9200:9200"
+    networks:
+      - elk
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.12.2
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - elk
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.12.2
+    container_name: filebeat
+    user: root
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/log:/var/log:ro
+    depends_on:
+      - elasticsearch
+    networks:
+      - elk
 volumes:
   keycloak_postgres_data:
   payment_postgres_data:
-  temporal_postgres_data:
-
 networks:
   keycloak-net:
-  temporal-network:
+  elk:
+    driver: bridge

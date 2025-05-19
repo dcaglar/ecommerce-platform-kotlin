@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.adapter.kafka.consumers
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
+import com.dogancaglar.paymentservice.adapter.delayqueue.ScheduledPaymentOrderStatusService
 import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
 import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryPaymentAdapter
 import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryStatusAdapter
@@ -35,6 +36,7 @@ class PaymentOrderRetryCommandExecutor(
     @Qualifier("paymentRetryStatusAdapter")
     val paymentRetryStatusAdapter: PaymentRetryStatusAdapter,
     @Qualifier("paymentRetryPaymentAdapter") val paymentRetryPaymentAdapter: PaymentRetryPaymentAdapter,
+    val scheduledPaymentOrderStatusService: ScheduledPaymentOrderStatusService,
     val pspClient: PSPClient,
     val paymentEventPublisher: PaymentEventPublisher
 ) {
@@ -73,7 +75,7 @@ class PaymentOrderRetryCommandExecutor(
                     }
                 }
             } catch (e: TimeoutException) {
-                logger.error("Request get timeout, retrying payment  ${e.message}", e)
+                logger.error("Request get timeout, retrying payment")
                 handleRetryPayment(paymentOrder, "TIMEOUT", e.message)
             } catch (e: Exception) {
                 val topic = record.topic()

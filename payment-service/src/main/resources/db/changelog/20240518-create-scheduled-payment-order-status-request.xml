@@ -9,14 +9,19 @@
             <constraints primaryKey="true" nullable="false"/>
         </column>
 
-        <column name="payload" type="jsonb">
-            <constraints nullable="false"/>
+        <column name="payment_order_id" type="varchar(255)">
+            <constraints nullable="true"/>
         </column>
 
+        <column name="payload" type="TEXT">
+            <constraints nullable="false"/>
+        </column>
+        <column name="status" type="varchar(255)">
+            <constraints nullable="false"/>
+        </column>
         <column name="send_after" type="timestamp with time zone">
             <constraints nullable="false"/>
         </column>
-
         <column name="created_at" type="timestamp">
             <constraints nullable="false"/>
         </column>
@@ -26,18 +31,6 @@
         <dropTable tableName="scheduled_payment_order_request_repository"/>
     </rollback>
 </changeSet>
-
-    <changeSet id="20240519-change-payload-to-text" author="dogancaglar">
-        <modifyDataType
-                tableName="scheduled_payment_order_request_repository"
-                columnName="payload"
-                newDataType="text"/>
-
-        <rollback>
-            <modifyDataType
-                    tableName="scheduled_payment_order_request_repository"
-                    columnName="payload"
-                    newDataType="jsonb"/>
-        </rollback>
-    </changeSet>
 </databaseChangeLog>
+
+

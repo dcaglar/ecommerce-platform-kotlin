@@ -32,6 +32,7 @@ class PaymentController(
         val traceId = UUID.randomUUID().toString()
         MDC.put("traceId", traceId)
         try {
+            logger.info("Starting with paymentId $traceId")
             val result =
                 paymentService.createPayment(PaymentRequestMapper.toDomain(request))      // Pass domain to service
             return ResponseEntity.ok(PaymentRequestMapper.toResponse(result)) // ✅ Transform back to DTO

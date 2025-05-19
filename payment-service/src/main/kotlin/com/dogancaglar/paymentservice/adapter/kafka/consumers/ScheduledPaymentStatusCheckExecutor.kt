@@ -3,6 +3,9 @@ package com.dogancaglar.paymentservice.adapter.kafka.consumers
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
+import com.dogancaglar.paymentservice.adapter.delayqueue.RequestStatus
+import com.dogancaglar.paymentservice.adapter.delayqueue.ScheduledPaymentOrderStatusRequestEntity
+import com.dogancaglar.paymentservice.adapter.delayqueue.ScheduledPaymentOrderStatusService
 import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
 import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryStatusAdapter
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
@@ -34,6 +37,7 @@ class  ScheduledPaymentStatusCheckExecutor(
     private val paymentEventPublisher: PaymentEventPublisher,
     @Qualifier("paymentRetryStatusAdapter")
     val paymentRetryStatusAdapter: RetryQueuePort<ScheduledPaymentOrderStatusRequest>,
+    val scheduledPaymentOrderStatusService : ScheduledPaymentOrderStatusService
     ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -49,7 +53,8 @@ class  ScheduledPaymentStatusCheckExecutor(
             try {
                 logger.info("Performing PSP status check wtih retry=${paymentOrder.retryCount}")
                 val response: PaymentOrderStatus = safePspCall(paymentOrder,)
-
+                logger.info("Updading PSP status check for payment=${paymentOrder.paymentOrderId}")
+                scheduledPaymentOrderStatusService.updateStatusToExecuted(paymentOrder.paymentOrderId, RequestStatus.EXECUTED)
                 when (response) {
                     PaymentOrderStatus.SUCCESSFUL -> {
                         val paidOrder = paymentOrder.markAsPaid().updatedAt(LocalDateTime.now())

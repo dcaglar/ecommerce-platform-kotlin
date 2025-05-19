@@ -12,6 +12,10 @@ data class ScheduledPaymentOrderStatusRequestEntity(
     val id: String=UUID.randomUUID().toString(),
 
 
+    @Column(name = "payment_order_id", nullable = true)
+    val paymentOrderId: String,
+
+
     @Column(name = "payload",columnDefinition = "TEXT")
     val payload: String,
 
@@ -19,5 +23,13 @@ data class ScheduledPaymentOrderStatusRequestEntity(
     val sendAfter: Instant,
 
     @Column(name = "created_at")
-    val createdAt: LocalDateTime = LocalDateTime.now()
-)
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+
+    @Column(name ="status")
+    @Enumerated(EnumType.STRING)
+    var status: RequestStatus = RequestStatus.SCHEDULED
+    )
+enum class RequestStatus {
+    SCHEDULED,
+    EXECUTED
+}

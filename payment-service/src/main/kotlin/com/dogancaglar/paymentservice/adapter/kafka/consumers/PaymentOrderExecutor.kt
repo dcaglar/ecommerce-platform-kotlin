@@ -135,6 +135,7 @@ class PaymentOrderExecutor(
         )
         paymentOrderRepository.save(failedOrder)
         if (failedOrder.retryCount < 5) {
+
             paymentRetryPaymentAdapter.scheduleRetry(failedOrder)
             //publish payment_not_succesful_event or retried event
             val retryPaymentEvent = failedOrder.toRetryEvent()
