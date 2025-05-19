@@ -10,21 +10,35 @@
             <pattern>${LOG_PATTERN}</pattern>
         </encoder>
     </appender>
-
-    <!-- File logging -->
-    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_PATH}/payment-service.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <fileNamePattern>${LOG_PATH}/payment-service.%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>14</maxHistory>
         </rollingPolicy>
-        <encoder>
-            <pattern>${LOG_PATTERN}</pattern>
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp>
+                    <fieldName>@timestamp</fieldName>
+                </timestamp>
+                <loggerName />
+                <threadName />
+                <logLevel />
+                <message />
+                <mdc>
+                    <includeMdcKey>traceId</includeMdcKey>
+                    <includeMdcKey>eventId</includeMdcKey>
+                    <includeMdcKey>aggregateId</includeMdcKey>
+                    <includeMdcKey></includeMdcKey>
+                </mdc>
+                <mdc />
+                <context />
+                <stackTrace />
+            </providers>
         </encoder>
     </appender>
-
     <root level="INFO">
-        <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="FILE"/>
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="JSON_FILE" />
     </root>
 </configuration>

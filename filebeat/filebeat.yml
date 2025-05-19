@@ -2,7 +2,13 @@ filebeat.inputs:
   - type: log
     enabled: true
     paths:
-      - /host_logs/payment-service.log
+      - /app-logs/payment-service.log
 
 output.elasticsearch:
   hosts: ["http://elasticsearch:9200"]
+  username: ""
+  password: ""
+  index: "filebeat-%{+yyyy.MM.dd}"
+
+setup.template.name: "filebeat"
+setup.template.pattern: "filebeat-*"

@@ -82,35 +82,22 @@ services:
       depends_on:
         - zookeeper
       restart: unless-stopped
-
-  kafka-ui:
-      image: provectuslabs/kafka-ui:latest
-      container_name: kafka-ui
-      ports:
-        - "8081:8080"
-      depends_on:
-        - kafka
-      environment:
-        - KAFKA_CLUSTERS_0_NAME=local
-        - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
-      restart: unless-stopped
-
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
     container_name: elasticsearch
     environment:
       - discovery.type=single-node
-      - xpack.security.enabled=false  # disable auth for local use
+      - xpack.security.enabled=false
     ports:
       - "9200:9200"
     networks:
       - elk
-
   kibana:
     image: docker.elastic.co/kibana/kibana:8.12.2
     container_name: kibana
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - xpack.security.enabled=false
     ports:
       - "5601:5601"
     depends_on:
@@ -122,8 +109,8 @@ services:
     container_name: filebeat
     user: root
     volumes:
-      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
-      - /var/log:/var/log:ro
+      - /Users/dogancaglar/IdeaProjects/ecommerce-platform-kotlin/filebeat:/ro
+      - /Users/dogancaglar/IdeaProjects/ecommerce-platform-kotlin/payment-service/logs:/app-logs:ro
     depends_on:
       - elasticsearch
     networks:
