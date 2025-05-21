@@ -1,5 +1,5 @@
 # 🧾 Payment Service
-
+> 📦 This is the `payment-service` module of the [`ecommerce-platform-kotlin`](https://github.com/dcaglar/ecommerce-platform-kotlin) monorepo.
 This service is part of the **ecommerce-platform-kotlin** monorepo and is responsible for managing the payment lifecycle using a resilient, event-driven architecture with Domain-Driven Design (DDD) principles.
 ![Architecture](https://dcaglar.github.io/ecommerce-platform-kotlin/docs/architecture/payment-service/payment_service_architecture.png)
 ---
