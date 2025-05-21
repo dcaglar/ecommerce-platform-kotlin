@@ -1,0 +1,39 @@
+name: Generate PlantUML diagrams
+
+on:
+  push:
+    paths:
+      - '**.puml'
+  workflow_dispatch:
+
+jobs:
+  generate-diagrams:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install PlantUML
+        run: sudo apt-get install plantuml -y
+
+      - name: Generate PNG diagrams from PUML files
+        run: |
+          find docs/ -name "*.puml" | while read file; do
+            echo "Rendering $file"
+            plantuml "$file"
+          done
+
+      - name: Commit and push generated diagrams
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add docs/**/*.png
+          git commit -m "Auto-generate PlantUML diagrams" || echo "No changes"
+          git push
