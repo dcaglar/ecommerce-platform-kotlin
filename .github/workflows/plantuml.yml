@@ -1,0 +1,50 @@
+name: Generate PlantUML Diagrams to gh-pages
+
+on:
+  push:
+    paths:
+      - '**.puml'
+  workflow_dispatch:
+
+jobs:
+  generate-diagrams:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v3
+        with:
+          ref: main
+          path: main
+
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v3
+        with:
+          ref: gh-pages
+          path: gh-pages
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install PlantUML
+        run: sudo apt-get install plantuml -y
+
+      - name: Generate diagrams into gh-pages/docs/
+        run: |
+          mkdir -p gh-pages/docs/architecture
+          find main/docs/architecture -name "*.puml" | while read file; do
+            echo "Rendering $file"
+            plantuml -tpng "$file" -o ../../../gh-pages/docs/architecture
+          done
+
+      - name: Commit PNGs to gh-pages
+        run: |
+          cd gh-pages
+          git config user.name "dcaglar"
+          git config user.email "dcaglar1987@gmail.com"
+          git add docs/architecture/*.png
+          git commit -m "Update rendered PlantUML diagrams" || echo "No changes"
+          git push origin gh-pages

@@ -1,7 +1,7 @@
 # 🧾 Payment Service
 
 This service is part of the **ecommerce-platform-kotlin** monorepo and is responsible for managing the payment lifecycle using a resilient, event-driven architecture with Domain-Driven Design (DDD) principles.
-
+![Architecture](https://dcaglar.github.io/ecommerce-platform-kotlin/docs/architecture/payment-service/payment_service_architecture.png)
 ---
 
 ## 🧩 Services
@@ -23,12 +23,13 @@ This service is part of the **ecommerce-platform-kotlin** monorepo and is respon
 ## 📬 Kafka Topics & Domain Events
 
 
-| Domain Event                        | Kafka Topic |
-|------------------------------------|------------|
-| `PaymentOrderCreated`              | `payment_order_created` |
-| `PaymentOrderRetryCommandExecutor`| `payment_order_retry_request_topic`|
-| `PaymentOrderStatusCheckScheduler`| `scheduled_status_check`|
-| `PaymentOrderSucceededEvent`      | `payment_order_success` |
+| Domain Event                   | Kafka Topic                         |
+|--------------------------------|-------------------------------------|
+| `PaymentOrderCreated`          | `payment_order_created_queue`             |
+| `PaymentOrderRetryRequested`   | `payment_order_retry_request_topic` |
+| `PaymentOrderStatusScheduled ` | `payment_status_check_scheduler_topic`            |
+| `DuePaymentOrderStatusCheck`   | `due_payment_status_check_topic`             |
+| `PaymentOrderSucceededEvent`   | `payment_order_success`             |
 
 ---
 
@@ -40,10 +41,10 @@ You can add a new consumer **without modifying any Java/Kotlin code**.
 ```yaml
 kafka:
   dynamic-consumers:
-    - id: payment-retry-executor
-      topic: payment_order_retry
-      group-id: payment-retry-group
-      class-name: com.dogancaglar.paymentservice.kafka.PaymentRetryExecutor
+    - id: payment-order-executor
+      topic: payment_order_created_queue
+      group-id: payment-executor-group
+      class-name: com.dogancaglar.paymentservice.kafka.PaymentOrderExecutor
 ```
 
 Each dynamic consumer must implement a `handle(EventEnvelope<T>)` method.
@@ -64,7 +65,9 @@ Topic: `payment_order_created`
     "sellerId": "seller-123",
     "amountValue": 1000,
     "currency": "EUR"
-  }
+  },
+"parentEventId": "payment-987",
+"traceId": "123121"
 }
 ```
 
