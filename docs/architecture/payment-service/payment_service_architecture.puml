@@ -1,39 +1,39 @@
-name: Generate PlantUML diagrams
+@startuml
+title Payment Service Architecture
 
-on:
-  push:
-    paths:
-      - '**.puml'
-  workflow_dispatch:
+actor User
+User -> PaymentController : POST /payments
 
-jobs:
-  generate-diagrams:
-    runs-on: ubuntu-latest
+component PaymentController
+component PaymentOrderService
+component "Outbox Dispatcher\n(Scheduled)" as OutboxDispatcher
+component "Kafka Producer" as KafkaProducer
+database "PostgreSQL\n(Payment + OutboxEvent)" as Postgres
+cloud Kafka
+component "PaymentOrderExecutor\n(Kafka Consumer)" as Executor
+component "PSP Client"
+cloud "Redis Retry ZSet" as RedisRetry
+cloud "Redis Scheduled ZSet" as RedisSchedule
+component "DueStatusCheckDispatcher\n(Scheduled Job)" as Scheduler
+component "ScheduledStatusCheckExecutor\n(Kafka Consumer)" as StatusExecutor
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+PaymentController --> PaymentOrderService
+PaymentOrderService --> Postgres
+Postgres --> OutboxDispatcher
+OutboxDispatcher --> KafkaProducer
+KafkaProducer --> Kafka : payment_order_created_queue
+Kafka --> Executor
 
-      - name: Set up Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+Executor --> PSP Client
+Executor --> RedisRetry : schedule retry
+Executor --> RedisSchedule : schedule status check
+Executor --> Kafka : payment_order_success
 
-      - name: Install PlantUML
-        run: sudo apt-get install plantuml -y
+RedisRetry --> Executor : retry events (poll)
+RedisSchedule --> Scheduler : due scheduled checks
+Scheduler --> Postgres : persist DueStatusCheck
+Scheduler --> Kafka : due_payment_status_check_topic
+Kafka --> StatusExecutor : DuePaymentOrderStatusCheck
+StatusExecutor --> PSP Client
 
-      - name: Generate PNG diagrams from PUML files
-        run: |
-          find docs/ -name "*.puml" | while read file; do
-            echo "Rendering $file"
-            plantuml "$file"
-          done
-
-      - name: Commit and push generated diagrams
-        run: |
-          git config user.name "dcaglar"
-          git config user.email "dcaglar1987@gmail.com"
-          git add docs/**/*.png
-          git commit -m "Auto-generate PlantUML diagrams" || echo "No changes"
-          git push
+@enduml
