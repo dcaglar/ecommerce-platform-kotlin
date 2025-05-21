@@ -32,8 +32,8 @@ jobs:
 
       - name: Commit and push generated diagrams
         run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
+          git config user.name "dcaglar"
+          git config user.email "dcaglar1987@gmail.com"
           git add docs/**/*.png
           git commit -m "Auto-generate PlantUML diagrams" || echo "No changes"
           git push
