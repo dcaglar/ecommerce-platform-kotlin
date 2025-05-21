@@ -22,6 +22,7 @@ This service is part of the **ecommerce-platform-kotlin** monorepo and is respon
 
 ## 📬 Kafka Topics & Domain Events
 
+
 | Domain Event                        | Kafka Topic |
 |------------------------------------|------------|
 | `PaymentOrderCreated`              | `payment_order_created` |

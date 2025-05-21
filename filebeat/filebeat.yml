@@ -1,14 +1,24 @@
 filebeat.inputs:
   - type: log
     enabled: true
+    json.keys_under_root: true
+    json.add_error_key: true
     paths:
-      - /app-logs/payment-service.log
+      - /app-logs/payment-service*.log
 
 output.elasticsearch:
   hosts: ["http://elasticsearch:9200"]
   username: ""
   password: ""
-  index: "filebeat-%{+yyyy.MM.dd}"
 
-setup.template.name: "filebeat"
-setup.template.pattern: "filebeat-*"
+setup.kibana:
+  host: "http://kibana:5601"
+
+setup.dashboards.enabled: true
+
+setup.ilm.enabled: true
+setup.ilm.rollover_alias: "payment-service-logs"
+setup.ilm.pattern: "{now/d}-000001"
+
+setup.template.name: "payment-service-logs"
+setup.template.pattern: "payment-service-logs-*"

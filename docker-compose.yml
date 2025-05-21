@@ -1,23 +1,44 @@
 services:
-    # Keycloak PostgreSQL DB
+  ### 🔐 Keycloak Identity Provider
   keycloak-db:
-      image: postgres:15
-      container_name: keycloak-db
-      environment:
-        POSTGRES_DB: keycloak
-        POSTGRES_USER: keycloak
-        POSTGRES_PASSWORD: keycloak
-      networks:
-        - keycloak-net
-      healthcheck:
-        test: [ "CMD-SHELL", "pg_isready -U keycloak" ]
-        interval: 5s
-        timeout: 5s
-        retries: 10
-      volumes:
-        - keycloak_postgres_data:/var/lib/postgresql/data
-      ports:
-        - 5433:5432 # avoid clashing with payment DB
+    image: postgres:15
+    container_name: keycloak-db
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    volumes:
+      - keycloak_postgres_data:/var/lib/postgresql/data
+    networks:
+      - auth-net
+    ports:
+      - "5433:5432"  # Exposed for IntelliJ/pgAdmin or Spring Boot if needed
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.3
+    container_name: keycloak
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    command: start-dev
+    ports:
+      - "8082:8080"  # Exposed for browser access to Keycloak
+    networks:
+      - auth-net
+
+  ### 🏦 Payment Database
   payment-db:
     image: postgres:15
     container_name: payment-postgres
@@ -28,97 +49,113 @@ services:
     volumes:
       - payment_postgres_data:/var/lib/postgresql/data
     ports:
-      - 5434:5432
-    # Keycloak itself
-  keycloak:
-      image: quay.io/keycloak/keycloak:24.0.3
-      container_name: keycloak
-      depends_on:
-        keycloak-db:
-          condition: service_healthy
-      ports:
-        - "8082:8080"
-      networks:
-        - keycloak-net
-      environment:
-        KC_DB: postgres
-        KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
-        KC_DB_USERNAME: keycloak
-        KC_DB_PASSWORD: keycloak
-        KEYCLOAK_ADMIN: admin
-        KEYCLOAK_ADMIN_PASSWORD: admin
-      command: start-dev
+      - "5434:5432"  # Exposed for Spring Boot to connect
+    networks:
+      - payment-net
 
-
-
-  redis:
-      image: redis:7
-      container_name: redis
-      ports:
-        - "6379:6379"
-      restart: unless-stopped
-
+  ### 📨 Messaging Stack
   zookeeper:
-      image: confluentinc/cp-zookeeper:7.2.1
-      container_name: zookeeper
-      ports:
-        - "2181:2181"
-      environment:
-        ZOOKEEPER_CLIENT_PORT: 2181
-        ZOOKEEPER_TICK_TIME: 2000
-      restart: unless-stopped
+    image: confluentinc/cp-zookeeper:7.2.1
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"  # Optional: expose for debugging Kafka/Zookeeper
+    restart: unless-stopped
+    networks:
+      - messaging-net
 
   kafka:
-      image: confluentinc/cp-kafka:7.2.1
-      container_name: kafka
-      ports:
-        - "9092:9092"
-      environment:
-        KAFKA_BROKER_ID: 1
-        KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-        KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-        KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-        KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      depends_on:
-        - zookeeper
-      restart: unless-stopped
+    image: confluentinc/cp-kafka:7.2.1
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"  # Exposed for Spring Boot Kafka client
+    restart: unless-stopped
+    networks:
+      - messaging-net
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"  # Exposed for Spring Boot to connect
+    restart: unless-stopped
+    networks:
+      - messaging-net  # Same as Kafka/Zookeeper for simplicity
+
+  ### 📊 Observability Stack
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
     container_name: elasticsearch
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    mem_limit: 3g  # optional Docker hard limit if needed
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:9200 || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     ports:
-      - "9200:9200"
+      - "9200:9200"  # Exposed for Filebeat, Spring Boot, or browser/curl
     networks:
-      - elk
+      - observability-net
+
   kibana:
     image: docker.elastic.co/kibana/kibana:8.12.2
     container_name: kibana
+    depends_on:
+      - elasticsearch
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5601/api/status" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
       - xpack.security.enabled=false
     ports:
-      - "5601:5601"
-    depends_on:
-      - elasticsearch
+      - "5601:5601"  # Exposed for browser access to Kibana
     networks:
-      - elk
+      - observability-net
+
   filebeat:
     image: docker.elastic.co/beats/filebeat:8.12.2
     container_name: filebeat
     user: root
-    volumes:
-      - /Users/dogancaglar/IdeaProjects/ecommerce-platform-kotlin/filebeat:/ro
-      - /Users/dogancaglar/IdeaProjects/ecommerce-platform-kotlin/payment-service/logs:/app-logs:ro
     depends_on:
-      - elasticsearch
+      kibana:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - /Users/dogancaglar/IdeaProjects/ecommerce-platform-kotlin/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /Users/dogancaglar/ecommerce-platform-logs/payment-service:/app-logs:ro
     networks:
-      - elk
+      - observability-net
+    command: [ "-c", "/usr/share/filebeat/filebeat.yml" ]
+
+### 🔁 Named volumes for persistent storage
 volumes:
   keycloak_postgres_data:
   payment_postgres_data:
+
+### 🌐 Custom networks per domain
 networks:
-  keycloak-net:
-  elk:
+  auth-net:
+    driver: bridge
+  payment-net:
+    driver: bridge
+  messaging-net:
+    driver: bridge
+  observability-net:
     driver: bridge
