@@ -1,6 +1,8 @@
 # 🛍️ ecommerce-platform-kotlin
 
-A modular, event-driven ecommerce platform prototype designed to demonstrate production-grade architectural principles using Kotlin, Spring Boot, and Kafka. Inspired by the needs of high-throughput marketplaces like Amazon or bol.com.
+A modular, event-driven ecommerce platform prototype designed to demonstrate production-grade architectural principles
+using Kotlin, Spring Boot, and Kafka.
+Inspired by the needs of high-throughput marketplaces like Amazon or bol.com.
 
 ---
 
@@ -45,16 +47,15 @@ This project uses:
 
 ## 📦 Kafka Topics
 
-| Domain Event                   | Kafka Topic                           |
-|--------------------------------|----------------------------------------|
-| `PaymentOrderCreated`          | `payment_order_created_queue`         |
-| `PaymentOrderRetryRequested`   | `payment_order_retry_request_topic`   |
-| `PaymentOrderStatusScheduled`  | `payment_status_check_scheduler_topic`|
-| `DuePaymentOrderStatusCheck`   | `due_payment_status_check_topic`      |
-| `PaymentOrderSucceeded`        | `payment_order_success`               |
+| Domain Event                  | Kafka Topic                            |
+|-------------------------------|----------------------------------------|
+| `PaymentOrderCreated`         | `payment_order_created_queue`          |
+| `PaymentOrderRetryRequested`  | `payment_order_retry_request_topic`    |
+| `PaymentOrderStatusScheduled` | `payment_status_check_scheduler_topic` |
+| `DuePaymentOrderStatusCheck`  | `due_payment_status_check_topic`       |
+| `PaymentOrderSucceeded`       | `payment_order_success`                |
 
 ---
-
 
 	•	One for each seller.
 	•	Each must be processed independently (for PSP, commission, wallets, etc).
@@ -64,15 +65,15 @@ This project uses:
 ⸻
 
 ✅ Your Domain Logic Captures This Well:
-•	Payment = aggregate root for the shopper’s intent
-•	PaymentOrder = per-seller subunit (child entity or separate aggregate depending on your rules)
-•	OutboxEvent = decoupled way to emit PaymentOrderCreated messages for asynchronous handling
+• Payment = aggregate root for the shopper’s intent
+• PaymentOrder = per-seller subunit (child entity or separate aggregate depending on your rules)
+• OutboxEvent = decoupled way to emit PaymentOrderCreated messages for asynchronous handling
 
 ⸻
 
 This is aligned with:
-•	Bol.com-style multi-seller platforms
-•	Hexagonal and modular architecture (each PaymentOrder can trigger wallet updates, ledger entries, shipment flows, etc)
+• Bol.com-style multi-seller platforms
+• Hexagonal and modular architecture (each PaymentOrder can trigger wallet updates, ledger entries, shipment flows, etc)
 
 Let me know if you want a diagram or Elasticsearch query use-case to trace a full payment flow!
 
@@ -116,4 +117,5 @@ MIT — use, fork, and contribute freely.
 ---
 
 
-👨‍💻 Developed by **Doğan Çağlar** to demonstrate how to build secure, fault-tolerant, and observable systems using Kotlin + Spring Boot.
+👨‍💻 Developed by **Doğan Çağlar** to demonstrate how to build secure, fault-tolerant, and observable systems using
+Kotlin + Spring Boot.

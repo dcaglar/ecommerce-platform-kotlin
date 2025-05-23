@@ -17,7 +17,6 @@ import io.micrometer.core.instrument.MeterRegistry
 import jakarta.transaction.Transactional
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
-import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
@@ -32,18 +31,20 @@ class PaymentOrderExecutor(
     val paymentRetryStatusAdapter: RetryQueuePort<ScheduledPaymentOrderStatusRequest>,
     @Qualifier("paymentRetryPaymentAdapter") val paymentRetryPaymentAdapter: RetryQueuePort<PaymentOrderRetryRequested>,
     val pspClient: PSPClient,
-    val paymentEventPublisher: EventPublisherPort,val meterRegistry: MeterRegistry
+    val paymentEventPublisher: EventPublisherPort, val meterRegistry: MeterRegistry
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @Transactional
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderCreated>>) {
         val envelope = record.value()
-        LogContext.with(envelope, mapOf(
-            LogFields.TOPIC_NAME to record.topic(),
-            LogFields.CONSUMER_GROUP to "payment-order-executor",
-            LogFields.PAYMENT_ORDER_ID to envelope.data.paymentOrderId
-        )) {
+        LogContext.with(
+            envelope, mapOf(
+                LogFields.TOPIC_NAME to record.topic(),
+                LogFields.CONSUMER_GROUP to "payment-order-executor",
+                LogFields.PAYMENT_ORDER_ID to envelope.data.paymentOrderId
+            )
+        ) {
             logger.info("▶️ [Handle Start] Processing PaymentOrderCreated")
             val paymentOrderCreatedEvent = envelope.data
             val order = paymentOrderCreatedEvent.toDomain()
@@ -52,62 +53,71 @@ class PaymentOrderExecutor(
                 return@with
             }
             try {
-                    val response = safePspCall(order)
-                    logger.info("✅ PSP call returned status=$response for paymentOrderId=${order.paymentOrderId}")
-                    when {
-                        response == PaymentOrderStatus.SUCCESSFUL -> {
-                            handleSuccess(envelope,order.markAsPaid())
-                        }
-                        //TODO PAYMENT_NOT__SCUCESFUL_EVENT PUBLISH
-                        PSPStatusMapper.requiresRetryPayment(response) -> {
-                            handleRetryPayment(envelope,order, reason = "Retryable status from PSP: $response")
-
-                        }
-
-                        PSPStatusMapper.requiresStatusCheck(response) -> {
-                            handleSchedulePaymentStatusCheck(parentEventEnvelope = envelope,
-                                order=order,
-                                reason = "Scheduling a   status check from PSP: $response"
-                            )
-                        }
-
-                        else -> {
-                            handleNonRetryable(order, response)
-                        }
+                val response = safePspCall(order)
+                logger.info("✅ PSP call returned status=$response for paymentOrderId=${order.paymentOrderId}")
+                when {
+                    response == PaymentOrderStatus.SUCCESSFUL -> {
+                        handleSuccess(envelope, order.markAsPaid())
+                    }
+                    //TODO PAYMENT_NOT__SCUCESFUL_EVENT PUBLISH
+                    PSPStatusMapper.requiresRetryPayment(response) -> {
+                        handleRetryPayment(envelope, order, reason = "Retryable status from PSP: $response")
 
                     }
-                } catch (e: TimeoutException) {
-                    logger.error("⏱️ PSP call timed out for orderId=${order.paymentOrderId}, retrying...", e)
-                    handleRetryPayment(envelope,order, "TIMEOUT", e.message)
-                } catch (e: Exception) {
-                    logger.error("❌ Unexpected error processing orderId=${order.paymentOrderId}, retrying...: ${e.message}", e)
-                    handleRetryPayment(envelope,order, e.message, e.message)
+
+                    PSPStatusMapper.requiresStatusCheck(response) -> {
+                        handleSchedulePaymentStatusCheck(
+                            parentEventEnvelope = envelope,
+                            order = order,
+                            reason = "Scheduling a   status check from PSP: $response"
+                        )
+                    }
+
+                    else -> {
+                        handleNonRetryable(order, response)
+                    }
+
                 }
+            } catch (e: TimeoutException) {
+                logger.error("⏱️ PSP call timed out for orderId=${order.paymentOrderId}, retrying...", e)
+                handleRetryPayment(envelope, order, "TIMEOUT", e.message)
+            } catch (e: Exception) {
+                logger.error(
+                    "❌ Unexpected error processing orderId=${order.paymentOrderId}, retrying...: ${e.message}",
+                    e
+                )
+                handleRetryPayment(envelope, order, e.message, e.message)
             }
+        }
 
     }
 
     private fun handleSuccess(envelope: EventEnvelope<PaymentOrderCreated>, order: PaymentOrder) {
-        meterRegistry.counter("payment.success.total").increment()
+        meterRegistry.counter("payment.order.succeeded.total").increment()
         val updatedOrder = order.markAsPaid()
-            paymentOrderRepository.save(updatedOrder)
+        paymentOrderRepository.save(updatedOrder)
         val publishedEvent = paymentEventPublisher.publish(
-                event = EventMetadatas.PaymentOrderSuccededMetaData,
-                aggregateId = updatedOrder.paymentOrderId,
-                data = PaymentOrderSucceeded(
-                    paymentOrderId = updatedOrder.paymentOrderId,
-                    sellerId = updatedOrder.sellerId,
-                    amountValue = updatedOrder.amount.value,
-                    currency = updatedOrder.amount.currency
-                ),
-                parentEnvelope = envelope,
-            )
+            event = EventMetadatas.PaymentOrderSuccededMetaData,
+            aggregateId = updatedOrder.paymentOrderId,
+            data = PaymentOrderSucceeded(
+                paymentOrderId = updatedOrder.paymentOrderId,
+                sellerId = updatedOrder.sellerId,
+                amountValue = updatedOrder.amount.value,
+                currency = updatedOrder.amount.currency
+            ),
+            parentEnvelope = envelope,
+        )
 
 
         logger.info("📨 Emitted follow-up event with ID=${publishedEvent.eventId}")        //todo do not push yet.then weiwill add eventmetatada
     }
 
-    private fun handleSchedulePaymentStatusCheck(parentEventEnvelope: EventEnvelope<PaymentOrderCreated>,order: PaymentOrder, reason: String? = "", error: String? = "") {
+    private fun handleSchedulePaymentStatusCheck(
+        parentEventEnvelope: EventEnvelope<PaymentOrderCreated>,
+        order: PaymentOrder,
+        reason: String? = "",
+        error: String? = ""
+    ) {
         //prepre schedul request for future but emit PAyment_Scheduled with parent payment_request
         val failedOrder = order.markAsFailed().incrementRetry().withRetryReason(reason).withLastError(error).updatedAt(
             LocalDateTime.now()
@@ -124,7 +134,12 @@ class PaymentOrderExecutor(
     }
 
 
-    private fun handleRetryPayment(parentEnvelope : EventEnvelope<PaymentOrderCreated> ,order: PaymentOrder, reason: String? = "", error: String? = "") {
+    private fun handleRetryPayment(
+        parentEnvelope: EventEnvelope<PaymentOrderCreated>,
+        order: PaymentOrder,
+        reason: String? = "",
+        error: String? = ""
+    ) {
         val failedOrder = order.markAsFailed().incrementRetry().withRetryReason(reason).withLastError(error).updatedAt(
             LocalDateTime.now()
         )
@@ -136,14 +151,14 @@ class PaymentOrderExecutor(
             paymentRetryPaymentAdapter.scheduleRetry(failedOrder)
             //publish payment_not_succesful_event or retried event
             val retryPaymentEvent = failedOrder.toRetryEvent()
-            paymentEventPublisher.publish(event = EventMetadatas.PaymentOrderRetryRequestedMetadata,
+            paymentEventPublisher.publish(
+                event = EventMetadatas.PaymentOrderRetryRequestedMetadata,
                 aggregateId = failedOrder.paymentOrderId,
                 data = retryPaymentEvent,
-                parentEnvelope =parentEnvelope
+                parentEnvelope = parentEnvelope
             )
             logger.warn("🔁 Retrry payment  order=${failedOrder.paymentOrderId} (retry=${failedOrder.retryCount}) reason=$reason, lastError=$error")
-        }
-        else {
+        } else {
             logger.error("Max retries exceeded for ${failedOrder.paymentOrderId}. Marking as failed permanently.")
         }
     }
@@ -172,6 +187,6 @@ class PaymentOrderExecutor(
             pspClient.charge(order)
         }.get(3, TimeUnit.SECONDS)
     }
-}
+}}
      */
 }

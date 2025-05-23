@@ -1,5 +1,5 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
                              http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
@@ -9,7 +9,6 @@
         <groupId>com.dogancaglar</groupId>
         <artifactId>ecommerce-platform-kotlin</artifactId>
         <version>1.0.0-SNAPSHOT</version>
-        <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>common</artifactId>
@@ -17,9 +16,6 @@
     <version>1.0.0-SNAPSHOT</version>
     <packaging>jar</packaging> <!-- ✅ Explicitly mark this as a library -->
 
-    <properties>
-        <kotlin.version>1.9.22</kotlin.version> <!-- ✅ Required for kotlin-maven-plugin -->
-    </properties>
 
     <dependencies>
         <dependency>
@@ -48,7 +44,7 @@
 
     <build>
         <sourceDirectory>src/main/kotlin</sourceDirectory>
-        <testSourceDirectory>src/test/kotlin</testSourceDirectory>
+        <!--        <testSourceDirectory>src/test/kotlin</testSourceDirectory>-->
 
         <plugins>
             <plugin>
