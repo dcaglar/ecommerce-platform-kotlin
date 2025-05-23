@@ -1,12 +1,12 @@
 package com.dogancaglar.paymentservice.adapter.redis
 
 import com.dogancaglar.paymentservice.adapter.delayqueue.ScheduledPaymentOrderStatusService
-import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.event.ScheduledPaymentOrderStatusRequest
 import com.dogancaglar.paymentservice.domain.event.toDomain
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.port.EventPublisherPort
 import com.dogancaglar.paymentservice.domain.port.PaymentOrderRepository
 import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import org.slf4j.LoggerFactory
@@ -21,7 +21,7 @@ class RetryDispatcherScheduler(
     @Qualifier("paymentRetryStatusAdapter")
     private val  paymentRetryStatusAdapter: RetryQueuePort<ScheduledPaymentOrderStatusRequest>,
     private val paymentOrderRepository: PaymentOrderRepository,
-    private val paymentEventPublisher: PaymentEventPublisher,
+    private val paymentEventPublisher: EventPublisherPort,
     private val scheduledPaymentOrderStatusService: ScheduledPaymentOrderStatusService
 ) {
 

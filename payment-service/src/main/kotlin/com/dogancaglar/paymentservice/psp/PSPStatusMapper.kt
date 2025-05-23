@@ -17,7 +17,8 @@ object PSPStatusMapper {
     }
     fun requiresRetryPayment(status: PaymentOrderStatus): Boolean { return status in retryPaymentStatus}
 
-    fun requiresStatusCheck(status: PaymentOrderStatus): Boolean {
+    fun
+            requiresStatusCheck(status: PaymentOrderStatus): Boolean {
         return status in scheduleCheckPaymentStatus
     }
 }

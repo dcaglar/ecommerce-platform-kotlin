@@ -5,16 +5,20 @@ filebeat.inputs:
     json.add_error_key: true
     paths:
       - /app-logs/payment-service*.log
+      - /app-logs/payment-service.*.log   # Include older rotated logs
+
 
 output.elasticsearch:
   hosts: ["http://elasticsearch:9200"]
   username: ""
   password: ""
+  index: "payment-service-logs"
+
 
 setup.kibana:
   host: "http://kibana:5601"
 
-setup.dashboards.enabled: true
+setup.dashboards.enabled: false
 
 setup.ilm.enabled: true
 setup.ilm.rollover_alias: "payment-service-logs"
@@ -22,3 +26,7 @@ setup.ilm.pattern: "{now/d}-000001"
 
 setup.template.name: "payment-service-logs"
 setup.template.pattern: "payment-service-logs-*"
+
+
+
+

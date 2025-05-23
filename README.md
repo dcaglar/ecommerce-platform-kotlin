@@ -1,159 +1,98 @@
-# 🧾 Payment Service
-> 📦 This is the `payment-service` module of the [`ecommerce-platform-kotlin`](https://github.com/dcaglar/ecommerce-platform-kotlin) monorepo.
-This service is part of the **ecommerce-platform-kotlin** monorepo and is responsible for managing the payment lifecycle using a resilient, event-driven architecture with Domain-Driven Design (DDD) principles.
-![Architecture](https://dcaglar.github.io/ecommerce-platform-kotlin/docs/architecture/payment-service/payment_service_architecture.png)
----
+# 🛍️ ecommerce-platform-kotlin
 
-## 🧩 Services
-
-📦 **Payment Service** — handles all payment lifecycle operations, retries, and integrations with external PSPs using DDD and event-driven architecture.
+A modular, event-driven ecommerce platform prototype designed to demonstrate production-grade architectural principles using Kotlin, Spring Boot, and Kafka. Inspired by the needs of high-throughput marketplaces like Amazon or bol.com.
 
 ---
 
-## 🚀 Responsibilities
+## 🧱 Architecture Overview
 
-- Handle `payment_order_created` events
-- Interact with external PSP (sync + async)
-- Retry failed payments using Redis
-- Defer status checks via Kafka delay queue
-- Emit `payment_order_success` events on success
+This project uses:
 
----
-
-## 📬 Kafka Topics & Domain Events
-
-
-| Domain Event                   | Kafka Topic                         |
-|--------------------------------|-------------------------------------|
-| `PaymentOrderCreated`          | `payment_order_created_queue`             |
-| `PaymentOrderRetryRequested`   | `payment_order_retry_request_topic` |
-| `PaymentOrderStatusScheduled ` | `payment_status_check_scheduler_topic`            |
-| `DuePaymentOrderStatusCheck`   | `due_payment_status_check_topic`             |
-| `PaymentOrderSucceededEvent`   | `payment_order_success`             |
+- **Domain-Driven Design (DDD)** to model the business domain clearly and explicitly
+- **Hexagonal Architecture** to decouple domain logic from external technologies
+- **Event-Driven Design** with Kafka to enable loose coupling and reactive flows
+- **Resilient patterns** like retries, scheduled status checks, and dead letter queues
+- **Observability** via structured logging with MDC trace IDs sent to Elasticsearch + Kibana
 
 ---
 
-## ✨ Dynamic Kafka Consumer Support
+## 🧩 Modules (WIP)
 
-This service supports dynamic consumer registration via `application.yml`.  
-You can add a new consumer **without modifying any Java/Kotlin code**.
-
-```yaml
-kafka:
-  dynamic-consumers:
-    - id: payment-order-executor
-      topic: payment_order_created_queue
-      group-id: payment-executor-group
-      class-name: com.dogancaglar.paymentservice.kafka.PaymentOrderExecutor
-```
-
-Each dynamic consumer must implement a `handle(EventEnvelope<T>)` method.
+- ✅ `payment-service`: handles full payment lifecycle, retry, and PSP interaction
+- ⏳ `order-service`: planned
+- ⏳ `wallet-service`: planned
+- ⏳ `shipment-service`: planned
+- ✅ `common`: shared event envelope, logging, and metadata abstractions
 
 ---
 
-## 📦 Kafka Message Format Example
-
-Topic: `payment_order_created`
-
-```json
-{
-  "eventId": "uuid-1234",
-  "eventType": "payment_order_created",
-  "aggregateId": "payment-987",
-  "data": {
-    "paymentOrderId": "payment-987",
-    "sellerId": "seller-123",
-    "amountValue": 1000,
-    "currency": "EUR"
-  },
-"parentEventId": "payment-987",
-"traceId": "123121"
-}
-```
-
----
-
-## 🔐 Security
-
-- OAuth2 Resource Server with Keycloak
-- JWT-based authentication
-
----
-
-## 🧠 Design Highlights
-
-- DDD + Hexagonal Architecture
-- Resilient retry mechanism (Redis & Kafka)
-- Exponential backoff on failure
-- Minimal coupling between consumers and PSP logic
-
----
-
-## TODO
- - add retrystatus count and retryStatusReason to paymet order
- - Observability: logs include eventId, retries, order status
- - idempotency checks.
- - maybe put paymentOrder,not paymentOrderId in redis queue.since we always check the order
- - redis evict data after they are retried.
- - and payment result is pending,do not schedule for hours later, first checkStatus for 5th and 10th minute other wise schedule for 1 hour later
- -  how to manage kafka queue or increase consumers for same queue for consumer per topic
- - config server
- - externalize configuration based on env
-## 🛠 Tech Stack
-
-- Kotlin 1.9+
-- Spring Boot 3.x
-- Kafka
-- Redis
-- PostgreSQL + Liquibase
-- OAuth2 (Keycloak)
-- Micrometer
-
----
-
-## 🧪 Testing
-
-- Unit testing with JUnit & MockK
-- Testcontainers (planned) for Kafka, Redis, PostgreSQL
-
----
-
-## 🧱 Architecture Diagram
+## 🔁 Key Event Flow (Payment)
 
 ```text
-[Kafka: payment_order_created]
-       ↓
-[PaymentOrderExecutor] ---> [PSPClient] ---> [Kafka: payment_order_success]
-       ↓
-   [RedisRetryQueue] ---> [Kafka: payment_order_retry] ---> [PaymentRetryExecutor]
+[OrderService] → POST /payments
+      ↓
+[PaymentController] → [PaymentOrderService] → [PostgreSQL + OutboxEvent]
+      ↓
+[OutboxDispatcher] → Kafka: payment_order_created_queue
+      ↓
+[PaymentOrderExecutor] → [PSPClient]
+        ├── onSuccess: Kafka → payment_order_success
+        ├── onFailure: Redis → payment_retry_queue
+        └── onPending: Redis → payment_status_check_queue
 ```
 
 ---
 
-## ⚙️ Getting Started
+## 📦 Kafka Topics
 
-### Prerequisites
+| Domain Event                   | Kafka Topic                           |
+|--------------------------------|----------------------------------------|
+| `PaymentOrderCreated`          | `payment_order_created_queue`         |
+| `PaymentOrderRetryRequested`   | `payment_order_retry_request_topic`   |
+| `PaymentOrderStatusScheduled`  | `payment_status_check_scheduler_topic`|
+| `DuePaymentOrderStatusCheck`   | `due_payment_status_check_topic`      |
+| `PaymentOrderSucceeded`        | `payment_order_success`               |
 
-- Java 17+
-- Docker
-- Maven or IntelliJ
+---
 
-### Local Setup
+## 🧠 Observability
+
+- **Structured JSON logs** via `logstash-logback-encoder`
+- **MDC-based traceId + parentEventId** for full event traceability
+- Logs sent to **Filebeat → Elasticsearch → Kibana**
+- Future: Grafana dashboards for retry rates, PSP success, DLQs
+
+---
+
+## ⚙️ Tech Stack
+
+- Kotlin 1.9+, Spring Boot 3.x
+- Kafka (event backbone)
+- PostgreSQL + Liquibase
+- Redis (retry queues)
+- Keycloak (OAuth2 Resource Server)
+- Docker Compose for local dev
+- Micrometer + ELK Stack for observability
+
+---
+
+## 🚀 Getting Started
 
 ```bash
-git clone https://github.com/yourusername/ecommerce-platform-kotlin.git
-cd payment-service
+git clone https://github.com/dcaglar/ecommerce-platform-kotlin.git
+cd ecommerce-platform-kotlin
 docker-compose up -d
+cd payment-service
 ./mvnw spring-boot:run
 ```
 
 ---
 
-## 👨‍💻 Author
+## 📜 License
 
-Developed with ❤️ by **Doğan Çağlar**  
-Designed to showcase production-grade architecture with resilience, clean code, and testability in mind.
+MIT — use, fork, and contribute freely.
 
 ---
 
-_Last updated: 2025-05-16_
+
+👨‍💻 Developed by **Doğan Çağlar** to demonstrate how to build secure, fault-tolerant, and observable systems using Kotlin + Spring Boot.

@@ -3,24 +3,17 @@ package com.dogancaglar.paymentservice.adapter.kafka.consumers
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
-import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
-import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryPaymentAdapter
-import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryStatusAdapter
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryRequested
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
-import com.dogancaglar.paymentservice.domain.event.ScheduledPaymentOrderStatusRequest
+import com.dogancaglar.paymentservice.domain.event.*
 import com.dogancaglar.paymentservice.domain.event.mapper.toRetryEvent
-import com.dogancaglar.paymentservice.domain.event.toDomain
-import com.dogancaglar.paymentservice.domain.event.toPaymentOrderStatusScheduled
-import com.dogancaglar.paymentservice.domain.event.toSchedulePaymentOrderStatusEvent
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.port.EventPublisherPort
 import com.dogancaglar.paymentservice.domain.port.PaymentOrderRepository
 import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import com.dogancaglar.paymentservice.psp.PSPClient
 import com.dogancaglar.paymentservice.psp.PSPStatusMapper
+import io.micrometer.core.instrument.MeterRegistry
 import jakarta.transaction.Transactional
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
@@ -39,17 +32,18 @@ class PaymentOrderExecutor(
     val paymentRetryStatusAdapter: RetryQueuePort<ScheduledPaymentOrderStatusRequest>,
     @Qualifier("paymentRetryPaymentAdapter") val paymentRetryPaymentAdapter: RetryQueuePort<PaymentOrderRetryRequested>,
     val pspClient: PSPClient,
-    val paymentEventPublisher: PaymentEventPublisher
+    val paymentEventPublisher: EventPublisherPort,val meterRegistry: MeterRegistry
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @Transactional
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderCreated>>) {
         val envelope = record.value()
-        LogContext.with(envelope){
-            MDC.put(LogFields.TOPIC_NAME,record.topic())
-            MDC.put(LogFields.PAYMENT_ORDER_ID,envelope.data.paymentOrderId)
-            MDC.put(LogFields.CONSUMER_GROUP,"payment-order-executor")
+        LogContext.with(envelope, mapOf(
+            LogFields.TOPIC_NAME to record.topic(),
+            LogFields.CONSUMER_GROUP to "payment-order-executor",
+            LogFields.PAYMENT_ORDER_ID to envelope.data.paymentOrderId
+        )) {
             logger.info("▶️ [Handle Start] Processing PaymentOrderCreated")
             val paymentOrderCreatedEvent = envelope.data
             val order = paymentOrderCreatedEvent.toDomain()
@@ -94,7 +88,8 @@ class PaymentOrderExecutor(
     }
 
     private fun handleSuccess(envelope: EventEnvelope<PaymentOrderCreated>, order: PaymentOrder) {
-            val updatedOrder = order.markAsPaid()
+        meterRegistry.counter("payment.success.total").increment()
+        val updatedOrder = order.markAsPaid()
             paymentOrderRepository.save(updatedOrder)
         val publishedEvent = paymentEventPublisher.publish(
                 event = EventMetadatas.PaymentOrderSuccededMetaData,
@@ -133,6 +128,8 @@ class PaymentOrderExecutor(
         val failedOrder = order.markAsFailed().incrementRetry().withRetryReason(reason).withLastError(error).updatedAt(
             LocalDateTime.now()
         )
+        meterRegistry.counter("payment.retry.attempts.total").increment()
+        meterRegistry.counter("payment.retry.attempts", "reason", reason ?: "unknown").increment()
         paymentOrderRepository.save(failedOrder)
         if (failedOrder.retryCount < 5) {
 
@@ -167,4 +164,14 @@ class PaymentOrderExecutor(
         }.get(3, TimeUnit.SECONDS)
         // This should be replaced with your actual PSP integration
     }
+
+    /*
+    private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
+    return meterRegistry.timer("psp.call.duration").recordCallable {
+        CompletableFuture.supplyAsync {
+            pspClient.charge(order)
+        }.get(3, TimeUnit.SECONDS)
+    }
+}
+     */
 }

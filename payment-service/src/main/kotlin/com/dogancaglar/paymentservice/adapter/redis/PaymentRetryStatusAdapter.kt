@@ -2,13 +2,11 @@ package com.dogancaglar.paymentservice.adapter.redis
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogFields
-import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderStatusScheduled
 import com.dogancaglar.paymentservice.domain.event.ScheduledPaymentOrderStatusRequest
 import com.dogancaglar.paymentservice.domain.event.toPaymentOrderStatusScheduled
-import com.dogancaglar.paymentservice.domain.event.toSchedulePaymentOrderStatusEvent
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.port.EventPublisherPort
 import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -21,7 +19,7 @@ import org.springframework.stereotype.Component
 @Component("paymentRetryStatusAdapter")
 open class PaymentRetryStatusAdapter(private val redisTemplate: StringRedisTemplate,
                                      @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper,
-                                    val paymentEventPublisher: PaymentEventPublisher ) : RetryQueuePort<ScheduledPaymentOrderStatusRequest> {
+                                    val paymentEventPublisher: EventPublisherPort ) : RetryQueuePort<ScheduledPaymentOrderStatusRequest> {
     private val queue = "payment_status_queue"
     private val logger = LoggerFactory.getLogger(javaClass)
 

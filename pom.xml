@@ -3,11 +3,27 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.5</version>
+        <relativePath/> <!-- lookup parent from Maven Central -->
+    </parent>
+    <packaging>pom</packaging>
+    <!-- IMPORTANT
+    iecommerce-platform-kotlin)
+    it declares parant proejct  not as deployable artifact
+    but container for  submodules
+    tells Maven this module is for project structure, dependency management, and configuration sharing, not to produce code.
+
+🔹 What it means:
+
+It declares that this module is:
+	•	Not a deployable artifact (like a JAR or WAR)
+-->
     <groupId>com.dogancaglar</groupId>
     <artifactId>ecommerce-platform-kotlin</artifactId>
     <version>1.0.0-SNAPSHOT</version>
-    <packaging>pom</packaging>
-
     <modules>
         <module>common</module>
         <module>payment-service</module>
@@ -16,36 +32,20 @@
     <properties>
         <java.version>21</java.version>
         <kotlin.version>1.9.22</kotlin.version>
-        <spring.boot.version>3.2.5</spring.boot.version>
-        <spring.kafka.version>3.1.2</spring.kafka.version>
         <postgresql.version>42.7.3</postgresql.version>
         <redisson.version>3.23.5</redisson.version>
         <liquibase.version>4.26.0</liquibase.version>
         <logstash.version>7.4</logstash.version>
-        <spring.logging>7.4</spring.logging>
+        <spring.boot.version>3.2.5</spring.boot.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
-            <!-- Spring Boot BOM -->
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-dependencies</artifactId>
-                <version>${spring.boot.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-security</artifactId>
-                <version>${spring.boot.version}</version>
-            </dependency>
-
+            <!-- Spring Boot BOM (already managed by parent, no need to re-import) -->
             <!-- Spring Kafka -->
             <dependency>
-                <groupId>org.springframework.kafka</groupId>
-                <artifactId>spring-kafka</artifactId>
-                <version>${spring.kafka.version}</version>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-kafka</artifactId>
             </dependency>
 
             <!-- PostgreSQL -->
@@ -62,7 +62,7 @@
                 <version>${liquibase.version}</version>
             </dependency>
 
-            <!-- Kotlin (no versions in children) -->
+            <!-- Kotlin dependencies (keep versions here for consistent management) -->
             <dependency>
                 <groupId>org.jetbrains.kotlin</groupId>
                 <artifactId>kotlin-stdlib-jdk8</artifactId>
@@ -80,27 +80,25 @@
             </dependency>
             <dependency>
                 <groupId>org.jetbrains.kotlin</groupId>
-                <artifactId>kotlin-maven-plugin</artifactId>
-                <version>${kotlin.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.jetbrains.kotlin</groupId>
                 <artifactId>kotlin-spring</artifactId>
                 <version>${kotlin.version}</version>
             </dependency>
+
+            <!-- Logstash encoder -->
             <dependency>
                 <groupId>net.logstash.logback</groupId>
                 <artifactId>logstash-logback-encoder</artifactId>
                 <version>${logstash.version}</version>
             </dependency>
+
+            <!-- Prometheus metrics -->
             <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-logging</artifactId>
-                <version>3.2.1</version>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-registry-prometheus</artifactId>
             </dependency>
         </dependencies>
     </dependencyManagement>
+
     <build>
         <pluginManagement>
             <plugins>
@@ -115,7 +113,22 @@
                                 <goal>compile</goal>
                             </goals>
                             <configuration>
-                                <jvmTarget>17</jvmTarget>
+                                <jvmTarget>${java.version}</jvmTarget>
+                                <!--
+                                🔧 What this means:
+	•	<java.version>21</java.version> is used by Spring Boot to configure things like the Java compiler, maven-compiler-plugin, and potentially some default behaviors.
+                        <jvmTarget>17</jvmTarget> tells the Kotlin compiler to generate bytecode compatible with Java 17.
+                            -->
+                            </configuration>
+                        </execution>
+
+                        <execution>
+                            <id>test-compile</id>
+                            <goals>
+                                <goal>test-compile</goal>
+                            </goals>
+                            <configuration>
+                                <jvmTarget>${java.version}</jvmTarget>
                             </configuration>
                         </execution>
                     </executions>

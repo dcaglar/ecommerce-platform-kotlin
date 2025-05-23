@@ -1,11 +1,10 @@
 package com.dogancaglar.paymentservice.adapter.delayqueue
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderStatusScheduled
-import com.dogancaglar.paymentservice.domain.event.toDomain
 import com.dogancaglar.paymentservice.domain.event.toDuePaymentOrderStatusCheck
+import com.dogancaglar.paymentservice.domain.port.EventPublisherPort
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
@@ -17,7 +16,7 @@ import java.time.Instant
 @Component
 class DueStatusCheckRequestDispatcherJob(
     private val repository: ScheduledPaymentOrderRequestRepository,
-    private val paymentEventPublisher: PaymentEventPublisher,
+    private val genericEventPublisher: EventPublisherPort,
     private val objectMapper: ObjectMapper
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -37,7 +36,7 @@ class DueStatusCheckRequestDispatcherJob(
                 //schedule due status check event
                 val envelope: EventEnvelope<PaymentOrderStatusScheduled> = objectMapper.readValue(it.payload,envelopeType)
                 val dueRequestEvent = envelope.data.toDuePaymentOrderStatusCheck()
-                paymentEventPublisher.publish(
+                genericEventPublisher.publish(
                     event = EventMetadatas.PaymentOrderStatusCheckExecutorMetadata,
                     aggregateId = envelope.data.paymentOrderId,
                     data = dueRequestEvent,

@@ -4,20 +4,15 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.adapter.delayqueue.RequestStatus
-import com.dogancaglar.paymentservice.adapter.delayqueue.ScheduledPaymentOrderStatusRequestEntity
 import com.dogancaglar.paymentservice.adapter.delayqueue.ScheduledPaymentOrderStatusService
-import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
-import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryStatusAdapter
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.DuePaymentOrderStatusCheck
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryRequested
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderStatusScheduled
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
 import com.dogancaglar.paymentservice.domain.event.ScheduledPaymentOrderStatusRequest
 import com.dogancaglar.paymentservice.domain.event.toDomain
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.port.EventPublisherPort
 import com.dogancaglar.paymentservice.domain.port.PaymentOrderRepository
 import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import com.dogancaglar.paymentservice.psp.PSPClient
@@ -34,7 +29,7 @@ import java.util.concurrent.TimeUnit
 class  ScheduledPaymentStatusCheckExecutor(
     private val paymentOrderRepository: PaymentOrderRepository,
     private val pspClient: PSPClient,
-    private val paymentEventPublisher: PaymentEventPublisher,
+    private val paymentEventPublisher: EventPublisherPort,
     @Qualifier("paymentRetryStatusAdapter")
     val paymentRetryStatusAdapter: RetryQueuePort<ScheduledPaymentOrderStatusRequest>,
     val scheduledPaymentOrderStatusService : ScheduledPaymentOrderStatusService

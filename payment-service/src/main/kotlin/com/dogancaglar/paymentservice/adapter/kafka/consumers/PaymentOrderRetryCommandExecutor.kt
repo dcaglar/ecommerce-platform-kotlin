@@ -4,20 +4,17 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.adapter.delayqueue.ScheduledPaymentOrderStatusService
-import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
 import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryPaymentAdapter
 import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryStatusAdapter
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
-import com.dogancaglar.paymentservice.domain.event.ScheduledPaymentOrderStatusRequest
 import com.dogancaglar.paymentservice.domain.event.toDomain
 import com.dogancaglar.paymentservice.domain.event.toPaymentOrderStatusScheduled
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.port.EventPublisherPort
 import com.dogancaglar.paymentservice.domain.port.PaymentOrderRepository
-import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import com.dogancaglar.paymentservice.psp.PSPClient
 import com.dogancaglar.paymentservice.psp.PSPStatusMapper
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -38,45 +35,46 @@ class PaymentOrderRetryCommandExecutor(
     @Qualifier("paymentRetryPaymentAdapter") val paymentRetryPaymentAdapter: PaymentRetryPaymentAdapter,
     val scheduledPaymentOrderStatusService: ScheduledPaymentOrderStatusService,
     val pspClient: PSPClient,
-    val paymentEventPublisher: PaymentEventPublisher
+    val paymentEventPublisher: EventPublisherPort
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderRetryRequested>>) {
         val eventId = record.key()
         val envelope = record.value()
-        LogContext.with(envelope) {
-            MDC.put(LogFields.TOPIC_NAME, record.topic())
-            MDC.put(LogFields.CONSUMER_GROUP, record.topic())
-            MDC.put(LogFields.PAYMENT_ORDER_ID, envelope.data.paymentOrderId)
             val paymentOrderRetryRequestedEvent = envelope.data
-            val paymentOrder = paymentOrderRetryRequestedEvent.toDomain()
+            val failedPaymentOrder = paymentOrderRetryRequestedEvent.toDomain()
+        LogContext.with(envelope, mapOf(
+            LogFields.TOPIC_NAME to record.topic(),
+            LogFields.CONSUMER_GROUP to "payment-order-executor",
+            LogFields.PAYMENT_ORDER_ID to envelope.data.paymentOrderId
+        )) {
             try {
-                val response = safePspRetryCall(paymentOrder)
+                val response = safePspRetryCall(failedPaymentOrder)
 
                 when {
                     response == PaymentOrderStatus.SUCCESSFUL -> {
-                        handleSuccess(envelope = envelope, order = paymentOrder)
+                        handleSuccess(envelope = envelope, order = failedPaymentOrder)
                     }
                     //TODO PAYMENT_NOT__SCUCESFUL_EVENT PUBLISH
                     PSPStatusMapper.requiresRetryPayment(response) -> {
-                        handleRetryPayment(paymentOrder, reason = "Retryable status from PSP: $response")
+                        handleRetryPayment(failedPaymentOrder, reason = "Retryable status from PSP: $response")
                     }
 
                     PSPStatusMapper.requiresStatusCheck(response) -> {
                         handleSchedulePaymentStatusCheck(
                             envelope,
-                            paymentOrder,
+                            failedPaymentOrder,
                             reason = "Scheduling a   status check from PSP: $response"
                         )
                     }
 
                     else -> {
-                        handleNonRetryable(paymentOrder, response)
+                        handleNonRetryable(failedPaymentOrder, response)
                     }
                 }
             } catch (e: TimeoutException) {
                 logger.error("Request get timeout, retrying payment")
-                handleRetryPayment(paymentOrder, "TIMEOUT", e.message)
+                handleRetryPayment(failedPaymentOrder, "TIMEOUT", e.message)
             } catch (e: Exception) {
                 val topic = record.topic()
                 val partition = record.partition()

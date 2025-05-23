@@ -30,7 +30,9 @@ class PaymentService(
 
     @Transactional
     fun createPayment(payment: Payment): Payment {
-        // Persist the payment entity
+        if (MDC.get(LogFields.TRACE_ID) == null) {
+            MDC.put(LogFields.TRACE_ID, UUID.randomUUID().toString())
+        }// Persist the payment entity
         paymentRepository.save(payment)
 
         val paymentOrderList = mutableListOf<PaymentOrder>()

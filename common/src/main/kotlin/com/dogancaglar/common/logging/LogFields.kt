@@ -8,4 +8,6 @@ object LogFields {
     const val TOPIC_NAME = "topicName"
     const val CONSUMER_GROUP = "consumerGroup"
     const val PAYMENT_ORDER_ID = "paymentOrderId"
+    const val RETRY_COUNT = "retryCount"
+    const val RETRY_REASON = "retryReason"
 }

@@ -5,12 +5,17 @@ import com.dogancaglar.common.event.EventEnvelope
 import org.slf4j.MDC
 
 object LogContext {
-    fun <T> with(envelope: EventEnvelope<T>, block: () -> Unit) {
+    fun <T> with(
+        envelope: EventEnvelope<T>,
+        additionalContext: Map<String, String> = emptyMap(),
+        block: () -> Unit
+    ) {
         try {
             MDC.put(LogFields.TRACE_ID, envelope.traceId)
             MDC.put(LogFields.EVENT_ID, envelope.eventId.toString())
             MDC.put(LogFields.AGGREGATE_ID, envelope.aggregateId)
             MDC.put(LogFields.EVENT_TYPE, envelope.eventType)
+            additionalContext.forEach { (k, v) -> MDC.put(k, v) }
             block()
         } finally {
             MDC.clear()
