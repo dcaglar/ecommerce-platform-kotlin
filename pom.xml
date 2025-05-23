@@ -41,14 +41,13 @@ It declares that this module is:
         <liquibase.version>4.26.0</liquibase.version>
         <logstash.version>7.4</logstash.version>
         <spring.boot.version>3.5.0</spring.boot.version>
+        <sulki.ulid.version>8.3.0</sulki.ulid.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
             <!-- Spring Boot BOM (already managed by parent, no need to re-import) -->
             <!-- Spring Kafka -->
-
-
             <!-- PostgreSQL -->
             <dependency>
                 <groupId>org.postgresql</groupId>
@@ -84,7 +83,11 @@ It declares that this module is:
                 <artifactId>kotlin-spring</artifactId>
                 <version>${kotlin.version}</version>
             </dependency>
-
+            <dependency>
+                <groupId>de.huxhorn.sulky</groupId>
+                <artifactId>de.huxhorn.sulky.ulid</artifactId>
+                <version>${sulki.ulid.version}</version>
+            </dependency>
             <!-- Logstash encoder -->
             <dependency>
                 <groupId>net.logstash.logback</groupId>

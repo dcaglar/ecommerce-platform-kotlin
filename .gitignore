@@ -11,7 +11,8 @@ target/
 .idea/libraries/
 *.iws
 *.iml
-*.ipr
+*.ipr]
+*.xml
 
 ### Eclipse ###
 .apt_generated
