@@ -55,6 +55,27 @@ This project uses:
 
 ---
 
+
+	•	One for each seller.
+	•	Each must be processed independently (for PSP, commission, wallets, etc).
+	•	Each can succeed or fail independently.
+	•	You handle retries, status checks, and events per PaymentOrder.
+
+⸻
+
+✅ Your Domain Logic Captures This Well:
+•	Payment = aggregate root for the shopper’s intent
+•	PaymentOrder = per-seller subunit (child entity or separate aggregate depending on your rules)
+•	OutboxEvent = decoupled way to emit PaymentOrderCreated messages for asynchronous handling
+
+⸻
+
+This is aligned with:
+•	Bol.com-style multi-seller platforms
+•	Hexagonal and modular architecture (each PaymentOrder can trigger wallet updates, ledger entries, shipment flows, etc)
+
+Let me know if you want a diagram or Elasticsearch query use-case to trace a full payment flow!
+
 ## 🧠 Observability
 
 - **Structured JSON logs** via `logstash-logback-encoder`

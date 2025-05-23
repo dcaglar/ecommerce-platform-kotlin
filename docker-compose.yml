@@ -119,8 +119,8 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
-      - ES_JAVA_OPTS=-Xms1g -Xmx1g
-    mem_limit: 3g  # optional Docker hard limit if needed
+      - ES_JAVA_OPTS=-Xms2g -Xmx2g
+    mem_limit: 3g  # optional Docker hard limit if neede
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:9200 || exit 1" ]
       interval: 10s
@@ -144,6 +144,8 @@ services:
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
       - xpack.security.enabled=false
+      - NODE_OPTIONS=--max-old-space-size=1024
+    mem_limit: 2g
     ports:
       - "5601:5601"  # Exposed for browser access to Kibana
     networks:

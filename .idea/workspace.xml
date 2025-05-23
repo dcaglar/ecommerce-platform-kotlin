@@ -4,27 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9f421c06-7ac3-46c3-82a7-642ba7215817" name="Changes" comment="addd gfitignore">
-      <change afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/port/EventPublisherPort.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
+    <list default="true" id="9f421c06-7ac3-46c3-82a7-642ba7215817" name="Changes" comment="introduce logcontext for tracing,add telemetry metrc for alerts grafana&#10;also extended mdc ffields and usage">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/event/Topics.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/event/Topics.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/logging/LogContext.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/logging/LogContext.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/logging/LogFields.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/logging/LogFields.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/docker-compose.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/filebeat/filebeat.yml" beforeDir="false" afterPath="$PROJECT_DIR$/filebeat/filebeat.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/delayqueue/DueStatusCheckRequestDispatcherJob.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/delayqueue/DueStatusCheckRequestDispatcherJob.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/PaymentOrderExecutor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/PaymentOrderExecutor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/PaymentOrderRetryCommandExecutor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/PaymentOrderRetryCommandExecutor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/ScheduledPaymentStatusCheckExecutor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/ScheduledPaymentStatusCheckExecutor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/producers/PaymentEventPublisher.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/producers/PaymentEventPublisher.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/outbox/producer/OutboxDispatcherScheduler.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/outbox/producer/OutboxDispatcherScheduler.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/redis/PaymentRetryStatusAdapter.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/redis/PaymentRetryStatusAdapter.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/redis/RetryDispatcherScheduler.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/redis/RetryDispatcherScheduler.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/application/service/PaymentService.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/application/service/PaymentService.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/psp/PSPStatusMapper.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/psp/PSPStatusMapper.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -175,7 +158,15 @@
       <option name="project" value="LOCAL" />
       <updated>1747769023127</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="introduce logcontext for tracing,add telemetry metrc for alerts grafana&#10;also extended mdc ffields and usage">
+      <option name="closed" value="true" />
+      <created>1747961911290</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1747961911290</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -192,6 +183,7 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="commit maven wrapper config" />
     <MESSAGE value="upgrade to java" />
-    <option name="LAST_COMMIT_MESSAGE" value="upgrade to java" />
+    <MESSAGE value="introduce logcontext for tracing,add telemetry metrc for alerts grafana&#10;also extended mdc ffields and usage" />
+    <option name="LAST_COMMIT_MESSAGE" value="introduce logcontext for tracing,add telemetry metrc for alerts grafana&#10;also extended mdc ffields and usage" />
   </component>
 </project>
