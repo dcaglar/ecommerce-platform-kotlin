@@ -1,14 +1,13 @@
 package com.dogancaglar.paymentservice.domain.port
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.event.EventMetadata
 
 
 interface EventPublisherPort {
     fun <T> publish(
-        event: EventMetadata<T>,
+        event: String,
         aggregateId: String,
         data: T,
-        parentEnvelope: EventEnvelope<*>?=null
+        parentEnvelope: EventEnvelope<*>? = null
     ): EventEnvelope<T>
 }
