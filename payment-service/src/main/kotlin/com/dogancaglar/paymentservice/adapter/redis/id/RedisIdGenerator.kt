@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.redis.id
 
-import com.dogancaglar.paymentservice.domain.port.IdGenerator
+import com.dogancaglar.common.id.IdGeneratorPort
 import de.huxhorn.sulky.ulid.ULID
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component
 @Component
 class RedisIdGenerator(
     private val redisTemplate: StringRedisTemplate
-) : IdGenerator {
+) : IdGeneratorPort {
 
 
     private val ulid = ULID()
