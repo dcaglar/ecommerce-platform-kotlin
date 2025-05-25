@@ -9,7 +9,7 @@ import com.dogancaglar.paymentservice.domain.event.mapper.toRetryEvent
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.port.EventPublisherPort
-import com.dogancaglar.paymentservice.domain.port.PaymentOrderRepository
+import com.dogancaglar.paymentservice.domain.port.PaymentOrderOutboundPort
 import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import com.dogancaglar.paymentservice.psp.PSPClient
 import com.dogancaglar.paymentservice.psp.PSPStatusMapper
@@ -26,7 +26,7 @@ import java.util.concurrent.TimeoutException
 
 @Component
 class PaymentOrderExecutor(
-    private val paymentOrderRepository: PaymentOrderRepository,
+    private val paymentOrderRepository: PaymentOrderOutboundPort,
     @Qualifier("paymentRetryStatusAdapter")
     val paymentRetryStatusAdapter: RetryQueuePort<ScheduledPaymentOrderStatusRequest>,
     @Qualifier("paymentRetryPaymentAdapter") val paymentRetryPaymentAdapter: RetryQueuePort<PaymentOrderRetryRequested>,
@@ -97,8 +97,8 @@ class PaymentOrderExecutor(
         val updatedOrder = order.markAsPaid()
         paymentOrderRepository.save(updatedOrder)
         val publishedEvent = paymentEventPublisher.publish(
-            event = EventMetadatas.PaymentOrderSuccededMetaData,
-            aggregateId = updatedOrder.paymentOrderId,
+            event = EventMetadatas.PaymentOrderSuccededMetaData.eventType,
+            aggregateId = updatedOrder.paymentOrderId.toString(),
             data = PaymentOrderSucceeded(
                 paymentOrderId = updatedOrder.paymentOrderId,
                 sellerId = updatedOrder.sellerId,

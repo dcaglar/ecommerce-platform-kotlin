@@ -1,15 +1,14 @@
 package com.dogancaglar.paymentservice.adapter.persistence
 
-import com.dogancaglar.paymentservice.adapter.persistence.mapper.PaymentEntityMapper
 import com.dogancaglar.paymentservice.adapter.persistence.mapper.PaymentOrderEntityMapper
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.port.PaymentOrderRepository
+import com.dogancaglar.paymentservice.domain.port.PaymentOrderOutboundPort
 import org.springframework.stereotype.Repository
 
 @Repository
 class JpaPaymentOrderAdapter(
     private val springRepo: SpringDataPaymentOrderJpaRepository
-) : PaymentOrderRepository {
+) : PaymentOrderOutboundPort {
     override fun save(paymentOrder: PaymentOrder) {
         springRepo.save(PaymentOrderEntityMapper.toEntity(paymentOrder))
     }
@@ -19,16 +18,16 @@ class JpaPaymentOrderAdapter(
         springRepo.saveAll(entities)
     }
 
-    override fun findById(id: String): PaymentOrder? {
-        return springRepo.findById(id).map(PaymentOrderEntityMapper::toDomain).orElse(null)
+    override fun findByPaymentId(paymentId: Long): PaymentOrder? {
+        return springRepo.findById(paymentId).map(PaymentOrderEntityMapper::toDomain).orElse(null)
     }
 
-    override fun countByPaymentId(paymentId: String): Long =
+    override fun countByPaymentId(paymentId: Long): Long =
         springRepo.countByPaymentId(paymentId)
 
-    override fun countByPaymentIdAndStatusIn(paymentId: String, statuses: List<String>): Long =
+    override fun countByPaymentIdAndStatusIn(paymentId: Long, statuses: List<String>): Long =
         springRepo.countByPaymentIdAndStatusIn(paymentId, statuses)
 
-    override fun existsByPaymentIdAndStatus(paymentId: String, status: String): Boolean =
+    override fun existsByPaymentIdAndStatus(paymentId: StLongring, status: String): Boolean =
         springRepo.existsByPaymentIdAndStatus(paymentId, status)
 }

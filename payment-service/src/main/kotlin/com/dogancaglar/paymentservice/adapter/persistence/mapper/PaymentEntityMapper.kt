@@ -9,22 +9,24 @@ object PaymentEntityMapper {
 
     fun toEntity(payment: Payment): PaymentEntity {
         return PaymentEntity(
-            paymentId = payment.id ?: "",
+            paymentId = payment.paymentId,
             buyerId = payment.buyerId,
-            orderId = payment.orderId,
             totalAmountValue = payment.totalAmount.value,
             totalAmountCurrency = payment.totalAmount.currency,
+            orderId = payment.orderId,
             status = payment.status,
-            createdAt = payment.createdAt
+            createdAt = payment.createdAt, paymentOrders = emptyList(),
+
+            // PaymentOrders loaded separately
         )
     }
 
     fun toDomain(entity: PaymentEntity): Payment {
         return Payment(
-            id = entity.paymentId,
+            paymentId = entity.paymentId,
             buyerId = entity.buyerId,
             orderId = entity.orderId,
-            totalAmount = Amount(entity.totalAmountValue,entity.totalAmountCurrency),
+            totalAmount = Amount(entity.totalAmountValue, entity.totalAmountCurrency),
             status = entity.status,
             createdAt = entity.createdAt,
             paymentOrders = emptyList() // PaymentOrders loaded separately

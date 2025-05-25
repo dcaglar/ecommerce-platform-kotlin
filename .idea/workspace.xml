@@ -4,30 +4,34 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9f421c06-7ac3-46c3-82a7-642ba7215817" name="Changes" comment="add missingmethodds">
-      <change afterPath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/id/IdGeneratorPort.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/PaymentOrderFactory.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/PaymentService.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/payment-service/src/test/kotlin/com/dogancaglar/paymentservice/id/RedisIdGeneratorIntegrationTest.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/payment-service/src/test/resources/application.yml" afterDir="false" />
+    <list default="true" id="9f421c06-7ac3-46c3-82a7-642ba7215817" name="Changes" comment="Revert &quot;add add uniquness redis ontainer test&quot;&#10;&#10;temporarily push">
+      <change afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/application/helper/DomainIdGenerator.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/id/IdGeneratorPort.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/id/IdGenerationConfig.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/PaymentOrderExecutor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/PaymentOrderExecutor.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/PaymentOrderRetryCommandExecutor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/PaymentOrderRetryCommandExecutor.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/ScheduledPaymentStatusCheckExecutor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/ScheduledPaymentStatusCheckExecutor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/producers/PaymentEventPublisher.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/producers/PaymentEventPublisher.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/outbox/producer/OutboxDispatcherScheduler.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/persistence/JpaPaymentAdapter.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/persistence/JpaPaymentAdapter.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/persistence/JpaPaymentOrderAdapter.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/persistence/JpaPaymentOrderAdapter.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/persistence/PaymentEntity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/persistence/PaymentEntity.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/persistence/PaymentOrderEntity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/persistence/PaymentOrderEntity.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/persistence/SpringDataPaymentJpaRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/persistence/SpringDataPaymentJpaRepository.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/persistence/SpringDataPaymentOrderJpaRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/persistence/SpringDataPaymentOrderJpaRepository.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/persistence/mapper/PaymentEntityMapper.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/persistence/mapper/PaymentEntityMapper.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/redis/RetryDispatcherScheduler.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/redis/RetryDispatcherScheduler.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/redis/id/RedisIdGenerator.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/redis/id/RedisIdGenerator.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/event/PaymentOrderSucceeded.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/event/PaymentOrderSucceeded.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/application/service/PaymentService.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/application/service/PaymentService.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/PaymentOrderFactory.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/PaymentOrderFactory.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/PaymentService.kt" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/model/Payment.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/model/Payment.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/model/PaymentOrder.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/model/PaymentOrder.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/port/EventPublisherPort.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/port/EventPublisherPort.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/port/IdGenerator.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/port/IdGeneratorPort.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/port/IdGeneratorPort.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/port/PaymentOrderRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/port/PaymentOrderRepository.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/port/PaymentRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/port/PaymentOutBoundPort.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/web/controller/PaymentController.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/web/controller/PaymentController.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/web/dto/PaymentOrderRequestDTO.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/web/dto/PaymentOrderRequestDTO.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/web/dto/PaymentRequestDTO.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/web/dto/PaymentRequestDTO.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/web/mapper/PaymentRequestMapper.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/web/mapper/PaymentRequestMapper.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/test/kotlin/com/dogancaglar/paymentservice/id/RedisIdGeneratorIntegrationTest.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/test/kotlin/com/dogancaglar/paymentservice/id/RedisIdGeneratorIntegrationTest.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -70,6 +74,8 @@
     <setting file="jar://$MAVEN_REPOSITORY$/org/jetbrains/kotlin/kotlin-stdlib/1.9.22/kotlin-stdlib-1.9.22-sources.jar!/commonMain/kotlin/collections/Maps.kt" root0="SKIP_INSPECTION" />
     <setting file="jar://$MAVEN_REPOSITORY$/org/jetbrains/kotlin/kotlin-stdlib/1.9.22/kotlin-stdlib-1.9.22-sources.jar!/jvmMain/kotlin/Collections.kt" root0="SKIP_INSPECTION" />
     <setting file="jar://$MAVEN_REPOSITORY$/org/testcontainers/testcontainers/1.21.0/testcontainers-1.21.0-sources.jar!/org/testcontainers/containers/ContainerState.java" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/docs/architecture/payment-service/payment_service_architecture.puml" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/persistence/PaymentOrderEntity.kt" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="MavenImportPreferences">
     <option name="generalSettings">
@@ -111,9 +117,9 @@
     &quot;Docker.docker-compose.yml: Compose Deployment.executor&quot;: &quot;Run&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;feature/redis__as__global__identifier&quot;,
     &quot;last_opened_file_path&quot;: &quot;/Users/dogancaglar/IdeaProjects/ecommerce-platform-kotlin/payment-service/src/test/resources&quot;,
-    &quot;project.structure.last.edited&quot;: &quot;Modules&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;SDKs&quot;,
     &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
     &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
     &quot;rearrange.code.on.save&quot;: &quot;true&quot;,
@@ -129,9 +135,12 @@
       <recent name="$PROJECT_DIR$/payment-service" />
       <recent name="$PROJECT_DIR$/payment-service/src/main/resources" />
     </key>
+    <key name="CopyKotlinDeclarationDialog.RECENTS_KEY">
+      <recent name="com.dogancaglar.paymentservice.adapter.outbox.producer" />
+    </key>
     <key name="K2MoveDeclarationsDialog.RECENT_PACKAGE_KEY">
-      <recent name="com.dogancaglar.common.id" />
       <recent name="com.dogancaglar.paymentservice.domain.port" />
+      <recent name="com.dogancaglar.common.id" />
       <recent name="com.dogancaglar.paymentservice.adapter.redis.id" />
     </key>
   </component>
@@ -249,10 +258,54 @@
       <option name="project" value="LOCAL" />
       <updated>1748038646603</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="Revert &quot;add add uniquness redis ontainer test&quot;&#10;&#10;This reverts commit feb7f5780fbcd73d3cf4f35d6c910a5f8a874ea6.">
+      <option name="closed" value="true" />
+      <created>1748075564719</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1748075564719</updated>
+    </task>
+    <task id="LOCAL-00010" summary="Revert &quot;add add uniquness redis ontainer test&quot;&#10;&#10;git add wprkspace.xml to gitignore">
+      <option name="closed" value="true" />
+      <created>1748102189370</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1748102189370</updated>
+    </task>
+    <task id="LOCAL-00011" summary="Revert &quot;add add uniquness redis ontainer test&quot;&#10;&#10;git add wprkspace.xml to gitignore">
+      <option name="closed" value="true" />
+      <created>1748102193391</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1748102193391</updated>
+    </task>
+    <option name="localTasksCounter" value="12" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
+    <option name="RECENT_FILTERS">
+      <map>
+        <entry key="Branch">
+          <value>
+            <list>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
+                  <option value="HEAD" />
+                </option>
+              </RecentGroup>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
+                  <option value="origin/main" />
+                </option>
+              </RecentGroup>
+            </list>
+          </value>
+        </entry>
+      </map>
+    </option>
     <option name="TAB_STATES">
       <map>
         <entry key="MAIN">
@@ -271,7 +324,9 @@
     <MESSAGE value="some refactoring dpendencey managemetn" />
     <MESSAGE value="introduced redis id generator" />
     <MESSAGE value="add missingmethodds" />
-    <option name="LAST_COMMIT_MESSAGE" value="add missingmethodds" />
+    <MESSAGE value="Revert &quot;add add uniquness redis ontainer test&quot;&#10;&#10;This reverts commit feb7f5780fbcd73d3cf4f35d6c910a5f8a874ea6." />
+    <MESSAGE value="Revert &quot;add add uniquness redis ontainer test&quot;&#10;&#10;git add wprkspace.xml to gitignore" />
+    <option name="LAST_COMMIT_MESSAGE" value="Revert &quot;add add uniquness redis ontainer test&quot;&#10;&#10;git add wprkspace.xml to gitignore" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -285,11 +340,25 @@
           </properties>
           <option name="timeStamp" value="2" />
         </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-function">
+          <url>file://$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/application/service/PaymentService.kt</url>
+          <line>30</line>
+          <properties class="com.dogancaglar.paymentservice.application.service.PaymentService">
+            <option name="EMULATED" value="true" />
+            <option name="WATCH_EXIT" value="false" />
+          </properties>
+          <option name="timeStamp" value="4" />
+        </line-breakpoint>
         <line-breakpoint enabled="true" type="kotlin-field">
           <url>file://$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/domain/model/PaymentOrder.kt</url>
-          <line>10</line>
-          <properties myFieldName="amount" myClassName="com.dogancaglar.paymentservice.domain.model.PaymentOrder" />
+          <line>11</line>
+          <properties myFieldName="createdAt" myClassName="com.dogancaglar.paymentservice.domain.model.PaymentOrder" />
           <option name="timeStamp" value="3" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="kotlin-line">
+          <url>file://$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/PaymentOrderRetryCommandExecutor.kt</url>
+          <line>116</line>
+          <option name="timeStamp" value="5" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

@@ -4,16 +4,16 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
-interface SpringDataPaymentOrderJpaRepository : JpaRepository<PaymentOrderEntity, String> {
+interface SpringDataPaymentOrderJpaRepository : JpaRepository<PaymentOrderEntity, Long> {
 
     @Query(
         value = "SELECT COUNT(*) FROM payment_orders WHERE payment_id = :paymentId",
         nativeQuery = true
     )
-    fun countByPaymentId(@Param("paymentId") paymentId: String): Long
+    fun countByPaymentId(@Param("paymentId") paymentId: Long): Long
 
     @Query(
-        value = """
+        value = """s
             SELECT COUNT(*) 
             FROM payment_orders 
             WHERE payment_id = :paymentId 
@@ -22,7 +22,7 @@ interface SpringDataPaymentOrderJpaRepository : JpaRepository<PaymentOrderEntity
         nativeQuery = true
     )
     fun countByPaymentIdAndStatusIn(
-        @Param("paymentId") paymentId: String,
+        @Param("paymentId") paymentId: Long,
         @Param("statuses") statuses: List<String>
     ): Long
 
@@ -38,10 +38,12 @@ interface SpringDataPaymentOrderJpaRepository : JpaRepository<PaymentOrderEntity
         nativeQuery = true
     )
     fun existsByPaymentIdAndStatus(
-        @Param("paymentId") paymentId: String,
+        @Param("paymentId") paymentId: Long,
         @Param("status") status: String
     ): Boolean
 
 
     fun save(entity: PaymentOrderEntity): PaymentOrderEntity
+
+    fun getMaxPaymentOrderId(): Long?
 }

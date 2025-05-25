@@ -7,7 +7,7 @@ import com.dogancaglar.paymentservice.domain.event.ScheduledPaymentOrderStatusRe
 import com.dogancaglar.paymentservice.domain.event.toDomain
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.port.EventPublisherPort
-import com.dogancaglar.paymentservice.domain.port.PaymentOrderRepository
+import com.dogancaglar.paymentservice.domain.port.PaymentOrderOutboundPort
 import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
@@ -20,7 +20,7 @@ class RetryDispatcherScheduler(
     private val paymentRetryPaymentAdapter: RetryQueuePort<PaymentOrderRetryRequested>,
     @Qualifier("paymentRetryStatusAdapter")
     private val  paymentRetryStatusAdapter: RetryQueuePort<ScheduledPaymentOrderStatusRequest>,
-    private val paymentOrderRepository: PaymentOrderRepository,
+    private val paymentOrderRepository: PaymentOrderOutboundPort,
     private val paymentEventPublisher: EventPublisherPort,
     private val scheduledPaymentOrderStatusService: ScheduledPaymentOrderStatusService
 ) {

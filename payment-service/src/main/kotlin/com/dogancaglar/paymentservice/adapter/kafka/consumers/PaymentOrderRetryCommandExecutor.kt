@@ -14,7 +14,7 @@ import com.dogancaglar.paymentservice.domain.event.toPaymentOrderStatusScheduled
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.port.EventPublisherPort
-import com.dogancaglar.paymentservice.domain.port.PaymentOrderRepository
+import com.dogancaglar.paymentservice.domain.port.PaymentOrderOutboundPort
 import com.dogancaglar.paymentservice.psp.PSPClient
 import com.dogancaglar.paymentservice.psp.PSPStatusMapper
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -29,7 +29,7 @@ import java.util.concurrent.TimeoutException
 
 @Component
 class PaymentOrderRetryCommandExecutor(
-    private val paymentOrderRepository: PaymentOrderRepository,
+    private val paymentOrderRepository: PaymentOrderOutboundPort,
     @Qualifier("paymentRetryStatusAdapter")
     val paymentRetryStatusAdapter: PaymentRetryStatusAdapter,
     @Qualifier("paymentRetryPaymentAdapter") val paymentRetryPaymentAdapter: PaymentRetryPaymentAdapter,

@@ -1,10 +1,10 @@
 package com.dogancaglar.paymentservice.domain.port
 
 import com.dogancaglar.paymentservice.domain.model.Payment
-import com.dogancaglar.paymentservice.domain.model.PaymentRequestDto
 
 
-interface PaymentRepository {
+interface PaymentOutBoundPort {
     fun save(payment: Payment): Payment
-    fun findById(id: String): Payment?
+    fun findByPaymentId(id: Long): Payment?
+
 }

@@ -13,7 +13,7 @@ import com.dogancaglar.paymentservice.domain.event.toDomain
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.port.EventPublisherPort
-import com.dogancaglar.paymentservice.domain.port.PaymentOrderRepository
+import com.dogancaglar.paymentservice.domain.port.PaymentOrderOutboundPort
 import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import com.dogancaglar.paymentservice.psp.PSPClient
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit
 //ScheduledPaymentStatusCheckExecutor will listen PaymentOrderStatusScheduled and perform actual status check
 @Component
 class  ScheduledPaymentStatusCheckExecutor(
-    private val paymentOrderRepository: PaymentOrderRepository,
+    private val paymentOrderRepository: PaymentOrderOutboundPort,
     private val pspClient: PSPClient,
     private val paymentEventPublisher: EventPublisherPort,
     @Qualifier("paymentRetryStatusAdapter")
