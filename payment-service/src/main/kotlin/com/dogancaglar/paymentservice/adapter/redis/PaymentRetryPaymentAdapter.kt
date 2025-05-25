@@ -2,9 +2,9 @@ package com.dogancaglar.paymentservice.adapter.redis
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogFields
+import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
+import com.dogancaglar.paymentservice.application.mapper.PaymentOrderEventMapper
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryRequested
-import com.dogancaglar.paymentservice.domain.event.mapper.toRetryEvent
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import com.fasterxml.jackson.core.type.TypeReference
@@ -14,8 +14,6 @@ import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
-import kotlin.jvm.javaClass
-
 
 
 @Component("paymentRetryPaymentAdapter")
@@ -29,10 +27,10 @@ open class PaymentRetryPaymentAdapter(
 
 
     override fun scheduleRetry(paymentOrder: PaymentOrder) {
-        val paymentOrderRetryRequested = paymentOrder.toRetryEvent()
+        val paymentOrderRetryRequested = PaymentOrderEventMapper.toPaymentOrderRetryRequestEvent(order = paymentOrder)
         val envelope = EventEnvelope.wrap(
             eventType = EventMetadatas.PaymentOrderRetryRequestedMetadata.eventType,
-            aggregateId = paymentOrderRetryRequested.paymentOrderId,
+            aggregateId = paymentOrderRetryRequested.publicPaymentOrderId,
             data = paymentOrderRetryRequested,
             traceId = MDC.get(LogFields.TRACE_ID) // optional
         )

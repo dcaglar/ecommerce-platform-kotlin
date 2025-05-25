@@ -4,8 +4,9 @@ import java.time.LocalDateTime
 
 data class PaymentOrder(
     val paymentOrderId: Long,
+    val publicPaymentOrderId: String,
     val paymentId: Long,
-    val publicId: String,
+    val publicPaymentId: String,
     val sellerId: String,
     val amount: Amount,
     val status: PaymentOrderStatus,
@@ -14,33 +15,34 @@ data class PaymentOrder(
     var retryCount: Int = 0,
     var retryReason: String? = "",
     var lastErrorMessage: String? = ""
-
 ) {
 
+    fun markAsFailed(): PaymentOrder {
+        return this.copy(status = PaymentOrderStatus.FAILED)
+    }
 
-    fun markAsPaid(): PaymentOrder =
-        this.copy(status = PaymentOrderStatus.SUCCESSFUL)
+    fun markAsPaid(): PaymentOrder {
+        return this.copy(status = PaymentOrderStatus.SUCCESSFUL)
+    }
 
-    fun markAsFailed(): PaymentOrder =
-        this.copy(status = PaymentOrderStatus.DECLINED)
+    fun markAsFinalizedFailed(): PaymentOrder {
+        return this.copy(status = PaymentOrderStatus.FINALIZE_FAILED)
+    }
 
-    fun markAsPending(): PaymentOrder =
-        this.copy(status = PaymentOrderStatus.PENDING)
+    fun incrementRetry(): PaymentOrder {
+        return this.copy(retryCount = this.retryCount + 1)
+    }
 
-    fun markAsFinalizedFailed(): PaymentOrder =
-        this.copy(status = PaymentOrderStatus.FINALIZE_FAILED)
+    fun withRetryReason(reason: String?): PaymentOrder {
+        return this.copy(retryReason = reason)
+    }
 
-    fun incrementRetry(): PaymentOrder =
-        this.copy(retryCount = retryCount + 1)
+    fun withLastError(error: String?): PaymentOrder {
+        return this.copy(lastErrorMessage = error)
+    }
 
-    fun withLastError(message: String?): PaymentOrder =
-        this.copy(lastErrorMessage = message)
-
-    fun withRetryReason(message: String?): PaymentOrder =
-        this.copy(retryReason = message)
-
-    fun updatedAt(updateAt: LocalDateTime): PaymentOrder =
-        this.copy(updatedAt = updateAt)
-
+    fun updatedAt(now: LocalDateTime): PaymentOrder {
+        return this.copy(updatedAt = now)
+    }
 }
 

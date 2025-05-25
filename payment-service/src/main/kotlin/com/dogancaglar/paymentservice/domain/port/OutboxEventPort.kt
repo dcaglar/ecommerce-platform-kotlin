@@ -2,9 +2,11 @@ package com.dogancaglar.paymentservice.domain.port
 
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 
-interface OutboxEventRepository {
+interface OutboxEventPort {
     fun findByStatus(status: String): List<OutboxEvent>
-    fun saveAll(orders: List<OutboxEvent>)
-    fun save(outboxEvent: OutboxEvent)
-
+    fun saveAll(events: List<OutboxEvent>): List<OutboxEvent>
+    fun save(event: OutboxEvent): OutboxEvent
 }
+
+
+

@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.adapter.persistence
+package com.dogancaglar.paymentservice.adapter.persistence.entity
 
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import jakarta.persistence.*
@@ -13,8 +13,8 @@ class PaymentEntity(
     @Column(name = "payment_id")  // 👈 Add this line
     val paymentId: Long,
 
-    @Column(name = "public_id", nullable = false, unique = true)
-    val publicId: String,
+    @Column(name = "public_payment_id", nullable = false, unique = true)
+    val publicPaymentId: String,
 
     @Column(nullable = false)
     val buyerId: String,
@@ -34,9 +34,9 @@ class PaymentEntity(
     @Column(nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()
 ) {
-    constructor(paymentId: Long, publicId: String) : this(
+    constructor(paymentId: Long, publicPaymentId: String) : this(
         paymentId = paymentId,
-        publicId = publicId,
+        publicPaymentId = publicPaymentId,
         buyerId = "",
         totalAmountValue = BigDecimal.ZERO,
         totalAmountCurrency = "EUR",

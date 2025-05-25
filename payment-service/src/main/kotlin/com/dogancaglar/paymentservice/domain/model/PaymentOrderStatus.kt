@@ -27,6 +27,6 @@ enum class PaymentOrderStatus {
     REVIEW,                 // Fraud review or manual review pending
 
     // Other transitional or error states
-    RETRY_SCHEDULED ,// Internally used to mark retry scheduling, optional
+    RETRY_SCHEDULED,// Internally used to mark retry scheduling, optional
     UNKNOWN
 }

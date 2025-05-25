@@ -16,7 +16,7 @@ import org.testcontainers.utility.DockerImageName
 class RedisIdGeneratorIntegrationTest {
 
     @Autowired
-    lateinit var idGenerator: RedisIdGenerator
+    lateinit var idGenerator: RedisIdGeneratorAdapter
 
     companion object {
         @Container
@@ -40,7 +40,7 @@ class RedisIdGeneratorIntegrationTest {
 
     @Test
     fun `should generate prefixed ULID for public ID`() {
-        val publicId = idGenerator.nextPublicId("paymentorder")
+        val publicId = idGenerator.nextId("paymentorder")
         assertThat(publicId).startsWith("paymentorder-")
     }
 
@@ -55,5 +55,5 @@ class RedisIdGeneratorIntegrationTest {
         val value2 = idGenerator.getRawValue(namespace)
         assertThat(value2).isEqualTo(1000L)
     }
-}
+
 }

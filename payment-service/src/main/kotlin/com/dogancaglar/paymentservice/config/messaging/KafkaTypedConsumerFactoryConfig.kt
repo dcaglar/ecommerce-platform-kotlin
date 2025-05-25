@@ -1,12 +1,8 @@
 package com.dogancaglar.paymentservice.config.messaging
 
 import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.paymentservice.application.event.*
 import com.dogancaglar.paymentservice.config.serialization.EventEnvelopeDeserializer
-import com.dogancaglar.paymentservice.domain.event.DuePaymentOrderStatusCheck
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryRequested
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderStatusScheduled
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.Deserializer
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -18,7 +14,7 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory
 import org.springframework.messaging.converter.MappingJackson2MessageConverter
 import org.springframework.messaging.handler.annotation.support.DefaultMessageHandlerMethodFactory
-import java.util.TimeZone
+import java.util.*
 import java.util.function.Supplier
 
 @Configuration
@@ -46,6 +42,7 @@ class KafkaTypedConsumerFactoryConfig(
     fun paymentScheduledStatusFactory(): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderStatusScheduled>> {
         return createTypedFactory(PaymentOrderStatusScheduled::class.java)
     }
+
     @Bean("due_payment_status_check_topic-factory")
     fun paymentStatusCheckExecutorFactory(): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<DuePaymentOrderStatusCheck>> {
         return createTypedFactory(DuePaymentOrderStatusCheck::class.java)
@@ -71,6 +68,7 @@ class KafkaTypedConsumerFactoryConfig(
         )
         return factory
     }
+
     @Configuration
     class MessageHandlerFactoryConfig {
 
