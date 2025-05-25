@@ -2,16 +2,10 @@ package com.dogancaglar.paymentservice.config.messaging
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
-import com.dogancaglar.paymentservice.domain.event.DuePaymentOrderStatusCheck
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryRequested
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderStatusScheduled
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
+import com.dogancaglar.paymentservice.application.event.*
 import com.fasterxml.jackson.core.type.TypeReference
 
 object EventMetadatas {
-
-
 
 
     object PaymentOrderCreatedMetadata : EventMetadata<PaymentOrderCreated> {

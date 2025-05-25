@@ -1,12 +1,7 @@
-package com.dogancaglar.paymentservice.adapter.persistence
+package com.dogancaglar.paymentservice.adapter.persistence.entity
 
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
-import jakarta.persistence.Column
-import jakarta.persistence.Entity
-import jakarta.persistence.EnumType
-import jakarta.persistence.Enumerated
-import jakarta.persistence.Id
-import jakarta.persistence.Table
+import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -16,7 +11,10 @@ class PaymentEntity(
 
     @Id
     @Column(name = "payment_id")  // 👈 Add this line
-    val paymentId: String,
+    val paymentId: Long,
+
+    @Column(name = "public_payment_id", nullable = false, unique = true)
+    val publicPaymentId: String,
 
     @Column(nullable = false)
     val buyerId: String,
@@ -33,12 +31,17 @@ class PaymentEntity(
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     val status: PaymentStatus,
-
     @Column(nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()
 ) {
-    constructor(paymentId: String) : this(
-        paymentId,
-        "", BigDecimal.ZERO, "EUR", "", PaymentStatus.INITIATED, LocalDateTime.MIN
+    constructor(paymentId: Long, publicPaymentId: String) : this(
+        paymentId = paymentId,
+        publicPaymentId = publicPaymentId,
+        buyerId = "",
+        totalAmountValue = BigDecimal.ZERO,
+        totalAmountCurrency = "EUR",
+        orderId = "",
+        status = PaymentStatus.INITIATED,
+        createdAt = LocalDateTime.MIN
     )
 }

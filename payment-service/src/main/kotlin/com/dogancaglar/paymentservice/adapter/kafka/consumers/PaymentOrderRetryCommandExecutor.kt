@@ -1,3 +1,4 @@
+/*
 package com.dogancaglar.paymentservice.adapter.kafka.consumers
 
 import com.dogancaglar.common.event.EventEnvelope
@@ -6,15 +7,15 @@ import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.adapter.delayqueue.ScheduledPaymentOrderStatusService
 import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryPaymentAdapter
 import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryStatusAdapter
+import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
+import com.dogancaglar.paymentservice.application.event.PaymentOrderSucceeded
+import com.dogancaglar.paymentservice.application.event.toDomain
+import com.dogancaglar.paymentservice.application.event.toPaymentOrderStatusScheduled
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderRetryRequested
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
-import com.dogancaglar.paymentservice.domain.event.toDomain
-import com.dogancaglar.paymentservice.domain.event.toPaymentOrderStatusScheduled
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.port.EventPublisherPort
-import com.dogancaglar.paymentservice.domain.port.PaymentOrderRepository
+import com.dogancaglar.paymentservice.domain.port.PaymentOrderOutboundPort
 import com.dogancaglar.paymentservice.psp.PSPClient
 import com.dogancaglar.paymentservice.psp.PSPStatusMapper
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -29,7 +30,7 @@ import java.util.concurrent.TimeoutException
 
 @Component
 class PaymentOrderRetryCommandExecutor(
-    private val paymentOrderRepository: PaymentOrderRepository,
+    private val paymentOrderRepository: PaymentOrderOutboundPort,
     @Qualifier("paymentRetryStatusAdapter")
     val paymentRetryStatusAdapter: PaymentRetryStatusAdapter,
     @Qualifier("paymentRetryPaymentAdapter") val paymentRetryPaymentAdapter: PaymentRetryPaymentAdapter,
@@ -41,13 +42,15 @@ class PaymentOrderRetryCommandExecutor(
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderRetryRequested>>) {
         val eventId = record.key()
         val envelope = record.value()
-            val paymentOrderRetryRequestedEvent = envelope.data
-            val failedPaymentOrder = paymentOrderRetryRequestedEvent.toDomain()
-        LogContext.with(envelope, mapOf(
-            LogFields.TOPIC_NAME to record.topic(),
-            LogFields.CONSUMER_GROUP to "payment-order-executor",
-            LogFields.PAYMENT_ORDER_ID to envelope.data.paymentOrderId
-        )) {
+        val paymentOrderRetryRequestedEvent = envelope.data
+        val failedPaymentOrder = paymentOrderRetryRequestedEvent.toDomain()
+        LogContext.with(
+            envelope, mapOf(
+                LogFields.TOPIC_NAME to record.topic(),
+                LogFields.CONSUMER_GROUP to "payment-order-executor",
+                LogFields.PAYMENT_ORDER_ID to envelope.data.paymentOrderPublicId
+            )
+        ) {
             try {
                 val response = safePspRetryCall(failedPaymentOrder)
 
@@ -81,7 +84,7 @@ class PaymentOrderRetryCommandExecutor(
                 val key = record.key()
                 val paymentOrderRequested = record.value().data
                 logger.error(
-                    "Failed to process retry payment paymentOrderId=${paymentOrderRequested.paymentOrderId}eventId=$key from topic=$topic partition=$partition",
+                    "Failed to process retry payment paymentOrderId=${paymentOrderRequested.paymentOrderPublicId}eventId=$key from topic=$topic partition=$partition",
                     e
                 )
 
@@ -167,3 +170,5 @@ class PaymentOrderRetryCommandExecutor(
     }
 
 }
+
+ */

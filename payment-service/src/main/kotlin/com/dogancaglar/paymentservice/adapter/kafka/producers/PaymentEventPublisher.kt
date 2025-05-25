@@ -2,14 +2,13 @@ package com.dogancaglar.paymentservice.adapter.kafka.producers
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
-import com.dogancaglar.paymentservice.domain.port.EventPublisherPort
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Component
-import java.util.UUID
+import java.util.*
 
 
 @Component
@@ -17,8 +16,8 @@ class PaymentEventPublisher(
     private val kafkaTemplate: KafkaTemplate<String, String>,
     @Qualifier("myObjectMapper")
     private val objectMapper: ObjectMapper
-) : EventPublisherPort{
-    private val logger = LoggerFactory.getLogger(PaymentEventPublisher::class.java)
+) {
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     /**
      * Publishes an event with optional parent envelope for traceability.
@@ -30,12 +29,12 @@ class PaymentEventPublisher(
      *     parentEventId = parentEnvelope?.eventId
      * )
      */
-    override fun <T> publish(
+    fun <T> publish(
         event: EventMetadata<T>,
         aggregateId: String,
         data: T,
         parentEnvelope: EventEnvelope<*>?  // optional parent context
-    ) : EventEnvelope<T>{
+    ): EventEnvelope<T> {
         val traceId = parentEnvelope?.traceId ?: UUID.randomUUID().toString()
         val eventId = UUID.randomUUID()
         val envelope = EventEnvelope.wrap(
@@ -61,3 +60,4 @@ class PaymentEventPublisher(
         }
     }
 }
+

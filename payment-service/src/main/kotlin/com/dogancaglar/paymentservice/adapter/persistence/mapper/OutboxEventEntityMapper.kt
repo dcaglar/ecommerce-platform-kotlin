@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.persistence.mapper
 
-import com.dogancaglar.paymentservice.adapter.persistence.OutboxEventEntity
+import com.dogancaglar.paymentservice.adapter.persistence.entity.OutboxEventEntity
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 
 object OutboxEventEntityMapper {
@@ -11,14 +11,15 @@ object OutboxEventEntityMapper {
             eventType = event.eventType,
             aggregateId = event.aggregateId,
             payload = event.payload,
-            status = event.status,
+            status = event.getStatus(),
             createdAt = event.createdAt
         )
     }
 
+
     fun toDomain(entity: OutboxEventEntity): OutboxEvent {
-        return OutboxEvent(
-            eventId = entity.eventId,
+        return OutboxEvent.restoreFromPersistence(
+            eventId = entity.eventId ?: error("eventId cannot be null when restoring from DB"),
             eventType = entity.eventType,
             aggregateId = entity.aggregateId,
             payload = entity.payload,
@@ -26,4 +27,6 @@ object OutboxEventEntityMapper {
             createdAt = entity.createdAt
         )
     }
+
+
 }

@@ -1,13 +1,8 @@
-package com.dogancaglar.common.id
+package com.dogancaglar.paymentservice.domain.port
 
-interface IdGeneratorPort {
-    fun nextId(namespace: String): Long
-    fun nextPublicId(prefix: String): String
-    fun getRawValue(namespace: String): Long?
-    fun setMinValue(namespace: String, value: Long)
-}
 
 object IdNamespaces {
+    const val PAYMENT = "payment"
     const val PAYMENT_ORDER = "payment-order"
     const val PAYMENT_REFUND = "payment-refund"
     const val ORDER = "order"

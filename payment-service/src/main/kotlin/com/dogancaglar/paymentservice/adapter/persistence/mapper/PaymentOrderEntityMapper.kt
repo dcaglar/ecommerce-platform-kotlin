@@ -1,39 +1,38 @@
 package com.dogancaglar.paymentservice.adapter.persistence.mapper
 
-import com.dogancaglar.paymentservice.adapter.persistence.PaymentEntity
-import com.dogancaglar.paymentservice.adapter.persistence.PaymentOrderEntity
+import com.dogancaglar.paymentservice.adapter.persistence.entity.PaymentOrderEntity
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 
 object PaymentOrderEntityMapper {
 
-    fun toEntity(domain: PaymentOrder): PaymentOrderEntity {
+    fun toEntity(order: PaymentOrder): PaymentOrderEntity {
         return PaymentOrderEntity(
-            paymentOrderId = domain.paymentOrderId,
-            sellerId = domain.sellerId,
-            amountValue = domain.amount.value,
-            amountCurrency = domain.amount.currency,
-            status = domain.status.name,
-            retryCount = domain.retryCount,
-            retryReason = domain.retryReason,
-            lastErrorMessage = domain.lastErrorMessage ?: "",
-            createdAt = domain.createdAt,
-            updatedAt = domain.updatedAt,
-            payment = PaymentEntity(paymentId = domain.paymentId)
+            paymentOrderId = order.paymentOrderId,
+            publicPaymentOrderId = order.publicPaymentOrderId,
+            paymentId = order.paymentId,
+            publicPaymentId = order.publicPaymentId,
+            sellerId = order.sellerId,
+            amountValue = order.amount.value,
+            amountCurrency = order.amount.currency,
+            status = order.status,
+            createdAt = order.createdAt,
+            updatedAt = order.updatedAt,
+            retryCount = order.retryCount,
+            retryReason = order.retryReason,
+            lastErrorMessage = order.lastErrorMessage
         )
     }
 
     fun toDomain(entity: PaymentOrderEntity): PaymentOrder {
         return PaymentOrder(
             paymentOrderId = entity.paymentOrderId,
-            paymentId = entity.payment.paymentId,
+            publicPaymentOrderId = entity.publicPaymentOrderId,
+            paymentId = entity.paymentId,
+            publicPaymentId = entity.publicPaymentId,
             sellerId = entity.sellerId,
-            amount = Amount(
-                value = entity.amountValue,
-                currency = entity.amountCurrency
-            ),
-            status = PaymentOrderStatus.valueOf(entity.status),
+            amount = Amount(entity.amountValue, entity.amountCurrency),
+            status = entity.status,
             createdAt = entity.createdAt,
             updatedAt = entity.updatedAt,
             retryCount = entity.retryCount,

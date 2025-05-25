@@ -1,3 +1,4 @@
+/*
 package com.dogancaglar.paymentservice.adapter.kafka.consumers
 
 import com.dogancaglar.common.event.EventEnvelope
@@ -5,15 +6,15 @@ import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.adapter.delayqueue.RequestStatus
 import com.dogancaglar.paymentservice.adapter.delayqueue.ScheduledPaymentOrderStatusService
+import com.dogancaglar.paymentservice.application.event.DuePaymentOrderStatusCheck
+import com.dogancaglar.paymentservice.application.event.PaymentOrderSucceeded
+import com.dogancaglar.paymentservice.application.event.ScheduledPaymentOrderStatusRequest
+import com.dogancaglar.paymentservice.application.event.toDomain
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.DuePaymentOrderStatusCheck
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
-import com.dogancaglar.paymentservice.domain.event.ScheduledPaymentOrderStatusRequest
-import com.dogancaglar.paymentservice.domain.event.toDomain
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.port.EventPublisherPort
-import com.dogancaglar.paymentservice.domain.port.PaymentOrderRepository
+import com.dogancaglar.paymentservice.domain.port.PaymentOrderOutboundPort
 import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import com.dogancaglar.paymentservice.psp.PSPClient
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -24,16 +25,17 @@ import org.springframework.stereotype.Component
 import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
+
 //ScheduledPaymentStatusCheckExecutor will listen PaymentOrderStatusScheduled and perform actual status check
 @Component
-class  ScheduledPaymentStatusCheckExecutor(
-    private val paymentOrderRepository: PaymentOrderRepository,
+class ScheduledPaymentStatusCheckExecutor(
+    private val paymentOrderRepository: PaymentOrderOutboundPort,
     private val pspClient: PSPClient,
     private val paymentEventPublisher: EventPublisherPort,
     @Qualifier("paymentRetryStatusAdapter")
     val paymentRetryStatusAdapter: RetryQueuePort<ScheduledPaymentOrderStatusRequest>,
-    val scheduledPaymentOrderStatusService : ScheduledPaymentOrderStatusService
-    ) {
+    val scheduledPaymentOrderStatusService: ScheduledPaymentOrderStatusService
+) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     fun handle(record: ConsumerRecord<String, EventEnvelope<DuePaymentOrderStatusCheck>>) {
@@ -47,9 +49,12 @@ class  ScheduledPaymentStatusCheckExecutor(
             val paymentOrder = paymentOrderStatusCheck.toDomain()
             try {
                 logger.info("Performing PSP status check wtih retry=${paymentOrder.retryCount}")
-                val response: PaymentOrderStatus = safePspCall(paymentOrder,)
+                val response: PaymentOrderStatus = safePspCall(paymentOrder)
                 logger.info("Updading PSP status check for payment=${paymentOrder.paymentOrderId}")
-                scheduledPaymentOrderStatusService.updateStatusToExecuted(paymentOrder.paymentOrderId, RequestStatus.EXECUTED)
+                scheduledPaymentOrderStatusService.updateStatusToExecuted(
+                    paymentOrder.paymentOrderId,
+                    RequestStatus.EXECUTED
+                )
                 when (response) {
                     PaymentOrderStatus.SUCCESSFUL -> {
                         val paidOrder = paymentOrder.markAsPaid().updatedAt(LocalDateTime.now())
@@ -108,10 +113,9 @@ class  ScheduledPaymentStatusCheckExecutor(
         )
         paymentOrderRepository.save(failedOrder)
         paymentRetryStatusAdapter.scheduleRetry(failedOrder)
-            logger.warn("🔁 Retrying order=${failedOrder.paymentOrderId} (retry=${failedOrder.retryCount}): reason=$reason")
+        logger.warn("🔁 Retrying order=${failedOrder.paymentOrderId} (retry=${failedOrder.retryCount}): reason=$reason")
 
     }
-
 
 
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
@@ -121,3 +125,6 @@ class  ScheduledPaymentStatusCheckExecutor(
         // This should be replaced with your actual PSP integration
     }
 }
+
+
+ */

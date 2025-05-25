@@ -1,20 +1,11 @@
-
 package com.dogancaglar.paymentservice.adapter.delayqueue
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.adapter.delayqueue.mapper.ScheduledPaymentOrderRequestMapper
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderStatusScheduled
-import com.dogancaglar.paymentservice.domain.event.ScheduledPaymentOrderStatusRequest
-import com.dogancaglar.paymentservice.domain.port.DelayQueuePort
+import com.dogancaglar.paymentservice.application.event.ScheduledPaymentOrderStatusRequest
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.http.RequestEntity
 import org.springframework.stereotype.Component
-import java.time.Duration
-import java.util.stream.Collectors.toList
-import javax.swing.text.html.parser.DTDConstants.MD
 
 
 @Component
@@ -23,18 +14,25 @@ class ScheduledPaymentOrderStatusService(
     private val scheduledPaymentOrderRequestRepository: ScheduledPaymentOrderRequestRepository,
     @Qualifier("myObjectMapper")
     private val objectMapper: ObjectMapper
-)  {
+) {
 
-    fun updateStatusToExecuted(paymentOrderId:String,newStatus: RequestStatus){
-        scheduledPaymentOrderRequestRepository.updateStatusByIds(paymentOrderId=paymentOrderId, newStatus)
+    fun updateStatusToExecuted(paymentOrderId: String, newStatus: RequestStatus) {
+        scheduledPaymentOrderRequestRepository.updateStatusByIds(paymentOrderId = paymentOrderId, newStatus)
     }
 
-    fun persist(scheduledPaymentStatusEnvelopeList: List<EventEnvelope<ScheduledPaymentOrderStatusRequest>>, delayMillis: Long) {
+    fun persist(
+        scheduledPaymentStatusEnvelopeList: List<EventEnvelope<ScheduledPaymentOrderStatusRequest>>,
+        delayMillis: Long
+    ) {
         val result = scheduledPaymentStatusEnvelopeList.map { e ->
-            scheduledPaymentOrderRequestMapper.toEntity(objectMapper.writeValueAsString(e),900,paymentOrderId =e.aggregateId)
+            scheduledPaymentOrderRequestMapper.toEntity(
+                objectMapper.writeValueAsString(e),
+                900,
+                paymentOrderId = e.aggregateId
+            )
         }
         result.stream().map {
-            System.out.println(" Timestamps $it.createdAt +  $it.sendAfter" )
+            System.out.println(" Timestamps $it.createdAt +  $it.sendAfter")
         }
         scheduledPaymentOrderRequestRepository.saveAll(result)
     }

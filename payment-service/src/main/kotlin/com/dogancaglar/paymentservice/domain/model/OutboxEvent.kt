@@ -3,15 +3,57 @@ package com.dogancaglar.paymentservice.domain.model
 import java.time.LocalDateTime
 import java.util.*
 
-data class OutboxEvent(
-    val eventId: UUID? = null,
+class OutboxEvent private constructor(
+    val eventId: UUID,
     val eventType: String,
     val aggregateId: String,
     val payload: String,
-    var status: String = "NEW",
-    val createdAt: LocalDateTime = LocalDateTime.now()
+    private var status: String,
+    val createdAt: LocalDateTime
 ) {
     fun markAsSent() {
-        this.status = "SENT"
+        if (status == "NEW") {
+            status = "SENT"
+        } else {
+            throw IllegalStateException("OutboxEvent must be NEW to mark as SENT")
+        }
+    }
+
+    fun getStatus(): String = status
+
+    companion object {
+        fun createNew(
+            eventType: String,
+            aggregateId: String,
+            payload: String,
+            createdAt: LocalDateTime = LocalDateTime.now()
+        ): OutboxEvent {
+            return OutboxEvent(
+                eventId = UUID.randomUUID(),
+                eventType = eventType,
+                aggregateId = aggregateId,
+                payload = payload,
+                status = "NEW",
+                createdAt = createdAt
+            )
+        }
+
+        fun restoreFromPersistence(
+            eventId: UUID,
+            eventType: String,
+            aggregateId: String,
+            payload: String,
+            status: String,
+            createdAt: LocalDateTime
+        ): OutboxEvent {
+            return OutboxEvent(
+                eventId = eventId,
+                eventType = eventType,
+                aggregateId = aggregateId,
+                payload = payload,
+                status = status,
+                createdAt = createdAt
+            )
+        }
     }
 }

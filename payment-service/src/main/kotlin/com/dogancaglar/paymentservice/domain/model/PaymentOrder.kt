@@ -3,50 +3,46 @@ package com.dogancaglar.paymentservice.domain.model
 import java.time.LocalDateTime
 
 data class PaymentOrder(
-    val paymentOrderId: String,
-    val paymentId: String,
+    val paymentOrderId: Long,
+    val publicPaymentOrderId: String,
+    val paymentId: Long,
+    val publicPaymentId: String,
     val sellerId: String,
     val amount: Amount,
     val status: PaymentOrderStatus,
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime? = LocalDateTime.now(),
-    var retryCount: Int=0,
-    var retryReason :String?="",
-    var lastErrorMessage :String?=""
-
+    var retryCount: Int = 0,
+    var retryReason: String? = "",
+    var lastErrorMessage: String? = ""
 ) {
 
+    fun markAsFailed(): PaymentOrder {
+        return this.copy(status = PaymentOrderStatus.FAILED)
+    }
 
+    fun markAsPaid(): PaymentOrder {
+        return this.copy(status = PaymentOrderStatus.SUCCESSFUL)
+    }
 
+    fun markAsFinalizedFailed(): PaymentOrder {
+        return this.copy(status = PaymentOrderStatus.FINALIZE_FAILED)
+    }
 
-    fun markAsPaid(): PaymentOrder =
-        this.copy(status = PaymentOrderStatus.SUCCESSFUL)
+    fun incrementRetry(): PaymentOrder {
+        return this.copy(retryCount = this.retryCount + 1)
+    }
 
-    fun markAsFailed(): PaymentOrder =
-        this.copy(status = PaymentOrderStatus.DECLINED)
+    fun withRetryReason(reason: String?): PaymentOrder {
+        return this.copy(retryReason = reason)
+    }
 
-    fun markAsPending(): PaymentOrder =
-        this.copy(status = PaymentOrderStatus.PENDING)
+    fun withLastError(error: String?): PaymentOrder {
+        return this.copy(lastErrorMessage = error)
+    }
 
-    fun markAsFinalizedFailed(): PaymentOrder =
-        this.copy(status = PaymentOrderStatus.FINALIZE_FAILED)
-
-
-
-    fun incrementRetry(): PaymentOrder =
-        this.copy(retryCount = retryCount+1)
-
-    fun withLastError(message: String?): PaymentOrder =
-        this.copy(lastErrorMessage = message)
-
-    fun withRetryReason(message: String?): PaymentOrder =
-        this.copy(retryReason = message)
-
-    fun updatedAt(updateAt : LocalDateTime): PaymentOrder =
-        this.copy(updatedAt = updateAt)
-
-
-    fun hasExceededMaxRetries(  maxRetries :Int = 5): Boolean =  this.retryCount>=5
-
+    fun updatedAt(now: LocalDateTime): PaymentOrder {
+        return this.copy(updatedAt = now)
+    }
 }
 
