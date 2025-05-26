@@ -2,6 +2,7 @@ package com.dogancaglar.paymentservice.application.mapper
 
 import com.dogancaglar.paymentservice.application.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
+import com.dogancaglar.paymentservice.application.event.PaymentOrderStatusScheduled
 import com.dogancaglar.paymentservice.application.event.PaymentOrderSucceeded
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import java.time.LocalDateTime
@@ -11,7 +12,7 @@ object PaymentOrderEventMapper {
         return PaymentOrderRetryRequested(
             paymentOrderId = order.paymentOrderId.toString(),
             publicPaymentOrderId = order.publicPaymentOrderId,
-            paymenId = order.paymentId.toString(),
+            paymentId = order.paymentId.toString(),
             publicPaymentId = order.publicPaymentId,
             sellerId = order.sellerId,
             retryCount = order.retryCount,
@@ -28,7 +29,7 @@ object PaymentOrderEventMapper {
         return PaymentOrderCreated(
             paymentOrderId = order.paymentOrderId.toString(),
             publicPaymentOrderId = order.publicPaymentOrderId,
-            paymenId = order.paymentId.toString(),
+            paymentId = order.paymentId.toString(),
             publicPaymentId = order.publicPaymentId,
             sellerId = order.sellerId,
             retryCount = 0,
@@ -44,9 +45,27 @@ object PaymentOrderEventMapper {
         return PaymentOrderSucceeded(
             paymentOrderId = order.paymentOrderId.toString(),
             publicPaymentOrderId = order.publicPaymentOrderId,
-            paymenId = order.paymentId.toString(),
+            paymentId = order.paymentId.toString(),
             publicPaymentId = order.publicPaymentId,
             sellerId = order.sellerId,
+            amountValue = order.amount.value,
+            currency = order.amount.currency,
+        )
+    }
+
+
+    fun toPaymentOrderStatusScheduled(order: PaymentOrder): PaymentOrderStatusScheduled {
+        return PaymentOrderStatusScheduled(
+            paymentOrderId = order.paymentOrderId.toString(),
+            publicPaymentOrderId = order.publicPaymentOrderId,
+            paymentId = order.paymentId.toString(),
+            publicPaymentId = order.publicPaymentId,
+            sellerId = order.sellerId,
+            retryCount = order.retryCount,
+            retryReason = order.retryReason,
+            createdAt = LocalDateTime.now(),
+            status = order.status.name,
+            updatedAt = LocalDateTime.now(),
             amountValue = order.amount.value,
             currency = order.amount.currency,
         )

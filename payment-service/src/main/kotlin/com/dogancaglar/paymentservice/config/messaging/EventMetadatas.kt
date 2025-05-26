@@ -46,8 +46,7 @@ object EventMetadatas {
     val all: List<EventMetadata<*>> = listOf(
         PaymentOrderCreatedMetadata,
         PaymentOrderRetryRequestedMetadata,
-        PaymentOrderStatusCheckScheduledMetadata,
-        PaymentOrderStatusCheckExecutorMetadata,
+        PaymentOrderStatusCheckScheduledMetadata, //PaymentOrderStatusCheckExecutorMetadata,
         PaymentOrderSuccededMetaData
     )
 }

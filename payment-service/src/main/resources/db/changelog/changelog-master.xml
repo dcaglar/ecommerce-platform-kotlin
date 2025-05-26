@@ -4,17 +4,13 @@
         xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
-
     <include file="payment-changelog.xml" relativeToChangelogFile="true"/>
+    <include file="uuid-extension-changelog.xml" relativeToChangelogFile="true"/>
     <include file="payment-order-changelog.xml" relativeToChangelogFile="true"/>
-    <include file="db/changelog/uuid-extension-changelog.xml"/>
     <include file="payment-outbox-changelog.xml" relativeToChangelogFile="true"/>
-    <include file="20240508-add-columns-to-payment-orders.xml" relativeToChangelogFile="true"/>
-    <include file="20240509-add-updatedAt-to-payment-orders.xml" relativeToChangelogFile="true"/>
     <include file="20240515-add-delayed-kafka-message.xml" relativeToChangelogFile="true"/>
-    <include file="20250517-add-retry-fields-to-payment-orders.xml" relativeToChangelogFile="true"/>
     <include file="20240518-create-scheduled-payment-order-status-request.xml" relativeToChangelogFile="true"/>
-    <include file="20240526-update-payment-aligned.xml" relativeToChangelogFile="true"/>
-    <include file="20240526-update-payment-order-entity-aligned.xml" relativeToChangelogFile="true"/>
-
+    <include file="20240526-remove-paymentorderid-payment.xml" relativeToChangelogFile="true"/>
+    <include file="20240526-remove-public-paymentorderid-payment.xml" relativeToChangelogFile="true"/>
+    <include file="20240526-remove-sellerid-payment.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

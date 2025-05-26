@@ -1,12 +1,12 @@
 package com.dogancaglar.paymentservice.adapter.redis
 
 import com.dogancaglar.paymentservice.adapter.delayqueue.ScheduledPaymentOrderStatusService
+import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
 import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.application.event.ScheduledPaymentOrderStatusRequest
 import com.dogancaglar.paymentservice.application.helper.PaymentOrderReconstructor
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.port.EventPublisherPort
 import com.dogancaglar.paymentservice.domain.port.PaymentOrderOutboundPort
 import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import org.slf4j.LoggerFactory
@@ -21,7 +21,7 @@ class RetryDispatcherScheduler(
     @Qualifier("paymentRetryStatusAdapter")
     private val paymentRetryStatusAdapter: RetryQueuePort<ScheduledPaymentOrderStatusRequest>,
     private val paymentOrderRepository: PaymentOrderOutboundPort,
-    private val paymentEventPublisher: EventPublisherPort,
+    private val paymentEventPublisher: PaymentEventPublisher,
     private val scheduledPaymentOrderStatusService: ScheduledPaymentOrderStatusService,
     private val reconstructor: PaymentOrderReconstructor
 ) {
@@ -38,7 +38,7 @@ class RetryDispatcherScheduler(
 
                 paymentEventPublisher.publish(
                     aggregateId = envelope.aggregateId,
-                    event = EventMetadatas.PaymentOrderRetryRequestedMetadata.eventType,
+                    event = EventMetadatas.PaymentOrderRetryRequestedMetadata,
                     data = envelope.data,
                     parentEnvelope = envelope
                 )

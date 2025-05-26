@@ -10,8 +10,8 @@ import java.time.LocalDateTime
 data class PaymentOrderRetryRequested @JsonCreator constructor(
     @JsonProperty("paymentOrderId") val paymentOrderId: String,
     @JsonProperty("publicPaymentOrderId") val publicPaymentOrderId: String,
-    @JsonProperty("paymenId") val paymenId: String,
-    @JsonProperty("paymentId") val publicPaymentId: String,
+    @JsonProperty("paymentId") val paymentId: String,
+    @JsonProperty("publicPaymentId") val publicPaymentId: String,
     @JsonProperty("sellerId") val sellerId: String,
     @JsonProperty("amountValue") val amountValue: BigDecimal,
     @JsonProperty("currency") val currency: String,

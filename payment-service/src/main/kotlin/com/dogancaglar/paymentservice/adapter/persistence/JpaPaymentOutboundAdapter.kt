@@ -19,4 +19,11 @@ class JpaPaymentOutboundAdapter(
     override fun findByPaymentId(id: Long): Payment? {
         return jpaRepository.findByPaymentId(id)?.let { PaymentEntityMapper.toDomain(it) }
     }
+
+    override fun getMaxPaymentId(): Long {
+        return jpaRepository.getMaxPaymentId() ?: 0
+
+    }
+
+
 }

@@ -1,7 +1,6 @@
 package com.dogancaglar.paymentservice.application.helper
 
-import com.dogancaglar.paymentservice.application.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
+import com.dogancaglar.paymentservice.application.event.*
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
@@ -15,7 +14,7 @@ class PaymentOrderReconstructor {
         return PaymentOrder(
             paymentOrderId = event.paymentOrderId.toLong(),
             publicPaymentOrderId = event.publicPaymentOrderId,
-            paymentId = event.paymenId.toLong(),
+            paymentId = event.paymentId.toLong(),
             publicPaymentId = event.publicPaymentId,
             sellerId = event.sellerId,
             amount = Amount(event.amountValue, event.currency),
@@ -30,7 +29,7 @@ class PaymentOrderReconstructor {
         return PaymentOrder(
             paymentOrderId = event.paymentOrderId.toLong(),
             publicPaymentOrderId = event.publicPaymentOrderId,
-            paymentId = event.paymenId.toLong(),
+            paymentId = event.paymentId.toLong(),
             publicPaymentId = event.publicPaymentId,
             sellerId = event.sellerId,
             amount = Amount(event.amountValue, event.currency),
@@ -40,4 +39,51 @@ class PaymentOrderReconstructor {
             retryCount = event.retryCount
         )
     }
+
+    fun fromDuePaymentOrderStatusCheck(event: DuePaymentOrderStatusCheck): PaymentOrder {
+        return PaymentOrder(
+            paymentOrderId = event.paymentOrderId.toLong(),
+            publicPaymentOrderId = event.publicPaymentOrderId,
+            paymentId = event.paymentId.toLong(),
+            publicPaymentId = event.publicPaymentId,
+            sellerId = event.sellerId,
+            amount = Amount(event.amountValue, event.currency),
+            status = PaymentOrderStatus.valueOf(event.status),
+            createdAt = event.createdAt,
+            updatedAt = LocalDateTime.now(), // or event.updatedAt if you trust it
+            retryCount = event.retryCount
+        )
+    }
+
+    fun fromPaymentOrderStatusScheduled(event: PaymentOrderStatusScheduled): PaymentOrder {
+        return PaymentOrder(
+            paymentOrderId = event.paymentOrderId.toLong(),
+            publicPaymentOrderId = event.publicPaymentOrderId,
+            paymentId = event.paymentId.toLong(),
+            publicPaymentId = event.publicPaymentId,
+            sellerId = event.sellerId,
+            amount = Amount(event.amountValue, event.currency),
+            status = PaymentOrderStatus.valueOf(event.status),
+            createdAt = event.createdAt,
+            updatedAt = LocalDateTime.now(), // or event.updatedAt if you trust it
+            retryCount = event.retryCount
+        )
+    }
+
+    fun fromScheduledPaymentOrderStatusRequest(event: ScheduledPaymentOrderStatusRequest): PaymentOrder {
+        return PaymentOrder(
+            paymentOrderId = event.paymentOrderId.toLong(),
+            publicPaymentOrderId = event.publicPaymentOrderId,
+            paymentId = event.paymentId.toLong(),
+            publicPaymentId = event.publicPaymentId,
+            sellerId = event.sellerId,
+            amount = Amount(event.amountValue, event.currency),
+            status = PaymentOrderStatus.valueOf(event.status),
+            createdAt = event.createdAt,
+            updatedAt = LocalDateTime.now(), // or event.updatedAt if you trust it
+            retryCount = event.retryCount
+        )
+    }
+
+
 }

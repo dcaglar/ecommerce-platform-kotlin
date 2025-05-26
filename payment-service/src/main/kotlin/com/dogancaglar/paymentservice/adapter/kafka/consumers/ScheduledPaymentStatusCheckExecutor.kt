@@ -1,22 +1,21 @@
-/*
 package com.dogancaglar.paymentservice.adapter.kafka.consumers
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
-import com.dogancaglar.paymentservice.adapter.delayqueue.RequestStatus
 import com.dogancaglar.paymentservice.adapter.delayqueue.ScheduledPaymentOrderStatusService
-import com.dogancaglar.paymentservice.application.event.DuePaymentOrderStatusCheck
-import com.dogancaglar.paymentservice.application.event.PaymentOrderSucceeded
-import com.dogancaglar.paymentservice.application.event.ScheduledPaymentOrderStatusRequest
-import com.dogancaglar.paymentservice.application.event.toDomain
+import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
+import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryPaymentAdapter
+import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryStatusAdapter
+import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
+import com.dogancaglar.paymentservice.application.mapper.PaymentOrderEventMapper
+import com.dogancaglar.paymentservice.application.service.PaymentService
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import com.dogancaglar.paymentservice.domain.port.EventPublisherPort
 import com.dogancaglar.paymentservice.domain.port.PaymentOrderOutboundPort
-import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import com.dogancaglar.paymentservice.psp.PSPClient
+import com.dogancaglar.paymentservice.psp.PSPStatusMapper
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
@@ -25,81 +24,85 @@ import org.springframework.stereotype.Component
 import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
-//ScheduledPaymentStatusCheckExecutor will listen PaymentOrderStatusScheduled and perform actual status check
 @Component
-class ScheduledPaymentStatusCheckExecutor(
+class PaymentOrderRetryCommandExecutor(
     private val paymentOrderRepository: PaymentOrderOutboundPort,
-    private val pspClient: PSPClient,
-    private val paymentEventPublisher: EventPublisherPort,
     @Qualifier("paymentRetryStatusAdapter")
-    val paymentRetryStatusAdapter: RetryQueuePort<ScheduledPaymentOrderStatusRequest>,
-    val scheduledPaymentOrderStatusService: ScheduledPaymentOrderStatusService
+    val paymentRetryStatusAdapter: PaymentRetryStatusAdapter,
+    @Qualifier("paymentRetryPaymentAdapter") val paymentRetryPaymentAdapter: PaymentRetryPaymentAdapter,
+    val scheduledPaymentOrderStatusService: ScheduledPaymentOrderStatusService,
+    val pspClient: PSPClient,
+    val paymentEventPublisher: PaymentEventPublisher,
+    val paymentService: PaymentService
 ) {
+
     private val logger = LoggerFactory.getLogger(javaClass)
-
-    fun handle(record: ConsumerRecord<String, EventEnvelope<DuePaymentOrderStatusCheck>>) {
-        // TODO BU METODU ALACAK PSP CALSTRACAK O KADAR
+    fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderRetryRequested>>) {
+        val eventId = record.key()
         val envelope = record.value()
-        LogContext.with(envelope) {
-            MDC.put(LogFields.TOPIC_NAME, record.topic())
-            MDC.put(LogFields.CONSUMER_GROUP, record.topic())
-            MDC.put(LogFields.PAYMENT_ORDER_ID, envelope.data.paymentOrderId)
-            val paymentOrderStatusCheck = envelope.data
-            val paymentOrder = paymentOrderStatusCheck.toDomain()
+        val paymentOrderRetryRequestedEvent = envelope.data
+        val failedPaymentOrder = paymentService.fromRetryRequestedEvent(paymentOrderRetryRequestedEvent)
+        LogContext.with(
+            envelope, mapOf(
+                LogFields.TOPIC_NAME to record.topic(),
+                LogFields.CONSUMER_GROUP to "payment-order-executor",
+                LogFields.PAYMENT_ORDER_ID to envelope.data.paymentOrderId
+            )
+        ) {
             try {
-                logger.info("Performing PSP status check wtih retry=${paymentOrder.retryCount}")
-                val response: PaymentOrderStatus = safePspCall(paymentOrder)
-                logger.info("Updading PSP status check for payment=${paymentOrder.paymentOrderId}")
-                scheduledPaymentOrderStatusService.updateStatusToExecuted(
-                    paymentOrder.paymentOrderId,
-                    RequestStatus.EXECUTED
-                )
-                when (response) {
-                    PaymentOrderStatus.SUCCESSFUL -> {
-                        val paidOrder = paymentOrder.markAsPaid().updatedAt(LocalDateTime.now())
-                        paymentOrderRepository.save(paidOrder)
+                val response = safePspRetryCall(failedPaymentOrder)
 
+                when {
+                    response == PaymentOrderStatus.SUCCESSFUL -> {
+                        handleSuccess(envelope = envelope, order = failedPaymentOrder)
+                    }
+                    //TODO PAYMENT_NOT__SCUCESFUL_EVENT PUBLISH
+                    PSPStatusMapper.requiresRetryPayment(response) -> {
+                        handleRetryPayment(failedPaymentOrder, reason = "Retryable status from PSP: $response")
                     }
 
-                    PaymentOrderStatus.PENDING,
-                    PaymentOrderStatus.CAPTURE_PENDING -> {
-                        paymentOrder.markAsPending().incrementRetry().updatedAt(LocalDateTime.now())
-                        paymentRetryStatusAdapter.scheduleRetry(paymentOrder)
+                    PSPStatusMapper.requiresStatusCheck(response) -> {
+                        handlePendingPayment(
+                            envelope,
+                            failedPaymentOrder,
+                            reason = "Scheduling a   status check from PSP: $response"
+                        )
                     }
 
                     else -> {
-                        logger.warn("${paymentOrder.paymentOrderId} failed with non-final PSP status: ${paymentOrderStatusCheck.status}")
-                        val failed = paymentOrder.markAsFinalizedFailed().incrementRetry()
-                        paymentOrderRepository.save(failed)
+                        handleNonRetryable(failedPaymentOrder, response)
                     }
                 }
-
+            } catch (e: TimeoutException) {
+                logger.error("Request get timeout, retrying payment")
+                handleRetryPayment(failedPaymentOrder, "TIMEOUT", e.message)
             } catch (e: Exception) {
-                logger.error("Transient error during PSP status check for ${paymentOrder}, rescheduling", e)
-                val updatedOrder = paymentOrder.markAsPending().incrementRetry().withRetryReason("transient error")
-                    .withLastError(e.message)
-                //do we want to ssave
-                paymentOrderRepository.save(updatedOrder);
-                // eeror in status check reschedukle  via redis
-                paymentRetryStatusAdapter.scheduleRetry(paymentOrder)
+                val topic = record.topic()
+                val partition = record.partition()
+                val key = record.key()
+                val paymentOrderRequested = record.value().data
+                logger.error(
+                    "Failed to process retry payment paymentOrderId=${paymentOrderRequested.paymentOrderId}eventId=$key from topic=$topic partition=$partition",
+                    e
+                )
+
+                // Optional: add to DLQ, monitoring queue, or emit an alert metric
             }
+
+
         }
+
     }
 
+    fun handleSuccess(envelope: EventEnvelope<PaymentOrderRetryRequested>, order: PaymentOrder) {
+        val updatedOrder = paymentService.processSuccessfulPayment(order)
 
-    private fun handleSuccess(envelope: EventEnvelope<DuePaymentOrderStatusCheck>, order: PaymentOrder) {
-        val updatedOrder = order.markAsPaid()
-        paymentOrderRepository.save(updatedOrder)
         val publishedEvent = paymentEventPublisher.publish(
             event = EventMetadatas.PaymentOrderSuccededMetaData,
-            aggregateId = order.paymentOrderId,
-            data = PaymentOrderSucceeded(
-                paymentOrderId = updatedOrder.paymentOrderId,
-                sellerId = updatedOrder.sellerId,
-                amountValue = updatedOrder.amount.value,
-                currency = updatedOrder.amount.currency
-            ),
+            aggregateId = updatedOrder.publicPaymentOrderId,
+            data = PaymentOrderEventMapper.toPaymentOrderSuccededEvent(updatedOrder),
             parentEnvelope = envelope,
         )
 
@@ -107,24 +110,61 @@ class ScheduledPaymentStatusCheckExecutor(
         logger.info("📨 Emitted follow-up event with ID=${publishedEvent.eventId}")        //todo do not push yet.then weiwill add eventmetatada
     }
 
-    private fun handleSchedulePaymentStatusCheck(order: PaymentOrder, reason: String? = "", error: String? = "") {
-        val failedOrder = order.markAsFailed().incrementRetry().withRetryReason(reason).withLastError(error).updatedAt(
+    fun handlePendingPayment(
+        envelope: EventEnvelope<PaymentOrderRetryRequested>,
+        order: PaymentOrder,
+        reason: String? = "",
+        error: String? = ""
+    ) {
+        val pendingPaymentOrder = paymentService.processPendingPayment(order, reason, error)
+        paymentRetryStatusAdapter.scheduleRetry(pendingPaymentOrder)
+        val paymentOrderStatusScheduled = PaymentOrderEventMapper.toPaymentOrderStatusScheduled(pendingPaymentOrder)
+
+        paymentEventPublisher.publish(
+            event = EventMetadatas.PaymentOrderStatusCheckScheduledMetadata,
+            aggregateId = pendingPaymentOrder.publicPaymentOrderId,
+            data = paymentOrderStatusScheduled,
+            parentEnvelope = envelope
+        )
+        MDC.put("retryCount", pendingPaymentOrder.retryCount.toString())
+        MDC.put("retryReason", reason ?: "N/A")
+        logger.warn("Scheduled retry status for ${pendingPaymentOrder.paymentOrderId} (retry ${pendingPaymentOrder.retryCount}): $reason")
+
+    }
+
+
+    fun handleRetryPayment(order: PaymentOrder, reason: String? = "", error: String? = "") {
+        val failedOrderDecision = paymentService.handleRetryAttempt(order);
+        val shouldRetry = !failedOrderDecision.second
+        val failedOrder = failedOrderDecision.first
+        MDC.put("retryCount", failedOrder.retryCount.toString())
+        MDC.put("retryReason", reason ?: "N/A")
+        if (shouldRetry) {
+            paymentRetryPaymentAdapter.scheduleRetry(failedOrder)
+            logger.warn("Scheduled retry for ${failedOrder} (retry ${failedOrder.retryCount}): $reason")
+        } else {
+            logger.error("Max retries exceeded for ${failedOrder.paymentOrderId}. Marking as failed permanently.")
+        }
+    }
+
+    fun handleNonRetryable(order: PaymentOrder, status: PaymentOrderStatus) {
+        val finalizedOrder = order.markAsFinalizedFailed().incrementRetry().updatedAt(
             LocalDateTime.now()
         )
-        paymentOrderRepository.save(failedOrder)
-        paymentRetryStatusAdapter.scheduleRetry(failedOrder)
-        logger.warn("🔁 Retrying order=${failedOrder.paymentOrderId} (retry=${failedOrder.retryCount}): reason=$reason")
+            .withRetryReason("Non-retryable PSP status: $status")
 
+        paymentOrderRepository.save(finalizedOrder)
+        logger.warn("PaymentOrder ${order.paymentOrderId} failed with non-retryable status $status")
     }
 
-
-    private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
+    fun safePspRetryCall(order: PaymentOrder): PaymentOrderStatus {
         return CompletableFuture.supplyAsync {
-            pspClient.checkPaymentStatus(order.paymentOrderId)
+            pspClient.chargeRetry(order)
         }.get(3, TimeUnit.SECONDS)
-        // This should be replaced with your actual PSP integration
     }
+
+    companion object {
+        private const val MAX_RETRIES = 5
+    }
+
 }
-
-
- */

@@ -5,6 +5,7 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.port.IdGeneratorPort
+import com.dogancaglar.paymentservice.domain.port.IdNamespaces
 import com.dogancaglar.paymentservice.web.dto.PaymentRequestDTO
 import com.dogancaglar.paymentservice.web.mapper.AmountMapper
 import java.time.Clock
@@ -17,28 +18,27 @@ class PaymentFactory(
     fun createFrom(request: PaymentRequestDTO): Payment {
         val now = LocalDateTime.now(clock)
 
-        val (paymentId, paymentPublicId) = idGenerator.nextPaymentId()
+        val paymentId = idGenerator.nextId(IdNamespaces.PAYMENT)
+        val paymentPublicId = "payment-$paymentId"
 
-
-        val paymentOrderIds = List(request.paymentOrders.size) {
-            idGenerator.nextPaymentOrderId()
+        val paymentOrderIdPairs = request.paymentOrders.map {
+            val orderId = idGenerator.nextId(IdNamespaces.PAYMENT_ORDER)
+            orderId to "paymentorder-$orderId"
         }
 
         val paymentOrders = request.paymentOrders.mapIndexed { index, dto ->
-            val (orderId, orderPublicId) = paymentOrderIds[index]
+            val (orderId, orderPublicId) = paymentOrderIdPairs[index]
             PaymentOrder(
                 paymentOrderId = orderId,
                 publicPaymentOrderId = orderPublicId,
                 paymentId = paymentId,
-                paymentPublicId,
+                publicPaymentId = paymentPublicId,
                 sellerId = dto.sellerId,
                 amount = AmountMapper.toDomain(dto.amount),
                 status = PaymentOrderStatus.INITIATED,
                 createdAt = now,
                 updatedAt = now
             )
-
-
         }
 
         return Payment(

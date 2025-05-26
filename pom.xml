@@ -96,6 +96,7 @@ It declares that this module is:
             </dependency>
             <!-- Prometheus metrics -->
         </dependencies>
+
     </dependencyManagement>
 
     <build>

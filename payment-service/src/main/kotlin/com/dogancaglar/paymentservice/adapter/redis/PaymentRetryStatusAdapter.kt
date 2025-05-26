@@ -1,10 +1,10 @@
-/*
 package com.dogancaglar.paymentservice.adapter.redis
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
 import com.dogancaglar.paymentservice.application.event.ScheduledPaymentOrderStatusRequest
+import com.dogancaglar.paymentservice.application.mapper.PaymentOrderEventMapper
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
@@ -26,10 +26,10 @@ open class PaymentRetryStatusAdapter(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     override fun scheduleRetry(paymentOrder: PaymentOrder) {
-        val paymentOrderStatusScheduled = paymentOrder.toPaymentOrderStatusScheduled()
+        val paymentOrderStatusScheduled = PaymentOrderEventMapper.toPaymentOrderStatusScheduled(paymentOrder)
         val envelope = EventEnvelope.wrap(
             eventType = EventMetadatas.PaymentOrderStatusCheckScheduledMetadata.eventType,
-            aggregateId = paymentOrderStatusScheduled.paymentOrderId,
+            aggregateId = paymentOrderStatusScheduled.publicPaymentOrderId,
             data = paymentOrderStatusScheduled,
             traceId = MDC.get(LogFields.TRACE_ID) // optional
         )
@@ -62,6 +62,3 @@ open class PaymentRetryStatusAdapter(
         return envelopes
     }
 }
-
-
- */

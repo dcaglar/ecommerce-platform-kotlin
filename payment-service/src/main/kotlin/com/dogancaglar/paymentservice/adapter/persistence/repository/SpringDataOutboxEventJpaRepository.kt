@@ -6,5 +6,4 @@ import java.util.*
 
 interface SpringDataOutboxEventJpaRepository : JpaRepository<OutboxEventEntity, UUID> {
     fun findByStatus(status: String): List<OutboxEventEntity>
-    fun saveAll(list: List<OutboxEventEntity>): List<OutboxEventEntity>
 }

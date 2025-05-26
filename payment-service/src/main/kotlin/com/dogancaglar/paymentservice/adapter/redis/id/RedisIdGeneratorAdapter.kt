@@ -1,26 +1,28 @@
-package com.dogancaglar.paymentservice.adapter.redis.id
+package com.dogancaglar.paymentservice.adapter.redis
 
+import com.dogancaglar.paymentservice.domain.port.IdGeneratorPort
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
 
 @Component
-class RedisIdGeneratorAdapter(
+class RedisIdGenerator(
     private val redis: StringRedisTemplate
-) {
+) : IdGeneratorPort {
 
-    fun nextId(namespace: String): Long {
-        return redis.opsForValue().increment("id-generator:$namespace")
-            ?: throw IllegalStateException("Redis ID generation failed for $namespace")
+    override fun nextId(namespace: String): Long {
+        return redis.opsForValue().increment(namespace)
+            ?: throw IllegalStateException("Redis ID generation failed for namespace: $namespace")
     }
 
-    fun getRawValue(namespace: String): Long? {
-        return redis.opsForValue().get("id-generator:$namespace")?.toLongOrNull()
+    // Optional: for recovery / fallback
+    override fun getRawValue(namespace: String): Long? {
+        return redis.opsForValue().get(namespace)?.toLongOrNull()
     }
 
-    fun setMinValue(namespace: String, value: Long) {
+    override fun setMinValue(namespace: String, value: Long) {
         val current = getRawValue(namespace) ?: 0
         if (value > current) {
-            redis.opsForValue().set("id-generator:$namespace", value.toString())
+            redis.opsForValue().set(namespace, value.toString())
         }
     }
 }

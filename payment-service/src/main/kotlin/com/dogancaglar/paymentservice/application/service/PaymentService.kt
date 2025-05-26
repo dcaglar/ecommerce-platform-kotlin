@@ -2,10 +2,13 @@ package com.dogancaglar.paymentservice.application.service
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogFields
+import com.dogancaglar.paymentservice.application.event.*
 import com.dogancaglar.paymentservice.application.helper.PaymentFactory
 import com.dogancaglar.paymentservice.application.mapper.PaymentOrderEventMapper
+import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.port.IdGeneratorPort
 import com.dogancaglar.paymentservice.domain.port.OutboxEventPort
 import com.dogancaglar.paymentservice.domain.port.PaymentOrderOutboundPort
@@ -17,6 +20,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.transaction.Transactional
 import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.LocalDateTime
@@ -79,6 +84,14 @@ class PaymentService(
         return updated
     }
 
+    fun processPendingPayment(order: PaymentOrder, reason: String?, error: String?): PaymentOrder {
+        val updated = order.markAsPending().updatedAt(LocalDateTime.now(clock))
+            .withRetryReason(reason)
+            .withLastError(error)
+        paymentOrderOutboundPort.save(updated)
+        return updated
+    }
+
     fun handleRetryAttempt(
         order: PaymentOrder,
         reason: String? = null,
@@ -105,12 +118,96 @@ class PaymentService(
         order: PaymentOrder,
         reason: String? = null
     ): PaymentOrder {
-        return order
+        val updated = order
             .markAsFinalizedFailed()
             .withRetryReason(reason)
             .updatedAt(LocalDateTime.now(clock))
+        paymentOrderOutboundPort.save(updated)
+        return updated
+    }
+
+    fun fromCreatedEvent(event: PaymentOrderCreated): PaymentOrder {
+        return PaymentOrder(
+            paymentOrderId = event.paymentOrderId.toLong(),
+            publicPaymentOrderId = event.publicPaymentOrderId,
+            paymentId = event.paymentId.toLong(),
+            publicPaymentId = event.publicPaymentId,
+            sellerId = event.sellerId,
+            amount = Amount(event.amountValue, event.currency),
+            status = PaymentOrderStatus.valueOf(event.status),
+            createdAt = event.createdAt,
+            updatedAt = LocalDateTime.now(), // or event.updatedAt if you trust it
+            retryCount = event.retryCount
+        )
+    }
+
+    fun fromRetryRequestedEvent(event: PaymentOrderRetryRequested): PaymentOrder {
+        return PaymentOrder(
+            paymentOrderId = event.paymentOrderId.toLong(),
+            publicPaymentOrderId = event.publicPaymentOrderId,
+            paymentId = event.paymentId.toLong(),
+            publicPaymentId = event.publicPaymentId,
+            sellerId = event.sellerId,
+            amount = Amount(event.amountValue, event.currency),
+            status = PaymentOrderStatus.valueOf(event.status),
+            createdAt = event.createdAt,
+            updatedAt = LocalDateTime.now(), // or event.updatedAt if you trust it
+            retryCount = event.retryCount
+        )
+    }
+
+    fun fromDuePaymentOrderStatusCheck(event: DuePaymentOrderStatusCheck): PaymentOrder {
+        return PaymentOrder(
+            paymentOrderId = event.paymentOrderId.toLong(),
+            publicPaymentOrderId = event.publicPaymentOrderId,
+            paymentId = event.paymentId.toLong(),
+            publicPaymentId = event.publicPaymentId,
+            sellerId = event.sellerId,
+            amount = Amount(event.amountValue, event.currency),
+            status = PaymentOrderStatus.valueOf(event.status),
+            createdAt = event.createdAt,
+            updatedAt = LocalDateTime.now(), // or event.updatedAt if you trust it
+            retryCount = event.retryCount
+        )
+    }
+
+    fun fromPaymentOrderStatusScheduled(event: PaymentOrderStatusScheduled): PaymentOrder {
+        return PaymentOrder(
+            paymentOrderId = event.paymentOrderId.toLong(),
+            publicPaymentOrderId = event.publicPaymentOrderId,
+            paymentId = event.paymentId.toLong(),
+            publicPaymentId = event.publicPaymentId,
+            sellerId = event.sellerId,
+            amount = Amount(event.amountValue, event.currency),
+            status = PaymentOrderStatus.valueOf(event.status),
+            createdAt = event.createdAt,
+            updatedAt = LocalDateTime.now(), // or event.updatedAt if you trust it
+            retryCount = event.retryCount
+        )
+    }
+
+    fun fromScheduledPaymentOrderStatusRequest(event: ScheduledPaymentOrderStatusRequest): PaymentOrder {
+        return PaymentOrder(
+            paymentOrderId = event.paymentOrderId.toLong(),
+            publicPaymentOrderId = event.publicPaymentOrderId,
+            paymentId = event.paymentId.toLong(),
+            publicPaymentId = event.publicPaymentId,
+            sellerId = event.sellerId,
+            amount = Amount(event.amountValue, event.currency),
+            status = PaymentOrderStatus.valueOf(event.status),
+            createdAt = event.createdAt,
+            updatedAt = LocalDateTime.now(), // or event.updatedAt if you trust it
+            retryCount = event.retryCount
+        )
     }
 
 
+}
+
+
+@Configuration
+class ClockConfig {
+    @Bean
+    fun clock(): Clock = Clock.systemDefaultZone()
 }
 

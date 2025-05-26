@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <databaseChangeLog
-        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
-                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
-
-    <changeSet id="20240507-create-outbox-event-table" author="dogancaglar">
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+    <changeSet id="create-outbox-event-table" author="dogancaglar">
         <createTable tableName="outbox_event">
-            <column name="id" type="UUID" defaultValueComputed="uuid_generate_v4()">
+            <column name="id" type="UUID">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
             <column name="event_type" type="VARCHAR(255)">
@@ -19,20 +18,15 @@
             <column name="payload" type="TEXT">
                 <constraints nullable="false"/>
             </column>
-            <column name="status" type="VARCHAR(32)">
+            <column name="status" type="VARCHAR(50)">
                 <constraints nullable="false"/>
             </column>
             <column name="created_at" type="TIMESTAMP">
                 <constraints nullable="false"/>
             </column>
         </createTable>
-
-        <createIndex indexName="idx_outbox_event_status" tableName="outbox_event">
-            <column name="status"/>
-        </createIndex>
-
-        <createIndex indexName="idx_outbox_event_aggregate_id" tableName="outbox_event">
-            <column name="aggregate_id"/>
-        </createIndex>
+        <rollback>
+            <dropTable tableName="outbox_event"/>
+        </rollback>
     </changeSet>
 </databaseChangeLog>

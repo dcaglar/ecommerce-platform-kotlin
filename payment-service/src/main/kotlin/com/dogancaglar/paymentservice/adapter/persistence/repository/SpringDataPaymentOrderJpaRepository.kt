@@ -15,6 +15,6 @@ interface SpringDataPaymentOrderJpaRepository : JpaRepository<PaymentOrderEntity
 
     fun existsByPaymentIdAndStatus(paymentId: Long, status: String): Boolean
 
+    @Query("SELECT MAX(p.paymentOrderId) FROM PaymentOrderEntity p")
     fun getMaxPaymentOrderId(): Long?
-
 }

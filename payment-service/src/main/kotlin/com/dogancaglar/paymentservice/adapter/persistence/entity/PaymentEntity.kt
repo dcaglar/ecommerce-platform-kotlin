@@ -19,10 +19,10 @@ class PaymentEntity(
     @Column(nullable = false)
     val buyerId: String,
 
-    @Column(nullable = false)
+    @Column(name = "amount_value", nullable = false)
     val totalAmountValue: BigDecimal,
 
-    @Column(nullable = false)
+    @Column(name = "amount_currency", nullable = false)
     val totalAmountCurrency: String,
 
     @Column(nullable = false)
@@ -42,6 +42,6 @@ class PaymentEntity(
         totalAmountCurrency = "EUR",
         orderId = "",
         status = PaymentStatus.INITIATED,
-        createdAt = LocalDateTime.MIN
+        createdAt = LocalDateTime.now()
     )
 }

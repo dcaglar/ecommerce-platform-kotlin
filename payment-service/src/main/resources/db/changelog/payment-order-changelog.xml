@@ -1,16 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <databaseChangeLog
-        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
-                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
-
-    <changeSet id="20240507-create-payment-order" author="dogan">
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+    <changeSet id="create-payment-orders-table" author="dogancaglar">
         <createTable tableName="payment_orders">
-            <column name="payment_order_id" type="VARCHAR(255)">
+            <column name="payment_order_id" type="BIGINT">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
-            <column name="payment_id" type="VARCHAR(255)">
+            <column name="public_payment_order_id" type="VARCHAR(255)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="payment_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="public_payment_id" type="VARCHAR(255)">
                 <constraints nullable="false"/>
             </column>
             <column name="seller_id" type="VARCHAR(255)">
@@ -25,11 +30,16 @@
             <column name="status" type="VARCHAR(50)">
                 <constraints nullable="false"/>
             </column>
+            <column name="created_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP"/>
+            <column name="retry_count" type="INTEGER"/>
+            <column name="retry_reason" type="VARCHAR(255)"/>
+            <column name="last_error_message" type="VARCHAR(255)"/>
         </createTable>
-
         <rollback>
             <dropTable tableName="payment_orders"/>
         </rollback>
     </changeSet>
-
 </databaseChangeLog>

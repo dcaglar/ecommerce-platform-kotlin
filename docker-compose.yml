@@ -14,7 +14,7 @@ services:
     ports:
       - "5433:5432"  # Exposed for IntelliJ/pgAdmin or Spring Boot if needed
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      test: [ "CMD-SHELL", "pg_isready -U keycloak" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -89,6 +89,9 @@ services:
     container_name: redis
     ports:
       - "6379:6379"  # Exposed for Spring Boot to connect
+    volumes:
+      - ./payment-service/src/main/resources/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
     restart: unless-stopped
     networks:
       - messaging-net  # Same as Kafka/Zookeeper for simplicity
@@ -112,7 +115,7 @@ services:
       - kafka
 
 
-### 📊 Observability Stack
+  ### 📊 Observability Stack
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
     container_name: elasticsearch

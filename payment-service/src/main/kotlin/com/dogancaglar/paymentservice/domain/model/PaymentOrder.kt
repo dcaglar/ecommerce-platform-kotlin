@@ -25,6 +25,10 @@ data class PaymentOrder(
         return this.copy(status = PaymentOrderStatus.SUCCESSFUL)
     }
 
+    fun markAsPending(): PaymentOrder {
+        return this.copy(status = PaymentOrderStatus.PENDING)
+    }
+
     fun markAsFinalizedFailed(): PaymentOrder {
         return this.copy(status = PaymentOrderStatus.FINALIZE_FAILED)
     }
