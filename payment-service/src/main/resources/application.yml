@@ -51,13 +51,13 @@ kafka:
 #      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.ScheduledPaymentStatusCheckExecutor
 psp:
   simulation:
-    timeouts:
+    timeous:
       enabled: true
-      probability: 0 # in percent
+      probability: 5 # in percent
     latency:
-      fast: 20       # % 500–1500ms
-      moderate: 80   # % 1500–3000ms
-      slow: 0       # % 3000–6000ms
+      fast: 50       # % 500–1500ms
+      moderate: 45   # % 1500–3000ms
+      slow: 5       # % 3000–6000ms
 payment-service:
   api-key: secretpaymentapikey12345
 spring.jackson.time-zone: Europe/Amsterdam
