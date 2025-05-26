@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <databaseChangeLog
-        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
 
@@ -14,4 +14,7 @@
     <include file="20240515-add-delayed-kafka-message.xml" relativeToChangelogFile="true"/>
     <include file="20250517-add-retry-fields-to-payment-orders.xml" relativeToChangelogFile="true"/>
     <include file="20240518-create-scheduled-payment-order-status-request.xml" relativeToChangelogFile="true"/>
+    <include file="20240526-update-payment-aligned.xml" relativeToChangelogFile="true"/>
+    <include file="20240526-update-payment-order-entity-aligned.xml" relativeToChangelogFile="true"/>
+
 </databaseChangeLog>

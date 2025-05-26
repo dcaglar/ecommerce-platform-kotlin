@@ -1,0 +1,66 @@
+<databaseChangeLog
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
+
+    <!-- Change payment_order_id to BIGINT -->
+    <changeSet id="20240526-1-update-paymentorders-paymentorderid-type" author="dogan">
+        <modifyDataType tableName="payment_orders" columnName="payment_order_id" newDataType="BIGINT"/>
+        <rollback>
+            <modifyDataType tableName="payment_orders" columnName="payment_order_id" newDataType="VARCHAR(255)"/>
+        </rollback>
+    </changeSet>
+
+    <!-- Change payment_id to BIGINT in payment_orders -->
+    <changeSet id="20240526-2-update-paymentorders-paymentid-type" author="dogan">
+        <modifyDataType tableName="payment_orders" columnName="payment_id" newDataType="BIGINT"/>
+        <rollback>
+            <modifyDataType tableName="payment_orders" columnName="payment_id" newDataType="VARCHAR(255)"/>
+        </rollback>
+    </changeSet>
+
+    <!-- Add public_payment_order_id -->
+    <changeSet id="20240526-3-add-public-payment-order-id" author="dogan">
+        <addColumn tableName="payment_orders">
+            <column name="public_payment_order_id" type="VARCHAR(255)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="payment_orders" columnName="public_payment_order_id"/>
+        </rollback>
+    </changeSet>
+
+    <!-- Add public_payment_id -->
+    <changeSet id="20240526-4-add-public-payment-id" author="dogan">
+        <addColumn tableName="payment_orders">
+            <column name="public_payment_id" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="payment_orders" columnName="public_payment_id"/>
+        </rollback>
+    </changeSet>
+
+    <!-- Add created_at, updated_at, retry_count, retry_reason, last_error_message -->
+    <changeSet id="20240526-5-add-missing-fields" author="dogan">
+        <addColumn tableName="payment_orders">
+            <column name="created_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP"/>
+            <column name="retry_count" type="INT"/>
+            <column name="retry_reason" type="VARCHAR(255)"/>
+            <column name="last_error_message" type="VARCHAR(255)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="payment_orders" columnName="created_at"/>
+            <dropColumn tableName="payment_orders" columnName="updated_at"/>
+            <dropColumn tableName="payment_orders" columnName="retry_count"/>
+            <dropColumn tableName="payment_orders" columnName="retry_reason"/>
+            <dropColumn tableName="payment_orders" columnName="last_error_message"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>
