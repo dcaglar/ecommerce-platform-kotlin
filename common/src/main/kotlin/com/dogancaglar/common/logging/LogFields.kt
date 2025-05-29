@@ -10,7 +10,7 @@ object LogFields {
     const val PUBLIC_ID = "publicId" // now used for any public ID
     const val PUBLIC_PAYMENT_ORDER_ID = "paymentOrderId"
     const val PUBLIC_PAYMENT_ID = "paymentOrderId"
-    const val PARENT_EVENT = "retryCount"
+    const val PARENT_EVENT_ID = "parentEventId"
     const val RETRY_COUNT = "retryCount"
     const val RETRY_REASON = "retryReason"
 }

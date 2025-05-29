@@ -54,7 +54,6 @@ class RetryDispatcherScheduler(
         try {
             val duePaymentStatusScheduledEnvelopeList = paymentRetryStatusAdapter.pollDueRetries()
             scheduledPaymentOrderStatusService.persist(duePaymentStatusScheduledEnvelopeList, 60 * 30)
-            logger.info("Saved to DB duePaymentStatusScheduledEnvelopeList: ")
 
         } catch (e: Exception) {
             logger.error("Failed to save retry duePaymentStatusScheduledEnvelopeList: ${e.message}", e)

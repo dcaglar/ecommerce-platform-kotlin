@@ -4,23 +4,17 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9f421c06-7ac3-46c3-82a7-642ba7215817" name="Changes" comment="cinfguure lesss flaky psp">
-      <change afterPath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/event/DomainEventFactory.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/event/PublicAggregateEvent.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/common/src/test/kotlin/logging/LogContextTest.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/application/event/PaymentEvent.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/payment-service/src/test/kotlin/com/dogancaglar/paymentservice/domain/event/DomainEventFactoryTest.kt" afterDir="false" />
+    <list default="true" id="9f421c06-7ac3-46c3-82a7-642ba7215817" name="Changes" comment="add test for DomainEventFactory and Event Publisher">
+      <change afterPath="$PROJECT_DIR$/payment-service/src/test/kotlin/com/dogancaglar/paymentservice/adapter/OutboxEventPayloadDeserializationTest.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/common/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/common/pom.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/logging/LogContext.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/logging/LogContext.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/logging/LogFields.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/logging/LogFields.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/pom.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/PaymentOrderExecutor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/PaymentOrderExecutor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/ScheduledPaymentStatusCheckExecutor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/ScheduledPaymentStatusCheckExecutor.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/application/event/PaymentOrderCreated.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/application/event/PaymentOrderCreated.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/producers/PaymentEventPublisher.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/producers/PaymentEventPublisher.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/outbox/producer/OutboxDispatcherScheduler.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/outbox/producer/OutboxDispatcherScheduler.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/redis/RetryDispatcherScheduler.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/redis/RetryDispatcherScheduler.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/application/service/PaymentService.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/application/service/PaymentService.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/web/controller/PaymentController.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/web/controller/PaymentController.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/resources/logback-spring.xml" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/resources/logback-spring.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/test/kotlin/com/dogancaglar/paymentservice/domain/event/DomainEventFactoryTest.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/test/kotlin/com/dogancaglar/paymentservice/domain/event/DomainEventFactoryTest.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -112,6 +106,7 @@
     "JUnit.DomainEventFactoryTest.executor": "Run",
     "JUnit.DomainEventFactoryTest.should create EventEnvelope with generated eventId and given traceId.executor": "Run",
     "JUnit.LogContextTest.executor": "Run",
+    "JUnit.OutboxEventPayloadDeserializationTest.executor": "Run",
     "JUnit.RedisIdGeneratorIntegrationTest.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
@@ -146,7 +141,7 @@
       <recent name="com.dogancaglar.paymentservice.adapter.persistence" />
     </key>
   </component>
-  <component name="RunManager" selected="JUnit.LogContextTest">
+  <component name="RunManager" selected="JUnit.DomainEventFactoryTest">
     <configuration name="DomainEventFactoryTest" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
       <module name="payment-service" />
       <extension name="coverage">
@@ -193,6 +188,21 @@
         <option name="Make" enabled="true" />
       </method>
     </configuration>
+    <configuration name="OutboxEventPayloadDeserializationTest" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="payment-service" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.dogancaglar.paymentservice.adapter.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="com.dogancaglar.paymentservice.adapter" />
+      <option name="MAIN_CLASS_NAME" value="com.dogancaglar.paymentservice.adapter.OutboxEventPayloadDeserializationTest" />
+      <option name="TEST_OBJECT" value="class" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
     <configuration name="RedisIdGeneratorIntegrationTest" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
       <module name="payment-service" />
       <extension name="coverage">
@@ -214,22 +224,13 @@
       </deployment>
       <method v="2" />
     </configuration>
-    <configuration name="docker-compose.yml: Compose Deployment" type="docker-deploy" factoryName="docker-compose.yml" temporary="true" server-name="Docker">
-      <deployment type="docker-compose.yml">
-        <settings>
-          <option name="envFilePath" value="" />
-          <option name="sourceFilePath" value="docker-compose.yml" />
-        </settings>
-      </deployment>
-      <method v="2" />
-    </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="JUnit.LogContextTest" />
         <item itemvalue="JUnit.DomainEventFactoryTest" />
+        <item itemvalue="JUnit.OutboxEventPayloadDeserializationTest" />
+        <item itemvalue="JUnit.LogContextTest" />
         <item itemvalue="JUnit.DomainEventFactoryTest.should create EventEnvelope with generated eventId and given traceId" />
         <item itemvalue="JUnit.RedisIdGeneratorIntegrationTest" />
-        <item itemvalue="Docker.docker-compose.yml: Compose Deployment" />
       </list>
     </recent_temporary>
   </component>
@@ -353,7 +354,15 @@
       <option name="project" value="LOCAL" />
       <updated>1748481562260</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="add test for DomainEventFactory and Event Publisher">
+      <option name="closed" value="true" />
+      <created>1748490927323</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1748490927323</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -440,7 +449,8 @@
     <MESSAGE value="remvoe redis flaky temporarrily&#10;&#10;make entity aligned with table" />
     <MESSAGE value="configure a flaky psp" />
     <MESSAGE value="cinfguure lesss flaky psp" />
-    <option name="LAST_COMMIT_MESSAGE" value="cinfguure lesss flaky psp" />
+    <MESSAGE value="add test for DomainEventFactory and Event Publisher" />
+    <option name="LAST_COMMIT_MESSAGE" value="add test for DomainEventFactory and Event Publisher" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

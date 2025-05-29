@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.domain.event
 import com.dogancaglar.common.event.DomainEventFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.application.event.PaymentOrderCreated
+import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
@@ -69,6 +70,35 @@ class DomainEventFactoryTest {
         val event2 = DomainEventFactory.envelopeFor("e2", "type", "agg")
 
         assertThat(event1.eventId).isNotEqualTo(event2.eventId)
+    }
+
+    @Test
+    fun `envelopeFor should create EventEnvelope with correct fields`() {
+        val event = PaymentOrderCreated(
+            paymentOrderId = "po-1001",
+            publicPaymentOrderId = "paymentorder-1001",
+            paymentId = "p-123",
+            publicPaymentId = "payment-123",
+            sellerId = "seller-1",
+            amountValue = BigDecimal("250.00"),
+            currency = "EUR",
+            status = "CREATED",
+            createdAt = LocalDateTime.now(),
+            updatedAt = LocalDateTime.now(),
+            retryCount = 0
+        )
+
+        val envelope = DomainEventFactory.envelopeFor(
+            event = event,
+            eventType = EventMetadatas.PaymentOrderCreatedMetadata.eventType,
+            aggregateId = event.publicPaymentOrderId
+        )
+
+        assertThat(envelope.traceId).isNotBlank
+        assertThat(envelope.eventId).isNotNull
+        assertThat(envelope.eventType).isEqualTo(EventMetadatas.PaymentOrderCreatedMetadata.eventType)
+        assertThat(envelope.aggregateId).isEqualTo(event.publicPaymentOrderId)
+        assertThat(envelope.data).isEqualTo(event)
     }
 
 }

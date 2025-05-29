@@ -29,6 +29,8 @@ class OutboxDispatcherScheduler(
         val newEvents = outboxEventPort.findByStatus(
             "NEW"
         )
+
+        logger.info("Starting outbox dispatch cycle, found ${newEvents.size} new events")
         val updatedEvents = mutableListOf<OutboxEvent>()
 
         newEvents.forEach { outboxEvent: OutboxEvent ->
@@ -41,6 +43,7 @@ class OutboxDispatcherScheduler(
             LogContext.with(envelope) {
                 try {
                     paymentEventPublisher.publish(
+
                         aggregateId = envelope.aggregateId,
                         event = EventMetadatas.PaymentOrderCreatedMetadata,
                         data = envelope.data,

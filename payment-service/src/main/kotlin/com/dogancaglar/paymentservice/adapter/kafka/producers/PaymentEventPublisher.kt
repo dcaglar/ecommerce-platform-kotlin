@@ -1,14 +1,14 @@
 package com.dogancaglar.paymentservice.adapter.kafka.producers
 
+import com.dogancaglar.common.event.DomainEventFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
+import com.dogancaglar.common.logging.LogContext
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
-import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Component
-import java.util.*
 
 
 @Component
@@ -35,29 +35,34 @@ class PaymentEventPublisher(
         data: T,
         parentEnvelope: EventEnvelope<*>?  // optional parent context
     ): EventEnvelope<T> {
-        val traceId = parentEnvelope?.traceId ?: UUID.randomUUID().toString()
-        val eventId = UUID.randomUUID()
-        val envelope = EventEnvelope.wrap(
+        val envelope = DomainEventFactory.envelopeFor(
+            event = data,
             eventType = event.eventType,
             aggregateId = aggregateId,
-            data = data,
-            traceId = traceId,
             parentEventId = parentEnvelope?.eventId
         )
-
-        try {
-            val json = objectMapper.writeValueAsString(envelope)
-            kafkaTemplate.send(event.topic, aggregateId, json)
+        LogContext.with(envelope) {
             logger.info(
-                "📦 Published event to topic='${event.topic}', key='$aggregateId', type='${event.eventType}', traceId='${envelope.traceId}', parentEventId=${envelope.parentEventId}"
-            )
-            return envelope;
-        } catch (e: Exception) {
-            logger.error("❌ Failed to publish event to topic=${event.topic}, key=$aggregateId", e)
-            throw RuntimeException("Failed to publish event to Kafka", e)
-        } finally {
-            MDC.clear()
+                "Publishing event: traceId={} eventType={}, aggregateId={}, eventId={}, parentEventId={}",
+                envelope.traceId,
+                envelope.eventType,
+                envelope.aggregateId,
+                envelope.eventId,
+                envelope.parentEventId,
+
+                )
+            try {
+                val json = objectMapper.writeValueAsString(envelope)
+                kafkaTemplate.send(event.topic, aggregateId, json)
+            } catch (e: Exception) {
+                logger.error("❌ Failed to publish event to topic=${event.topic}, key=$aggregateId", e)
+                throw RuntimeException("Failed to publish event to Kafka", e)
+            }
+
         }
+        return envelope;
+
     }
+
 }
 

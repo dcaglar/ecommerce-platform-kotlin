@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
 
-    <property name="LOG_PATH" value="/Users/dogancaglar/ecommerce-platform-logs/payment-service" />
-    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{traceId}] [%X{eventId}] [%X{aggregateId}] %-5level [%thread] %logger{36} - %msg%n"/>
+    <property name="LOG_PATH" value="/Users/dogancaglar/ecommerce-platform-logs/payment-service"/>
+    <property name="LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{traceId}] [%X{eventId}] [%X{aggregateId}] [%X{parentEventId}] %-5level [%thread] %logger{36} - %msg%n"/>
 
     <!-- Console logging -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
@@ -21,23 +22,28 @@
                 <timestamp>
                     <fieldName>@timestamp</fieldName>
                 </timestamp>
-                <loggerName />
-                <threadName />
-                <logLevel />
-                <message />
+                <loggerName/>
+                <threadName/>
+                <logLevel/>
+                <message/>
                 <mdc>
                     <includeMdcKey>traceId</includeMdcKey>
                     <includeMdcKey>eventId</includeMdcKey>
                     <includeMdcKey>aggregateId</includeMdcKey>
+                    <includeMdcKey>eventType</includeMdcKey>
+                    <includeMdcKey>parentEventId</includeMdcKey>
                 </mdc>
 
-                <context />
-                <stackTrace />
+                <context/>
+                <stackTrace/>
             </providers>
         </encoder>
     </appender>
     <root level="INFO">
-        <appender-ref ref="CONSOLE" />
-        <appender-ref ref="JSON_FILE" />
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="JSON_FILE"/>
     </root>
+    <logger name="org.apache.kafka" level="WARN"/>
+    <logger name="org.springframework" level="WARN"/>
+
 </configuration>

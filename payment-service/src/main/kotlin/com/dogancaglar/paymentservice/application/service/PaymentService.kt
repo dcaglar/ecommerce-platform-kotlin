@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.application.service
 
 import com.dogancaglar.common.event.DomainEventFactory
+import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.application.event.*
 import com.dogancaglar.paymentservice.application.helper.PaymentFactory
@@ -89,6 +90,13 @@ class PaymentService(
 
 
             )
+
+        LogContext.with(envelope) {
+            logger.debug(
+                "Creating OutboxEvent for eventType={}, aggregateId={}, eventId={}",
+                envelope.eventType, envelope.aggregateId, envelope.eventId
+            )
+        }
         val jsonPayload = objectMapper.writeValueAsString(envelope)
         return OutboxEvent.createNew(
             eventType = envelope.eventType,
