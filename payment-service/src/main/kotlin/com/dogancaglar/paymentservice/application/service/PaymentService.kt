@@ -18,6 +18,7 @@ import com.dogancaglar.paymentservice.web.dto.PaymentResponseDTO
 import com.dogancaglar.paymentservice.web.mapper.PaymentRequestMapper
 import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.transaction.Transactional
+import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
@@ -37,6 +38,9 @@ class PaymentService(
     private val clock: Clock
 ) {
 
+    private val logger = LoggerFactory.getLogger(javaClass)
+
+
     private val paymentFactory: PaymentFactory = PaymentFactory(idGenerator, clock)
 
     @Transactional
@@ -44,14 +48,30 @@ class PaymentService(
 
         //create domain
         val paymentDomain = paymentFactory.createFrom(request)
-        //build and genereate outboxevent for eachpersistedd payment order domain
-        buildOutboxEvents(paymentDomain.paymentOrders).forEach { outboxEventPort.save(it) }
-        // persist payment domain to db
+        //we already have ids for domains
+        val paymentOrderList = mutableListOf<PaymentOrder>()
+        // each order is represent on payment request to PSP
+        for (order in paymentDomain.paymentOrders) {
+            try {
+                paymentOrderList.add(order);
+            } catch (ex: Exception) {
+                logger.warn("PSP call failed for PaymentOrder ${order.paymentOrderId}, falling back to async", ex)
+            }
+
+        }
+        //save paymeetn
         paymentOutboundPort.save(paymentDomain)
-        return PaymentRequestMapper.toResponse(paymentDomain)
+        //save paymentorders
+        paymentOrderOutboundPort.saveAll(paymentOrderList)
+        //build and genereate outboxevent for eachpersistedd payment order domain
+        val outboxBatch = buildOutboxEvents(paymentDomain.paymentOrders)
+        // persist payment domain to db
+        outboxEventPort.saveAll(outboxBatch);
+        return PaymentRequestMapper.toResponse(paymentDomain);
 
 
     }
+
 
     private fun buildOutboxEvents(paymentOrders: List<PaymentOrder>): List<OutboxEvent> {
         return paymentOrders.map { toOutBoxEvent(it) }
@@ -67,14 +87,15 @@ class PaymentService(
             traceId = traceId
         )
 
-        val json = objectMapper.writeValueAsString(envelope)
+        val jsonPayload = objectMapper.writeValueAsString(envelope)
         return OutboxEvent.createNew(
             eventType = envelope.eventType,
             aggregateId = envelope.aggregateId,
-            payload = json,
+            payload = jsonPayload,
             createdAt = LocalDateTime.now(clock),
         )
     }
+
 
     fun processSuccessfulPayment(order: PaymentOrder): PaymentOrder {
         val updated = order

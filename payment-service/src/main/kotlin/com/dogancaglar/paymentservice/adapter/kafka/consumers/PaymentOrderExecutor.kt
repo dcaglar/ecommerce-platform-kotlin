@@ -7,7 +7,6 @@ import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublis
 import com.dogancaglar.paymentservice.application.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.application.event.ScheduledPaymentOrderStatusRequest
-import com.dogancaglar.paymentservice.application.helper.PaymentOrderReconstructor
 import com.dogancaglar.paymentservice.application.mapper.PaymentOrderEventMapper
 import com.dogancaglar.paymentservice.application.service.PaymentService
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
@@ -36,7 +35,6 @@ class PaymentOrderExecutor(
     @Qualifier("paymentRetryPaymentAdapter") val paymentRetryPaymentAdapter: RetryQueuePort<PaymentOrderRetryRequested>,
     val pspClient: PSPClient,
     val paymentEventPublisher: PaymentEventPublisher, val meterRegistry: MeterRegistry,
-    val paymentOrderReconstructor: PaymentOrderReconstructor
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -44,7 +42,7 @@ class PaymentOrderExecutor(
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderCreated>>) {
         val envelope = record.value()
         val paymentOrderCreatedEvent = envelope.data
-        val order = paymentOrderReconstructor.fromCreatedEvent(paymentOrderCreatedEvent)
+        val order = paymentService.fromCreatedEvent(paymentOrderCreatedEvent)
         LogContext.with(
             envelope, mapOf(
                 LogFields.TOPIC_NAME to record.topic(),

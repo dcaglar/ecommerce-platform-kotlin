@@ -30,7 +30,9 @@ class PaymentController(
         MDC.put("traceId", traceId)
         try {
             logger.info("Starting with paymentId $traceId")
-            val result = paymentService.createPayment(request)    // Pass domain to service)
+            val result = paymentService.createPayment(
+                request
+            )
             return ResponseEntity.ok(result)
         } finally {
             MDC.clear()
