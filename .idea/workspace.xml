@@ -4,9 +4,23 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9f421c06-7ac3-46c3-82a7-642ba7215817" name="Changes" comment="remvoe redis flaky temporarrily&#10;&#10;make entity aligned with table">
+    <list default="true" id="9f421c06-7ac3-46c3-82a7-642ba7215817" name="Changes" comment="cinfguure lesss flaky psp">
+      <change afterPath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/event/DomainEventFactory.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/event/PublicAggregateEvent.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/common/src/test/kotlin/logging/LogContextTest.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/application/event/PaymentEvent.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/payment-service/src/test/kotlin/com/dogancaglar/paymentservice/domain/event/DomainEventFactoryTest.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/common/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/logging/LogContext.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/logging/LogContext.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/logging/LogFields.kt" beforeDir="false" afterPath="$PROJECT_DIR$/common/src/main/kotlin/com/dogancaglar/common/logging/LogFields.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/payment-service/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/pom.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/payment-service/src/main/resources/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/resources/application.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/PaymentOrderExecutor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/PaymentOrderExecutor.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/ScheduledPaymentStatusCheckExecutor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/adapter/kafka/consumers/ScheduledPaymentStatusCheckExecutor.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/application/event/PaymentOrderCreated.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/application/event/PaymentOrderCreated.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/application/service/PaymentService.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/application/service/PaymentService.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/web/controller/PaymentController.kt" beforeDir="false" afterPath="$PROJECT_DIR$/payment-service/src/main/kotlin/com/dogancaglar/paymentservice/web/controller/PaymentController.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -26,7 +40,7 @@
   <component name="Git.Settings">
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$" value="1bf546dba05b66b587d0ef6bcb8043f580b3ad6b" />
+        <entry key="$PROJECT_DIR$" value="main" />
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -90,29 +104,33 @@
     <option name="showLibraryContents" value="true" />
     <option name="showScratchesAndConsoles" value="false" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Docker.Docker Image (1).executor&quot;: &quot;Run&quot;,
-    &quot;Docker.Docker Image.executor&quot;: &quot;Run&quot;,
-    &quot;Docker.docker-compose.yml: Compose Deployment.executor&quot;: &quot;Run&quot;,
-    &quot;JUnit.RedisIdGeneratorIntegrationTest.executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/dogancaglar/IdeaProjects/ecommerce-platform-kotlin/payment-service/src/main/resources/db/changelog&quot;,
-    &quot;project.structure.last.edited&quot;: &quot;SDKs&quot;,
-    &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
-    &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
-    &quot;rearrange.code.on.save&quot;: &quot;true&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.lookFeel&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Docker.Docker Image (1).executor": "Run",
+    "Docker.Docker Image.executor": "Run",
+    "Docker.docker-compose.yml: Compose Deployment.executor": "Run",
+    "JUnit.DomainEventFactoryTest.executor": "Run",
+    "JUnit.DomainEventFactoryTest.should create EventEnvelope with generated eventId and given traceId.executor": "Run",
+    "JUnit.LogContextTest.executor": "Run",
+    "JUnit.RedisIdGeneratorIntegrationTest.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "implement-elk-stack",
+    "last_opened_file_path": "/Users/dogancaglar/IdeaProjects/ecommerce-platform-kotlin/payment-service/src/main/resources/db/changelog",
+    "project.structure.last.edited": "SDKs",
+    "project.structure.proportion": "0.15",
+    "project.structure.side.proportion": "0.2",
+    "rearrange.code.on.save": "true",
+    "settings.editor.selected.configurable": "preferences.lookFeel"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/payment-service/src/main/resources/db/changelog" />
       <recent name="$PROJECT_DIR$/payment-service/src/test/resources" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/common/src/test/kotlin" />
       <recent name="$PROJECT_DIR$" />
       <recent name="$PROJECT_DIR$/payment-service" />
       <recent name="$PROJECT_DIR$/payment-service/src/main/resources" />
@@ -121,14 +139,60 @@
       <recent name="com.dogancaglar.paymentservice.adapter.outbox.producer" />
     </key>
     <key name="K2MoveDeclarationsDialog.RECENT_PACKAGE_KEY">
+      <recent name="com.dogancaglar.common.event" />
       <recent name="com.dogancaglar.paymentservice.application.startup" />
       <recent name="com.dogancaglar.paymentservice.web.dto" />
       <recent name="com.dogancaglar.paymentservice.adapter.persistence.repository" />
       <recent name="com.dogancaglar.paymentservice.adapter.persistence" />
-      <recent name="com.dogancaglar.paymentservice.adapter.persistence.adapter" />
     </key>
   </component>
-  <component name="RunManager" selected="JUnit.RedisIdGeneratorIntegrationTest">
+  <component name="RunManager" selected="JUnit.LogContextTest">
+    <configuration name="DomainEventFactoryTest" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="payment-service" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.dogancaglar.paymentservice.domain.event.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="com.dogancaglar.paymentservice.domain.event" />
+      <option name="MAIN_CLASS_NAME" value="com.dogancaglar.paymentservice.domain.event.DomainEventFactoryTest" />
+      <option name="TEST_OBJECT" value="class" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="DomainEventFactoryTest.should create EventEnvelope with generated eventId and given traceId" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="payment-service" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.dogancaglar.paymentservice.domain.event.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="com.dogancaglar.paymentservice.domain.event" />
+      <option name="MAIN_CLASS_NAME" value="com.dogancaglar.paymentservice.domain.event.DomainEventFactoryTest" />
+      <option name="METHOD_NAME" value="should create EventEnvelope with generated eventId and given traceId" />
+      <option name="TEST_OBJECT" value="method" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="LogContextTest" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="common" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.dogancaglar.common.logging.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="com.dogancaglar.common.logging" />
+      <option name="MAIN_CLASS_NAME" value="com.dogancaglar.common.logging.LogContextTest" />
+      <option name="TEST_OBJECT" value="class" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
     <configuration name="RedisIdGeneratorIntegrationTest" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
       <module name="payment-service" />
       <extension name="coverage">
@@ -143,24 +207,6 @@
       <method v="2">
         <option name="Make" enabled="true" />
       </method>
-    </configuration>
-    <configuration name="Docker Image (1)" type="docker-deploy" factoryName="docker-image" temporary="true" server-name="Docker">
-      <deployment type="docker-image">
-        <settings>
-          <option name="imageTag" value="docker.elastic.co/beats/filebeat:8.12.2" />
-          <option name="containerName" value="filebeat" />
-        </settings>
-      </deployment>
-      <method v="2" />
-    </configuration>
-    <configuration name="Docker Image" type="docker-deploy" factoryName="docker-image" temporary="true" server-name="Docker">
-      <deployment type="docker-image">
-        <settings>
-          <option name="imageTag" value="docker.elastic.co/beats/filebeat:8.12.2" />
-          <option name="containerName" value="" />
-        </settings>
-      </deployment>
-      <method v="2" />
     </configuration>
     <configuration default="true" type="docker-deploy" factoryName="docker-image" temporary="true">
       <deployment type="docker-image">
@@ -179,6 +225,9 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="JUnit.LogContextTest" />
+        <item itemvalue="JUnit.DomainEventFactoryTest" />
+        <item itemvalue="JUnit.DomainEventFactoryTest.should create EventEnvelope with generated eventId and given traceId" />
         <item itemvalue="JUnit.RedisIdGeneratorIntegrationTest" />
         <item itemvalue="Docker.docker-compose.yml: Compose Deployment" />
       </list>
@@ -288,7 +337,23 @@
       <option name="project" value="LOCAL" />
       <updated>1748220342031</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="configure a flaky psp">
+      <option name="closed" value="true" />
+      <created>1748265146076</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1748265146076</updated>
+    </task>
+    <task id="LOCAL-00014" summary="cinfguure lesss flaky psp">
+      <option name="closed" value="true" />
+      <created>1748481562259</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1748481562260</updated>
+    </task>
+    <option name="localTasksCounter" value="15" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -373,7 +438,9 @@
     <MESSAGE value="Revert &quot;add add uniquness redis ontainer test&quot;&#10;&#10;This reverts commit feb7f5780fbcd73d3cf4f35d6c910a5f8a874ea6." />
     <MESSAGE value="Revert &quot;add add uniquness redis ontainer test&quot;&#10;&#10;git add wprkspace.xml to gitignore" />
     <MESSAGE value="remvoe redis flaky temporarrily&#10;&#10;make entity aligned with table" />
-    <option name="LAST_COMMIT_MESSAGE" value="remvoe redis flaky temporarrily&#10;&#10;make entity aligned with table" />
+    <MESSAGE value="configure a flaky psp" />
+    <MESSAGE value="cinfguure lesss flaky psp" />
+    <option name="LAST_COMMIT_MESSAGE" value="cinfguure lesss flaky psp" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

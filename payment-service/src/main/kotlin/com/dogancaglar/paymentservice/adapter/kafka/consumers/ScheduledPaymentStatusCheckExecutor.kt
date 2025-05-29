@@ -48,7 +48,7 @@ class PaymentOrderRetryCommandExecutor(
             envelope, mapOf(
                 LogFields.TOPIC_NAME to record.topic(),
                 LogFields.CONSUMER_GROUP to "payment-order-executor",
-                LogFields.PAYMENT_ORDER_ID to envelope.data.paymentOrderId
+                LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.data.paymentOrderId
             )
         ) {
             try {

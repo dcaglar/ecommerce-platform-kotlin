@@ -40,7 +40,7 @@ It declares that this module is:
         <postgresql.version>42.7.3</postgresql.version>
         <liquibase.version>4.26.0</liquibase.version>
         <logstash.version>7.4</logstash.version>
-        <spring.boot.version>3.5.0</spring.boot.version>
+        <spring-boot.version>3.5.0</spring-boot.version>
         <sulki.ulid.version>8.3.0</sulki.ulid.version>
     </properties>
 
@@ -95,6 +95,44 @@ It declares that this module is:
                 <version>${logstash.version}</version>
             </dependency>
             <!-- Prometheus metrics -->
+
+            <!-- testr -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-test</artifactId>
+                <version>${spring-boot.version}</version>
+                <scope>test</scope>
+                <exclusions>
+                    <!-- Optional: exclude legacy JUnit 4 -->
+                    <exclusion>
+                        <groupId>junit</groupId>
+                        <artifactId>junit</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-test</artifactId>
+                <version>${kotlin.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+
+            <!-- ✅ AssertJ (if you want to pin a specific version explicitly) -->
+            <dependency>
+                <groupId>org.assertj</groupId>
+                <artifactId>assertj-core</artifactId>
+                <version>3.25.3</version> <!-- Use latest -->
+                <scope>test</scope>
+            </dependency>
+
+            <!-- ✅ Mockito Kotlin Support (Optional but clean for Kotlin mocking) -->
+            <dependency>
+                <groupId>org.mockito.kotlin</groupId>
+                <artifactId>mockito-kotlin</artifactId>
+                <version>5.2.1</version>
+                <scope>test</scope>
+            </dependency>
         </dependencies>
 
     </dependencyManagement>

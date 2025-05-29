@@ -7,7 +7,9 @@ object LogFields {
     const val EVENT_TYPE = "eventType"
     const val TOPIC_NAME = "topicName"
     const val CONSUMER_GROUP = "consumerGroup"
-    const val PAYMENT_ORDER_ID = "paymentOrderId"
+    const val PUBLIC_ID = "publicId" // now used for any public ID
+    const val PUBLIC_PAYMENT_ORDER_ID = "paymentOrderId"
+    const val PUBLIC_PAYMENT_ID = "paymentOrderId"
     const val PARENT_EVENT = "retryCount"
     const val RETRY_COUNT = "retryCount"
     const val RETRY_REASON = "retryReason"

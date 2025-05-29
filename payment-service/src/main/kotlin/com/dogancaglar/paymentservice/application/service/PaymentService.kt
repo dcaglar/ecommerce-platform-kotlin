@@ -1,10 +1,11 @@
 package com.dogancaglar.paymentservice.application.service
 
-import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.common.event.DomainEventFactory
 import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.application.event.*
 import com.dogancaglar.paymentservice.application.helper.PaymentFactory
 import com.dogancaglar.paymentservice.application.mapper.PaymentOrderEventMapper
+import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
@@ -62,6 +63,7 @@ class PaymentService(
         //save paymeetn
         paymentOutboundPort.save(paymentDomain)
         //save paymentorders
+
         paymentOrderOutboundPort.saveAll(paymentOrderList)
         //build and genereate outboxevent for eachpersistedd payment order domain
         val outboxBatch = buildOutboxEvents(paymentDomain.paymentOrders)
@@ -78,15 +80,15 @@ class PaymentService(
     }
 
     private fun toOutBoxEvent(paymentOrder: PaymentOrder): OutboxEvent {
-        val event = PaymentOrderEventMapper.toPaymentOrderCreatedEvent(paymentOrder)
         val traceId = MDC.get(LogFields.TRACE_ID) ?: UUID.randomUUID().toString()
-        val envelope = EventEnvelope.wrap(
-            eventType = "payment_order_created",
+        val paymentOrderCreatedEvent = PaymentOrderEventMapper.toPaymentOrderCreatedEvent(paymentOrder)
+        val envelope = DomainEventFactory.envelopeFor(
+            event = paymentOrderCreatedEvent,
+            eventType = EventMetadatas.PaymentOrderCreatedMetadata.eventType,
             aggregateId = paymentOrder.publicPaymentOrderId,
-            data = event,
-            traceId = traceId
-        )
 
+
+            )
         val jsonPayload = objectMapper.writeValueAsString(envelope)
         return OutboxEvent.createNew(
             eventType = envelope.eventType,

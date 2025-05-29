@@ -47,7 +47,7 @@ class PaymentOrderExecutor(
             envelope, mapOf(
                 LogFields.TOPIC_NAME to record.topic(),
                 LogFields.CONSUMER_GROUP to "payment-order-executor",
-                LogFields.PAYMENT_ORDER_ID to envelope.data.publicPaymentOrderId
+                LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.data.publicPaymentOrderId
             )
         ) {
             logger.info("▶️ [Handle Start] Processing PaymentOrderCreated")

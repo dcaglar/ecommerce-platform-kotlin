@@ -25,7 +25,6 @@ class PaymentController(
     @PostMapping
     @PreAuthorize("hasAuthority('payment:write')")
     fun createPayment(@Valid @RequestBody request: PaymentRequestDTO): ResponseEntity<PaymentResponseDTO> {
-
         val traceId = UUID.randomUUID().toString()
         MDC.put("traceId", traceId)
         try {
