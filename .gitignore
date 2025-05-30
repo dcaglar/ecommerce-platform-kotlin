@@ -15,6 +15,7 @@
 !.idea/inspectionProfiles/
 !.idea/compiler.xml
 !.idea/vcs.xml
+!.idea/workspace.xml
 *.iml
 *.iws
 *.ipr
