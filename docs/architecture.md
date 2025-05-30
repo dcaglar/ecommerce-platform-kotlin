@@ -58,7 +58,7 @@ on scalability, resilience, and modularity.
 
 ---
 
-### Benefits in Your Project
+### Benefits in the Project
 
 - **Loose Coupling:**  
   Changes in infrastructure (e.g., swapping Redis or Kafka clients) don’t impact domain logic.
