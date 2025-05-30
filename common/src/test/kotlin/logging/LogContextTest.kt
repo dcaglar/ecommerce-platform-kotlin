@@ -35,4 +35,19 @@ class LogContextTest {
         assertThat(MDC.get(LogFields.AGGREGATE_ID)).isNull()
         assertThat(MDC.get(LogFields.EVENT_TYPE)).isNull()
     }
+
+    @Test
+    fun `should populate and clear MDC correctly for traceId`() {
+        // given
+        val traceId = "trace-456"
+        val label = "unit-test"
+
+        // when
+        LogContext.withTrace(traceId, label) {
+            assertThat(MDC.get(LogFields.TRACE_ID)).isEqualTo(traceId)
+        }
+
+        // then
+        assertThat(MDC.get(LogFields.TRACE_ID)).isNull()
+    }
 }

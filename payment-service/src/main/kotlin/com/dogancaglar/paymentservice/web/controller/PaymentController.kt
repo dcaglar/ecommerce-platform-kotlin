@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.web.controller
 
+import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.paymentservice.application.service.PaymentService
 import com.dogancaglar.paymentservice.web.dto.PaymentRequestDTO
 import com.dogancaglar.paymentservice.web.dto.PaymentResponseDTO
@@ -26,15 +27,10 @@ class PaymentController(
     @PreAuthorize("hasAuthority('payment:write')")
     fun createPayment(@Valid @RequestBody request: PaymentRequestDTO): ResponseEntity<PaymentResponseDTO> {
         val traceId = UUID.randomUUID().toString()
-        MDC.put("traceId", traceId)
-        try {
-            logger.info("Starting with paymentId $traceId")
-            val result = paymentService.createPayment(
-                request
-            )
-            return ResponseEntity.ok(result)
-        } finally {
-            MDC.clear()
+
+        return LogContext.withTrace(traceId, "PaymentController.createPayment") {
+            logger.info("📥 Received payment request for order: ${request.orderId}")
+            ResponseEntity.ok(paymentService.createPayment(request))
         }
     }
 }
