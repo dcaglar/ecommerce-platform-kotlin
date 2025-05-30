@@ -1,6 +1,6 @@
 ### Build Output ###
-**/target/
-**/build/
+/target/
+/build/
 !**/src/main/**/target/
 !**/src/test/**/target/
 !**/src/main/**/build/
