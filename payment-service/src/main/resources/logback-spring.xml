@@ -26,13 +26,20 @@
                 <threadName/>
                 <logLevel/>
                 <message/>
-                <mdc>
-                    <includeMdcKey>traceId</includeMdcKey>
-                    <includeMdcKey>eventId</includeMdcKey>
-                    <includeMdcKey>aggregateId</includeMdcKey>
-                    <includeMdcKey>eventType</includeMdcKey>
-                    <includeMdcKey>parentEventId</includeMdcKey>
-                </mdc>
+<!--                <mdc>-->
+<!--                    <includeKeys>-->
+<!--                        <key>traceId</key>-->
+<!--                        <key>eventId</key>-->
+<!--                        <key>aggregateId</key>-->
+<!--                        <key>eventType</key>-->
+<!--                        <key>parentEventId</key>-->
+<!--                        <key>publicPaymentOrderId</key>-->
+<!--                        <key>publicPaymentId</key>-->
+<!--                        <key>consumerGroup</key>-->
+<!--                    </includeKeys>-->
+<!--                </mdc>    TODO use this one explicity  define what needs to be set-->
+
+                <mdc/>
 
                 <context/>
                 <stackTrace/>

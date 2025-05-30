@@ -118,13 +118,18 @@ Handles the full lifecycle of payment processing for multi-seller orders:
 
 ## 🚧 Roadmap
 
-- ⏱ Improve retry observability
-- 🧪 Write integration tests for `PaymentOrderExecutor`
-- 🧾 Add Elasticsearch read model for payment status queries
-- 🛡 Harden failure flows and implement DLQ
-- 🔐 Enforce OAuth2 in all APIs
-- 🔁 Implement scheduled PSP status polling
-- 📤 Build dummy wallet & shipment services for end-to-end simulation
+## Roadmap
+
+1. Complete structured logging and ELK stack setup.-ongoing
+2. Implement and move retry payment logic to PaymentORder
+2. Add Elasticsearch read model for payment queries.
+3. Build monitoring dashboards and basic metrics.
+4. Build Kubernetes CI/CD pipelines.
+5. Implement node affinity and resource management.
+6. Add alerting and advanced monitoring.
+7. Build dummy wallet and shipment services.
+8. Harden retry and DLQ handling.
+9. Add OAuth2 security to all APIs.
 
 ---
 

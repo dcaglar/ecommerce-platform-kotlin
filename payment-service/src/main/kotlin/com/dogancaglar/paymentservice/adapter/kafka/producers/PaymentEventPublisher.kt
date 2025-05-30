@@ -36,6 +36,7 @@ class PaymentEventPublisher(
         parentEnvelope: EventEnvelope<*>?  // optional parent context
     ): EventEnvelope<T> {
         val envelope = DomainEventFactory.envelopeFor(
+            traceId = parentEnvelope?.traceId, // optional traceId from parent
             event = data,
             eventType = event.eventType,
             aggregateId = aggregateId,

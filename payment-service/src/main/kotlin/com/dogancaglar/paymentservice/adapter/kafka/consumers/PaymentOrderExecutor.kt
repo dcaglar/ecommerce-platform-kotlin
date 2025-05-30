@@ -42,12 +42,13 @@ class PaymentOrderExecutor(
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderCreated>>) {
         val envelope = record.value()
         val paymentOrderCreatedEvent = envelope.data
-        val order = paymentService.fromCreatedEvent(paymentOrderCreatedEvent)
+        val order = paymentService.mapEventToDomain(paymentOrderCreatedEvent)
         LogContext.with(
             envelope, mapOf(
                 LogFields.TOPIC_NAME to record.topic(),
                 LogFields.CONSUMER_GROUP to "payment-order-executor",
-                LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.data.publicPaymentOrderId
+                LogFields.PUBLIC_PAYMENT_ID to envelope.data.publicPaymentId,
+                LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.data.publicPaymentOrderId,
             )
         ) {
             logger.info("▶️ [Handle Start] Processing PaymentOrderCreated")
@@ -61,7 +62,7 @@ class PaymentOrderExecutor(
                 logger.info("✅ PSP call returned status=$response for paymentOrderId=${order.paymentOrderId}")
                 when {
                     response == PaymentOrderStatus.SUCCESSFUL -> {
-                        handleSuccess(envelope, order.markAsPaid())
+                        handleSuccess(envelope,order)
                     }
                     //TODO PAYMENT_NOT__SCUCESFUL_EVENT PUBLISH
                     PSPStatusMapper.requiresRetryPayment(response) -> {
@@ -104,7 +105,7 @@ class PaymentOrderExecutor(
         val publishedEvent = paymentEventPublisher.publish(
             event = EventMetadatas.PaymentOrderSuccededMetaData,
             aggregateId = updatedOrder.publicPaymentOrderId,
-            data = PaymentOrderEventMapper.toPaymentOrderSuccededEvent(order),
+            data = PaymentOrderEventMapper.toPaymentOrderSuccededEvent(updatedOrder),
             parentEnvelope = envelope,
         )
 

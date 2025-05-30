@@ -2,10 +2,12 @@ package com.dogancaglar.paymentservice.domain.event
 
 import com.dogancaglar.common.event.DomainEventFactory
 import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.application.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.slf4j.MDC
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.*
@@ -99,6 +101,35 @@ class DomainEventFactoryTest {
         assertThat(envelope.eventType).isEqualTo(EventMetadatas.PaymentOrderCreatedMetadata.eventType)
         assertThat(envelope.aggregateId).isEqualTo(event.publicPaymentOrderId)
         assertThat(envelope.data).isEqualTo(event)
+    }
+
+    @Test
+    fun `should set parentEventId when provided`() {
+        val parentId = UUID.randomUUID()
+        val envelope = DomainEventFactory.envelopeFor(
+            event = "testEvent",
+            eventType = "testType",
+            aggregateId = "agg-1",
+            traceId = "trace-xyz",
+            parentEventId = parentId
+        )
+        assertThat(envelope.parentEventId).isEqualTo(parentId)
+    }
+
+    @Test
+    fun `should use traceId from MDC when traceId param is null`() {
+        val mdcTraceId = "mdc-trace-123"
+        try {
+            MDC.put(LogFields.TRACE_ID, mdcTraceId)
+            val envelope = DomainEventFactory.envelopeFor(
+                event = "event",
+                eventType = "type",
+                aggregateId = "agg"
+            )
+            assertThat(envelope.traceId).isEqualTo(mdcTraceId)
+        } finally {
+            MDC.clear()
+        }
     }
 
 }

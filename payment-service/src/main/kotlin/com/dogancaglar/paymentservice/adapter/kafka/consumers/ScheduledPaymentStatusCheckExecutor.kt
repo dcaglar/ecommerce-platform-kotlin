@@ -126,8 +126,8 @@ class PaymentOrderRetryCommandExecutor(
             data = paymentOrderStatusScheduled,
             parentEnvelope = envelope
         )
-        MDC.put("retryCount", pendingPaymentOrder.retryCount.toString())
-        MDC.put("retryReason", reason ?: "N/A")
+        //MDC.put(LogFields.RETRY_COUNT, pendingPaymentOrder.retryCount.toString())
+        //MDC.put("retryReason", reason ?: "N/A")
         logger.warn("Scheduled retry status for ${pendingPaymentOrder.paymentOrderId} (retry ${pendingPaymentOrder.retryCount}): $reason")
 
     }

@@ -19,6 +19,9 @@ object LogContext {
             MDC.put(LogFields.AGGREGATE_ID, envelope.aggregateId)
             MDC.put(LogFields.EVENT_TYPE, envelope.eventType)
             MDC.put(LogFields.PARENT_EVENT_ID, envelope.parentEventId?.toString() ?: "")
+            //MDC.put(LogFields.PUBLIC_PAYMENT_ID, envelope.data?.toString() ?: "")
+            MDC.put(LogFields.PUBLIC_PAYMENT_ORDER_ID, envelope.aggregateId?.toString() ?: "")
+
             additionalContext.forEach { (k, v) -> MDC.put(k, v) }
             block()
         } finally {

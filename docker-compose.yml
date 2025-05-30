@@ -125,10 +125,10 @@ services:
       - ES_JAVA_OPTS=-Xms2g -Xmx2g
     mem_limit: 3g  # optional Docker hard limit if neede
     healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:9200 || exit 1" ]
+      test: [ "CMD-SHELL", "curl -f http://elasticsearch:9200 || exit 1" ]
       interval: 10s
-      timeout: 5s
-      retries: 10
+      timeout: 10s
+      retries: 15
     ports:
       - "9200:9200"  # Exposed for Filebeat, Spring Boot, or browser/curl
     networks:
@@ -140,10 +140,10 @@ services:
     depends_on:
       - elasticsearch
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5601/api/status" ]
+      test: [ "CMD", "curl", "-f", "http://kibana:5601/api/status" ]
       interval: 10s
-      timeout: 5s
-      retries: 10
+      timeout: 10s
+      retries: 15
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
       - xpack.security.enabled=false

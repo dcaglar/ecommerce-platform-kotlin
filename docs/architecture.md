@@ -213,12 +213,13 @@ on scalability, resilience, and modularity.
 - Use Horizontal Pod Autoscalers for payment-service based on CPU/memory or custom metrics
 - Implement node autoscaling policies (if supported by cluster)
 - Prepare for disaster recovery strategies (backups, multi-zone clusters)
-
+dom
 ---
 
 ## Roadmap
 
-1. Complete structured logging and ELK stack setup.
+1. Complete structured logging and ELK stack setup.-ongoing
+2. Implement and move retry payment logic to PaymentORder
 2. Add Elasticsearch read model for payment queries.
 3. Build monitoring dashboards and basic metrics.
 4. Build Kubernetes CI/CD pipelines.

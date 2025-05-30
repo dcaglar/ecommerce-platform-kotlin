@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.application.startup
 
+import com.dogancaglar.paymentservice.config.id.IdNamespaces
 import com.dogancaglar.paymentservice.domain.port.IdGeneratorPort
-import com.dogancaglar.paymentservice.domain.port.IdNamespaces
 import com.dogancaglar.paymentservice.domain.port.PaymentOrderOutboundPort
 import com.dogancaglar.paymentservice.domain.port.PaymentOutboundPort
 import jakarta.annotation.PostConstruct

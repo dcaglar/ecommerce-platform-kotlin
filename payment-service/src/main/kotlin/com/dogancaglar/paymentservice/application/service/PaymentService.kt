@@ -84,14 +84,16 @@ class PaymentService(
         val traceId = MDC.get(LogFields.TRACE_ID) ?: UUID.randomUUID().toString()
         val paymentOrderCreatedEvent = PaymentOrderEventMapper.toPaymentOrderCreatedEvent(paymentOrder)
         val envelope = DomainEventFactory.envelopeFor(
+            traceId = traceId,
             event = paymentOrderCreatedEvent,
             eventType = EventMetadatas.PaymentOrderCreatedMetadata.eventType,
             aggregateId = paymentOrder.publicPaymentOrderId,
-
-
             )
-
-        LogContext.with(envelope) {
+        val extraLogFields = mapOf(
+            LogFields.PUBLIC_PAYMENT_ORDER_ID to paymentOrder.publicPaymentOrderId,
+            LogFields.PUBLIC_PAYMENT_ID to paymentOrder.publicPaymentId
+        )
+        LogContext.with(envelope, additionalContext = extraLogFields) {
             logger.debug(
                 "Creating OutboxEvent for eventType={}, aggregateId={}, eventId={}",
                 envelope.eventType, envelope.aggregateId, envelope.eventId
@@ -157,7 +159,7 @@ class PaymentService(
         return updated
     }
 
-    fun fromCreatedEvent(event: PaymentOrderCreated): PaymentOrder {
+    fun mapEventToDomain(event: PaymentOrderCreated): PaymentOrder {
         return PaymentOrder(
             paymentOrderId = event.paymentOrderId.toLong(),
             publicPaymentOrderId = event.publicPaymentOrderId,

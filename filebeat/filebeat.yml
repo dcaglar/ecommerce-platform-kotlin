@@ -5,28 +5,20 @@ filebeat.inputs:
     json.add_error_key: true
     paths:
       - /app-logs/payment-service*.log
-      - /app-logs/payment-service.*.log   # Include older rotated logs
-
+      - /app-logs/payment-service.*.log
 
 output.elasticsearch:
   hosts: ["http://elasticsearch:9200"]
   username: ""
   password: ""
-  index: "payment-service-logs"
-
+  index: "payment-service-logs"  # ✅ Send logs to a raw index
 
 setup.kibana:
   host: "http://kibana:5601"
 
+# ⛔ Disable dashboards and ILM
 setup.dashboards.enabled: false
-
-setup.ilm.enabled: true
-setup.ilm.rollover_alias: "payment-service-logs"
-setup.ilm.pattern: "{now/d}-000001"
-
+setup.ilm.enabled: false           # ✅ Disables data streams + ILM
+setup.template.enabled: true       # ✅ Still installs mappings
 setup.template.name: "payment-service-logs"
-setup.template.pattern: "payment-service-logs-*"
-
-
-
-
+setup.template.pattern: "payment-service-logs*"

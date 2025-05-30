@@ -1,11 +1,11 @@
 package com.dogancaglar.paymentservice.application.helper
 
+import com.dogancaglar.paymentservice.config.id.IdNamespaces
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.port.IdGeneratorPort
-import com.dogancaglar.paymentservice.domain.port.IdNamespaces
 import com.dogancaglar.paymentservice.web.dto.PaymentRequestDTO
 import com.dogancaglar.paymentservice.web.mapper.AmountMapper
 import java.time.Clock
