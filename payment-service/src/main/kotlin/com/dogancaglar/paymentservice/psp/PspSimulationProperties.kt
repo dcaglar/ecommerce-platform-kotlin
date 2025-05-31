@@ -23,8 +23,8 @@ class PspSimulationProperties {
 
     class ResponseDistribution {
         var successful: Int = 60      // 60% of responses
-        var retryable: Int = 25       // 25% of responses
-        var statusCheck: Int = 10     // 10% of responses
-        var nonRetryable: Int = 5     // 5% of responses
+        var retryable: Int = 40       // 25% of responses
+        var statusCheck: Int = 0     // 10% of responses
+        var nonRetryable: Int = 0     // 5% of responses
     }
 }

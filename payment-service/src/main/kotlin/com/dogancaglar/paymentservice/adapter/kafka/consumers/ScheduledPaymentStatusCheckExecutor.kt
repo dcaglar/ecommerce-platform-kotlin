@@ -103,7 +103,7 @@ class PaymentOrderRetryCommandExecutor(
             event = EventMetadatas.PaymentOrderSuccededMetaData,
             aggregateId = updatedOrder.publicPaymentOrderId,
             data = PaymentOrderEventMapper.toPaymentOrderSuccededEvent(updatedOrder),
-            parentEnvelope = envelope,
+            parentEventId = envelope.eventId,
         )
 
 
@@ -124,7 +124,7 @@ class PaymentOrderRetryCommandExecutor(
             event = EventMetadatas.PaymentOrderStatusCheckScheduledMetadata,
             aggregateId = pendingPaymentOrder.publicPaymentOrderId,
             data = paymentOrderStatusScheduled,
-            parentEnvelope = envelope
+            parentEventId = envelope.eventId
         )
         //MDC.put(LogFields.RETRY_COUNT, pendingPaymentOrder.retryCount.toString())
         //MDC.put("retryReason", reason ?: "N/A")

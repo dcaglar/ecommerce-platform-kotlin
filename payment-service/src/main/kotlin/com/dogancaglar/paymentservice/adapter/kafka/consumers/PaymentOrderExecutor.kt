@@ -106,7 +106,7 @@ class PaymentOrderExecutor(
             event = EventMetadatas.PaymentOrderSuccededMetaData,
             aggregateId = updatedOrder.publicPaymentOrderId,
             data = PaymentOrderEventMapper.toPaymentOrderSuccededEvent(updatedOrder),
-            parentEnvelope = envelope,
+            parentEventId = envelope.eventId,
         )
 
 

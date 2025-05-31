@@ -40,7 +40,7 @@ class RetryDispatcherScheduler(
                     aggregateId = envelope.aggregateId,
                     event = EventMetadatas.PaymentOrderRetryRequestedMetadata,
                     data = envelope.data,
-                    parentEnvelope = envelope
+                    parentEventId = envelope.eventId
                 )
             } catch (e: Exception) {
                 logger.error("Failed to dispatch retry event: ${e.message}", e)

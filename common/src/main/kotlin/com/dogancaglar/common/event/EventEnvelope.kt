@@ -28,6 +28,11 @@ data class EventEnvelope<T> @JsonCreator(mode = JsonCreator.Mode.PROPERTIES) con
 )
 {
     companion object {
+        @Deprecated(
+            message = "Use DomainEventEnvelopeFactory.envelopeFor(...) instead for consistency and better observability.",
+            replaceWith = ReplaceWith("DomainEventEnvelopeFactory.envelopeFor(...)"),
+            level = DeprecationLevel.ERROR
+        )
         fun <T> wrap(
             eventType: String,
             aggregateId: String,

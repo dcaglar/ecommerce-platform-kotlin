@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.application.service
 
-import com.dogancaglar.common.event.DomainEventFactory
+import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.application.event.*
@@ -47,7 +47,6 @@ class PaymentService(
 
     @Transactional
     fun createPayment(request: PaymentRequestDTO): PaymentResponseDTO {
-
         //create domain
         val paymentDomain = paymentFactory.createFrom(request)
         //we already have ids for domains
@@ -81,12 +80,10 @@ class PaymentService(
     }
 
     private fun toOutBoxEvent(paymentOrder: PaymentOrder): OutboxEvent {
-        val traceId = MDC.get(LogFields.TRACE_ID) ?: UUID.randomUUID().toString()
         val paymentOrderCreatedEvent = PaymentOrderEventMapper.toPaymentOrderCreatedEvent(paymentOrder)
-        val envelope = DomainEventFactory.envelopeFor(
-            traceId = traceId,
-            event = paymentOrderCreatedEvent,
-            eventType = EventMetadatas.PaymentOrderCreatedMetadata.eventType,
+        val envelope = DomainEventEnvelopeFactory.envelopeFor(
+            data = paymentOrderCreatedEvent,
+            eventType = EventMetadatas.PaymentOrderCreatedMetadata,
             aggregateId = paymentOrder.publicPaymentOrderId,
             )
         val extraLogFields = mapOf(

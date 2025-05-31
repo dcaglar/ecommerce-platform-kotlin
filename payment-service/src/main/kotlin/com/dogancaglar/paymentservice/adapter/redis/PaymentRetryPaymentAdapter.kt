@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.redis
 
+import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
@@ -28,11 +29,9 @@ open class PaymentRetryPaymentAdapter(
 
     override fun scheduleRetry(paymentOrder: PaymentOrder) {
         val paymentOrderRetryRequested = PaymentOrderEventMapper.toPaymentOrderRetryRequestEvent(order = paymentOrder)
-        val envelope = EventEnvelope.wrap(
-            eventType = EventMetadatas.PaymentOrderRetryRequestedMetadata.eventType,
-            aggregateId = paymentOrderRetryRequested.publicPaymentOrderId,
-            data = paymentOrderRetryRequested,
-            traceId = MDC.get(LogFields.TRACE_ID) // optional
+        val envelope = DomainEventEnvelopeFactory.envelopeFor(data = paymentOrderRetryRequested,
+            eventType = EventMetadatas.PaymentOrderRetryRequestedMetadata,
+            aggregateId = paymentOrderRetryRequested.publicPaymentOrderId
         )
         val json = objectMapper.writeValueAsString(envelope);
         val delayMillis = calculateBackoffMillis(paymentOrder.retryCount)

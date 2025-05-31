@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.redis
 
+import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
@@ -27,12 +28,11 @@ open class PaymentRetryStatusAdapter(
 
     override fun scheduleRetry(paymentOrder: PaymentOrder) {
         val paymentOrderStatusScheduled = PaymentOrderEventMapper.toPaymentOrderStatusScheduled(paymentOrder)
-        val envelope = EventEnvelope.wrap(
-            eventType = EventMetadatas.PaymentOrderStatusCheckScheduledMetadata.eventType,
+        val envelope = DomainEventEnvelopeFactory.envelopeFor(data = paymentOrderStatusScheduled,
+            eventType = EventMetadatas.PaymentOrderStatusCheckScheduledMetadata,
             aggregateId = paymentOrderStatusScheduled.publicPaymentOrderId,
-            data = paymentOrderStatusScheduled,
-            traceId = MDC.get(LogFields.TRACE_ID) // optional
-        )
+            )
+
         val json = objectMapper.writeValueAsString(envelope);
         //todo publish a PaymentOrderStatusCheckScheduledMetadata
         redisTemplate.opsForList().leftPush(queue, json)

@@ -128,6 +128,8 @@ Handles the full lifecycle of payment processing for multi-seller orders:
 5. Implement node affinity and resource management.
 6. Add alerting and advanced monitoring.
 7. Build dummy wallet and shipment services.
+8. Enforce consistent, encapsulated creation of EventEnvelope<T> to align with Domain-Driven Design (DDD) and Factory Pattern principles.
+•	☑ Restrict direct usage of EventEnvelope constructo
 8. Harden retry and DLQ handling.
 9. Add OAuth2 security to all APIs.
 

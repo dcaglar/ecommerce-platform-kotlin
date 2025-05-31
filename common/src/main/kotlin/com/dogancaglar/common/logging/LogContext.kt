@@ -8,6 +8,9 @@ import org.slf4j.MDC
 object LogContext {
     private val logger = LoggerFactory.getLogger(LogContext::class.java)
 
+    fun getTraceId(): String? = MDC.get(LogFields.TRACE_ID)
+
+
     fun <T> with(
         envelope: EventEnvelope<T>,
         additionalContext: Map<String, String> = emptyMap(),
