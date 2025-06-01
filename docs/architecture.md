@@ -1,244 +1,234 @@
-# Architecture Overview: ecommerce-platform-kotlin
+# Architecture Overview · `ecommerce-platform-kotlin`
 
-## Introduction
-
-This document describes the architectural design and principles behind the `ecommerce-platform-kotlin` project, focusing
-on scalability, resilience, and modularity.
+_Last updated: 2025-06-01 – maintained by **Doğan Çağlar**_
 
 ---
 
-## Architectural Principles
-
-## Domain-Driven Design (DDD) and Hexagonal Architecture in This Project
-
-### Domain-Driven Design (DDD)
-
-- **Domain:**  
-  The core business logic lives in the domain layer. This includes entities like `Payment`, `PaymentOrder`, domain
-  exceptions, value objects, and domain events. The domain expresses the business rules, invariants, and behaviors
-  without being polluted by technical concerns.
-
-- **Bounded Contexts:**  
-  Your modules (e.g., `payment-service`, `order-service`, `wallet-service`) represent distinct bounded contexts, each
-  owning its own domain model and logic. This separation prevents mixing concepts and promotes clear responsibility.
-
-- **Ubiquitous Language:**  
-  The code, event names, and DTOs reflect domain concepts directly (e.g., `PaymentOrderCreated`), ensuring clear
-  communication between technical and domain experts.
-
-- **Ports and Adapters:**  
-  The domain exposes interfaces (ports) like `PaymentOrderOutboundPort` or `IdGeneratorPort`. These define contracts for
-  infrastructure interactions without leaking implementation details.
+## 1 · Purpose & Scope
+This document is the single source of truth for the technical design of **ecommerce-platform-kotlin**.  
+It explains **why** and **how** we build a modular, event-driven, cloud-ready backend that can scale to multi-seller, high-throughput workloads while remaining observable, resilient, and easy to extend.
 
 ---
 
-### Hexagonal Architecture (aka Ports and Adapters)
+## 2 · Key Design Principles
 
-- **Core Domain:**  
-  The `domain` package forms the inner hexagon, containing pure business logic isolated from external systems.
-
-- **Ports:**  
-  Interfaces defined in the domain layer that specify required operations for persistence, messaging, retry queues, and
-  external services.
-
-- **Adapters:**  
-  Implementations of ports live in the adapter layer:
-    - Persistence adapters (e.g., `JpaPaymentOutboundAdapter`) handle DB interactions.
-    - Messaging adapters manage Kafka producers and consumers.
-    - Redis adapters handle caching, retry queues, and ID generation.
-    - Outbox pattern adapters manage reliable event dispatching.
-
-- **Configuration Layer:**  
-  External configuration and wiring (e.g., Spring Beans, Kafka configs) live in the `config` package, keeping
-  infrastructure details outside the domain.
-
-- **Application Layer:**  
-  Contains use-case orchestration, event handling, and service logic (`PaymentService`, event mappers). It bridges
-  domain model operations and external interactions.
+| Principle | How it’s applied |
+|-----------|-----------------|
+| **Domain-Driven Design** | Clear bounded contexts (`payment-service`, `wallet-service`, `shipment-service`, …). Domain, application, adapter, config layers in every module. |
+| **Hexagonal Architecture** | Domain code depends on _ports_ (interfaces); adapters implement them (JPA, Kafka, Redis, Outbox, PSP, …). |
+| **Event-Driven** | Kafka is the backbone; every state change is emitted as an event wrapped in `EventEnvelope<T>`. |
+| **Outbox Pattern** | Events are written to an outbox table in the same TX as the aggregate change and reliably published. |
+| **Observability First** | JSON logs with traceId/eventId, Prometheus metrics, (planned) OpenTelemetry tracing. |
+| **Cloud-Native Readiness** | Early containerization, Kubernetes manifests, profile-based config, secret management. |
 
 ---
 
-### Benefits in the Project
+## 3 · Service Landscape (Target)
 
-- **Loose Coupling:**  
-  Changes in infrastructure (e.g., swapping Redis or Kafka clients) don’t impact domain logic.
+## Bounded Contexts Diagram
 
-- **Testability:**  
-  Domain logic can be tested in isolation using mocks of ports.
+```mermaid
+flowchart LR
+subgraph Client Layer
+A["REST Controller<br/>(PaymentController)"]:::controller
+end
 
-- **Clear Boundaries:**  
-  Enforced separation helps avoid domain leakage and mixing technical details in business code.
+subgraph Application Layer
+B["PaymentService<br/>(Orchestrator)"]:::service
+C[DomainEventEnvelopeFactory]:::service
+D[PaymentOrderOutboxDispatcherScheduler]:::service
+E[PaymentOrderEventPublisher]:::service
+end
 
-- **Event-Driven Flow:**  
-  The hexagonal design enables seamless event choreography between bounded contexts via Kafka, with traceability
-  embedded.
+subgraph Domain Layer
+F["Domain Models<br/>• Payment  • PaymentOrder"]:::domain
+G["Ports / Interfaces<br/>• PaymentOutboundPort<br/>• PaymentOrderOutboundPort<br/>• OutboxEventPort<br/>• IdGeneratorPort"]:::domain
+H["Retry Logic & Backoff<br/>(encapsulated in PaymentOrder)"]:::domain
+end
 
-### Event-Driven Architecture
+subgraph Adapter Layer
+I["Persistence Adapters<br/>• JPA Repositories"]:::adapter
+J["Redis Adapters<br/>• ID Generator  • Retry ZSet"]:::adapter
+K["Kafka Consumer<br/>(PaymentOrderExecutor)"]:::adapter
+M["Retry Scheduler Job<br/>(Redis → PaymentOrderRetryRequested)"]:::adapter
+N["PSP Client<br/>(Mock PSP)"]:::adapter
+end
 
-- Kafka is used as the backbone for asynchronous communication.
-- Events wrapped in `EventEnvelope` carry metadata (`traceId`, `parentEventId`).
-- Ensures traceability and loose coupling.
+subgraph Infrastructure
+DB[(PostgreSQL)]:::infra
+REDIS[(Redis)]:::infra
+KAFKA[(Kafka)]:::infra
+PSP_API[(Mock PSP Endpoint)]:::infra
+end
 
-### Observability
+%% Relationships
+A --> B
+B --> F
+B --> J
+B --> I
+B --> G
+B --> C
+B --> D
+D --> E
+E --> KAFKA
+M --> E
+KAFKA --> K
+K --> N
+K --> H
+H --> J
+I --> DB
+J --> REDIS
+N --> PSP_API
 
-- Structured JSON logs with context propagation.
-- Use of MDC for correlating requests and events.
-- Integration with Elasticsearch and Kibana for search and visualization.
-- Planned addition of Prometheus and Micrometer for metrics.
+%% Styling
+classDef controller   fill:#e8f0fe, stroke:#4b7bec, stroke-width:1px;
+classDef service      fill:#e6ffe6, stroke:#43a047, stroke-width:1px;
+classDef domain       fill:#fff4e6, stroke:#f39c12, stroke-width:1px;
+classDef adapter      fill:#f3e5f5, stroke:#8e24aa, stroke-width:1px;
+classDef infra        fill:#fce4ec, stroke:#d81b60, stroke-width:1px;
 
-### Resilience Patterns
+class A controller
+class B,C,D,E service
+class F,G,H domain
+class I,J,K,M,N adapter
+class DB,REDIS,KAFKA,PSP_API infra
+```
 
-- Retry with exponential backoff using Redis ZSet.
-- Scheduled status checks stored in PostgreSQL.
-- Dead Letter Queue (DLQ) for failed events.
-- Redis-backed ID generation with state synchronization.
+~~## 4 · Outbox Pattern – Dual Tables
+
+| Table | Example Events                                          | Dispatcher                      |
+|-------|---------------------------------------------------------|---------------------------------|
+| `outbox_payment` | `PaymentCreated`,                                       | **PaymentOutboxDispatcher**     |
+| `outbox_payment_order` | `PaymentOrderCreated`, | **PaymentCreatedEventConsumer** |
+
+```mermaid
+flowchart TD
+%% Database Tables
+  A1["Payment Table"]
+  A2["PaymentOrder Table"]
+  O1["Outbox_Payment"]
+  O2["Outbox_PaymentOrder"]
+
+%% Application Nodes
+  P1["PaymentService (persist Payment & PaymentCreated)"]
+  D1["PaymentOutboxDispatcher (publish PaymentCreated)"]
+  C1["PaymentCreated Consumer (Kafka Listener)"]
+  P2["PaymentOrderService (persist PaymentOrders & PaymentOrderCreated)"]
+  D2["PaymentOrderOutboxDispatcher (publish PaymentOrderCreated)"]
+
+%% Kafka Topics
+  K1["Kafka: payment_created_topic"]
+  K2["Kafka: payment_order_created_topic"]
+
+%% Flows
+  P1 --> A1
+  P1 --> O1
+  D1 --> O1
+  D1 --> K1
+  K1 --> C1
+  C1 --> A1
+  C1 --> P2
+  P2 --> A2
+  P2 --> O2
+  D2 --> O2
+  D2 --> K2
+
+%% Styling
+  classDef outbox fill:#fce4ec,stroke:#d81b60;
+  class O1,O2 outbox
+  classDef kafka fill:#e1f5fe,stroke:#0288d1;
+  class K1,K2 kafka
+  classDef db fill:#f3e5f5,stroke:#8e24aa;
+  class A1,A2 db
+  classDef app fill:#e6ffe6,stroke:#43a047;
+  class P1,P2,D1,D2,C1 app
+```
+---
+
+## 5 · Unique ID Generation
+
+All aggregates receive a **sequential, cluster-unique ID _before_ persistence** via `Redis INCR`.  
+If Redis restarts, an init routine seeds the counter from the DB’s current max to guarantee no gaps or duplicates.
+
+**Benefits**
+
+* Stable ID available for logs, foreign keys, and event keys.
+* Enables idempotent upserts.
+* Allows clients to receive a public ID immediately after creation.
 
 ---
 
-## Component Overview
+## 6 · Retry & Status-Check Strategy
 
-### payment-service
-
-- Processes payment requests for multi-seller orders.
-- Creates Payment and PaymentOrder aggregates.
-- Emits and consumes domain events via Kafka.
-- Integrates with mock PSP with latency and failure simulations.
-- Supports retry, status polling, and DLQ mechanisms.
-
-### common
-
-- Contains shared models, event envelopes, and logging utilities.
-
-### Future Modules
-
-- order-service: emits order-created events.
-- wallet-service: manages seller balances.
-- shipment-service: handles delivery workflows.
+| Scenario | Storage | Trigger | Notes |
+|----------|---------|---------|-------|
+| **Transient PSP error** | Redis ZSet (`payment:retry`) | PaymentOrderExecutor schedules retry | Exponential back-off, polling job republishes `PaymentOrderRetryRequested`. |
+| **Pending PSP status** | Postgres table (`payment_order_status_check`) | Scheduled job queries due rows | Publishes `PaymentOrderStatusCheckRequested`. |
+| **Max retries exceeded** | DLQ Topic | – | PaymentOrder marked `FAILED_FINALIZED`, alert emitted. |
 
 ---
 
-## Deployment Architecture
+## 7 · Idempotency
 
-### Local Development
+Processing the same event/request twice must have no side-effects.
 
-- Docker Compose orchestrates all required services:
-    - PostgreSQL (payment-db, keycloak-db)
-    - Kafka + Zookeeper
-    - Redis + RedisInsight
-    - Elasticsearch + Kibana + Filebeat
-    - Keycloak (optional)
-    - Payment-service backend
+* _Outbox Dispatcher_ – safe re-publish if state not marked `SENT`.
+* _Kafka Consumers_ – skip update if aggregate already in expected state or if `eventId` seen.
+* _DB Constraints_ – natural keys unique; duplicates rejected.
 
-### Kubernetes Deployment (Planned)
-
-- Single Kubernetes cluster with namespaces for:
-    - auth (Keycloak)
-    - payment (payment-service, payment-db, Redis)
-    - messaging (Kafka, Zookeeper)
-    - observability (Elasticsearch, Kibana, Filebeat)
-
-- Use node affinity to colocate Redis and PostgreSQL.
-- Use PersistentVolumeClaims for durable storage.
-- Deploy Filebeat as a DaemonSet for log shipping.
-- Configure Horizontal Pod Autoscaling (HPA) for payment-service.
+```kotlin
+if (order.status == SUCCESSFUL) {
+    log.info("Duplicate PaymentOrderSucceeded – skipping")
+    return
+}
+```
 
 ---
 
-## Observability & Logging Flow
+## 8 · Observability Stack
 
-- Application logs contain structured JSON with `traceId`, `eventId`, `aggregateId`, `parentEventId`.
-- Logs are collected by Filebeat running on each node.
-- Filebeat ships logs to Elasticsearch.
-- Kibana provides dashboards and search interfaces for troubleshooting by `publicPaymentId` or `publicPaymentOrderId`.
+| Layer | Tool |
+|-------|------|
+| Logs | Logback JSON → Filebeat → Elasticsearch → **Kibana** |
+| Metrics | Micrometer → **Prometheus** → Grafana |
+| Tracing | OpenTelemetry → **Jaeger / Tempo** (planned) |
 
----
-
-## Kubernetes Deployment Plan
-
-### Cluster Setup
-
-- Choose environment: Local (minikube, Docker Desktop), Cloud (GKE, EKS, AKS)
-- Create a cluster with minimal nodes, scalable node pools
-
-### Namespace Strategy
-
-- Separate namespaces for logical grouping:
-    - `auth` (optional, for Keycloak)
-    - `payment` (payment-service backend, payment-db, Redis)
-    - `messaging` (Kafka, Zookeeper)
-    - `observability` (Elasticsearch, Kibana, Filebeat)
-
-### Node Pools and Affinity
-
-- Define node pools labeled by role:
-    - `role=db` for PostgreSQL and Redis (ID generation colocated for latency)
-    - `role=kafka` for Kafka and Zookeeper
-    - `role=app` for payment-service pods
-    - `role=observability` for ELK stack pods
-
-- Use Pod affinity/anti-affinity and node selectors to ensure colocated services for low latency and separation of
-  concerns
-
-### Persistent Storage
-
-- Use PersistentVolumeClaims (PVCs) for all stateful services (Postgres, Redis, Kafka where needed)
-- Align PVCs with cloud provider storage classes or local storage options
-
-### Deployment Objects
-
-- Use StatefulSets for stateful services (Postgres, Redis, Kafka)
-- Use Deployments for stateless services (payment-service, Keycloak, Kafka UI, RedisInsight)
-- Deploy Filebeat as a DaemonSet for cluster-wide log collection
-
-### Networking and Service Discovery
-
-- Use Kubernetes Services for stable internal access
-- Leverage DNS names like `redis.payment.svc.cluster.local` for intra-cluster communication
-
-### CI/CD Pipelines
-
-- Build automated pipelines to:
-    - Build Docker images
-    - Push images to container registry
-    - Deploy manifests to Kubernetes cluster
-
-### Observability
-
-- Set up Filebeat DaemonSet for log shipping to Elasticsearch
-- Configure Kibana dashboards for structured logs
-- Plan to add Prometheus and Grafana monitoring dashboards and alerts
-
-### Scaling and Resilience
-
-- Use Horizontal Pod Autoscalers for payment-service based on CPU/memory or custom metrics
-- Implement node autoscaling policies (if supported by cluster)
-- Prepare for disaster recovery strategies (backups, multi-zone clusters)
-dom
----
-
-## Roadmap
-
-1. Complete structured logging and ELK stack setup.-ongoing
-2. Implement and move retry payment logic to PaymentORder
-2. Add Elasticsearch read model for payment queries.
-3. Build monitoring dashboards and basic metrics.
-4. Build Kubernetes CI/CD pipelines.
-5. Implement node affinity and resource management.
-6. Add alerting and advanced monitoring.
-7. Build dummy wallet and shipment services.
-8. Harden retry and DLQ handling.
-9. Add OAuth2 security to all APIs.
-10. Implement scheduled PSP status polling.
+Structured log fields: `traceId`, `eventId`, `parentEventId`, `aggregateId`.
 
 ---
 
-## References
+## 9 · Security & Profiles
 
-- Domain-Driven Design by Eric Evans
-- Kubernetes documentation
-- Spring Boot and Kafka guides
-- Elasticsearch and Kibana tutorials
+* Spring profiles: `local`, `k8s`, `prod`.
+* Secrets: `.gitignored` `secrets-local.yml` (dev) vs. Kubernetes Secrets (k8s/prod).
+* **OAuth2 / Keycloak** integration planned for all APIs.
 
 ---
 
-*Document maintained by Doğan Çağlar.*
+## 10 · Roadmap (June 2025)
+
+| # | Task | Key Deliverable |
+|---|------|-----------------|
+| 0 | ✅ Structured logging & ELK | JSON logs, Kibana |
+| 1 | Retry logic refactor | Domain-owned; Redis ZSet + job |
+| 2 | Elasticsearch read model | `/payments/search` |
+| 3 | Monitoring & metrics | Prometheus, Grafana |
+| 4 | Containerize services | Dockerfile, Compose |
+| 5 | Dual outbox tables | Payment & PaymentOrder flows |
+| 6 | Local Kubernetes deploy | Deployment & Service YAML |
+| 7 | Dummy wallet/shipment | Event choreography demo |
+| 8 | EventEnvelope factory enforcement | No direct constructors |
+| 9 | OAuth2 security | Keycloak / Auth0 |
+| 10 | Retry & DLQ hardening | DLQ topic + alerts |
+| 11 | K8s node affinity & resources | Tuned limits/requests |
+| 12 | Alerting & advanced monitoring | Slack/email alerts |
+| 13 | Kafka consumer scaling | Concurrency & replicas |
+
+---
+
+## 11 · References
+* Eric Evans, **Domain-Driven Design**
+* Spring Boot, Spring Kafka, Micrometer documentation
+* Apache Kafka & Kubernetes references
+* OpenTelemetry specification
+* Red Hat, **Building Event‑Driven Microservices**

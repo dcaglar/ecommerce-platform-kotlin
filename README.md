@@ -29,12 +29,79 @@ This project simulates a real-world multi-seller eCommerce platform where:
 
 ---
 
+```mermaid
+flowchart LR
+subgraph Client Layer
+A["REST Controller<br/>(PaymentController)"]:::controller
+end
+
+subgraph Application Layer
+B["PaymentService<br/>(Orchestrator)"]:::service
+C[DomainEventEnvelopeFactory]:::service
+D[PaymentOrderOutboxDispatcherScheduler]:::service
+E[PaymentOrderEventPublisher]:::service
+end
+
+subgraph Domain Layer
+F["Domain Models<br/>• Payment  • PaymentOrder"]:::domain
+G["Ports / Interfaces<br/>• PaymentOutboundPort<br/>• PaymentOrderOutboundPort<br/>• OutboxEventPort<br/>• IdGeneratorPort"]:::domain
+H["Retry Logic & Backoff<br/>(encapsulated in PaymentOrder)"]:::domain
+end
+
+subgraph Adapter Layer
+I["Persistence Adapters<br/>• JPA Repositories"]:::adapter
+J["Redis Adapters<br/>• ID Generator  • Retry ZSet"]:::adapter
+K["Kafka Consumer<br/>(PaymentOrderExecutor)"]:::adapter
+M["Retry Scheduler Job<br/>(Redis → PaymentOrderRetryRequested)"]:::adapter
+N["PSP Client<br/>(Mock PSP)"]:::adapter
+end
+
+subgraph Infrastructure
+DB[(PostgreSQL)]:::infra
+REDIS[(Redis)]:::infra
+KAFKA[(Kafka)]:::infra
+PSP_API[(Mock PSP Endpoint)]:::infra
+end
+
+%% Relationships
+A --> B
+B --> F
+B --> J
+B --> I
+B --> G
+B --> C
+B --> D
+D --> E
+E --> KAFKA
+M --> E
+KAFKA --> K
+K --> N
+K --> H
+H --> J
+I --> DB
+J --> REDIS
+N --> PSP_API
+
+%% Styling
+classDef controller   fill:#e8f0fe, stroke:#4b7bec, stroke-width:1px;
+classDef service      fill:#e6ffe6, stroke:#43a047, stroke-width:1px;
+classDef domain       fill:#fff4e6, stroke:#f39c12, stroke-width:1px;
+classDef adapter      fill:#f3e5f5, stroke:#8e24aa, stroke-width:1px;
+classDef infra        fill:#fce4ec, stroke:#d81b60, stroke-width:1px;
+
+class A controller
+class B,C,D,E service
+class F,G,H domain
+class I,J,K,M,N adapter
+class DB,REDIS,KAFKA,PSP_API infra
+```
+
 ## Project Structure
 
 This project follows a modular multi-module Maven layout designed for scalability and maintainability.
 
 For detailed folder and package structure, see [docs/folder-structure.md](./docs/folder-structure.md).  
-For architectural principles and deployment plans, see [docs/architecture.md](./docs/architecture.md).
+For architectural principles and deployment plans,  and detailed  diagrams see [docs/architecture.md](./docs/architecture.md).
 
 ## ✅ Current Focus: `payment-service`
 
@@ -120,20 +187,38 @@ Handles the full lifecycle of payment processing for multi-seller orders:
 
 ## Roadmap
 
-1. Complete structured logging and ELK stack setup.-ongoing
-2. Implement and move retry payment logic to PaymentORder
-2. Add Elasticsearch read model for payment queries.
-3. Build monitoring dashboards and basic metrics.
-4. Build Kubernetes CI/CD pipelines.
-5. Implement node affinity and resource management.
-6. Add alerting and advanced monitoring.
-7. Build dummy wallet and shipment services.
-8. Enforce consistent, encapsulated creation of EventEnvelope<T> to align with Domain-Driven Design (DDD) and Factory Pattern principles.
-•	☑ Restrict direct usage of EventEnvelope constructo
-8. Harden retry and DLQ handling.
-9. Add OAuth2 security to all APIs.
+📋 Updated Roadmap (with containerization earlier)
+Updated Roadmap with Outbox Event Split
+1.	Complete structured logging and ELK stack setup (done)
+2.	Implement and refactor retry payment logic in PaymentOrder
+3.	Add Elasticsearch read model for payment queries
+4.	Build monitoring dashboards and basic metrics (Prometheus/Grafana)
+5.	Containerize Spring Boot apps
+•	Write Dockerfile for payment-service (and others)
+•	Test locally with Docker Compose
+•	Ensure profiles/secrets can be injected at runtime
+6.	Implement dual outbox event tables/flows
+•	Separate Payment-level and PaymentOrder-level outbox tables
+•	Implement outbox polling/dispatch for both
+•	Ensure causal event flow and idempotency
+7.	Enable basic Kubernetes deployment (Docker Desktop/Minikube)
+•	Write deployment.yaml/service.yaml
+•	Deploy and verify app health
+8.	Build dummy wallet and shipment services
+9.	Enforce EventEnvelope encapsulation (DDD Factory pattern)
+•	Forbid direct construction; require DomainEventEnvelopeFactory
+•	Audit/refactor across modules
+10.	Add OAuth2 security to all APIs
+•	Integrate with Keycloak (or Auth0)
+•	Add token validation to REST endpoints
+11.	Harden retry and DLQ handling
+12.	Implement node affinity/resource management for K8s
+13.	Add alerting and advanced monitoring
+14.	Scale Kafka consumers (horizontal concurrency tuning)
 
----
+
+
+Basic CI/CD with GitHub Actions
 
 ## 🧪 Testing Strategy
 
