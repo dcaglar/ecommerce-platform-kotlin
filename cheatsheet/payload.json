@@ -1,0 +1,31 @@
+{
+  "orderId": "ORDER-20240508-XYZ",
+  "buyerId": "BUYER-123",
+  "totalAmount": {
+    "value": 199.49,
+    "currency": "EUR"
+  },
+  "paymentOrders": [
+    {
+      "sellerId": "SELLER-001",
+      "amount": {
+        "value": 49.99,
+        "currency": "EUR"
+      }
+    },
+    {
+      "sellerId": "SELLER-002",
+      "amount": {
+        "value": 29.50,
+        "currency": "EUR"
+      }
+    },
+    {
+      "sellerId": "SELLER-003",
+      "amount": {
+        "value": 120.00,
+        "currency": "EUR"
+      }
+    }
+  ]
+}'

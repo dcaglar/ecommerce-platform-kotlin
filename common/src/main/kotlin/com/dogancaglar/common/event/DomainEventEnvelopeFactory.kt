@@ -19,10 +19,10 @@ object DomainEventEnvelopeFactory {
         data: T,
         eventType: EventMetadata<T>,
         aggregateId: String,
-        parentEventId: UUID? = null
+        parentEventId: UUID? = null,
+        traceId :String,
     ): EventEnvelope<T> {
         val eventId = UUID.randomUUID()
-        val traceId = LogContext.getTraceId() ?: error("Missing traceId")
         return EventEnvelope(
             traceId = traceId,
             eventId = eventId,

@@ -16,6 +16,7 @@ import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
+import java.util.UUID
 
 @Component("paymentRetryStatusAdapter")
 open class PaymentRetryStatusAdapter(
@@ -31,6 +32,7 @@ open class PaymentRetryStatusAdapter(
         val envelope = DomainEventEnvelopeFactory.envelopeFor(data = paymentOrderStatusScheduled,
             eventType = EventMetadatas.PaymentOrderStatusCheckScheduledMetadata,
             aggregateId = paymentOrderStatusScheduled.publicPaymentOrderId,
+            traceId = MDC.get(LogFields.TRACE_ID) ?: UUID.randomUUID().toString(),
             )
 
         val json = objectMapper.writeValueAsString(envelope);

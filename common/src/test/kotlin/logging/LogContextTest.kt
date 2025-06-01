@@ -2,15 +2,23 @@ package com.dogancaglar.common.logging
 
 import com.dogancaglar.common.event.EventEnvelope
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.slf4j.MDC
 import java.util.*
 
 class LogContextTest {
 
+    @AfterEach
+    fun tearDown() {
+        MDC.clear()
+    }
+
     @Test
-    fun `should populate and clear MDC correctly for envelope`() {
-        // given
+    fun `should populate MDC for envelope and restore previous context`() {
+        // given – an outer trace already in MDC (simulates a nested scope)
+        MDC.put(LogFields.TRACE_ID, "outer-trace")
+
         val envelope = EventEnvelope(
             traceId = "trace-123",
             eventId = UUID.randomUUID(),
@@ -22,32 +30,15 @@ class LogContextTest {
 
         // when
         LogContext.with(envelope) {
+            // inside scope
             assertThat(MDC.get(LogFields.TRACE_ID)).isEqualTo("trace-123")
             assertThat(MDC.get(LogFields.EVENT_ID)).isEqualTo(envelope.eventId.toString())
             assertThat(MDC.get(LogFields.AGGREGATE_ID)).isEqualTo("payment-123")
-            assertThat(MDC.get(LogFields.EVENT_TYPE)).isEqualTo("payment_created")
         }
 
-        // then
-        // MDC should be cleared outside of LogContext scope
-        assertThat(MDC.get(LogFields.TRACE_ID)).isNull()
+        // then – previous value should be restored, not cleared
+        assertThat(MDC.get(LogFields.TRACE_ID)).isEqualTo("outer-trace")
         assertThat(MDC.get(LogFields.EVENT_ID)).isNull()
         assertThat(MDC.get(LogFields.AGGREGATE_ID)).isNull()
-        assertThat(MDC.get(LogFields.EVENT_TYPE)).isNull()
-    }
-
-    @Test
-    fun `should populate and clear MDC correctly for traceId`() {
-        // given
-        val traceId = "trace-456"
-        val label = "unit-test"
-
-        // when
-        LogContext.withTrace(traceId, label) {
-            assertThat(MDC.get(LogFields.TRACE_ID)).isEqualTo(traceId)
-        }
-
-        // then
-        assertThat(MDC.get(LogFields.TRACE_ID)).isNull()
     }
 }

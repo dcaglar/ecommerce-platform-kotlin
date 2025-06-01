@@ -2,8 +2,6 @@ package com.dogancaglar.paymentservice.domain.event
 
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.event.EventMetadata
-import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.application.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
@@ -21,10 +19,11 @@ class DomainEventFactoryTest {
     fun `should create EventEnvelope with generated eventId and traceid from mdc`() {
         // given
         val traceIdFromMDC = "test-traceid"
-        val eventType = "payment_order_created"
-        LogContext.withTrace(traceIdFromMDC, "DomainEventFactoryTest") {
+        MDC.put(LogFields.TRACE_ID, traceIdFromMDC)
+        try {
             // when
             val envelope: EventEnvelope<PaymentOrderCreated> = DomainEventEnvelopeFactory.envelopeFor(
+                traceId = traceIdFromMDC,
                 data = PaymentOrderCreated(
                     paymentOrderId = "po-1001",
                     publicPaymentOrderId = "paymentorder-1001",
@@ -45,7 +44,9 @@ class DomainEventFactoryTest {
             // then
             assertThat(envelope.eventId).isNotNull
             assertThat (envelope.traceId).isEqualTo(traceIdFromMDC)
-            assertThat(envelope.eventType).isEqualTo(eventType)
+            assertThat(envelope.eventType).isEqualTo("payment_order_created")
+        } finally {
+            MDC.clear()
         }
     }
 
@@ -54,6 +55,7 @@ class DomainEventFactoryTest {
         // when
         assertThrows <IllegalStateException> {
             DomainEventEnvelopeFactory.envelopeFor(
+                traceId = MDC.get(LogFields.TRACE_ID) ?: throw IllegalStateException("TraceId missing"),
                 data = PaymentOrderCreated(
                     paymentOrderId = "po-1",
                     publicPaymentOrderId = "paymentorder-1",
@@ -77,8 +79,10 @@ class DomainEventFactoryTest {
     @Test
     fun `should generate unique eventId and same traceid each time`() {
         val traceIdFromMDC = "test-traceid"
-        LogContext.withTrace(traceIdFromMDC, "DomainEventFactoryTest") {
+        MDC.put(LogFields.TRACE_ID, traceIdFromMDC)
+        try {
             val event1 = DomainEventEnvelopeFactory.envelopeFor(
+                traceId = traceIdFromMDC,
                 data = PaymentOrderCreated(
                     paymentOrderId = "po-1",
                     publicPaymentOrderId = "paymentorder-1",
@@ -96,6 +100,7 @@ class DomainEventFactoryTest {
                 aggregateId = "paymentorder-1"
             )
             val event2 = DomainEventEnvelopeFactory.envelopeFor(
+                traceId = traceIdFromMDC,
                 data = PaymentOrderCreated(
                     paymentOrderId = "po-3",
                     publicPaymentOrderId = "paymentorder-1",
@@ -115,6 +120,8 @@ class DomainEventFactoryTest {
             assertThat(event1.traceId).isEqualTo(event2.traceId)
             assertThat(event1.eventId).isNotEqualTo(event2.eventId)
 
+        } finally {
+            MDC.clear()
         }
     }
 
@@ -122,7 +129,8 @@ class DomainEventFactoryTest {
     fun `envelopeFor should create EventEnvelope with correct fields`() {
 
         val traceIdFromMDC = "test-traceid"
-        LogContext.withTrace(traceIdFromMDC, "DomainEventFactoryTest") {
+        MDC.put(LogFields.TRACE_ID, traceIdFromMDC)
+        try {
             val event = PaymentOrderCreated(
                 paymentOrderId = "po-1001",
                 publicPaymentOrderId = "paymentorder-1001",
@@ -138,6 +146,7 @@ class DomainEventFactoryTest {
             )
 
             val envelope = DomainEventEnvelopeFactory.envelopeFor(
+                traceId = traceIdFromMDC,
                 data = event,
                 eventType = EventMetadatas.PaymentOrderCreatedMetadata,
                 aggregateId = event.publicPaymentOrderId
@@ -148,13 +157,16 @@ class DomainEventFactoryTest {
             assertThat(envelope.eventType).isEqualTo(EventMetadatas.PaymentOrderCreatedMetadata.eventType)
             assertThat(envelope.aggregateId).isEqualTo(event.publicPaymentOrderId)
             assertThat(envelope.data).isEqualTo(event)
+        } finally {
+            MDC.clear()
         }
     }
 
     @Test
     fun `should set parentEventId when provided`() {
         val traceIdFromMDC = "test-traceid"
-        LogContext.withTrace(traceIdFromMDC, "DomainEventFactoryTest") {
+        MDC.put(LogFields.TRACE_ID, traceIdFromMDC)
+        try {
             val parentId = UUID.randomUUID()
             val event = PaymentOrderCreated(
                 paymentOrderId = "po-1001",
@@ -171,6 +183,7 @@ class DomainEventFactoryTest {
             )
 
             val envelope = DomainEventEnvelopeFactory.envelopeFor(
+                traceId = traceIdFromMDC,
                 data = event,
                 eventType = EventMetadatas.PaymentOrderCreatedMetadata,
                 aggregateId = event.publicPaymentOrderId,
@@ -178,35 +191,6 @@ class DomainEventFactoryTest {
             )
             assertThat(envelope.parentEventId).isEqualTo(parentId)
             assertThat(envelope.traceId).isEqualTo(traceIdFromMDC)
-        }
-    }
-
-    @Test
-    fun `should use traceId from MDC when traceId param is null`() {
-        val mdcTraceId = "mdc-trace-123"
-        try {
-            MDC.put(LogFields.TRACE_ID, mdcTraceId)
-            val event = PaymentOrderCreated(
-                paymentOrderId = "po-1001",
-                publicPaymentOrderId = "paymentorder-1001",
-                paymentId = "p-123",
-                publicPaymentId = "payment-123",
-                sellerId = "seller-1",
-                amountValue = BigDecimal("250.00"),
-                currency = "EUR",
-                status = "CREATED",
-                createdAt = LocalDateTime.now(),
-                updatedAt = LocalDateTime.now(),
-                retryCount = 0
-            )
-
-            val envelope = DomainEventEnvelopeFactory.envelopeFor(
-                data = event,
-                eventType = EventMetadatas.PaymentOrderCreatedMetadata,
-                aggregateId = event.publicPaymentOrderId,
-            )
-
-            assertThat(envelope.traceId).isEqualTo(mdcTraceId)
         } finally {
             MDC.clear()
         }

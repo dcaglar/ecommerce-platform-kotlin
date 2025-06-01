@@ -26,12 +26,8 @@ class PaymentController(
     @PostMapping
     @PreAuthorize("hasAuthority('payment:write')")
     fun createPayment(@Valid @RequestBody request: PaymentRequestDTO): ResponseEntity<PaymentResponseDTO> {
-        val traceId = UUID.randomUUID().toString()
-
-        return LogContext.withTrace(traceId, "PaymentController.createPayment") {
-            logger.info("📥 Received payment request for order: ${request.orderId}")
-            ResponseEntity.ok(paymentService.createPayment(request))
-        }
+        logger.info("📥 Received payment request for order: ${request.orderId}")
+            return ResponseEntity.ok(paymentService.createPayment(request))
     }
 }
 

@@ -8,7 +8,6 @@ import org.slf4j.MDC
 object LogContext {
     private val logger = LoggerFactory.getLogger(LogContext::class.java)
 
-    fun getTraceId(): String? = MDC.get(LogFields.TRACE_ID)
 
 
     fun <T> with(
@@ -16,37 +15,21 @@ object LogContext {
         additionalContext: Map<String, String> = emptyMap(),
         block: () -> Unit
     ) {
+        // capture outer MDC (if any)
+        val previous = MDC.getCopyOfContextMap()
         try {
             MDC.put(LogFields.TRACE_ID, envelope.traceId)
             MDC.put(LogFields.EVENT_ID, envelope.eventId.toString())
             MDC.put(LogFields.AGGREGATE_ID, envelope.aggregateId)
             MDC.put(LogFields.EVENT_TYPE, envelope.eventType)
-            MDC.put(LogFields.PARENT_EVENT_ID, envelope.parentEventId?.toString() ?: "")
-            //MDC.put(LogFields.PUBLIC_PAYMENT_ID, envelope.data?.toString() ?: "")
-            MDC.put(LogFields.PUBLIC_PAYMENT_ORDER_ID, envelope.aggregateId?.toString() ?: "")
-
-            additionalContext.forEach { (k, v) -> MDC.put(k, v) }
+            envelope.parentEventId?.let {
+                MDC.put(LogFields.PARENT_EVENT_ID, it.toString())
+            }
+            additionalContext.forEach(MDC::put)
             block()
         } finally {
-            MDC.clear()
-        }
-    }
-
-    fun <R> withTrace(
-        traceId: String,
-        contextLabel: String,
-        additionalContext: Map<String, String> = emptyMap(),
-        block: () -> R
-    ): R {
-        try {
-            MDC.put(LogFields.TRACE_ID, traceId)
-            additionalContext.forEach { (k, v) -> MDC.put(k, v) }
-
-            logger.debug("Initialized MDC context [$contextLabel] with traceId=$traceId")
-
-            return block()
-        } finally {
-            MDC.clear()
+            // restore outer context
+            if (previous != null) MDC.setContextMap(previous) else MDC.clear()
         }
     }
 }

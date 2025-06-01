@@ -24,7 +24,7 @@ class NetworkSimulator(
             else -> Random.nextLong(2000, 2800)
         }
 
-        logger.info("🕒 Simulating network latency: ${delayMillis}ms (chance=$chance)")
+        logger.debug("🕒 Simulating network latency: ${delayMillis}ms (chance=$chance)")
         Thread.sleep(delayMillis)
     }
 }

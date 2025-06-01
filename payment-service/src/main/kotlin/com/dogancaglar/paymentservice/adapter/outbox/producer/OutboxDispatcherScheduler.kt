@@ -30,7 +30,7 @@ class OutboxDispatcherScheduler(
             "NEW"
         )
 
-        logger.info("Starting outbox dispatch cycle, found ${newEvents.size} new events")
+        logger.debug("Starting outbox dispatch cycle, found ${newEvents.size} new events")
         val updatedEvents = mutableListOf<OutboxEvent>()
 
         newEvents.forEach { outboxEvent: OutboxEvent ->

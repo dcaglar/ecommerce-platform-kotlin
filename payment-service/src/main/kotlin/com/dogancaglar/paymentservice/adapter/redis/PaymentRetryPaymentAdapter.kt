@@ -15,6 +15,7 @@ import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
+import java.util.UUID
 
 
 @Component("paymentRetryPaymentAdapter")
@@ -31,8 +32,9 @@ open class PaymentRetryPaymentAdapter(
         val paymentOrderRetryRequested = PaymentOrderEventMapper.toPaymentOrderRetryRequestEvent(order = paymentOrder)
         val envelope = DomainEventEnvelopeFactory.envelopeFor(data = paymentOrderRetryRequested,
             eventType = EventMetadatas.PaymentOrderRetryRequestedMetadata,
-            aggregateId = paymentOrderRetryRequested.publicPaymentOrderId
-        )
+            aggregateId = paymentOrderRetryRequested.publicPaymentOrderId,
+            traceId = MDC.get(LogFields.TRACE_ID) ?: UUID.randomUUID().toString(),
+            )
         val json = objectMapper.writeValueAsString(envelope);
         val delayMillis = calculateBackoffMillis(paymentOrder.retryCount)
         val retryAt = System.currentTimeMillis() + delayMillis

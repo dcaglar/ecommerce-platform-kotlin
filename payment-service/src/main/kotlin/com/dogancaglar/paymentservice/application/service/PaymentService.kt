@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.transaction.Transactional
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
+import java.util.UUID
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -82,10 +83,12 @@ class PaymentService(
     private fun toOutBoxEvent(paymentOrder: PaymentOrder): OutboxEvent {
         val paymentOrderCreatedEvent = PaymentOrderEventMapper.toPaymentOrderCreatedEvent(paymentOrder)
         val envelope = DomainEventEnvelopeFactory.envelopeFor(
+            traceId = MDC.get(LogFields.TRACE_ID)
+                ?: UUID.randomUUID().toString(),
             data = paymentOrderCreatedEvent,
             eventType = EventMetadatas.PaymentOrderCreatedMetadata,
-            aggregateId = paymentOrder.publicPaymentOrderId,
-            )
+            aggregateId = paymentOrder.publicPaymentOrderId
+        )
         val extraLogFields = mapOf(
             LogFields.PUBLIC_PAYMENT_ORDER_ID to paymentOrder.publicPaymentOrderId,
             LogFields.PUBLIC_PAYMENT_ID to paymentOrder.publicPaymentId
