@@ -1,13 +1,12 @@
 package com.dogancaglar.paymentservice.application.event
 
-import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class PaymentOrderRetryRequested @JsonCreator constructor(
+data class PaymentOrderStatusCheckRequested @JvmOverloads constructor(
     @JsonProperty("paymentOrderId") override val paymentOrderId: String,
     @JsonProperty("publicPaymentOrderId") override val publicPaymentOrderId: String,
     @JsonProperty("paymentId") override val paymentId: String,
@@ -18,7 +17,7 @@ data class PaymentOrderRetryRequested @JsonCreator constructor(
     @JsonProperty("status") override val status: String,
     @JsonProperty("createdAt") override val createdAt: LocalDateTime = LocalDateTime.now(),
     @JsonProperty("updatedAt") override val updatedAt: LocalDateTime = LocalDateTime.now(),
-    @JsonProperty("retryCount") override val retryCount: Int = 0,
+    @JsonProperty("retryCount") override val retryCount: Int,
     @JsonProperty("retryReason") override val retryReason: String? = null,
-    @JsonProperty("lastErrorMessage") override val lastErrorMessage: String? = null
+    @JsonProperty("lastErrorMessage") override val lastErrorMessage: String? = null,
 ) : PaymentOrderEvent

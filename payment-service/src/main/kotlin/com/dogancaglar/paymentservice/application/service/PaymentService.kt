@@ -3,18 +3,24 @@ package com.dogancaglar.paymentservice.application.service
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
+import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
 import com.dogancaglar.paymentservice.application.event.*
 import com.dogancaglar.paymentservice.application.helper.PaymentFactory
+import com.dogancaglar.paymentservice.application.helper.PaymentOrderFactory
 import com.dogancaglar.paymentservice.application.mapper.PaymentOrderEventMapper
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
-import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrderStatusCheck
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.port.IdGeneratorPort
 import com.dogancaglar.paymentservice.domain.port.OutboxEventPort
 import com.dogancaglar.paymentservice.domain.port.PaymentOrderOutboundPort
+import com.dogancaglar.paymentservice.domain.port.PaymentOrderStatusCheckOutBoundPort
 import com.dogancaglar.paymentservice.domain.port.PaymentOutboundPort
+import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
+import com.dogancaglar.paymentservice.psp.PSPStatusMapper
 import com.dogancaglar.paymentservice.web.dto.PaymentRequestDTO
 import com.dogancaglar.paymentservice.web.dto.PaymentResponseDTO
 import com.dogancaglar.paymentservice.web.mapper.PaymentRequestMapper
@@ -29,13 +35,15 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.LocalDateTime
-import java.util.*
 
 @Service
 class PaymentService(
+    @Qualifier("paymentRetryPaymentAdapter") val paymentRetryPaymentAdapter: RetryQueuePort<PaymentOrderRetryRequested>,
+    val paymentEventPublisher: PaymentEventPublisher,
     private val paymentOutboundPort: PaymentOutboundPort,
     private val paymentOrderOutboundPort: PaymentOrderOutboundPort,
     private val outboxEventPort: OutboxEventPort,
+    private val statusCheckOutBoundPort: PaymentOrderStatusCheckOutBoundPort,
     private val idGenerator: IdGeneratorPort,
     @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper,
     private val clock: Clock
@@ -45,6 +53,9 @@ class PaymentService(
 
 
     private val paymentFactory: PaymentFactory = PaymentFactory(idGenerator, clock)
+
+    private val paymentOrderFactory: PaymentOrderFactory = PaymentOrderFactory()
+
 
     @Transactional
     fun createPayment(request: PaymentRequestDTO): PaymentResponseDTO {
@@ -108,17 +119,51 @@ class PaymentService(
         )
     }
 
+    fun processPspResult(event: PaymentOrderEvent, pspStatus: PaymentOrderStatus,parentEventId: UUID) {
+        val order = paymentOrderFactory.fromEvent(event)
+        when {
+            pspStatus == PaymentOrderStatus.SUCCESSFUL -> {
+              processSuccessfulPayment(order = order,parentEventId=parentEventId)
+            }
+            PSPStatusMapper.requiresRetryPayment(pspStatus) -> {
+                 handleRetryAttempt(order =order, parentEventId=parentEventId );
+            }
+            PSPStatusMapper.requiresStatusCheck(pspStatus) -> {
+                val updatedOrder = order.markAsPending().incrementRetry().withUpdatedAt(LocalDateTime.now(clock))
+                val paymentOrderStatusScheduled = PaymentOrderEventMapper.toPaymentOrderStatusCheckRequested(updatedOrder)
+                paymentOrderOutboundPort.save(updatedOrder)
+                statusCheckOutBoundPort.save(
+                    PaymentOrderStatusCheck.createNew(updatedOrder.paymentOrderId, LocalDateTime.now(clock).plusHours(2))
+                )
+                paymentEventPublisher.publish(
+                    event = EventMetadatas.PaymentOrderStatusCheckScheduledMetadata,
+                    aggregateId = updatedOrder.publicPaymentOrderId,
+                    data = paymentOrderStatusScheduled,
+                    parentEventId = parentEventId
+                )
+                //paymentStatusCheckQueuePort.savePaymentStatusRequest()
+                //persist a entry in paymentstatuscheck table for a time
+            }
+            else -> {
+                // Mark as non-retryable failure, persist, publish PaymentOrderFailed event, etc.
+            }
+        }
+        // All event publishing, retry logic, and DB writes live here.
+    }
 
-    fun processSuccessfulPayment(order: PaymentOrder): PaymentOrder {
-        val updated = order
-            .markAsPaid()
-            .updatedAt(LocalDateTime.now(clock))
-        paymentOrderOutboundPort.save(updated)
-        return updated
+
+    fun processSuccessfulPayment(order: PaymentOrder,parentEventId:UUID) {
+        val updatedOrder = order.markAsPaid().withUpdatedAt(LocalDateTime.now(clock))
+        paymentOrderOutboundPort.save(updatedOrder)
+        paymentEventPublisher.publish(
+            event = EventMetadatas.PaymentOrderSuccededMetaData,
+            aggregateId = updatedOrder.publicPaymentOrderId,
+            data = PaymentOrderEventMapper.toPaymentOrderSuccededEvent(updatedOrder),
+            parentEventId = parentEventId)
     }
 
     fun processPendingPayment(order: PaymentOrder, reason: String?, error: String?): PaymentOrder {
-        val updated = order.markAsPending().updatedAt(LocalDateTime.now(clock))
+        val updated = order.markAsPending().withUpdatedAt(LocalDateTime.now(clock))
             .withRetryReason(reason)
             .withLastError(error)
         paymentOrderOutboundPort.save(updated)
@@ -128,112 +173,52 @@ class PaymentService(
     fun handleRetryAttempt(
         order: PaymentOrder,
         reason: String? = null,
-        lastError: String? = null
-    ): Pair<PaymentOrder, Boolean> {
+        lastError: String? = null,
+        parentEventId : UUID
+    ) {
         val updated = order
             .markAsFailed()
             .incrementRetry()
             .withRetryReason(reason)
             .withLastError(lastError)
-            .updatedAt(LocalDateTime.now(clock))
-
+            .withUpdatedAt(LocalDateTime.now(clock))
         paymentOrderOutboundPort.save(updated)
+        PaymentOrderEventMapper.toPaymentOrderRetryRequestEvent(updated)
+        if(updated.retryCount< MAX_RETRIES){
+        paymentRetryPaymentAdapter.scheduleRetry(updated,
+            calculateBackoffMillis= calculateBackoffMillis( updated.retryCount.toLong())
+        } else {
+            val finalizedStatus = updated.markAsFinalizedFailed()
+            paymentOrderOutboundPort.save(finalizedStatus)
 
-        val exceeded = updated.retryCount >= MAX_RETRIES
-        return updated to exceeded
+
+        }
+
     }
 
     companion object {
         private const val MAX_RETRIES = 5
     }
 
-    fun processNonRetryableFailure(
+    fun handleNonRetryableFailure(
         order: PaymentOrder,
         reason: String? = null
     ): PaymentOrder {
         val updated = order
             .markAsFinalizedFailed()
             .withRetryReason(reason)
-            .updatedAt(LocalDateTime.now(clock))
+            .withUpdatedAt(LocalDateTime.now(clock))
         paymentOrderOutboundPort.save(updated)
         return updated
     }
 
-    fun mapEventToDomain(event: PaymentOrderCreated): PaymentOrder {
-        return PaymentOrder(
-            paymentOrderId = event.paymentOrderId.toLong(),
-            publicPaymentOrderId = event.publicPaymentOrderId,
-            paymentId = event.paymentId.toLong(),
-            publicPaymentId = event.publicPaymentId,
-            sellerId = event.sellerId,
-            amount = Amount(event.amountValue, event.currency),
-            status = PaymentOrderStatus.valueOf(event.status),
-            createdAt = event.createdAt,
-            updatedAt = LocalDateTime.now(), // or event.updatedAt if you trust it
-            retryCount = event.retryCount
-        )
+    fun mapEventToDomain(event: PaymentOrderEvent): PaymentOrder {
+        return paymentOrderFactory.fromEvent(event)
     }
-
-    fun fromRetryRequestedEvent(event: PaymentOrderRetryRequested): PaymentOrder {
-        return PaymentOrder(
-            paymentOrderId = event.paymentOrderId.toLong(),
-            publicPaymentOrderId = event.publicPaymentOrderId,
-            paymentId = event.paymentId.toLong(),
-            publicPaymentId = event.publicPaymentId,
-            sellerId = event.sellerId,
-            amount = Amount(event.amountValue, event.currency),
-            status = PaymentOrderStatus.valueOf(event.status),
-            createdAt = event.createdAt,
-            updatedAt = LocalDateTime.now(), // or event.updatedAt if you trust it
-            retryCount = event.retryCount
-        )
+    fun calculateBackoffMillis(retryCount: Long): Long {
+        val baseDelay = 5_000L // 5 seconds
+        return baseDelay * (retryCount + 1) // Linear or exponential backoff
     }
-
-    fun fromDuePaymentOrderStatusCheck(event: DuePaymentOrderStatusCheck): PaymentOrder {
-        return PaymentOrder(
-            paymentOrderId = event.paymentOrderId.toLong(),
-            publicPaymentOrderId = event.publicPaymentOrderId,
-            paymentId = event.paymentId.toLong(),
-            publicPaymentId = event.publicPaymentId,
-            sellerId = event.sellerId,
-            amount = Amount(event.amountValue, event.currency),
-            status = PaymentOrderStatus.valueOf(event.status),
-            createdAt = event.createdAt,
-            updatedAt = LocalDateTime.now(), // or event.updatedAt if you trust it
-            retryCount = event.retryCount
-        )
-    }
-
-    fun fromPaymentOrderStatusScheduled(event: PaymentOrderStatusScheduled): PaymentOrder {
-        return PaymentOrder(
-            paymentOrderId = event.paymentOrderId.toLong(),
-            publicPaymentOrderId = event.publicPaymentOrderId,
-            paymentId = event.paymentId.toLong(),
-            publicPaymentId = event.publicPaymentId,
-            sellerId = event.sellerId,
-            amount = Amount(event.amountValue, event.currency),
-            status = PaymentOrderStatus.valueOf(event.status),
-            createdAt = event.createdAt,
-            updatedAt = LocalDateTime.now(), // or event.updatedAt if you trust it
-            retryCount = event.retryCount
-        )
-    }
-
-    fun fromScheduledPaymentOrderStatusRequest(event: ScheduledPaymentOrderStatusRequest): PaymentOrder {
-        return PaymentOrder(
-            paymentOrderId = event.paymentOrderId.toLong(),
-            publicPaymentOrderId = event.publicPaymentOrderId,
-            paymentId = event.paymentId.toLong(),
-            publicPaymentId = event.publicPaymentId,
-            sellerId = event.sellerId,
-            amount = Amount(event.amountValue, event.currency),
-            status = PaymentOrderStatus.valueOf(event.status),
-            createdAt = event.createdAt,
-            updatedAt = LocalDateTime.now(), // or event.updatedAt if you trust it
-            retryCount = event.retryCount
-        )
-    }
-
 
 }
 

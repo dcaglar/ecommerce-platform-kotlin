@@ -22,18 +22,11 @@ object EventMetadatas {
         override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderRetryRequested>>() {}
     }
 
-    object PaymentOrderStatusCheckScheduledMetadata : EventMetadata<PaymentOrderStatusScheduled> {
+    object PaymentOrderStatusCheckScheduledMetadata : EventMetadata<PaymentOrderStatusCheckRequested> {
         override val topic = "payment_status_check_scheduler_topic"
         override val eventType = "payment_order_status_check_scheduled"
-        override val clazz = PaymentOrderStatusScheduled::class.java
-        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderStatusScheduled>>() {}
-    }
-
-    object PaymentOrderStatusCheckExecutorMetadata : EventMetadata<DuePaymentOrderStatusCheck> {
-        override val topic = "due_payment_status_check_topic"
-        override val eventType = "due_payment_status_check"
-        override val clazz = DuePaymentOrderStatusCheck::class.java
-        override val typeRef = object : TypeReference<EventEnvelope<DuePaymentOrderStatusCheck>>() {}
+        override val clazz = PaymentOrderStatusCheckRequested::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderStatusCheckRequested>>() {}
     }
 
     object PaymentOrderSuccededMetaData : EventMetadata<PaymentOrderSucceeded> {

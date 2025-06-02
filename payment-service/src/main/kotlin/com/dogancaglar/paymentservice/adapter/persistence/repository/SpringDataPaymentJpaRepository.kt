@@ -6,7 +6,6 @@ import org.springframework.data.jpa.repository.Query
 
 
 interface SpringDataPaymentJpaRepository : JpaRepository<PaymentEntity, Long> {
-    fun findByPaymentId(paymentId: Long): PaymentEntity?
 
     @Query("SELECT MAX(p.paymentId) FROM PaymentEntity p")
     fun getMaxPaymentId(): Long?

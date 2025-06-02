@@ -1,9 +1,8 @@
 package com.dogancaglar.paymentservice.psp
 
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import org.springframework.stereotype.Component
-import java.util.concurrent.TimeoutException
 import kotlin.random.Random
 
 @Component

@@ -232,6 +232,9 @@ Enable more consumer instances for high throughput.
 
 Basic CI/CD with GitHub Actions
 
+
+
+
 ## 🧪 Testing Strategy
 
 - Unit tests for domain and mappers

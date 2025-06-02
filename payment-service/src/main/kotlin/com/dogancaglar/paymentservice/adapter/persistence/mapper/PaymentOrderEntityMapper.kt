@@ -1,8 +1,8 @@
 package com.dogancaglar.paymentservice.adapter.persistence.mapper
 
 import com.dogancaglar.paymentservice.adapter.persistence.entity.PaymentOrderEntity
+import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 
 object PaymentOrderEntityMapper {
 
@@ -21,23 +21,6 @@ object PaymentOrderEntityMapper {
             retryCount = order.retryCount,
             retryReason = order.retryReason,
             lastErrorMessage = order.lastErrorMessage
-        )
-    }
-
-    fun toDomain(entity: PaymentOrderEntity): PaymentOrder {
-        return PaymentOrder(
-            paymentOrderId = entity.paymentOrderId,
-            publicPaymentOrderId = entity.publicPaymentOrderId,
-            paymentId = entity.paymentId,
-            publicPaymentId = entity.publicPaymentId,
-            sellerId = entity.sellerId,
-            amount = Amount(entity.amountValue, entity.amountCurrency),
-            status = entity.status,
-            createdAt = entity.createdAt,
-            updatedAt = entity.updatedAt,
-            retryCount = entity.retryCount,
-            retryReason = entity.retryReason,
-            lastErrorMessage = entity.lastErrorMessage
         )
     }
 }

@@ -6,14 +6,6 @@ import org.slf4j.MDC
 import java.util.*
 
 
-/*
-/**
- * Creates a new EventEnvelope with optional trace context.
- *
- * @param traceId Optional trace ID; falls back to MDC or random UUID.
- * @param parentEventId Optional parent event ID for event chaining.
- */
- */
 object DomainEventEnvelopeFactory {
     fun <T> envelopeFor(
         data: T,

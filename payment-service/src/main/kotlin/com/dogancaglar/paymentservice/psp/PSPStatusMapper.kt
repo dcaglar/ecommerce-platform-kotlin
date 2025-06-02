@@ -13,6 +13,7 @@ object PSPStatusMapper {
         "INSUFFICIENT_FUNDS" -> PaymentOrderStatus.DECLINED
         "PENDING"            -> PaymentOrderStatus.PENDING
         "SUCCESSFUL"            -> PaymentOrderStatus.SUCCESSFUL
+        "TIMEOUT"        -> PaymentOrderStatus.TIMEOUT
         else                 -> PaymentOrderStatus.UNKNOWN
     }
     fun requiresRetryPayment(status: PaymentOrderStatus): Boolean { return status in retryPaymentStatus}

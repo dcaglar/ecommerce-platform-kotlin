@@ -2,11 +2,12 @@ package com.dogancaglar.paymentservice.adapter.redis
 
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.application.mapper.PaymentOrderEventMapper
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -28,13 +29,20 @@ open class PaymentRetryPaymentAdapter(
     private val queue = "payment_retry_queue"
 
 
-    override fun scheduleRetry(paymentOrder: PaymentOrder) {
+    override fun scheduleRetry(paymentOrder: PaymentOrder,backOffMillis:Long) {
         val paymentOrderRetryRequested = PaymentOrderEventMapper.toPaymentOrderRetryRequestEvent(order = paymentOrder)
         val envelope = DomainEventEnvelopeFactory.envelopeFor(data = paymentOrderRetryRequested,
             eventType = EventMetadatas.PaymentOrderRetryRequestedMetadata,
             aggregateId = paymentOrderRetryRequested.publicPaymentOrderId,
-            traceId = MDC.get(LogFields.TRACE_ID) ?: UUID.randomUUID().toString(),
+            traceId = MDC.get("traceId") ?: UUID.randomUUID().toString())
+        LogContext.with(
+            envelope, mapOf(
+                LogFields.RETRY_COUNT to envelope.data.retryCount,,
+                LogFields.PUBLIC_PAYMENT_ID to envelope.data.publicPaymentId,
+                LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.data.publicPaymentOrderId,
             )
+        )
+        ){
         val json = objectMapper.writeValueAsString(envelope);
         val delayMillis = calculateBackoffMillis(paymentOrder.retryCount)
         val retryAt = System.currentTimeMillis() + delayMillis

@@ -2,9 +2,9 @@ package com.dogancaglar.paymentservice.application.mapper
 
 import com.dogancaglar.paymentservice.application.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
-import com.dogancaglar.paymentservice.application.event.PaymentOrderStatusScheduled
+import com.dogancaglar.paymentservice.application.event.PaymentOrderStatusCheckRequested
 import com.dogancaglar.paymentservice.application.event.PaymentOrderSucceeded
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import java.time.LocalDateTime
 
 object PaymentOrderEventMapper {
@@ -54,8 +54,8 @@ object PaymentOrderEventMapper {
     }
 
 
-    fun toPaymentOrderStatusScheduled(order: PaymentOrder): PaymentOrderStatusScheduled {
-        return PaymentOrderStatusScheduled(
+    fun toPaymentOrderStatusCheckRequested(order: PaymentOrder): PaymentOrderStatusCheckRequested {
+        return PaymentOrderStatusCheckRequested(
             paymentOrderId = order.paymentOrderId.toString(),
             publicPaymentOrderId = order.publicPaymentOrderId,
             paymentId = order.paymentId.toString(),
