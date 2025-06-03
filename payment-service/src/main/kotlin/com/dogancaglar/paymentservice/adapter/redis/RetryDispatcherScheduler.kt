@@ -2,9 +2,7 @@ package com.dogancaglar.paymentservice.adapter.redis
 
 import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
 import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
-import com.dogancaglar.paymentservice.application.event.ScheduledPaymentOrderStatusRequest
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
-import com.dogancaglar.paymentservice.domain.port.PaymentOrderOutboundPort
 import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
@@ -17,7 +15,7 @@ class RetryDispatcherScheduler(
     private val paymentRetryPaymentAdapter: RetryQueuePort<PaymentOrderRetryRequested>,
     private val paymentEventPublisher: PaymentEventPublisher,
 
-) {
+    ) {
 
     private val logger = LoggerFactory.getLogger(RetryDispatcherScheduler::class.java)
 
@@ -28,7 +26,7 @@ class RetryDispatcherScheduler(
             try {
                 paymentEventPublisher.publish(
                     aggregateId = envelope.aggregateId,
-                    event = EventMetadatas.PaymentOrderRetryRequestedMetadata,
+                    eventMetaData = EventMetadatas.PaymentOrderRetryRequestedMetadata,
                     data = envelope.data,
                     parentEventId = envelope.parentEventId,
                     traceId = envelope.traceId

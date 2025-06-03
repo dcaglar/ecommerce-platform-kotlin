@@ -4,7 +4,6 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
 import com.dogancaglar.paymentservice.application.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.domain.port.OutboxEventPort
@@ -46,7 +45,7 @@ class OutboxDispatcherScheduler(
                     paymentEventPublisher.publish(
                         preSetEventIdFromCaller = envelope.eventId,
                         aggregateId = envelope.aggregateId,
-                        event = EventMetadatas.PaymentOrderCreatedMetadata,
+                        eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
                         data = envelope.data,
                         traceId = envelope.traceId
                     )

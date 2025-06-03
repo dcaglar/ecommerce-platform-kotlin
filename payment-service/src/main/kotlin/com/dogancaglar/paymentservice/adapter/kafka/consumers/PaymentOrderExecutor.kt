@@ -1,10 +1,10 @@
 package com.dogancaglar.paymentservice.adapter.kafka.consumers
 
+import PaymentService
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.application.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.application.service.PaymentService
 import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.psp.PSPClient
@@ -31,18 +31,19 @@ class PaymentOrderExecutor(
 
     @Transactional
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderCreated>>) {
+        // This method is called when a  event is received from Kafka and we set MDC of consumed event this is gonna be parent for the rest
         val envelope = record.value()
         val paymentOrderCreatedEvent = envelope.data
         val order = paymentService.mapEventToDomain(paymentOrderCreatedEvent)
         LogContext.with(
             envelope, mapOf(
                 LogFields.TOPIC_NAME to record.topic(),
-                LogFields.CONSUMER_GROUP to "payment-order-executor",
+                LogFields.CONSUMER_GROUP to "PAYMENT_ORDER_EXECUTOR",
                 LogFields.PUBLIC_PAYMENT_ID to envelope.data.publicPaymentId,
                 LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.data.publicPaymentOrderId,
             )
         ) {
-            logger.info("▶️ [Handle Start] Processing PaymentOrder")
+            logger.info("▶️ [Handle Start] Processing PAYMENT_RETRY_EXECUTOR")
 
             if (order.status != PaymentOrderStatus.INITIATED) {
                 logger.info("⏩ Skipping already processed order with status=${order.status}")
@@ -51,16 +52,22 @@ class PaymentOrderExecutor(
             try {
                 val response = safePspCall(order)
                 logger.info("✅ PSP call returned status=$response for paymentOrderId=${order.paymentOrderId}")
-                paymentService.processPspResult(event = paymentOrderCreatedEvent, pspStatus = response,envelope.eventId)
+                paymentService.processPspResult(event = paymentOrderCreatedEvent, pspStatus = response)
             } catch (e: TimeoutException) {
                 logger.error("⏱️ PSP call timed out for orderId=${order.paymentOrderId}, retrying...", e)
-                paymentService.processPspResult(event = paymentOrderCreatedEvent, pspStatus = PaymentOrderStatus.TIMEOUT,envelope.eventId)
+                paymentService.processPspResult(
+                    event = paymentOrderCreatedEvent,
+                    pspStatus = PaymentOrderStatus.TIMEOUT
+                )
             } catch (e: Exception) {
                 logger.error(
                     "❌ Unexpected error processing orderId=${order.paymentOrderId}, retrying...: ${e.message}",
                     e
                 )
-                paymentService.processPspResult(event = paymentOrderCreatedEvent, pspStatus = PaymentOrderStatus.UNKNOWN,envelope.eventId)
+                paymentService.processPspResult(
+                    event = paymentOrderCreatedEvent,
+                    pspStatus = PaymentOrderStatus.UNKNOWN
+                )
 
             }
         }
