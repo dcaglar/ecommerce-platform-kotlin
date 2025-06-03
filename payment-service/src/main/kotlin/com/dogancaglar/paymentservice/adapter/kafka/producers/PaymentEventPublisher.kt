@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
 import org.slf4j.LoggerFactory
-import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Component
@@ -28,24 +27,31 @@ class PaymentEventPublisher(
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
-
+        //if we are publishing a follwup event, then just call  with dont set trace or parentEventId they are already in predecesor evet
+        //if parentid is not being passsed that means its the outboxenvelope intiating the transaction
     fun <T> publish(
+        preSetEventIdFromCaller:UUID?=null,
         aggregateId: String,
         event: EventMetadata<T>,
         data: T,
-        parentEventId: UUID? = null
+        traceId:String?=null,
+        parentEventId:UUID?=null
     ): EventEnvelope<T> {
-
+        val preSetEventId = preSetEventIdFromCaller
+        val resolvedTraceId = traceId ?: LogContext.getTraceId() ?: error("Missing traceId: either pass explicitly or set via LogContext.with(...)")
+        val resolvedParentId = parentEventId ?: LogContext.getEventId()
         val envelope = DomainEventEnvelopeFactory.envelopeFor(
-            traceId = MDC.get("traceId") ?: UUID.randomUUID().toString(),
+            preSetEventId= preSetEventId,
+            traceId = resolvedTraceId,
             data = data,
-            eventType = event,
+            eventMetaData = event,
             aggregateId = aggregateId,
-            parentEventId = parentEventId
+            parentEventId = resolvedParentId
         )
 
         LogContext.with(envelope) {
             val payload = objectMapper.writeValueAsString(envelope)
+            logger.info("Published EventEnvelop {\n $payload + \n")
             logger.info(
                 "Publishing eventType={}, eventId={}, traceId={}, aggregateId={}",
                 envelope.eventType,

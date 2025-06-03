@@ -29,33 +29,31 @@ class PSPClient(private val simulator: NetworkSimulator) {
     private fun getPaymentResult(): PSPResponse {
         val roll = Random.nextInt(100)
         val result = when {
-            roll < 30 -> "SUCCESSFUL"  //final
-            roll < 60 -> "DECLINED"   //retry payment
-            roll < 80 -> "CAPTURE_PENDING"  //schedule payment status check
-            else      -> "AUTH_NEEDED" //schedule payment status check
+            roll < 40 -> PaymentOrderStatus.SUCCESSFUL  //final
+            roll < 80 -> PaymentOrderStatus.FAILED     //retry payment
+            roll < 90 ->PaymentOrderStatus.DECLINED    //final stage
+            else      -> PaymentOrderStatus.AUTH_NEEDED //schedule payment status check
         }
-        return PSPResponse(result);
+        return PSPResponse(result.toString());
     }
 
     private fun getRetryPaymentResult(): PSPResponse {
         val roll = Random.nextInt(100)
         val result = when {
-            roll < 40 -> "SUCCESSFUL"  //final
-            roll < 60 -> "DECLINED"   //retry payment
-            roll < 80 -> "CAPTURE_PENDING"  //schedule payment status check
-            else      -> "AUTH_NEEDED" //schedule payment status check
+            roll < 0 -> PaymentOrderStatus.SUCCESSFUL  //final
+            roll < 100 -> PaymentOrderStatus.FAILED     //retry payment
+            roll < 0 ->PaymentOrderStatus.DECLINED    //final stage
+            else      -> PaymentOrderStatus.AUTH_NEEDED //
         }
-        return PSPResponse(result);
+        return PSPResponse(result.toString());
     }
 
     private fun getPaymentStatusResult(): PSPResponse {
         val roll = Random.nextInt(100)
         val result = when {
-            roll < 40 -> "CAPTURE_PENDING" //schedule a status check for 10 mins later
-            roll < 70 -> "DECLINED"       // final
-            roll < 90 -> "SUCCESSFUL"    //final
-            else      -> "AUTH_NEEDED" //schedule a status check for 10 mins later
-        }
-        return PSPResponse(result);
+            roll < 50 -> PaymentOrderStatus.CAPTURE_PENDING //schedule a status check for hours later
+            roll < 70 ->  PaymentOrderStatus.SUCCESSFUL      // final success
+            else ->  PaymentOrderStatus.DECLINED   } //final declibe
+        return PSPResponse(result.toString());
     }
 }

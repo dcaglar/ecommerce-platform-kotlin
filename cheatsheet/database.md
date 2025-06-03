@@ -1,0 +1,1 @@
+docker exec -it payment-postgres psql -U postgres -d payment-db

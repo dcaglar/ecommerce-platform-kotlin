@@ -32,6 +32,7 @@
                         <key>eventId</key>
                         <key>parentEventId</key>
                         <key>aggregateId</key>
+                        <key>eventType</key>
                     </includeKeys>
                 </mdc>
                 <context/>

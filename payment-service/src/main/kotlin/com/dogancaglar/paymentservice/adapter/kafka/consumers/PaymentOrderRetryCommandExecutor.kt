@@ -37,11 +37,7 @@ class PaymentOrderRetryCommandExecutor(
             )
         ) {
             logger.info("▶️ [Handle Start] Processing PaymentOrder")
-                //todo
-            if (order.status != PaymentOrderStatus.INITIATED) {
-                logger.info("⏩ Skipping already processed order with status=${order.status}")
-                return@with
-            }
+                //todo any check is needed
             try {
                 val response = safePspCall(order)
                 logger.info("✅ PSP call returned status=$response for paymentOrderId=${order.paymentOrderId}")

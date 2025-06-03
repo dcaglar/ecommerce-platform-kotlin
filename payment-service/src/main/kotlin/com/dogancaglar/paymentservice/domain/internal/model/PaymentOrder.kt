@@ -22,7 +22,7 @@ class PaymentOrder private constructor(
     fun markAsFailed() = copy(status = PaymentOrderStatus.FAILED)
     fun markAsPaid() = copy(status = PaymentOrderStatus.SUCCESSFUL)
     fun markAsPending() = copy(status = PaymentOrderStatus.PENDING)
-    fun markAsFinalizedFailed() = copy(status = PaymentOrderStatus.FINALIZE_FAILED)
+    fun markAsFinalizedFailed() = copy(status = PaymentOrderStatus.FINALIZED_FAILED)
     fun incrementRetry() = copy(retryCount = retryCount + 1)
     fun withRetryReason(reason: String?) = copy(retryReason = reason)
     fun withLastError(error: String?) = copy(lastErrorMessage = error)

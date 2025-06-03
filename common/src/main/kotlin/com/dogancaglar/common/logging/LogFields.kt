@@ -14,4 +14,5 @@ object LogFields {
     const val PARENT_EVENT_ID = "parentEventId"
     const val RETRY_COUNT = "retryCount"
     const val RETRY_REASON = "retryReason"
+    const val RETRY_REASON = "retryError"
 }

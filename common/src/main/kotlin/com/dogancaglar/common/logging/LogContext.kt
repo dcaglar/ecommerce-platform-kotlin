@@ -4,11 +4,12 @@ package com.dogancaglar.common.logging
 import com.dogancaglar.common.event.EventEnvelope
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
+import java.util.UUID
 
 object LogContext {
     private val logger = LoggerFactory.getLogger(LogContext::class.java)
-
-
+    fun getTraceId(): String? = MDC.get(LogFields.TRACE_ID)
+    fun getEventId() : UUID ?= UUID.fromString(MDC.get(LogFields.EVENT_ID))
 
     fun <T> with(
         envelope: EventEnvelope<T>,

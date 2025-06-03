@@ -13,7 +13,6 @@ import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrderStatusCheck
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.port.IdGeneratorPort
 import com.dogancaglar.paymentservice.domain.port.OutboxEventPort
 import com.dogancaglar.paymentservice.domain.port.PaymentOrderOutboundPort
@@ -27,7 +26,6 @@ import com.dogancaglar.paymentservice.web.mapper.PaymentRequestMapper
 import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.transaction.Transactional
 import org.slf4j.LoggerFactory
-import org.slf4j.MDC
 import java.util.UUID
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
@@ -35,6 +33,8 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.LocalDateTime
+import kotlin.math.min
+import kotlin.math.pow
 
 @Service
 class PaymentService(
@@ -66,7 +66,7 @@ class PaymentService(
         // each order is represent on payment request to PSP
         for (order in paymentDomain.paymentOrders) {
             try {
-                paymentOrderList.add(order);
+                paymentOrderList.add(order)
             } catch (ex: Exception) {
                 logger.warn("PSP call failed for PaymentOrder ${order.paymentOrderId}, falling back to async", ex)
             }
@@ -80,8 +80,8 @@ class PaymentService(
         //build and genereate outboxevent for eachpersistedd payment order domain
         val outboxBatch = buildOutboxEvents(paymentDomain.paymentOrders)
         // persist payment domain to db
-        outboxEventPort.saveAll(outboxBatch);
-        return PaymentRequestMapper.toResponse(paymentDomain);
+        outboxEventPort.saveAll(outboxBatch)
+        return PaymentRequestMapper.toResponse(paymentDomain)
 
 
     }
@@ -94,18 +94,19 @@ class PaymentService(
     private fun toOutBoxEvent(paymentOrder: PaymentOrder): OutboxEvent {
         val paymentOrderCreatedEvent = PaymentOrderEventMapper.toPaymentOrderCreatedEvent(paymentOrder)
         val envelope = DomainEventEnvelopeFactory.envelopeFor(
-            traceId = MDC.get(LogFields.TRACE_ID)
+            traceId = LogContext.getTraceId()
                 ?: UUID.randomUUID().toString(),
             data = paymentOrderCreatedEvent,
-            eventType = EventMetadatas.PaymentOrderCreatedMetadata,
+            eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
             aggregateId = paymentOrder.publicPaymentOrderId
+            //if not pass parenteventid then that means its root paymentordercereatedd
         )
         val extraLogFields = mapOf(
             LogFields.PUBLIC_PAYMENT_ORDER_ID to paymentOrder.publicPaymentOrderId,
             LogFields.PUBLIC_PAYMENT_ID to paymentOrder.publicPaymentId
         )
         LogContext.with(envelope, additionalContext = extraLogFields) {
-            logger.debug(
+            logger.info(
                 "Creating OutboxEvent for eventType={}, aggregateId={}, eventId={}",
                 envelope.eventType, envelope.aggregateId, envelope.eventId
             )
@@ -123,43 +124,47 @@ class PaymentService(
         val order = paymentOrderFactory.fromEvent(event)
         when {
             pspStatus == PaymentOrderStatus.SUCCESSFUL -> {
-              processSuccessfulPayment(order = order,parentEventId=parentEventId)
+
+              processSuccessfulPayment(order = order)
             }
             PSPStatusMapper.requiresRetryPayment(pspStatus) -> {
-                 handleRetryAttempt(order =order, parentEventId=parentEventId );
+                 handleRetryAttempt(order =order )
             }
             PSPStatusMapper.requiresStatusCheck(pspStatus) -> {
                 val updatedOrder = order.markAsPending().incrementRetry().withUpdatedAt(LocalDateTime.now(clock))
                 val paymentOrderStatusScheduled = PaymentOrderEventMapper.toPaymentOrderStatusCheckRequested(updatedOrder)
                 paymentOrderOutboundPort.save(updatedOrder)
                 statusCheckOutBoundPort.save(
-                    PaymentOrderStatusCheck.createNew(updatedOrder.paymentOrderId, LocalDateTime.now(clock).plusHours(2))
+                    PaymentOrderStatusCheck.createNew(updatedOrder.paymentOrderId, LocalDateTime.now(clock).plusMinutes(30))
                 )
                 paymentEventPublisher.publish(
                     event = EventMetadatas.PaymentOrderStatusCheckScheduledMetadata,
                     aggregateId = updatedOrder.publicPaymentOrderId,
                     data = paymentOrderStatusScheduled,
-                    parentEventId = parentEventId
                 )
                 //paymentStatusCheckQueuePort.savePaymentStatusRequest()
                 //persist a entry in paymentstatuscheck table for a time
             }
             else -> {
-                // Mark as non-retryable failure, persist, publish PaymentOrderFailed event, etc.
+                val failedOrder = order.markAsFinalizedFailed().incrementRetry().
+                withUpdatedAt(LocalDateTime.now(clock))
+                    .withLastError(error = event.lastErrorMessage)
+                    .withRetryReason(reason = event.retryReason)
+                paymentOrderOutboundPort.save(failedOrder)
+                //todo publish a payment_failed , so  intertsted domains would use that
             }
         }
         // All event publishing, retry logic, and DB writes live here.
     }
 
 
-    fun processSuccessfulPayment(order: PaymentOrder,parentEventId:UUID) {
+    fun processSuccessfulPayment(order: PaymentOrder) {
         val updatedOrder = order.markAsPaid().withUpdatedAt(LocalDateTime.now(clock))
         paymentOrderOutboundPort.save(updatedOrder)
         paymentEventPublisher.publish(
             event = EventMetadatas.PaymentOrderSuccededMetaData,
             aggregateId = updatedOrder.publicPaymentOrderId,
-            data = PaymentOrderEventMapper.toPaymentOrderSuccededEvent(updatedOrder),
-            parentEventId = parentEventId)
+            data = PaymentOrderEventMapper.toPaymentOrderSuccededEvent(updatedOrder))
     }
 
     fun processPendingPayment(order: PaymentOrder, reason: String?, error: String?): PaymentOrder {
@@ -173,8 +178,7 @@ class PaymentService(
     fun handleRetryAttempt(
         order: PaymentOrder,
         reason: String? = null,
-        lastError: String? = null,
-        parentEventId : UUID
+        lastError: String? = null
     ) {
         val updated = order
             .markAsFailed()
@@ -183,10 +187,9 @@ class PaymentService(
             .withLastError(lastError)
             .withUpdatedAt(LocalDateTime.now(clock))
         paymentOrderOutboundPort.save(updated)
-        PaymentOrderEventMapper.toPaymentOrderRetryRequestEvent(updated)
         if(updated.retryCount< MAX_RETRIES){
-        paymentRetryPaymentAdapter.scheduleRetry(updated,
-            calculateBackoffMillis= calculateBackoffMillis( updated.retryCount.toLong())
+            val backOffExpMillis = computeBackoffDelayMillis(retryCount = updated.retryCount)
+            paymentRetryPaymentAdapter.scheduleRetry(paymentOrder = updated, backOffMillis = backOffExpMillis)
         } else {
             val finalizedStatus = updated.markAsFinalizedFailed()
             paymentOrderOutboundPort.save(finalizedStatus)
@@ -218,6 +221,35 @@ class PaymentService(
     fun calculateBackoffMillis(retryCount: Long): Long {
         val baseDelay = 5_000L // 5 seconds
         return baseDelay * (retryCount + 1) // Linear or exponential backoff
+    }
+
+    /**
+     * Returns a randomized backoff delay in milliseconds using bounded exponential backoff with full jitter.
+     *
+     * @param retryCount Retry attempt number (1-based).
+     * @param baseDelayMillis Initial delay in milliseconds (e.g. 500).
+     * @param maxDelayMillis Maximum backoff delay (e.g. 30000).
+     * @param random Random instance (can be injected for tests).
+     * @return Delay in milliseconds between 0 and the calculated backoff.
+     *By combining exponential delay + randomization, you spread retries over time and avoid cascading failures.
+     * If you use base = 500ms, maxDelay = 30s:
+     *Attempt|Raw Delay|With Full Jitter (Random between 0 and Delay)
+     *  1 | 500 |778
+     *  2| 1 | 733
+     *  3 |2 | 1.4
+     */
+    fun computeBackoffDelayMillis(
+        retryCount: Int,
+        baseDelayMillis: Long = 500,
+        maxDelayMillis: Long = 30_000,
+        random: kotlin.random.Random = kotlin.random.Random.Default
+    ): Long {
+        require(retryCount >= 1) { "attempt must be >= 1" }
+
+        val exponential = baseDelayMillis * 2.0.pow(retryCount - 1).toLong()
+        val cappedDelay = min(exponential, maxDelayMillis)
+
+        return random.nextLong(0, cappedDelay + 1) // +1 to make it inclusive
     }
 
 }

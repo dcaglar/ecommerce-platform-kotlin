@@ -12,11 +12,9 @@ import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
-import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
-import java.util.UUID
 
 
 @Component("paymentRetryPaymentAdapter")
@@ -28,25 +26,27 @@ open class PaymentRetryPaymentAdapter(
 
     private val queue = "payment_retry_queue"
 
-
-    override fun scheduleRetry(paymentOrder: PaymentOrder,backOffMillis:Long) {
+    override fun scheduleRetry(
+        paymentOrder: PaymentOrder,
+        backOffMillis: Long
+    ) {
         val paymentOrderRetryRequested = PaymentOrderEventMapper.toPaymentOrderRetryRequestEvent(order = paymentOrder)
-        val envelope = DomainEventEnvelopeFactory.envelopeFor(data = paymentOrderRetryRequested,
-            eventType = EventMetadatas.PaymentOrderRetryRequestedMetadata,
+        val envelope = DomainEventEnvelopeFactory.envelopeFor(
+            data = paymentOrderRetryRequested,
+            eventMetaData = EventMetadatas.PaymentOrderRetryRequestedMetadata,
             aggregateId = paymentOrderRetryRequested.publicPaymentOrderId,
-            traceId = MDC.get("traceId") ?: UUID.randomUUID().toString())
-        LogContext.with(
-            envelope, mapOf(
-                LogFields.RETRY_COUNT to envelope.data.retryCount,,
-                LogFields.PUBLIC_PAYMENT_ID to envelope.data.publicPaymentId,
-                LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.data.publicPaymentOrderId,
-            )
+            traceId = LogContext.getTraceId()!!,
+            parentEventId = LogContext.getEventId()
         )
-        ){
-        val json = objectMapper.writeValueAsString(envelope);
-        val delayMillis = calculateBackoffMillis(paymentOrder.retryCount)
-        val retryAt = System.currentTimeMillis() + delayMillis
-        redisTemplate.opsForZSet().add(queue, json, retryAt.toDouble())
+        LogContext.with(envelope= envelope,additionalContext = mapOf<String,String>(
+            "retryCount" to paymentOrderRetryRequested.retryCount.toString(),
+            "retryDelay" to paymentOrderRetryRequested.   "retryReason" to "PSP_TIMEOUT"
+        )) {
+        {   logger.info("Sending to redis with expantoal backoff jittery $")
+            val json = objectMapper.writeValueAsString(envelope);
+            val retryAt = System.currentTimeMillis() + backOffMillis
+            redisTemplate.opsForZSet().add(queue, json, retryAt.toDouble())
+        }
     }
 
     override fun pollDueRetries(): List<EventEnvelope<PaymentOrderRetryRequested>> {
@@ -67,10 +67,5 @@ open class PaymentRetryPaymentAdapter(
         } ?: emptyList()
         return dueEnvelops
     }
-
-
-    fun calculateBackoffMillis(retryCount: Int): Long {
-        val baseDelay = 5_000L // 5 seconds
-        return baseDelay * (retryCount + 1) // Linear or exponential backoff
-    }
 }
+
