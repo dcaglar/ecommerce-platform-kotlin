@@ -187,7 +187,12 @@ class PaymentService(
         if (nextRetryCount < MAX_RETRIES) {
             val backOffExpMillis = computeEqualJitterBackoff(attempt = nextRetryCount)
             val scheduledAt = System.currentTimeMillis().plus(backOffExpMillis)
-            logRetrySchedule(order, nextRetryCount, scheduledAt, reason, lastError)
+            LogContext.withRetryFields(
+                retryCount = nextRetryCount, retryReason = reason, lastErrorMessage = lastError,
+                backOffInMillis = backOffExpMillis
+            ) {
+                logRetrySchedule(order, nextRetryCount, scheduledAt, reason, lastError)
+            }
             retryQueuePort.scheduleRetry(order, retryReason = reason, backOffMillis = backOffExpMillis)
         } else {
             logger.warn(
@@ -245,35 +250,6 @@ class PaymentService(
 
     fun mapEventToDomain(event: PaymentOrderEvent): PaymentOrder {
         return paymentOrderFactory.fromEvent(event)
-    }
-
-    /**
-     * Returns a randomized backoff delay in milliseconds using bounded exponential backoff with full jitter.
-     *
-     * @param attempt Retry attempt number (1-based).
-     * @param baseDelayMillis Initial delay in milliseconds (e.g. 500).
-     * @param maxDelayMillis Maximum backoff delay (e.g. 30000).
-     * @param random Random instance (can be injected for tests).
-     * @return Delay in milliseconds between 0 and the calculated backoff.
-     *By combining exponential delay + randomization, you spread retries over time and avoid cascading failures.
-     * If you use base = 500ms, maxDelay = 30s:
-     *Attempt|Raw Delay|With Full Jitter (Random between 0 and Delay)
-     *  1 | 500 |778
-     *  2| 1 | 733
-     *  3 |2 | 1.4
-     */
-    fun computeBackoffDelayMillis(
-        attempt: Int,
-        baseDelayMillis: Long = 500,
-        maxDelayMillis: Long = 120000,
-        random: kotlin.random.Random = kotlin.random.Random.Default
-    ): Long {
-        require(attempt >= 1) { "attempt must be >= 1" }
-
-        val exponential = baseDelayMillis * 2.0.pow(attempt - 1).toLong()
-        val cappedDelay = min(exponential, maxDelayMillis)
-
-        return random.nextLong(0, cappedDelay + 1) // +1 to make it inclusive
     }
 
 
