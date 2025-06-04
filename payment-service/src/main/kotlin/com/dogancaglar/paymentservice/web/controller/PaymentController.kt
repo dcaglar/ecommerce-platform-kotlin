@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.web.controller
 
-import PaymentService
+import com.dogancaglar.paymentservice.application.service.PaymentService
 import com.dogancaglar.paymentservice.web.dto.PaymentRequestDTO
 import com.dogancaglar.paymentservice.web.dto.PaymentResponseDTO
 import jakarta.validation.Valid

@@ -19,6 +19,6 @@ data class PaymentOrderRetryRequested @JsonCreator constructor(
     @JsonProperty("createdAt") override val createdAt: LocalDateTime = LocalDateTime.now(),
     @JsonProperty("updatedAt") override val updatedAt: LocalDateTime = LocalDateTime.now(),
     @JsonProperty("retryCount") override val retryCount: Int = 0,
-    @JsonProperty("retryReason") override val retryReason: String? = "",
-    @JsonProperty("lastErrorMessage") override val lastErrorMessage: String? = ""
+    @JsonProperty("retryReason") override val retryReason: String? = null,
+    @JsonProperty("lastErrorMessage") override val lastErrorMessage: String? = null
 ) : PaymentOrderEvent

@@ -8,15 +8,21 @@ import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import java.time.LocalDateTime
 
 object PaymentOrderEventMapper {
-    fun toPaymentOrderRetryRequestEvent(order: PaymentOrder): PaymentOrderRetryRequested {
+    fun toPaymentOrderRetryRequestEvent(
+        order: PaymentOrder,
+        newRetryCount: Int,
+        retryReason: String? = "UNKNOWN",
+        lastErrorMessage: String? = "N/A"
+    ): PaymentOrderRetryRequested {
         return PaymentOrderRetryRequested(
             paymentOrderId = order.paymentOrderId.toString(),
             publicPaymentOrderId = order.publicPaymentOrderId,
             paymentId = order.paymentId.toString(),
             publicPaymentId = order.publicPaymentId,
             sellerId = order.sellerId,
-            retryCount = order.retryCount,
-            retryReason = order.retryReason,
+            retryCount = newRetryCount,
+            retryReason = retryReason,
+            lastErrorMessage = lastErrorMessage,
             createdAt = LocalDateTime.now(),
             status = order.status.name,
             updatedAt = LocalDateTime.now(),
