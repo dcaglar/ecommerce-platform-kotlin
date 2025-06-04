@@ -29,6 +29,8 @@ import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.*
 import kotlin.math.min
 import kotlin.math.pow
@@ -133,7 +135,7 @@ class PaymentService(
             }
 
             PSPStatusMapper.requiresRetryPayment(pspStatus) -> {
-                handleRetryEvent(order = order)
+                handleRetryEvent(order = order, reason = pspStatus.name)
             }
 
             PSPStatusMapper.requiresStatusCheck(pspStatus) -> {
@@ -176,28 +178,17 @@ class PaymentService(
     fun handleRetryEvent(
         order: PaymentOrder, reason: String? = null, lastError: String? = null
     ) {
+
         val retryCount = retryQueuePort.getRetryCount(order.paymentOrderId)
         val nextRetryCount = retryCount + 1
         val updated = order.markAsFailed().withRetryReason(reason).withLastError(lastError)
             .withUpdatedAt(LocalDateTime.now(clock))
 
         if (nextRetryCount < MAX_RETRIES) {
-            val backOffExpMillis = computeBackoffDelayMillis(attempt = nextRetryCount)
-            LogContext.withRetryFields(
-                nextRetryCount - 1, reason, lastError, backOffExpMillis
-            ) {
-                val scheduledAt = System.currentTimeMillis().plus(backOffExpMillis)
-                logger.info(
-                    "Scheduling retry for paymentOrderId={} [attempt {}/{}] due at {}. Reason='{}', LastError='{}'",
-                    order.publicPaymentOrderId,
-                    nextRetryCount,
-                    MAX_RETRIES,
-                    Instant.ofEpochMilli(scheduledAt),
-                    reason ?: "",
-                    lastError ?: ""
-                )
-            }
-            retryQueuePort.scheduleRetry(order, backOffExpMillis)
+            val backOffExpMillis = computeEqualJitterBackoff(attempt = nextRetryCount)
+            val scheduledAt = System.currentTimeMillis().plus(backOffExpMillis)
+            logRetrySchedule(order, nextRetryCount, scheduledAt, reason, lastError)
+            retryQueuePort.scheduleRetry(order, retryReason = reason, backOffMillis = backOffExpMillis)
         } else {
             logger.warn(
                 "[RETRY-FAILURE] paymentOrderId={} has reached the maximum retry attempts ({}/{}). Marking as permanently FAILED. LastError='{}', RetryReason='{}'",
@@ -207,12 +198,36 @@ class PaymentService(
                 lastError ?: "-",
                 reason ?: "-"
             )
-            val finalizedStatus = updated.markAsFinalizedFailed().withLastError("Max retries reached")
-                .withUpdatedAt(LocalDateTime.now(clock))
-            paymentOrderOutboundPort.save(finalizedStatus)
             // ✅ Reset the retry counter after exceeding max retries
             retryQueuePort.resetRetryCounter(order.paymentOrderId)
+            //finalize the order
+            handleNonRetryableFailEvent(updated)
+
         }
+    }
+
+    private fun logRetrySchedule(
+        order: PaymentOrder,
+        nextRetryCount: Int,
+        scheduledAt: Long,
+        reason: String?,
+        lastError: String?
+    ) {
+        val scheduledLocal = LocalDateTime.ofInstant(Instant.ofEpochMilli(scheduledAt), clock.zone)
+        val formattedLocal = scheduledLocal.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))
+        val scheduledUtc = LocalDateTime.ofInstant(Instant.ofEpochMilli(scheduledAt), ZoneId.of("UTC"))
+        val formattedUtc = scheduledUtc.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))
+        logger.info(
+            "Scheduling retry for paymentOrderId={} [attempt {}/{}] due at {} (local, {}) / {} (UTC). Reason='{}', LastError='{}'",
+            order.publicPaymentOrderId,
+            nextRetryCount,
+            MAX_RETRIES,
+            formattedLocal,          // Local time
+            clock.zone,              // What is 'local'
+            formattedUtc,            // UTC time
+            reason ?: "",
+            lastError ?: ""
+        )
     }
 
     fun handleNonRetryableFailEvent(
@@ -220,6 +235,10 @@ class PaymentService(
     ): PaymentOrder {
         val updated = order.markAsFinalizedFailed().withRetryReason(reason).withUpdatedAt(LocalDateTime.now(clock))
         paymentOrderOutboundPort.save(updated)
+        logger.info(
+            "PaymentOrder {} marked as permanently FAILED. Reason='{}'",
+            updated.publicPaymentOrderId, (reason ?: updated.retryReason ?: "N/A")
+        )
         return updated
     }
 
@@ -246,7 +265,7 @@ class PaymentService(
     fun computeBackoffDelayMillis(
         attempt: Int,
         baseDelayMillis: Long = 500,
-        maxDelayMillis: Long = 30_000,
+        maxDelayMillis: Long = 120000,
         random: kotlin.random.Random = kotlin.random.Random.Default
     ): Long {
         require(attempt >= 1) { "attempt must be >= 1" }
@@ -255,6 +274,30 @@ class PaymentService(
         val cappedDelay = min(exponential, maxDelayMillis)
 
         return random.nextLong(0, cappedDelay + 1) // +1 to make it inclusive
+    }
+
+
+    /**
+     * Calculates backoff delay using AWS "Equal Jitter" strategy.
+     * Each retry waits at least half of the exponential backoff, up to maxDelay.
+     *
+     * @param attempt      1-based retry attempt number (first retry = 1)
+     * @param minDelayMs   Minimum delay (e.g., 2000L for 2 seconds)
+     * @param maxDelayMs   Maximum delay (e.g., 300000L for 5 minutes)
+     * @param random       Random instance (for testability)
+     * @return             Milliseconds to wait before next retry
+     */
+    fun computeEqualJitterBackoff(
+        attempt: Int,
+        minDelayMs: Long = 2_000L,
+        maxDelayMs: Long = 300_000L,
+        random: kotlin.random.Random = kotlin.random.Random.Default
+    ): Long {
+        require(attempt >= 1) { "Attempt must be >= 1" }
+        val exp = minDelayMs * 2.0.pow(attempt - 1).toLong()
+        val capped = min(exp, maxDelayMs)
+        val half = capped / 2
+        return half + random.nextLong(half + 1) // [half, capped]
     }
 
 }

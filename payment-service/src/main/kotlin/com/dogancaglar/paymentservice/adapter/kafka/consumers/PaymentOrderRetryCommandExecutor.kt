@@ -71,7 +71,7 @@ class PaymentOrderRetryCommandExecutor(
 
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
         return CompletableFuture.supplyAsync {
-            pspClient.checkPaymentStatus(order.paymentOrderId.toString())
+            pspClient.chargeRetry(order)
         }.get(3, TimeUnit.SECONDS)
         // This should be replaced with your actual PSP integration
     }
