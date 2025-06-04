@@ -117,7 +117,7 @@ services:
 
   ### 📊 Observability Stack
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
     container_name: elasticsearch
     environment:
       - discovery.type=single-node
@@ -131,11 +131,13 @@ services:
       retries: 15
     ports:
       - "9200:9200"  # Exposed for Filebeat, Spring Boot, or browser/curl
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
     networks:
       - observability-net
 
   kibana:
-    image: docker.elastic.co/kibana/kibana:8.12.2
+    image: docker.elastic.co/kibana/kibana:8.13.4
     container_name: kibana
     depends_on:
       - elasticsearch
@@ -155,7 +157,7 @@ services:
       - observability-net
 
   filebeat:
-    image: docker.elastic.co/beats/filebeat:8.12.2
+    image: docker.elastic.co/beats/filebeat:8.13.4
     container_name: filebeat
     user: root
     depends_on:
@@ -168,6 +170,8 @@ services:
     volumes:
       - /Users/dogancaglar/IdeaProjects/ecommerce-platform-kotlin/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
       - /Users/dogancaglar/ecommerce-platform-logs/payment-service:/app-logs:ro
+      - filebeat-data:/usr/share/filebeat/data     # <--- Add this line!
+
     networks:
       - observability-net
     command: [ "-c", "/usr/share/filebeat/filebeat.yml" ]
@@ -176,6 +180,8 @@ services:
 volumes:
   keycloak_postgres_data:
   payment_postgres_data:
+  elasticsearch-data:
+  filebeat-data:
 
 ### 🌐 Custom networks per domain
 networks:

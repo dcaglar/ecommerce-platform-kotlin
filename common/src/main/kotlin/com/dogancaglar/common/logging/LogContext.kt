@@ -41,18 +41,15 @@ object LogContext {
         backOffInMillis: Long,
         block: () -> Unit
     ) {
+        val previous = MDC.getCopyOfContextMap()
         try {
             MDC.put(LogFields.RETRY_COUNT, retryCount.toString())
-            MDC.put(LogFields.RETRY_REASON, retryReason ?: "UNKNOWN")
-            MDC.put(LogFields.RETRY_ERROR_MESSAGE, lastErrorMessage ?: "N/A")
+            retryReason?.let { MDC.put(LogFields.RETRY_REASON, it) }
+            lastErrorMessage?.let { MDC.put(LogFields.RETRY_ERROR_MESSAGE, it) }
             MDC.put(LogFields.RETRY_BACKOFF_MILLIS, backOffInMillis.toString())
-
             block()
         } finally {
-            MDC.remove(LogFields.RETRY_COUNT)
-            MDC.remove(LogFields.RETRY_REASON)
-            MDC.remove(LogFields.RETRY_ERROR_MESSAGE)
-            MDC.remove(LogFields.RETRY_BACKOFF_MILLIS)
+            MDC.setContextMap(previous ?: emptyMap())
         }
     }
 

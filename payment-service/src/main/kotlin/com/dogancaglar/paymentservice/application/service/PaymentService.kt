@@ -187,7 +187,12 @@ class PaymentService(
         if (nextRetryCount < MAX_RETRIES) {
             val backOffExpMillis = computeEqualJitterBackoff(attempt = nextRetryCount)
             val scheduledAt = System.currentTimeMillis().plus(backOffExpMillis)
-            logRetrySchedule(order, nextRetryCount, scheduledAt, reason, lastError)
+            LogContext.withRetryFields(
+                retryCount = nextRetryCount, retryReason = reason, lastErrorMessage = lastError,
+                backOffInMillis = backOffExpMillis
+            ) {
+                logRetrySchedule(order, nextRetryCount, scheduledAt, reason, lastError)
+            }
             retryQueuePort.scheduleRetry(order, retryReason = reason, backOffMillis = backOffExpMillis)
         } else {
             logger.warn(

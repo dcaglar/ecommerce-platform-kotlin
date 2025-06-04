@@ -5,10 +5,10 @@ filebeat.inputs:
     json.add_error_key: true
     paths:
       - /app-logs/payment-service*.log
-      - /app-logs/payment-service.*.log
+
 
 output.elasticsearch:
-  hosts: ["http://elasticsearch:9200"]
+  hosts: [ "http://elasticsearch:9200" ]
   username: ""
   password: ""
   index: "payment-service-logs"  # ✅ Send logs to a raw index
