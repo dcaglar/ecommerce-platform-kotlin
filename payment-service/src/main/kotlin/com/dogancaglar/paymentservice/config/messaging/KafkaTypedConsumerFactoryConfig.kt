@@ -56,14 +56,9 @@ class KafkaTypedConsumerFactoryConfig(
         createTypedFactory(PaymentOrderRetryRequested::class.java, interceptor)
 
     @Bean("payment_status_check_scheduler_topic-factory")
-    fun paymentScheduledStatusFactory(interceptor: RecordInterceptor<String, EventEnvelope<*>>)
-            : ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderStatusScheduled>> =
-        createTypedFactory(PaymentOrderStatusScheduled::class.java, interceptor)
-
-    @Bean("due_payment_status_check_topic-factory")
     fun paymentStatusCheckExecutorFactory(interceptor: RecordInterceptor<String, EventEnvelope<*>>)
-            : ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<DuePaymentOrderStatusCheck>> =
-        createTypedFactory(DuePaymentOrderStatusCheck::class.java, interceptor)
+            : ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderStatusCheckRequested>> =
+        createTypedFactory(PaymentOrderStatusCheckRequested::class.java, interceptor)
 
     @Bean("payment_order_succeded_topic-factory")
     fun paymentOrderSucceededFactory(interceptor: RecordInterceptor<String, EventEnvelope<*>>)

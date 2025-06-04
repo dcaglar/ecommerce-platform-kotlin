@@ -13,4 +13,5 @@
     <include file="20240526-remove-paymentorderid-payment.xml" relativeToChangelogFile="true"/>
     <include file="20240526-remove-public-paymentorderid-payment.xml" relativeToChangelogFile="true"/>
     <include file="20240526-remove-sellerid-payment.xml" relativeToChangelogFile="true"/>
+    <include file="20240601-01-create-payment-order-status-checks.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

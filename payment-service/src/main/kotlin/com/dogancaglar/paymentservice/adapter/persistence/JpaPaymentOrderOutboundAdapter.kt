@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.adapter.persistence
 
 import com.dogancaglar.paymentservice.adapter.persistence.mapper.PaymentOrderEntityMapper
 import com.dogancaglar.paymentservice.adapter.persistence.repository.SpringDataPaymentOrderJpaRepository
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.port.PaymentOrderOutboundPort
 import org.springframework.stereotype.Repository
 
@@ -19,10 +19,6 @@ class JpaPaymentOrderOutboundAdapter(
     override fun saveAll(orders: List<PaymentOrder>) {
         val entities = orders.map { PaymentOrderEntityMapper.toEntity(it) }
         jpaRepository.saveAll(entities)
-    }
-
-    override fun findByPaymentId(id: Long): PaymentOrder? {
-        return jpaRepository.findByPaymentId(id).firstOrNull()?.let { PaymentOrderEntityMapper.toDomain(it) }
     }
 
     override fun countByPaymentId(paymentId: Long): Long {

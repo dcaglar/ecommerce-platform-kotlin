@@ -207,23 +207,38 @@ Structured log fields: `traceId`, `eventId`, `parentEventId`, `aggregateId`.
 
 ## 10 · Roadmap (June 2025)
 
-| # | Task | Key Deliverable |
-|---|------|-----------------|
-| 0 | ✅ Structured logging & ELK | JSON logs, Kibana |
-| 1 | Retry logic refactor | Domain-owned; Redis ZSet + job |
-| 2 | Elasticsearch read model | `/payments/search` |
-| 3 | Monitoring & metrics | Prometheus, Grafana |
-| 4 | Containerize services | Dockerfile, Compose |
-| 5 | Dual outbox tables | Payment & PaymentOrder flows |
-| 6 | Local Kubernetes deploy | Deployment & Service YAML |
-| 7 | Dummy wallet/shipment | Event choreography demo |
-| 8 | EventEnvelope factory enforcement | No direct constructors |
-| 9 | OAuth2 security | Keycloak / Auth0 |
-| 10 | Retry & DLQ hardening | DLQ topic + alerts |
-| 11 | K8s node affinity & resources | Tuned limits/requests |
-| 12 | Alerting & advanced monitoring | Slack/email alerts |
-| 13 | Kafka consumer scaling | Concurrency & replicas |
+## 🧠 Considerations for Future Architecture -1
 
+
+---
+
+## 🧠 Considerations for Future Architecture-2
+ WE SHOULD UPDATE PAYMENTORDER ONLY WHEN IT'S FINALIZED_FAILED OR EXCEEDED 5 RETRY ATTEMPT
+OR
+PAYMENT IS SUCCESFUL
+OR 
+PAYMETN STATUS CHECK IS SUCCESFUL OR FINALIZED_FAILED OR MAX RETRY EXCEEDED
+
+AND ALL FINALIZED PAYMENTS ARE FIRST PUSHED TO REDIS AND ANOTHER JOB GETFROOM REDIS_RESULT QUEUE AND SAVE IT
+
+WE SHOULD PUBLISH TO PAYMENT_RESULT KAFKA OR REDIS , AND SOMEWHAT BATCH DATA AND SAVEALL
+
+- **Independently Deployable Executors:**  
+  Consider evolving each executor (e.g., payment-order, retry, status check) into its own Spring Boot application.  
+  This enables independent scaling, tuning, and deployment for each workload.
+
+- **Shared Domain Logic as a Library:**  
+  Refactor `payment-service` as a pure domain library/module.  
+  All executor apps (and optionally the REST API app) can import this library for business logic, enforcing DRY principles and eliminating network latency.
+
+- **No Network or Serialization Overhead:**  
+  With the domain logic shared as a library, all apps use direct JVM calls—no HTTP/gRPC/REST, zero network-induced latency or serialization cost.
+
+- **Ultimate Flexibility and Testability:**  
+  Executors stay stateless and focused, while domain rules are always consistent and easily testable.
+
+> This design pattern mirrors the scalable event-driven backends of high-volume companies (e.g., Adyen, Stripe, Shopify).  
+> **Not yet implemented, but under active consideration for later stages.**
 ---
 
 ## 11 · References

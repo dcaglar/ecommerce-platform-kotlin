@@ -43,11 +43,11 @@ class OutboxDispatcherScheduler(
             LogContext.with(envelope) {
                 try {
                     paymentEventPublisher.publish(
-
+                        preSetEventIdFromCaller = envelope.eventId,
                         aggregateId = envelope.aggregateId,
-                        event = EventMetadatas.PaymentOrderCreatedMetadata,
+                        eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
                         data = envelope.data,
-                        parentEventId = envelope.parentEventId
+                        traceId = envelope.traceId
                     )
                     outboxEvent.markAsSent()
                     updatedEvents.add(outboxEvent)

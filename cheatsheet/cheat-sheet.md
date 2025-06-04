@@ -31,10 +31,19 @@ curl -X POST http://localhost:9200/payment-service-logs*/_search -H 'Content-Typ
 
 ## 🟦 2. 📥 Filebeat
 
+### 🔁Connect to filebeat container
+```bash
+docker compose down -v filebeat elasticsearch kibana
+docker volume rm <volume_name_if_needed>
+docker compose up -d filebeat elasticsearch kibana
+```
+
 ### ✅ Check Filebeat Status
 ```bash
 docker logs filebeat
 ```
+
+
 
 ### 🔍 Troubleshoot Ingest
 - Check file paths are correct and mounted:

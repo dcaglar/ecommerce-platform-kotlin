@@ -1,33 +1,24 @@
 package com.dogancaglar.common.event
 
-import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.common.logging.LogFields
-import org.slf4j.MDC
 import java.util.*
 
 
-/*
-/**
- * Creates a new EventEnvelope with optional trace context.
- *
- * @param traceId Optional trace ID; falls back to MDC or random UUID.
- * @param parentEventId Optional parent event ID for event chaining.
- */
- */
 object DomainEventEnvelopeFactory {
     fun <T> envelopeFor(
+        preSetEventId: UUID?=null,
         data: T,
-        eventType: EventMetadata<T>,
+        eventMetaData: EventMetadata<T>,
         aggregateId: String,
-        parentEventId: UUID? = null,
+        parentEventId: UUID?=null,
         traceId :String,
     ): EventEnvelope<T> {
-        val eventId = UUID.randomUUID()
+        val eventId = preSetEventId ?: UUID.randomUUID()
+        val resolvedParentId = parentEventId ?: eventId //if parent not passed then its the initiator i.e When we first emit PAymentOrderCreated there is no parent so we assing eventid
         return EventEnvelope(
             traceId = traceId,
             eventId = eventId,
-            parentEventId = parentEventId,
-            eventType = eventType.eventType,
+            parentEventId = resolvedParentId,
+            eventType = eventMetaData.eventType,
             aggregateId = aggregateId,
             data = data
         )

@@ -8,12 +8,11 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
 import org.slf4j.LoggerFactory
-import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Component
 import java.nio.charset.StandardCharsets
-import java.util.UUID
+import java.util.*
 
 /**
  * Publishes any domain event wrapped in [EventEnvelope] to Kafka,
@@ -29,23 +28,32 @@ class PaymentEventPublisher(
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
+    //if we are publishing a follwup event, then just call  with dont set trace or parentEventId they are already in predecesor evet
+    //if parentid is not being passsed that means its the outboxenvelope intiating the transaction
     fun <T> publish(
+        preSetEventIdFromCaller: UUID? = null,
         aggregateId: String,
-        event: EventMetadata<T>,
+        eventMetaData: EventMetadata<T>,
         data: T,
+        traceId: String? = null,
         parentEventId: UUID? = null
     ): EventEnvelope<T> {
-
+        val preSetEventId = preSetEventIdFromCaller
+        val resolvedTraceId = traceId ?: LogContext.getTraceId()
+        ?: error("Missing traceId: either pass explicitly or set via LogContext.with(...)")
+        val resolvedParentId = parentEventId ?: LogContext.getEventId()
         val envelope = DomainEventEnvelopeFactory.envelopeFor(
-            traceId = MDC.get("traceId") ?: UUID.randomUUID().toString(),
+            preSetEventId = preSetEventId,
+            traceId = resolvedTraceId,
             data = data,
-            eventType = event,
+            eventMetaData = eventMetaData,
             aggregateId = aggregateId,
-            parentEventId = parentEventId
+            parentEventId = resolvedParentId
         )
 
         LogContext.with(envelope) {
             val payload = objectMapper.writeValueAsString(envelope)
+            logger.info("Published EventEnvelop {\n $payload + \n")
             logger.info(
                 "Publishing eventType={}, eventId={}, traceId={}, aggregateId={}",
                 envelope.eventType,
@@ -54,7 +62,7 @@ class PaymentEventPublisher(
                 envelope.aggregateId
             )
             val record = ProducerRecord<String, String>(
-                event.topic,
+                eventMetaData.topic,
                 envelope.aggregateId,  // key
                 payload
             ).apply {
@@ -82,12 +90,12 @@ class PaymentEventPublisher(
             val future = kafkaTemplate.send(record)
             future.whenComplete { _, ex ->
                 if (ex == null) {
-                    logger.info("📨 Event published to topic={} eventId={}", event.topic, envelope.eventId)
+                    logger.info("📨 Event published to topic={} eventId={}", eventMetaData.topic, envelope.eventId)
                 } else {
                     logger.error(
                         "❌ Failed to publish eventId={} to topic={}: {}",
                         envelope.eventId,
-                        event.topic,
+                        eventMetaData.topic,
                         ex.message,
                         ex
                     )

@@ -163,6 +163,8 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
+    ports:
+      - "5066:5066"
     volumes:
       - /Users/dogancaglar/IdeaProjects/ecommerce-platform-kotlin/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
       - /Users/dogancaglar/ecommerce-platform-logs/payment-service:/app-logs:ro

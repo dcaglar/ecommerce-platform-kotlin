@@ -37,7 +37,7 @@ class DomainEventFactoryTest {
                     updatedAt = LocalDateTime.now(),
                     retryCount = 0
                 ),
-                eventType = EventMetadatas.PaymentOrderCreatedMetadata,
+                eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
                 aggregateId = "paymentorder-1001"
             )
 
@@ -69,7 +69,7 @@ class DomainEventFactoryTest {
                     updatedAt = LocalDateTime.now(),
                     retryCount = 0
                 ),
-                eventType = EventMetadatas.PaymentOrderCreatedMetadata,
+                eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
                 aggregateId = "paymentorder-1"
             )
 
@@ -96,7 +96,7 @@ class DomainEventFactoryTest {
                     updatedAt = LocalDateTime.now(),
                     retryCount = 0
                 ),
-                eventType = EventMetadatas.PaymentOrderCreatedMetadata,
+                eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
                 aggregateId = "paymentorder-1"
             )
             val event2 = DomainEventEnvelopeFactory.envelopeFor(
@@ -114,7 +114,7 @@ class DomainEventFactoryTest {
                     updatedAt = LocalDateTime.now(),
                     retryCount = 0
                 ),
-                eventType = EventMetadatas.PaymentOrderCreatedMetadata,
+                eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
                 aggregateId = "paymentorder-1"
             )
             assertThat(event1.traceId).isEqualTo(event2.traceId)
@@ -148,7 +148,7 @@ class DomainEventFactoryTest {
             val envelope = DomainEventEnvelopeFactory.envelopeFor(
                 traceId = traceIdFromMDC,
                 data = event,
-                eventType = EventMetadatas.PaymentOrderCreatedMetadata,
+                eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
                 aggregateId = event.publicPaymentOrderId
             )
 
@@ -185,7 +185,7 @@ class DomainEventFactoryTest {
             val envelope = DomainEventEnvelopeFactory.envelopeFor(
                 traceId = traceIdFromMDC,
                 data = event,
-                eventType = EventMetadatas.PaymentOrderCreatedMetadata,
+                eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
                 aggregateId = event.publicPaymentOrderId,
                 parentEventId = parentId
             )

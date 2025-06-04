@@ -8,21 +8,17 @@ import java.time.LocalDateTime
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class PaymentOrderCreated @JsonCreator constructor(
-    @JsonProperty("paymentOrderId") val paymentOrderId: String,
-    @JsonProperty("publicPaymentOrderId") val publicPaymentOrderId: String,
-    @JsonProperty("paymentId") val paymentId: String,
+    @JsonProperty("paymentOrderId") override val paymentOrderId: String,
+    @JsonProperty("publicPaymentOrderId") override val publicPaymentOrderId: String,
+    @JsonProperty("paymentId") override val paymentId: String,
     @JsonProperty("publicPaymentId") override val publicPaymentId: String,
-    @JsonProperty("sellerId") val sellerId: String,
-    @JsonProperty("amountValue") val amountValue: BigDecimal,
-    @JsonProperty("currency") val currency: String,
-    @JsonProperty("status") val status: String,
-    @JsonProperty("createdAt") val createdAt: LocalDateTime = LocalDateTime.now(),
-    @JsonProperty("updatedAt") val updatedAt: LocalDateTime = LocalDateTime.now(),
-    @JsonProperty("retryCount") val retryCount: Int
-
-) : PaymentEvent
-
-
-
-
-
+    @JsonProperty("sellerId") override val sellerId: String,
+    @JsonProperty("amountValue") override val amountValue: BigDecimal,
+    @JsonProperty("currency") override val currency: String,
+    @JsonProperty("status") override val status: String,
+    @JsonProperty("createdAt") override val createdAt: LocalDateTime = LocalDateTime.now(),
+    @JsonProperty("updatedAt") override val updatedAt: LocalDateTime = LocalDateTime.now(),
+    @JsonProperty("retryCount") override val retryCount: Int = 0,
+    @JsonProperty("retryReason") override val retryReason: String? = null,
+    @JsonProperty("lastErrorMessage") override val lastErrorMessage: String? = null
+) : PaymentOrderEvent
