@@ -189,48 +189,50 @@ Handles the full lifecycle of payment processing for multi-seller orders:
 ## Roadmap
 
 Updated Roadmap (Containerization moved up, dual outbox event support)
-• 🟦 1. Enforce Controlled Construction for Domain & Event Classes✅
-Make constructors for Payment, PaymentOrder, and EventEnvelope<T> private or protected.
-Require creation via factory methods (e.g., PaymentFactory, DomainEventEnvelopeFactory).
-Refactor usage across all modules.
-• 🟩 2. Align Entity Instantiation with Domain Factories✅
-Use factory/mapping methods for all JPA/entity reconstruction.
-Keep domain and persistence logic separate.()
-• 🟨 3. Complete Structured Logging and ELK Stack Setup ✅
-JSON logs, traceability, Kibana dashboards.
-• 🟧 4. Implement and Refactor Retry Payment Logic in PaymentOrder✅
-Move retry/backoff logic into the domain model.
-Use Redis ZSet and a scheduled job for retry scheduling.✅
--log retry as a searchable event.
-• 🟫 5. Add Elasticsearch Read Model for Payment Queries
-Enable fast search/filter by payment/order.
-• 🟥 6. Build Monitoring Dashboards and Basic Metrics (Prometheus/Grafana)
-Expose essential service metrics for operations.
-• 🟦 7. Containerize Spring Boot Apps
-Write Dockerfile(s), test with Docker Compose.
-Ensure profiles/secrets are runtime-injectable.
-• 🟩 8. Implement Dual Outbox Event Tables/Flows
-Separate Payment-level and PaymentOrder-level outbox tables.
-Implement outbox polling/dispatch for both.
-Ensure causal event flow and idempotency.
-• 🟨 9. Enable Basic Kubernetes Deployment (Docker Desktop/Minikube)
-Write and test deployment/service YAML.
-Verify health in a local k8s cluster.
-• 🟧 10. Build Dummy Wallet and Shipment Services
-Event choreography across bounded contexts.
-• 🟫 11. Add OAuth2 Security to All APIs
-Integrate Keycloak (or Auth0).
-Add token validation to all REST endpoints.
-• 🟥 12. Harden Retry and DLQ Handling
-Add DLQ topic(s) and alerting on failures.
-Ensure resilience for transient errors.
-• 🟦 13. Implement Node Affinity & Resource Management for K8s
-Set resource requests/limits, node selectors.
-• 🟩 14. Add Alerting and Advanced Monitoring
-Slack/email alerts for key events/errors.
-SLO/SLA tracking.
-• 🟨 15. Scale Kafka Consumers (Horizontal Concurrency Tuning)
-Enable more consumer instances for high throughput.
+
+- 🟦 1. Enforce Controlled Construction for Domain & Event Classes✅
+  Make constructors for Payment, PaymentOrder, and EventEnvelope<T> private or protected.
+  Require creation via factory methods (e.g., PaymentFactory, DomainEventEnvelopeFactory).
+  Refactor usage across all modules.
+- 🟩 2. Align Entity Instantiation with Domain Factories✅
+  Use factory/mapping methods for all JPA/entity reconstruction.✅
+  Keep domain and persistence logic separate.()✅
+- 🟨 3. Complete Structured Logging and ELK Stack Setup ✅
+  JSON logs, traceability, Kibana dashboards.
+- 🟧 4. Implement and Refactor Retry Payment Logic in PaymentOrder✅
+  Move retry/backoff logic into the domain model.✅
+- 🟧 5. Use Redis ZSet and a scheduled job for retry scheduling.✅
+  -log retry as a searchable event.✅
+- 🟦 6. Containerize Spring Boot Apps
+  Write Dockerfile(s), test with Docker Compose.
+  Ensure profiles/secrets are runtime-injectable.
+- 🟥 7. Build Monitoring Dashboards and Basic Metrics (Prometheus/Grafana)
+  Expose essential service metrics for operations.
+
+- 🟩 8. Implement Dual Outbox Event Tables/Flows
+  Separate Payment-level and PaymentOrder-level outbox tables.
+  Implement outbox polling/dispatch for both.
+  Ensure causal event flow and idempotency.
+- 🟨 9. Enable Basic Kubernetes Deployment (Docker Desktop/Minikube)
+  Write and test deployment/service YAML.
+  Verify health in a local k8s cluster.
+- 🟧 10. Build Dummy Wallet and Shipment Services
+  Event choreography across bounded contexts.
+- 🟫 11. Add Elasticsearch Read Model for Payment Queries
+  Enable fast search/filter by payment/order.
+- 🟫 12. Add OAuth2 Security to All APIs
+  Integrate Keycloak (or Auth0).
+  Add token validation to all REST endpoints.
+- 🟥 13. Harden Retry and DLQ Handling
+  Add DLQ topic(s) and alerting on failures.
+  Ensure resilience for transient errors.
+- 🟦 14. Implement Node Affinity & Resource Management for K8s
+  Set resource requests/limits, node selectors.
+- 🟩 15. Add Alerting and Advanced Monitoring
+  Slack/email alerts for key events/errors.
+  SLO/SLA tracking.
+- 🟨 16. Scale Kafka Consumers (Horizontal Concurrency Tuning)
+  Enable more consumer instances for high throughput.
 
 Basic CI/CD with GitHub Actions
 
