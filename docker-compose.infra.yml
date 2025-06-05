@@ -1,0 +1,195 @@
+services:
+  ### 🔐 Keycloak Identity Provider
+  keycloak-db:
+    image: postgres:15
+    container_name: keycloak-db
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    volumes:
+      - keycloak_postgres_data:/var/lib/postgresql/data
+    networks:
+      - auth-net
+    ports:
+      - "5433:5432"  # Exposed for IntelliJ/pgAdmin or Spring Boot if needed
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U keycloak" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.3
+    container_name: keycloak
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    command: start-dev
+    ports:
+      - "8082:8080"  # Exposed for browser access to Keycloak
+    networks:
+      - auth-net
+
+  ### 🏦 Payment Database
+  payment-db:
+    image: postgres:15
+    container_name: payment-postgres
+    environment:
+      POSTGRES_DB: payment
+      POSTGRES_USER: payment
+      POSTGRES_PASSWORD: payment
+    volumes:
+      - payment_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"  # Exposed for Spring Boot to connect
+    networks:
+      - payment-net
+
+  ### 📨 Messaging Stack
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.2.1
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"  # Optional: expose for debugging Kafka/Zookeeper
+    restart: unless-stopped
+    networks:
+      - messaging-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.2.1
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"  # Exposed for Spring Boot Kafka client
+    restart: unless-stopped
+    networks:
+      - messaging-net
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"  # Exposed for Spring Boot to connect
+    volumes:
+      - ./payment-service/src/main/resources/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+    restart: unless-stopped
+    networks:
+      - messaging-net  # Same as Kafka/Zookeeper for simplicity
+  redisinsight:
+    image: redis/redisinsight:latest
+    ports:
+      - "8001:8001"
+    restart: always
+    networks:
+      - messaging-net
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - "8088:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    networks:
+      - messaging-net
+    depends_on:
+      - kafka
+
+
+  ### 📊 Observability Stack
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms2g -Xmx2g
+    mem_limit: 3g  # optional Docker hard limit if neede
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://elasticsearch:9200 || exit 1" ]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+    ports:
+      - "9200:9200"  # Exposed for Filebeat, Spring Boot, or browser/curl
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - observability-net
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    container_name: kibana
+    depends_on:
+      - elasticsearch
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://kibana:5601/api/status" ]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - xpack.security.enabled=false
+      - NODE_OPTIONS=--max-old-space-size=1024
+    mem_limit: 2g
+    ports:
+      - "5601:5601"  # Exposed for browser access to Kibana
+    networks:
+      - observability-net
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.13.4
+    container_name: filebeat
+    user: root
+    depends_on:
+      kibana:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    ports:
+      - "5066:5066"
+    volumes:
+      - /Users/dogancaglar/IdeaProjects/ecommerce-platform-kotlin/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /Users/dogancaglar/ecommerce-platform-logs/payment-service:/app-logs:ro
+      - filebeat-data:/usr/share/filebeat/data     # <--- Add this line!
+
+    networks:
+      - observability-net
+    command: [ "-c", "/usr/share/filebeat/filebeat.yml" ]
+
+### 🔁 Named volumes for persistent storage
+volumes:
+  keycloak_postgres_data:
+  payment_postgres_data:
+  elasticsearch-data:
+  filebeat-data:
+
+### 🌐 Custom networks per domain
+networks:
+  auth-net:
+    driver: bridge
+  payment-net:
+    external: true
+  messaging-net:
+    external: true
+  observability-net:
+    driver: bridge
