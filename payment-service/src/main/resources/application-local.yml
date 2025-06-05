@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5434/payment
+    username: payment
+    password: payment
+  redis:
+    host: localhost
+    data:
+      redis:
+        host: redis
+        port: 6379
+        timeout: 2000ms
+        lettuce:
+          pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8082/realms/ecommerce-platform
+kafka:
+  bootstrap-servers: localhost:9092

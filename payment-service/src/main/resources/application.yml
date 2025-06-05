@@ -1,3 +1,6 @@
+logging:
+  level:
+    org.springframework.boot.context.config: DEBUG
 server:
   port: 8080
 spring:
@@ -7,20 +10,6 @@ spring:
       value-deserializer: com.dogancaglar.paymentservice.config.serialization.EventEnvelopeDeserializer
   liquibase:
     change-log: classpath:db/changelog/changelog-master.xml
-  datasource:
-    url: jdbc:postgresql://localhost:5434/payment
-    username: payment
-    password: payment
-  redis:
-    host: localhost
-    port: 6379
-    timeout: 2000ms
-    lettuce:
-      pool:
-      max-active: 8
-      max-idle: 8
-      min-idle: 0
-      max-wait: -1ms
   jpa:
     hibernate:
       ddl-auto: none  # ❌ Disable automatic table creation
@@ -29,9 +18,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8082/realms/ecommerce-platform
-kafka:
-  bootstrap-servers: localhost:9092
+          issuer-uri: http://myserver/realms/ecommerce-platform
   dynamic-consumers:
     - id: payment-retry-executor
       topic: payment_order_retry_request_topic
