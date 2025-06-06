@@ -1,0 +1,23 @@
+kafka:
+  bootstrap-servers: kafka:9092
+spring:
+  datasource:
+    url: jdbc:postgresql://payment-db:5432/payment
+    username: payment
+    password: payment
+server:
+  port: 8080
+  data:
+    redis:
+      timeout: 2000ms
+      lettuce:
+        pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+        max-wait: -1ms
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://keycloak:8080/realms/ecommerce-platform
