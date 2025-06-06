@@ -7,7 +7,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       SPRING_DATA_REDIS_URL: redis://redis:6379
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     ports:
       - "8081:8080"  # Avoid collision with Kafka UI
     networks:

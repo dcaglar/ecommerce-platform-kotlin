@@ -1,3 +1,17 @@
+kafka:
+  dynamic-consumers:
+    - id: payment-retry-executor
+      topic: payment_order_retry_request_topic
+      group-id: payment-retry-executor-group
+      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderRetryCommandExecutor
+    - id: payment-order-executor
+      topic: payment_order_created_queue
+      group-id: payment-order-group
+      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderExecutor
+    - id: payment-status-check-executor-scheduler
+      topic: payment_status_check_scheduler_topic
+      group-id: payment-status-check-executor-group
+      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.ScheduledPaymentStatusCheckExecutor
 logging:
   level:
     org.springframework.boot.context.config: DEBUG
@@ -19,19 +33,6 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: http://myserver/realms/ecommerce-platform
-  dynamic-consumers:
-    - id: payment-retry-executor
-      topic: payment_order_retry_request_topic
-      group-id: payment-retry-executor-group
-      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderRetryCommandExecutor
-    - id: payment-order-executor
-      topic: payment_order_created_queue
-      group-id: payment-order-group
-      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderExecutor
-    - id: payment-status-check-executor-scheduler
-      topic: payment_status_check_scheduler_topic
-      group-id: payment-status-check-executor-group
-      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.ScheduledPaymentStatusCheckExecutor
 psp:
   simulation:
     timeouts:
