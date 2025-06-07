@@ -53,11 +53,10 @@ class PaymentEventPublisher(
 
         LogContext.with(envelope) {
             val payload = objectMapper.writeValueAsString(envelope)
-            logger.info("Published EventEnvelop {\n $payload + \n")
             logger.info(
-                "Publishing eventType={}, eventId={}, traceId={}, aggregateId={}",
                 envelope.eventType,
                 envelope.eventId,
+                envelope.parentEventId,
                 envelope.traceId,
                 envelope.aggregateId
             )
@@ -87,6 +86,7 @@ class PaymentEventPublisher(
                     )
                 }
             }
+            logger.info("SEnding producer recird ${record.value()}  $record.")
             val future = kafkaTemplate.send(record)
             future.whenComplete { _, ex ->
                 if (ex == null) {

@@ -47,7 +47,8 @@ class OutboxDispatcherScheduler(
                         aggregateId = envelope.aggregateId,
                         eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
                         data = envelope.data,
-                        traceId = envelope.traceId
+                        traceId = envelope.traceId,
+                        parentEventId = envelope.eventId
                     )
                     outboxEvent.markAsSent()
                     updatedEvents.add(outboxEvent)

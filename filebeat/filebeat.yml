@@ -1,24 +1,25 @@
 filebeat.inputs:
-  - type: log
-    enabled: true
+  - type: container
+    paths:
+      - /var/lib/docker/containers/*/*.log
+    processors:
+      - add_docker_metadata: ~
     json.keys_under_root: true
     json.add_error_key: true
-    paths:
-      - /app-logs/payment-service*.log
-
+    json.message_key: message  # assumes your JSON logs include a "message" field
 
 output.elasticsearch:
   hosts: [ "http://elasticsearch:9200" ]
-  username: ""
-  password: ""
-  index: "payment-service-logs"  # ✅ Send logs to a raw index
+
+
+setup.template.name: "ecommerce-logs"
+setup.template.pattern: "ecommerce-logs-*"
+setup.ilm.enabled: false
+setup.dashboards.enabled: false
+setup.template.enabled: true
 
 setup.kibana:
   host: "http://kibana:5601"
 
-# ⛔ Disable dashboards and ILM
-setup.dashboards.enabled: false
-setup.ilm.enabled: false           # ✅ Disables data streams + ILM
-setup.template.enabled: true       # ✅ Still installs mappings
-setup.template.name: "payment-service-logs"
-setup.template.pattern: "payment-service-logs*"
+logging.level: info
+monitoring.enabled: true

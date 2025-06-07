@@ -2,7 +2,6 @@ package com.dogancaglar.paymentservice.adapter.persistence.mapper
 
 import com.dogancaglar.paymentservice.adapter.persistence.entity.PaymentOrderEntity
 import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.Amount
 
 object PaymentOrderEntityMapper {
 

@@ -39,11 +39,13 @@ class PaymentOrderExecutor(
             envelope, mapOf(
                 LogFields.TOPIC_NAME to record.topic(),
                 LogFields.CONSUMER_GROUP to "PAYMENT_ORDER_EXECUTOR",
+                LogFields.EVENT_ID to envelope.eventId.toString(),
+                LogFields.TRACE_ID to envelope.traceId,
                 LogFields.PUBLIC_PAYMENT_ID to envelope.data.publicPaymentId,
-                LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.data.publicPaymentOrderId,
+                LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.data.publicPaymentOrderId
             )
         ) {
-            logger.info("▶️ [Handle Start] Processing PAYMENT_RETRY_EXECUTOR")
+            logger.info("▶️ [Handle Start] Processing PAYMENT_ORDER_EXECUTOR")
 
             if (order.status != PaymentOrderStatus.INITIATED) {
                 logger.info("⏩ Skipping already processed order with status=${order.status}")

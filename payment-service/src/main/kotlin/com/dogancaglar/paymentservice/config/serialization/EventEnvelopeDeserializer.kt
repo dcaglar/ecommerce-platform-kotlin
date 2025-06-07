@@ -9,7 +9,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import org.apache.kafka.common.header.Headers
 import org.apache.kafka.common.serialization.Deserializer
-import kotlin.collections.get
 
 class EventEnvelopeDeserializer : Deserializer<EventEnvelope<*>> {
 
@@ -35,5 +34,11 @@ class EventEnvelopeDeserializer : Deserializer<EventEnvelope<*>> {
         return objectMapper.readValue(data, typeRef)
     }
 
-    override fun close() {}
+    override fun close() {
+        /*
+        because EventEnvelopeDeserializer implements the Deserializer interface,
+        which requires the close method to be present. Even if the method body is empty,
+        it must be overridden to fulfill the interface contract.
+         */
+    }
 }

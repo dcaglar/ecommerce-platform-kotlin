@@ -1,7 +1,6 @@
 package com.dogancaglar.paymentservice.config.messaging
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
 import com.fasterxml.jackson.core.type.TypeReference
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration

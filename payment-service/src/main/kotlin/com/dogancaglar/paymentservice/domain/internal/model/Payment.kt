@@ -2,6 +2,7 @@ package com.dogancaglar.paymentservice.domain.internal.model
 
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
+import java.math.BigDecimal
 import java.time.LocalDateTime
 
 class Payment private constructor(
@@ -15,22 +16,54 @@ class Payment private constructor(
     val paymentOrders: List<PaymentOrder>
 ) {
 
+
+    class Builder {
+        private var paymentId: Long = 0
+        private var publicPaymentId: String = ""
+        private var buyerId: String = ""
+        private var orderId: String = ""
+        private var totalAmount: Amount = Amount(BigDecimal.ZERO, "USD") // Default value
+        private var status: PaymentStatus = PaymentStatus.INITIATED
+        private var createdAt: LocalDateTime = LocalDateTime.now()
+        private var paymentOrders: List<PaymentOrder> = listOf()
+
+        fun paymentId(paymentId: Long) = apply { this.paymentId = paymentId }
+        fun publicPaymentId(publicPaymentId: String) = apply { this.publicPaymentId = publicPaymentId }
+        fun buyerId(buyerId: String) = apply { this.buyerId = buyerId }
+        fun orderId(orderId: String) = apply { this.orderId = orderId }
+        fun totalAmount(totalAmount: Amount) = apply { this.totalAmount = totalAmount }
+        fun status(status: PaymentStatus) = apply { this.status = status }
+        fun createdAt(createdAt: LocalDateTime) = apply { this.createdAt = createdAt }
+        fun paymentOrders(paymentOrders: List<PaymentOrder>) = apply { this.paymentOrders = paymentOrders }
+
+        fun build(): Payment = Payment(
+            paymentId,
+            publicPaymentId,
+            buyerId,
+            orderId,
+            totalAmount,
+            status,
+            createdAt,
+            paymentOrders
+        )
+    }
+
     fun markAsPaid() = copy(status = PaymentStatus.SUCCESS)
     fun markAsFailed() = copy(status = PaymentStatus.FAILED)
 
     private fun copy(
         status: PaymentStatus = this.status,
         paymentOrders: List<PaymentOrder> = this.paymentOrders
-    ): Payment = Payment(
-        paymentId,
-        publicPaymentId,
-        buyerId,
-        orderId,
-        totalAmount,
-        status,
-        createdAt,
-        paymentOrders
-    )
+    ): Payment = Builder()
+        .paymentId(paymentId)
+        .publicPaymentId(publicPaymentId)
+        .buyerId(buyerId)
+        .orderId(orderId)
+        .totalAmount(totalAmount)
+        .status(status)
+        .createdAt(createdAt)
+        .paymentOrders(paymentOrders)
+        .build()
 
     companion object {
         fun createNew(
@@ -41,16 +74,16 @@ class Payment private constructor(
             totalAmount: Amount,
             createdAt: LocalDateTime,
             paymentOrders: List<PaymentOrder>
-        ): Payment = Payment(
-            paymentId,
-            publicPaymentId,
-            buyerId,
-            orderId,
-            totalAmount,
-            PaymentStatus.INITIATED,
-            createdAt,
-            paymentOrders
-        )
+        ): Payment = Builder()
+            .paymentId(paymentId)
+            .publicPaymentId(publicPaymentId)
+            .buyerId(buyerId)
+            .orderId(orderId)
+            .totalAmount(totalAmount)
+            .status(PaymentStatus.INITIATED)
+            .createdAt(createdAt)
+            .paymentOrders(paymentOrders)
+            .build()
 
         fun reconstructFromPersistence(
             paymentId: Long,
@@ -61,15 +94,15 @@ class Payment private constructor(
             status: PaymentStatus,
             createdAt: LocalDateTime,
             paymentOrders: List<PaymentOrder>
-        ): Payment = Payment(
-            paymentId,
-            publicPaymentId,
-            buyerId,
-            orderId,
-            totalAmount,
-            status,
-            createdAt,
-            paymentOrders
-        )
+        ): Payment = Payment.Builder()
+            .paymentId(paymentId)
+            .publicPaymentId(publicPaymentId)
+            .buyerId(buyerId)
+            .orderId(orderId)
+            .totalAmount(totalAmount)
+            .status(status)
+            .createdAt(createdAt)
+            .paymentOrders(paymentOrders)
+            .build()
     }
 }
