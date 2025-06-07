@@ -1,4 +1,4 @@
 #!/bin/bash
-echo "🛑 Stopping and removing infra containers..."
+echo "🛑 Stopping infra containers (preserving volumes)..."
 docker compose -f ../docker-compose.infra.yml down
-echo "✅ Infra containers removed."
+echo "✅ Infra stopped."

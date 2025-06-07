@@ -1,4 +1,4 @@
 #!/bin/bash
-echo "🛑 Stopping and removing app containers only..."
+echo "🛑 Stopping app containers..."
 docker compose -f ../docker-compose.app.yml down
-echo "✅ App containers removed."
+echo "✅ App containers stopped."
