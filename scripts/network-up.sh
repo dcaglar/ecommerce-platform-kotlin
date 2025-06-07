@@ -1,6 +1,4 @@
 #!/bin/bash
-set -e
-
 EXTERNAL_NETWORKS=("payment-net" "messaging-net")
 
 echo "🔧 Creating external Docker networks (if not already present)..."
