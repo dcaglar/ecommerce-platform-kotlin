@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.LocalDateTime
 import java.util.*
+
 data class EventEnvelope<T> @JsonCreator(mode = JsonCreator.Mode.PROPERTIES) constructor(
     @JsonProperty("eventId")
     val eventId: UUID = UUID.randomUUID(),
@@ -26,27 +27,3 @@ data class EventEnvelope<T> @JsonCreator(mode = JsonCreator.Mode.PROPERTIES) con
     @JsonProperty("parentEventId")
     val parentEventId: UUID? = null
 )
-{
-    companion object {
-        @Deprecated(
-            message = "Use DomainEventEnvelopeFactory.envelopeFor(...) instead for consistency and better observability.",
-            replaceWith = ReplaceWith("DomainEventEnvelopeFactory.envelopeFor(...)"),
-            level = DeprecationLevel.ERROR
-        )
-        fun <T> wrap(
-            eventType: String,
-            aggregateId: String,
-            data: T,
-            traceId: String? = null,
-            parentEventId: UUID? = null
-        ): EventEnvelope<T> {
-            return EventEnvelope(
-                eventType = eventType,
-                aggregateId = aggregateId,
-                data = data,
-                traceId = traceId ?: UUID.randomUUID().toString(),
-                parentEventId = parentEventId
-            )
-        }
-    }
-}

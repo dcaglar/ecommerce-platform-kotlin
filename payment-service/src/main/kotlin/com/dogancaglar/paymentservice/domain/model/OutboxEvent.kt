@@ -15,7 +15,7 @@ class OutboxEvent private constructor(
         if (status == "NEW") {
             status = "SENT"
         } else {
-            throw IllegalStateException("OutboxEvent must be NEW to mark as SENT")
+            error("OutboxEvent must be NEW to mark as SENT")
         }
     }
 
@@ -23,10 +23,7 @@ class OutboxEvent private constructor(
 
     companion object {
         fun createNew(
-            eventType: String,
-            aggregateId: String,
-            payload: String,
-            createdAt: LocalDateTime = LocalDateTime.now()
+            eventType: String, aggregateId: String, payload: String, createdAt: LocalDateTime = LocalDateTime.now()
         ): OutboxEvent {
             return OutboxEvent(
                 eventId = UUID.randomUUID(),

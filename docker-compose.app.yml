@@ -1,5 +1,8 @@
 services:
   payment-service:
+    labels:
+      service: payment-service
+      environment: local
     container_name: payment-service
     build:
       context: .

@@ -41,7 +41,7 @@ object LogContext {
         backOffInMillis: Long,
         block: () -> Unit
     ) {
-        val previous = MDC.getCopyOfContextMap()
+        val previous = MDC.getCopyOfContextMap()?.let { Collections.unmodifiableMap(it) }
         try {
             MDC.put(LogFields.RETRY_COUNT, retryCount.toString())
             retryReason?.let { MDC.put(LogFields.RETRY_REASON, it) }

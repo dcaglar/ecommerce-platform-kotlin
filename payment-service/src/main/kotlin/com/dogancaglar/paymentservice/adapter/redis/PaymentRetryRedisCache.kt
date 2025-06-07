@@ -10,38 +10,9 @@ open class PaymentRetryRedisCache(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val queue = "payment_retry_queue"
-
-    /*
-    fun incrementAndGetRetryCount(paymentOrderId: Long): Int {
-        val retryKey = "retry:count:$paymentOrderId"
-        return redisTemplate.opsForValue().increment(retryKey)?.toInt() ?: 1
-    }
-
     fun getRetryCount(paymentOrderId: Long): Int {
         val retryKey = "retry:count:$paymentOrderId"
-        return redisTemplate.opsForValue().get(retryKey)?.toInt() ?: 0
-    }
-
-    fun resetRetryCounter(paymentOrderId: Long) {
-        val retryKey = "retry:count:$paymentOrderId"
-        redisTemplate.delete(retryKey)
-    }
-
-    fun scheduleRetry(json: String, retryAt: Double) {
-        redisTemplate.opsForZSet().add(queue, json, retryAt)
-    }
-
-    fun pollDueRetries(): List<String> {
-        val now = System.currentTimeMillis().toDouble()
-        val dueItems = redisTemplate.opsForZSet().rangeByScore(queue, 0.0, now)
-        dueItems?.forEach { json -> redisTemplate.opsForZSet().remove(queue, json) }
-        return dueItems?.toList() ?: emptyList()
-    }
-     */
-
-    fun getRetryCount(paymentOrderId: Long): Int {
-        val retryKey = "retry:count:$paymentOrderId"
-        return redisTemplate.opsForValue().get(retryKey)?.toInt() ?: 0
+        return redisTemplate.opsForValue()[retryKey]?.toInt() ?: 0
     }
 
     fun incrementAndGetRetryCount(paymentOrderId: Long): Int {

@@ -34,7 +34,10 @@ class PaymentOrderRetryCommandExecutor(
                 LogFields.CONSUMER_GROUP to "PAYMENT_RETRY_EXECUTOR",
                 LogFields.PUBLIC_PAYMENT_ID to envelope.data.publicPaymentId,
                 LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.data.publicPaymentOrderId,
-            )
+                LogFields.EVENT_ID to envelope.eventId.toString(),
+                LogFields.TRACE_ID to envelope.traceId,
+
+                )
         ) {
             logger.info("▶️ [Handle Start] Processing PaymentOrderRetryCommandExecutor")
             //todo any check is needed

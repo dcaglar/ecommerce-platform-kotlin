@@ -156,7 +156,9 @@ class PaymentService(
         paymentEventPublisher.publish(
             eventMetaData = EventMetadatas.PaymentOrderSuccededMetaData,
             aggregateId = updatedOrder.publicPaymentOrderId,
-            data = PaymentOrderEventMapper.toPaymentOrderSuccededEvent(updatedOrder)
+            data = PaymentOrderEventMapper.toPaymentOrderSuccededEvent(updatedOrder),
+            parentEventId = LogContext.getEventId(),
+            traceId = LogContext.getTraceId()
         )
     }
 

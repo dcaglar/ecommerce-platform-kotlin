@@ -21,6 +21,7 @@ class RetryDispatcherScheduler(
         for (envelope in expiredPaymentRetryRequestEnvelopeList) {
             try {
                 paymentEventPublisher.publish(
+                    preSetEventIdFromCaller = envelope.eventId,
                     aggregateId = envelope.aggregateId,
                     eventMetaData = EventMetadatas.PaymentOrderRetryRequestedMetadata,
                     data = envelope.data,

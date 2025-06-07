@@ -46,6 +46,9 @@ services:
       POSTGRES_DB: payment
       POSTGRES_USER: payment
       POSTGRES_PASSWORD: payment
+    labels:
+      service: payment-db
+      environment: local
     volumes:
       - payment_postgres_data:/var/lib/postgresql/data
     ports:
@@ -60,6 +63,9 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    labels:
+      service: zookeper
+      environment: local
     ports:
       - "2181:2181"  # Optional: expose for debugging Kafka/Zookeeper
     restart: unless-stopped
@@ -74,6 +80,9 @@ services:
     ports:
       - "9092:9092"     # for container-to-container communication
       - "29092:29092"   # for access from localhost (host machine)
+    labels:
+      service: kafka
+      environment: local
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_BROKER_ID: 1
@@ -90,6 +99,9 @@ services:
   redis:
     image: redis:7
     container_name: redis
+    labels:
+      service: redis
+      environment: local
     ports:
       - "6379:6379"  # Exposed for Spring Boot to connect
     volumes:
@@ -99,6 +111,10 @@ services:
     networks:
       - messaging-net  # Same as Kafka/Zookeeper for simplicity
   redisinsight:
+    container_name: redis-ui
+    labels:
+      service: redis-ui
+      environment: local
     image: redis/redisinsight:latest
     ports:
       - "8001:8001"
@@ -107,6 +123,10 @@ services:
       - messaging-net
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    labels:
+      service: kafka-ui
+      environment: local
     ports:
       - "8088:8080"
     environment:
@@ -142,6 +162,9 @@ services:
   kibana:
     image: docker.elastic.co/kibana/kibana:8.13.4
     container_name: kibana
+    labels:
+      service: kibana
+      environment: local
     depends_on:
       - elasticsearch
     healthcheck:
@@ -162,24 +185,27 @@ services:
   filebeat:
     image: docker.elastic.co/beats/filebeat:8.13.4
     container_name: filebeat
+    labels:
+      service: filebeat
+      environment: local
     user: root
-    depends_on:
-      kibana:
-        condition: service_healthy
-      elasticsearch:
-        condition: service_healthy
-    ports:
-      - "5066:5066"
     volumes:
-      - /Users/dogancaglar/IdeaProjects/ecommerce-platform-kotlin/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
-      - /Users/dogancaglar/ecommerce-platform-logs/payment-service:/app-logs:ro
-      - filebeat-data:/usr/share/filebeat/data     # <--- Add this line!
-
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro   # ✅ critical
+      - /var/run/docker.sock:/var/run/docker.sock:ro               # ✅ needed for metadata
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
     networks:
       - observability-net
-    command: [ "-c", "/usr/share/filebeat/filebeat.yml" ]
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      kibana:
+        condition: service_healthy
+    command: [ "-c", "/usr/share/filebeat/filebeat.yml" , "--strict.perms=false" ]
 
-### 🔁 Named volumes for persistent storage
+
+    ### 🔁 Named volumes for persistent storage
+
+
 volumes:
   keycloak_postgres_data:
   payment_postgres_data:

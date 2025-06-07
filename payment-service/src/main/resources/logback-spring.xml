@@ -1,55 +1,80 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<configuration>
+<configuration scan="true">
 
-    <property name="LOG_PATH" value="/Users/dogancaglar/ecommerce-platform-logs/payment-service"/>
-    <property name="LOG_PATTERN"
-              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{traceId}] [%X{eventId}] [%X{aggregateId}] [%X{parentEventId}] %-5level [%thread] %logger{36} - %msg%n"/>
+    <!-- Common timestamp-based naming for the file appender -->
+    <timestamp key="date" datePattern="yyyy-MM-dd"/>
 
-    <!-- Console logging -->
-    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>${LOG_PATTERN}</pattern>
-        </encoder>
-    </appender>
-    <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOG_PATH}/payment-service.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_PATH}/payment-service.%d{yyyy-MM-dd}.log</fileNamePattern>
-            <maxHistory>14</maxHistory>
-        </rollingPolicy>
-        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
-            <providers>
-                <timestamp>
-                    <fieldName>@timestamp</fieldName>
-                </timestamp>
-                <loggerName/>
-                <threadName/>
-                <logLevel/>
-                <message/>
-                <mdc>
-                    <includeKeys>
-                        <key>traceId</key>
-                        <key>eventId</key>
-                        <key>parentEventId</key>
-                        <key>aggregateId</key>
-                        <key>eventType</key>
-                        <key>retryCount</key>
-                        <key>retryReason</key>
-                        <key>lastErrorMessage</key>
-                        <key>scheduledRetryAt</key>
+    <!-- ===================================== -->
+    <!--       LOCAL PROFILE (developer)      -->
+    <!-- ===================================== -->
+    <springProfile name="local">
+        <!-- Rolling file: logs/app-local-<date>.<index>.log.gz -->
+        <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>logs/app-local.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                <!-- e.g. logs/app-local-2025-06-07.0.log.gz -->
+                <fileNamePattern>logs/app-local-${date}.%i.log.gz</fileNamePattern>
+                <maxFileSize>10MB</maxFileSize>
+                <maxHistory>30</maxHistory>
+            </rollingPolicy>
+            <encoder>
+                <pattern>[%d{ISO8601}] %-5level [%thread] %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
 
-                    </includeKeys>
-                </mdc>
-                <context/>
-                <stackTrace/>
-            </providers>
-        </encoder>
-    </appender>
-    <root level="INFO">
-        <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="JSON_FILE"/>
-    </root>
-    <logger name="org.apache.kafka" level="WARN"/>
-    <logger name="org.springframework" level="WARN"/>
+        <!-- Console (colorized if your terminal supports it) -->
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%cyan([%d{HH:mm:ss.SSS}]) %highlight(%-5level) [%thread] %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+
+        <!-- Root logger at DEBUG for local dev -->
+        <root level="DEBUG">
+            <appender-ref ref="FILE"/>
+            <appender-ref ref="STDOUT"/>
+        </root>
+    </springProfile>
+
+
+    <!-- ===================================== -->
+    <!--       DOCKER PROFILE (production)    -->
+    <!-- ===================================== -->
+    <springProfile name="docker">
+        <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                <providers>
+                    <!-- @timestamp is Elasticsearch’s standard field name -->
+                    <timestamp>
+                        <fieldName>@timestamp</fieldName>
+                    </timestamp>
+                    <logLevel/>
+                    <threadName/>
+                    <loggerName/>
+                    <message/>
+                    <!-- Export your MDC keys (e.g. traceId, userId) up to top level -->
+                    <mdc>
+                        <includeKeys>
+                            <key>traceId</key>
+                            <key>eventId</key>
+                            <key>parentEventId</key>
+                            <key>aggregateId</key>
+                            <key>eventType</key>
+                            <key>retryCount</key>
+                            <key>retryBackoffMillis</key>
+                            <key>retryReason</key>
+                            <key>retryErrorMessage</key>
+                        </includeKeys>
+                    </mdc>
+                    <stackTrace/>
+                </providers>
+            </encoder>
+        </appender>
+
+        <!-- Root logger at INFO for containers -->
+        <root level="INFO">
+            <appender-ref ref="JSON"/>
+        </root>
+    </springProfile>
 
 </configuration>
