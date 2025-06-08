@@ -44,10 +44,9 @@ class PaymentOrderExecutor(
                 LogFields.EVENT_ID to envelope.eventId.toString(),
                 LogFields.TRACE_ID to envelope.traceId,
                 LogFields.PUBLIC_PAYMENT_ID to envelope.data.publicPaymentId,
-                LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.data.publicPaymentOrderId
+                LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.aggregateId
             )
         ) {
-            logger.info("▶️ [Handle Start] Processing PAYMENT_ORDER_EXECUTOR")
 
             if (order.status != PaymentOrderStatus.INITIATED) {
                 logger.info("⏩ Skipping already processed order with status=${order.status}")

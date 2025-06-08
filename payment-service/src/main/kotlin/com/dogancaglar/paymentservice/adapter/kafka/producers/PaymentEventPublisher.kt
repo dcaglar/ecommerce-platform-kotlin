@@ -86,11 +86,11 @@ class PaymentEventPublisher(
                     )
                 }
             }
-            logger.info("SEnding producer recird ${record.value()}  $record.")
+            logger.debug("Sending payment ${record.value()}  $record.")
             val future = kafkaTemplate.send(record)
             future.whenComplete { _, ex ->
                 if (ex == null) {
-                    logger.info("📨 Event published to topic={} eventId={}", eventMetaData.topic, envelope.eventId)
+                    logger.debug("📨 Event published to topic={} eventId={}", eventMetaData.topic, envelope.eventId)
                 } else {
                     logger.error(
                         "❌ Failed to publish eventId={} to topic={}: {}",

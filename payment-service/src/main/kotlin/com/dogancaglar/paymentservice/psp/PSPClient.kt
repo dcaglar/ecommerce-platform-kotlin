@@ -6,7 +6,13 @@ import org.springframework.stereotype.Component
 import kotlin.random.Random
 
 @Component
-class PSPClient(private val simulator: NetworkSimulator) {
+class PSPClient(
+    val simulator: NetworkSimulator, val config: PspSimulationProperties
+) {
+
+    private val active: PspSimulationProperties.ScenarioConfig
+        get() = config.scenarios[config.scenario]
+            ?: throw IllegalStateException("No scenario config for ${config.scenario}")
 
     fun charge(order: PaymentOrder): PaymentOrderStatus {
         simulator.simulate();
@@ -20,7 +26,7 @@ class PSPClient(private val simulator: NetworkSimulator) {
         return PSPStatusMapper.fromPspStatus(pspResponse.status)
     }
 
-    fun checkPaymentStatus(paymentOrderId:String): PaymentOrderStatus {
+    fun checkPaymentStatus(paymentOrderId: String): PaymentOrderStatus {
         simulator.simulate();
         val pspResponse = getPaymentStatusResult()
         return PSPStatusMapper.fromPspStatus(pspResponse.status)
@@ -29,10 +35,10 @@ class PSPClient(private val simulator: NetworkSimulator) {
     private fun getPaymentResult(): PSPResponse {
         val roll = Random.nextInt(100)
         val result = when {
-            roll < 40 -> PaymentOrderStatus.SUCCESSFUL  //final
-            roll < 80 -> PaymentOrderStatus.FAILED     //retry payment
-            roll < 90 ->PaymentOrderStatus.DECLINED    //final stage
-            else      -> PaymentOrderStatus.AUTH_NEEDED //schedule payment status check
+            roll < active.response.successful -> PaymentOrderStatus.SUCCESSFUL  //final
+            roll < active.response.successful + active.response.retryable -> PaymentOrderStatus.FAILED     //retry payment
+            roll < active.response.successful + active.response.retryable + active.response.nonRetryable -> PaymentOrderStatus.DECLINED    //final stage
+            else -> PaymentOrderStatus.PENDING
         }
         return PSPResponse(result.toString());
     }
@@ -40,10 +46,10 @@ class PSPClient(private val simulator: NetworkSimulator) {
     private fun getRetryPaymentResult(): PSPResponse {
         val roll = Random.nextInt(100)
         val result = when {
-            roll < 0 -> PaymentOrderStatus.SUCCESSFUL  //final
-            roll < 100 -> PaymentOrderStatus.FAILED     //retry payment
-            roll < 0 ->PaymentOrderStatus.DECLINED    //final stage
-            else      -> PaymentOrderStatus.AUTH_NEEDED //
+            roll < 50 -> PaymentOrderStatus.SUCCESSFUL  //final
+            roll < 90 -> PaymentOrderStatus.FAILED     //retry payment
+            roll < 95 -> PaymentOrderStatus.DECLINED    //final stage
+            else -> PaymentOrderStatus.PSP_UNAVAILABLE //retryable
         }
         return PSPResponse(result.toString());
     }
@@ -52,8 +58,9 @@ class PSPClient(private val simulator: NetworkSimulator) {
         val roll = Random.nextInt(100)
         val result = when {
             roll < 50 -> PaymentOrderStatus.CAPTURE_PENDING //schedule a status check for hours later
-            roll < 70 ->  PaymentOrderStatus.SUCCESSFUL      // final success
-            else ->  PaymentOrderStatus.DECLINED   } //final declibe
+            roll < 70 -> PaymentOrderStatus.SUCCESSFUL      // final success
+            else -> PaymentOrderStatus.DECLINED
+        } //final declibe
         return PSPResponse(result.toString());
     }
 }

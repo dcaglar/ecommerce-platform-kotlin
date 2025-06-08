@@ -36,14 +36,13 @@ class PaymentOrderRetryCommandExecutor(
                 LogFields.TOPIC_NAME to record.topic(),
                 LogFields.CONSUMER_GROUP to "PAYMENT_RETRY_EXECUTOR",
                 LogFields.PUBLIC_PAYMENT_ID to envelope.data.publicPaymentId,
-                LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.data.publicPaymentOrderId,
+                LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.aggregateId,
                 LogFields.EVENT_ID to envelope.eventId.toString(),
                 LogFields.TRACE_ID to envelope.traceId,
+                LogFields.PARENT_EVENT_ID to envelope.parentEventId.toString()
 
-                )
+            )
         ) {
-            logger.info("▶️ [Handle Start] Processing PaymentOrderRetryCommandExecutor")
-            //todo any check is needed
             try {
                 val response = safePspCall(order)
                 logger.info("✅ PSP call PaymentOrderRetryCommandExecutor returned status=$response for paymentOrderId=${order.paymentOrderId}")

@@ -3,12 +3,22 @@ package com.dogancaglar.paymentservice.psp
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Configuration
 
+enum class PspScenario { NORMAL, PEAK, DEGRADED }
+
 @Configuration
 @ConfigurationProperties(prefix = "psp.simulation")
 class PspSimulationProperties {
-    var timeouts: TimeoutConfig = TimeoutConfig()
-    var latency: LatencyConfig = LatencyConfig()
-    var response: ResponseDistribution = ResponseDistribution()
+    var scenario: PspScenario = PspScenario.NORMAL
+
+    // now wrap your existing blocks under a map of named configs
+    var scenarios: Map<PspScenario, ScenarioConfig> = emptyMap()
+
+    class ScenarioConfig {
+        var timeouts: TimeoutConfig = TimeoutConfig()
+        var latency: LatencyConfig = LatencyConfig()
+        var response: ResponseDistribution = ResponseDistribution()
+        // ... same as before
+    }
 
     class TimeoutConfig {
         var enabled: Boolean = true
@@ -22,9 +32,10 @@ class PspSimulationProperties {
     }
 
     class ResponseDistribution {
-        var successful: Int = 60      // 60% of responses
-        var retryable: Int = 40       // 25% of responses
+        var successful: Int = 80      // 60% of responses
+        var retryable: Int = 17      // 25% of responses
         var statusCheck: Int = 0     // 10% of responses
-        var nonRetryable: Int = 0     // 5% of responses
+        var nonRetryable: Int = 3     // 5% of responses
     }
+    // existing inner classes TimeoutConfig, LatencyConfig, ResponseDistribution…
 }

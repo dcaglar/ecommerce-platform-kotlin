@@ -35,18 +35,50 @@ spring:
           issuer-uri: http://myserver/realms/ecommerce-platform
 psp:
   simulation:
-    timeouts:
-      enabled: true
-      probability: 5  # 5% chance of timeout
-    latency:
-      fast: 50        # 50% of requests: 500–1000ms
-      moderate: 45    # 45% of requests: 1000–2000ms
-      slow: 5         # 5% of requests: 2000–2800ms
-    response:
-      successful: 60      # 60% of requests → SUCCESSFUL
-      retryable: 25       # 25% of requests → FAILED (retryable)
-      statusCheck: 10     # 10% of requests → PENDING (status check needed)
-      nonRetryable: 5     # 5% of requests → FINALIZE_FAILED (permanent failure)
+    scenario: NORMAL
+
+    scenarios:
+      NORMAL:
+        timeouts:
+          enabled: true
+          probability: 5    # 1% timeouts in normal
+        latency:
+          fast: 70     # 70% in 50–150ms
+          moderate: 25     # 25% in 150–300ms
+          slow: 5      # 5% in 300–600ms
+        response:
+          successful: 80
+          retryable: 15
+          statusCheck: 0
+          nonRetryable: 5
+
+      PEAK:
+        timeouts:
+          enabled: true
+          probability: 5    # 5% timeouts at peak
+        latency:
+          fast: 40
+          moderate: 40
+          slow: 20
+        response:
+          successful: 95
+          retryable: 3
+          statusCheck: 1
+          nonRetryable: 1
+
+      DEGRADED:
+        timeouts:
+          enabled: true
+          probability: 20   # 20% timeouts in outage
+        latency:
+          fast: 10
+          moderate: 30
+          slow: 60
+        response:
+          successful: 80
+          retryable: 10
+          statusCheck: 5
+          nonRetryable: 5
 payment-service:
   api-key: secretpaymentapikey12345
 spring.jackson.time-zone: Europe/Amsterdam

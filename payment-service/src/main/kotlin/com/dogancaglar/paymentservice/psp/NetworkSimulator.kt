@@ -10,21 +10,32 @@ class NetworkSimulator(
 ) {
     private val logger = LoggerFactory.getLogger(NetworkSimulator::class.java)
 
+    private val active: PspSimulationProperties.ScenarioConfig
+        get() = config.scenarios[config.scenario]
+            ?: throw IllegalStateException("No scenario config for ${config.scenario}")
+
     fun simulate() {
-        val timeoutChance = Random.nextInt(100)
-        if (config.timeouts.enabled && timeoutChance < config.timeouts.probability) {
-            logger.warn("💣 Simulated PSP timeout triggered (chance=$timeoutChance%)")
-            Thread.sleep(5000) // simulate a real stall
+        val sc = active
+
+        // 1) timeouts
+        if (sc.timeouts.enabled && Random.nextInt(100) < sc.timeouts.probability) {
+            logger.warn(
+                "💥 [${
+                    config.scenario
+                }] Simulated PSP timeout"
+            )
+            Thread.sleep(5_000)
         }
 
-        val chance = Random.nextInt(100)
-        val delayMillis = when {
-            chance < config.latency.fast -> Random.nextLong(500, 1000)
-            chance < config.latency.fast + config.latency.moderate -> Random.nextLong(1000, 2000)
-            else -> Random.nextLong(2000, 2800)
+        // 2) latency buckets
+        val roll = Random.nextInt(100)
+        val latency = when {
+            roll < sc.latency.fast -> Random.nextLong(50, 150)       // fast path
+            roll < sc.latency.fast + sc.latency.moderate -> Random.nextLong(150, 300)
+            roll < sc.latency.fast + sc.latency.moderate + sc.latency.slow -> Random.nextLong(300, 600)
+            else -> Random.nextLong(300, 600)
         }
-
-        logger.debug("🕒 Simulating network latency: ${delayMillis}ms (chance=$chance)")
-        Thread.sleep(delayMillis)
+        logger.debug("🕒 [${config.scenario}] Latency ${latency}ms (roll=$roll)")
+        Thread.sleep(latency)
     }
 }

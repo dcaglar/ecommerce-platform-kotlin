@@ -52,7 +52,7 @@ class PaymentService(
 ) {
 
     companion object {
-        const val MAX_RETRIES = 5
+        const val MAX_RETRIES = 10
     }
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -156,6 +156,7 @@ class PaymentService(
 
 
     fun handleSuccessfulPayment(order: PaymentOrder) {
+        logger.info("Payment Order is succesfull.")
         val updatedOrder = order.markAsPaid().withUpdatedAt(LocalDateTime.now(clock))
         paymentOrderOutboundPort.save(updatedOrder)
         paymentEventPublisher.publish(
@@ -170,6 +171,7 @@ class PaymentService(
     fun handlePaymentStatusCheckEvent(
         order: PaymentOrder, reason: String? = null, lastError: String? = null
     ) {
+        logger.info("Patment order failed to be processed, marking as pending for retry.")
         val updated = order.markAsPending().incrementRetry().withRetryReason(reason).withLastError(lastError)
             .withUpdatedAt(LocalDateTime.now(clock))
         paymentOrderOutboundPort.save(updated)
@@ -185,7 +187,10 @@ class PaymentService(
     fun handleRetryEvent(
         order: PaymentOrder, reason: String? = null, lastError: String? = null
     ) {
-
+        logger.info(
+            "Handling retry for  paymentOrderId={} with reason='{}', lastError='{}'",
+            order.publicPaymentOrderId, reason ?: "N/A", lastError ?: "N/A"
+        )
         val retryCount = retryQueuePort.getRetryCount(order.paymentOrderId)
         val nextRetryCount = retryCount + 1
         val updated = order.markAsFailed().withRetryReason(reason).withLastError(lastError)
@@ -273,7 +278,7 @@ class PaymentService(
     fun computeEqualJitterBackoff(
         attempt: Int,
         minDelayMs: Long = 2_000L,
-        maxDelayMs: Long = 300_000L,
+        maxDelayMs: Long = 60_000L,
         random: kotlin.random.Random = kotlin.random.Random.Default
     ): Long {
         require(attempt >= 1) { "Attempt must be >= 1" }
