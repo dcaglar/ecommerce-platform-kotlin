@@ -8,11 +8,12 @@ import com.dogancaglar.paymentservice.application.service.PaymentService
 import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.psp.PSPClient
+import io.micrometer.core.instrument.MeterRegistry
 import jakarta.transaction.Transactional
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
-import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
@@ -26,6 +27,7 @@ import java.util.concurrent.TimeoutException
 class PaymentOrderExecutor(
     private val paymentService: PaymentService,
     val pspClient: PSPClient,
+    val meterRegistry: MeterRegistry
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -77,9 +79,21 @@ class PaymentOrderExecutor(
     }
 
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
-        return CompletableFuture.supplyAsync {
-            pspClient.charge(order)
-        }.get(3, TimeUnit.SECONDS)
-        // This should be replaced with your actual PSP integration
+        val executor = Executors.newSingleThreadExecutor()
+
+        return try {
+            executor.submit<PaymentOrderStatus> {
+                val start = System.nanoTime()
+                try {
+                    return@submit pspClient.charge(order)
+                } finally {
+                    val end = System.nanoTime()
+                    meterRegistry.timer("psp.call.duration", "operation", "charge")
+                        .record(end - start, TimeUnit.NANOSECONDS)
+                }
+            }.get(3, TimeUnit.SECONDS)
+        } finally {
+            executor.shutdown()
+        }
     }
 }

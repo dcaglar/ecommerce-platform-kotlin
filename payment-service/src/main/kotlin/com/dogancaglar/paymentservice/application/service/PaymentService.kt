@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.application.service
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
+import com.dogancaglar.paymentservice.adapter.kafka.consumers.RetryMetrics
 import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
 import com.dogancaglar.paymentservice.application.event.PaymentOrderEvent
 import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
@@ -45,6 +46,7 @@ class PaymentService(
     private val outboxEventPort: OutboxEventPort,
     private val statusCheckOutBoundPort: PaymentOrderStatusCheckOutBoundPort,
     private val idGenerator: IdGeneratorPort,
+    private val retryMetrics: RetryMetrics,
     @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper,
     private val clock: Clock
 ) {
@@ -130,7 +132,10 @@ class PaymentService(
         val order = paymentOrderFactory.fromEvent(event)
         when {
             pspStatus == PaymentOrderStatus.SUCCESSFUL -> {
-
+                retryMetrics.recordRetryAttempt(
+                    retryCount = order.retryCount,
+                    reason = order.retryReason ?: "unknown", // or another tag if you track more causes
+                )
                 handleSuccessfulPayment(order = order)
             }
 

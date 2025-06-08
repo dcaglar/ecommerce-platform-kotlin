@@ -8,6 +8,8 @@ import com.dogancaglar.paymentservice.application.service.PaymentService
 import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.psp.PSPClient
+import io.micrometer.core.instrument.DistributionSummary
+import io.micrometer.core.instrument.MeterRegistry
 import jakarta.transaction.Transactional
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
@@ -20,6 +22,7 @@ import java.util.concurrent.TimeoutException
 class PaymentOrderRetryCommandExecutor(
     private val paymentService: PaymentService,
     val pspClient: PSPClient,
+    val retryMetrics: RetryMetrics
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -80,4 +83,19 @@ class PaymentOrderRetryCommandExecutor(
     }
 
 
+}
+
+
+@Component
+class RetryMetrics(
+    private val meterRegistry: MeterRegistry
+) {
+    fun recordRetryAttempt(retryCount: Int, reason: String) {
+        DistributionSummary.builder("paymentorder.retry.attempts")
+            .baseUnit("attempts")
+            .tags("reason", reason)
+            .description("Number of retry attempts before PaymentOrder succeeded")
+            .register(meterRegistry)
+            .record(retryCount.toDouble())
+    }
 }

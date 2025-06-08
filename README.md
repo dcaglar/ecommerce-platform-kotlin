@@ -208,9 +208,9 @@ Updated Roadmap (Containerization moved up, dual outbox event support)
   Ensure profiles/secrets are runtime-injectable.
 - 🟥 7. Build Monitoring Dashboards and Basic Metrics (Prometheus/Grafana)
   Expose essential service metrics for operations.
-
 - 🟩 8. Implement Dual Outbox Event Tables/Flows
   Separate Payment-level and PaymentOrder-level outbox tables.
+  Create PaymentCreated and also emit PamyentCompleted events in an effcient manner.
   Implement outbox polling/dispatch for both.
   Ensure causal event flow and idempotency.
 - 🟨 9. Enable Basic Kubernetes Deployment (Docker Desktop/Minikube)

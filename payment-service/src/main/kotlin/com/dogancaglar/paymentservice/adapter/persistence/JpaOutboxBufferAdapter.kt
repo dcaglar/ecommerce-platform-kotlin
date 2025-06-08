@@ -8,20 +8,26 @@ import org.springframework.stereotype.Repository
 
 @Repository
 class JpaOutboxBufferAdapter(
-    private val jpaRepository: SpringDataOutboxEventJpaRepository
+    private val springDataJpaRepository: SpringDataOutboxEventJpaRepository
 ) : OutboxEventPort {
 
     override fun findByStatus(status: String): List<OutboxEvent> =
-        jpaRepository.findByStatus(status).map { OutboxEventEntityMapper.toDomain(it) }
+        springDataJpaRepository.findByStatus(status).map { OutboxEventEntityMapper.toDomain(it) }
 
     override fun saveAll(events: List<OutboxEvent>): List<OutboxEvent> {
         val entities = events.map { OutboxEventEntityMapper.toEntity(it) }
-        return jpaRepository.saveAll(entities).map { OutboxEventEntityMapper.toDomain(it) }
+        return springDataJpaRepository.saveAll(entities).map { OutboxEventEntityMapper.toDomain(it) }
     }
 
     override fun save(event: OutboxEvent): OutboxEvent {
         val entity = OutboxEventEntityMapper.toEntity(event)
-        val savedEntity = jpaRepository.save(entity)
+        val savedEntity = springDataJpaRepository.save(entity)
         return OutboxEventEntityMapper.toDomain(savedEntity)
     }
+
+    override fun countByStatus(status: String): Long {
+        return springDataJpaRepository.countByStatus(status)
+    }
+
+
 }

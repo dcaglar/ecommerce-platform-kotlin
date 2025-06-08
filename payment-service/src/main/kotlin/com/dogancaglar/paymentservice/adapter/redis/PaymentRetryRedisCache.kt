@@ -47,6 +47,9 @@ open class PaymentRetryRedisCache(
     fun pureRemoveDueRetry(json: String) {
         redisTemplate.opsForZSet().remove(queue, json)
     }
+
+    fun zsetSize(): Long =
+        redisTemplate.opsForZSet().zCard(queue) ?: 0L
     /*
     fun scheduleRetry(
         paymentOrder: PaymentOrder,

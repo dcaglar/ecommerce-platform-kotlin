@@ -6,4 +6,5 @@ import java.util.*
 
 interface SpringDataOutboxEventJpaRepository : JpaRepository<OutboxEventEntity, UUID> {
     fun findByStatus(status: String): List<OutboxEventEntity>
+    fun countByStatus(status: String): Long
 }
