@@ -60,6 +60,8 @@ services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.2.1
     container_name: zookeeper
+    volumes:
+      - redis-data:/data
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -75,6 +77,8 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.6.0
     container_name: kafka
+    volumes:
+      - kafka-data:/var/lib/kafka/data
     depends_on:
       - zookeeper
     ports:
@@ -99,13 +103,15 @@ services:
   redis:
     image: redis:7
     container_name: redis
+    volumes:
+      - redis-data:/data
+      - ./payment-service/src/main/resources/redis/redis.conf:/usr/local/etc/redis/redis.conf
+
     labels:
       service: redis
       environment: local
     ports:
       - "6379:6379"  # Exposed for Spring Boot to connect
-    volumes:
-      - ./payment-service/src/main/resources/redis/redis.conf:/usr/local/etc/redis/redis.conf
     command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
     restart: unless-stopped
     networks:
@@ -207,6 +213,7 @@ services:
     container_name: prometheus
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
     ports:
       - "9090:9090"
     networks:
@@ -215,6 +222,8 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
+    volumes:
+      - grafana-data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     ports:
@@ -233,6 +242,13 @@ volumes:
   payment_postgres_data:
   elasticsearch-data:
   filebeat-data:
+  redis-data:
+  zookeeper-data:
+  kafka-data:
+  grafana-data:
+  prometheus-data:
+
+
 
 ### 🌐 Custom networks per domain
 networks:

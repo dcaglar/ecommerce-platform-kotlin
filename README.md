@@ -233,6 +233,9 @@ Updated Roadmap (Containerization moved up, dual outbox event support)
   SLO/SLA tracking.
 - 🟨 16. Scale Kafka Consumers (Horizontal Concurrency Tuning)
   Enable more consumer instances for high throughput.
+- 🟨 17. Implement Circuit Breaker Patterns
+  Add resilience4j or similar for external service calls.
+- 18- mode mircrometer realted logic out of business callass. USE AOP,DECATORATOR
 
 Basic CI/CD with GitHub Actions
 

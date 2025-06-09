@@ -35,17 +35,24 @@ spring:
           issuer-uri: http://myserver/realms/ecommerce-platform
 psp:
   simulation:
-    scenario: NORMAL
-
-    scenarios:
+    scenario:
       NORMAL:
         timeouts:
           enabled: true
-          probability: 5    # 1% timeouts in normal
+          probability: 1    # 1% timeouts in normal
         latency:
-          fast: 70     # 70% in 50–150ms
-          moderate: 25     # 25% in 150–300ms
-          slow: 5      # 5% in 300–600ms
+          fast:
+            probability: 70
+            minMs: 50
+            maxMs: 150
+          moderate:
+            probability: 25
+            minMs: 150
+            maxMs: 300
+          slow:
+            probability: 5
+            minMs: 300
+            maxMs: 600
         response:
           successful: 80
           retryable: 15
@@ -55,30 +62,48 @@ psp:
       PEAK:
         timeouts:
           enabled: true
-          probability: 5    # 5% timeouts at peak
+          probability: 25
         latency:
-          fast: 40
-          moderate: 40
-          slow: 20
+          fast:
+            probability: 30
+            minMs: 250
+            maxMs: 500
+          moderate:
+            probability: 50
+            minMs: 501
+            maxMs: 1500
+          slow:
+            probability: 20
+            minMs: 1501
+            maxMs: 2500
         response:
-          successful: 95
-          retryable: 3
-          statusCheck: 1
-          nonRetryable: 1
+          successful: 50
+          retryable: 45
+          statusCheck: 0
+          nonRetryable: 5
 
       DEGRADED:
         timeouts:
           enabled: true
-          probability: 20   # 20% timeouts in outage
+          probability: 30      # 10% of calls simply time out (higher than normal, less than peak)
         latency:
-          fast: 10
-          moderate: 30
-          slow: 60
+          fast:
+            probability: 20
+            minMs: 2000
+            maxMs: 2200
+          moderate:
+            probability: 20
+            minMs: 2201
+            maxMs: 2600
+          slow:
+            probability: 60
+            minMs: 2601
+            maxMs: 2990
         response:
-          successful: 80
-          retryable: 10
-          statusCheck: 5
-          nonRetryable: 5
+          successful: 50       # Only 65% succeed (down from 80% in normal)
+          retryable: 40        # 25% retryable errors (up from 15%)
+          statusCheck: 0       # Still none, as you wish
+          nonRetryable: 10
 payment-service:
   api-key: secretpaymentapikey12345
 spring.jackson.time-zone: Europe/Amsterdam

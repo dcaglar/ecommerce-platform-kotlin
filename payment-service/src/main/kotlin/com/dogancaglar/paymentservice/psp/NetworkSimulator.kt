@@ -30,10 +30,21 @@ class NetworkSimulator(
         // 2) latency buckets
         val roll = Random.nextInt(100)
         val latency = when {
-            roll < sc.latency.fast -> Random.nextLong(50, 150)       // fast path
-            roll < sc.latency.fast + sc.latency.moderate -> Random.nextLong(150, 300)
-            roll < sc.latency.fast + sc.latency.moderate + sc.latency.slow -> Random.nextLong(300, 600)
-            else -> Random.nextLong(300, 600)
+            roll < sc.latency.fast.probability -> Random.nextLong(
+                sc.latency.fast.minMs,
+                sc.latency.fast.maxMs
+            )       // fast path
+            roll < sc.latency.fast.probability + sc.latency.moderate.probability -> Random.nextLong(
+                sc.latency.moderate.minMs,
+                sc.latency.moderate.maxMs
+            )
+
+            roll < sc.latency.slow.probability + sc.latency.moderate.probability + sc.latency.fast.probability -> Random.nextLong(
+                sc.latency.slow.minMs,
+                sc.latency.slow.maxMs
+            )
+
+            else -> Random.nextLong(5000, 5000)//this enver happens
         }
         logger.debug("🕒 [${config.scenario}] Latency ${latency}ms (roll=$roll)")
         Thread.sleep(latency)

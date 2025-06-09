@@ -14,7 +14,7 @@ import jakarta.transaction.Transactional
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
-import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
@@ -75,10 +75,21 @@ class PaymentOrderRetryCommandExecutor(
     }
 
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
-        return CompletableFuture.supplyAsync {
-            pspClient.chargeRetry(order)
-        }.get(3, TimeUnit.SECONDS)
-        // This should be replaced with your actual PSP integration
+        val executor = Executors.newSingleThreadExecutor()
+
+        return try {
+            executor.submit<PaymentOrderStatus> {
+                val start = System.nanoTime()
+                try {
+                    return@submit pspClient.chargeRetry(order)
+                } finally {
+                    val end = System.nanoTime()
+                    retryMetrics.recordRetryAttempt(retryCount = order.retryCount, reason = order.retryReason)
+                }
+            }.get(3, TimeUnit.SECONDS)
+        } finally {
+            executor.shutdown()
+        }
     }
 
 
@@ -89,7 +100,7 @@ class PaymentOrderRetryCommandExecutor(
 class RetryMetrics(
     private val meterRegistry: MeterRegistry
 ) {
-    fun recordRetryAttempt(retryCount: Int, reason: String) {
+    fun recordRetryAttempt(retryCount: Int, reason: String?) {
         DistributionSummary.builder("paymentorder.retry.attempts")
             .baseUnit("attempts")
             .tags("reason", reason)
