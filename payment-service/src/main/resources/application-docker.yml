@@ -24,3 +24,6 @@ server:
       resourceserver:
         jwt:
           issuer-uri: http://keycloak:8080/realms/ecommerce-platform
+metrics:
+  tags:
+    application: payment-service
