@@ -191,3 +191,46 @@ dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % VUS=5 DURATION=10m k6
 
 running (10m00.9s), 0/5 VUs, 2960 complete and 0 interrupted iterations
 
+
+
+
+dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % VUS=5 DURATION=20m k6 run load-tests/baseline-smoke-test.js
+
+         /\      Grafana   /‾‾/
+    /\  /  \     |\  __   /  /
+   /  \/    \    | |/ /  /   ‾‾\
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/
+
+     execution: local
+        script: load-tests/baseline-smoke-test.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 5 max VUs, 20m30s max duration (incl. graceful stop):
+              * default: 5 looping VUs for 20m0s (gracefulStop: 30s)
+
+
+
+  █ TOTAL RESULTS
+
+    checks_total.......................: 5925    4.936172/s
+    checks_succeeded...................: 100.00% 5925 out of 5925
+    checks_failed......................: 0.00%   0 out of 5925
+
+    ✓ status is 200
+
+    HTTP
+    http_req_duration.......................................................: avg=11.48ms min=2.73ms med=10.52ms max=166.54ms p(90)=16.67ms p(95)=19.29ms
+      { expected_response:true }............................................: avg=11.48ms min=2.73ms med=10.52ms max=166.54ms p(90)=16.67ms p(95)=19.29ms
+    http_req_failed.........................................................: 0.00%  0 out of 5925
+    http_reqs...............................................................: 5925   4.936172/s
+
+    EXECUTION
+    iteration_duration......................................................: avg=1.01s   min=1s     med=1.01s   max=1.16s    p(90)=1.01s   p(95)=1.02s
+    iterations..............................................................: 5925   4.936172/s
+    vus.....................................................................: 5      min=5         max=5
+    vus_max.................................................................: 5      min=5         max=5
+
+    NETWORK
+    data_received...........................................................: 3.9 MB 3.3 kB/s
+    data_sent...............................................................: 11 MB  9.4 kB/s

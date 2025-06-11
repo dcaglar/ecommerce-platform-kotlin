@@ -17,6 +17,9 @@ logging:
     org.springframework.boot.context.config: DEBUG
 server:
   port: 8080
+  tomcat: ##expose tomcat metrics
+    mbeanregistry:
+      enabled: true
 spring:
   kafka:
     consumer:

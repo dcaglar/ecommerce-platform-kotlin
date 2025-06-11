@@ -228,6 +228,7 @@ services:
       - ./prometheus/grafana-provisioning/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
       - ./prometheus/grafana-provisioning/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
       - ./prometheus/grafana-provisioning/dashboards/:/etc/grafana/provisioning/dashboards/
+      - ./prometheus/grafana.ini:/etc/grafana/grafana.ini
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     ports:
