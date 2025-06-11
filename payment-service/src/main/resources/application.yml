@@ -35,7 +35,8 @@ spring:
           issuer-uri: http://myserver/realms/ecommerce-platform
 psp:
   simulation:
-    scenario:
+    scenario: NORMAL  # Default scenario
+    scenarios:
       NORMAL:
         timeouts:
           enabled: true
@@ -109,9 +110,18 @@ payment-service:
 spring.jackson.time-zone: Europe/Amsterdam
 spring.jpa.properties.hibernate.jdbc.time_zone: UTC
 logging.config: classpath:logback-spring.xml
-
 management:
   endpoints:
     web:
       exposure:
         include: prometheus,metrics,health,info
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http:
+          server:
+            requests: true
+    sla:
+      http:
+        server:
+          requests: true

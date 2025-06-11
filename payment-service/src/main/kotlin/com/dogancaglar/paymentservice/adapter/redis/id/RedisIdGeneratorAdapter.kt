@@ -5,7 +5,7 @@ import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
 
 @Component
-class RedisIdGenerator(
+class RedisIdGeneratorAdapter(
     private val redis: StringRedisTemplate
 ) : IdGeneratorPort {
 

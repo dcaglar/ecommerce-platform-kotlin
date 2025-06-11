@@ -4,9 +4,12 @@ filebeat.inputs:
       - /var/lib/docker/containers/*/*.log
     processors:
       - add_docker_metadata: ~
-    json.keys_under_root: true
-    json.add_error_key: true
-    json.message_key: message  # assumes your JSON logs include a "message" field
+      - decode_json_fields:
+          fields: [ "log", "message" ]  # Try both fields for compatibility
+          target: ""
+          overwrite_keys: true
+          max_depth: 1
+          process_array: false
 
 output.elasticsearch:
   hosts: [ "http://elasticsearch:9200" ]

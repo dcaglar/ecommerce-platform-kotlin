@@ -1,0 +1,8 @@
+16:25 started with PSP DEgraded
+
+ ab -n 100000 -c 30 -T 'application/json' -p payload.json http://localhost:8081/payments
+
+
+
+
+we nned to test the performance of the PSP with degraded mode icnreasing fold or udnersdtand metric or add some missing metrics

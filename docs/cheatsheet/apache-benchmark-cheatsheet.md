@@ -6,7 +6,7 @@ ab -n 500 -c 5 -T  'application/json' -p payload.json http://localhost:8081/paym
 
 ab -n 2000 -c 50 -T  'application/json' -p payload.json http://localhost:8081/payments
 
-ab -n 10000 -c 100 -T 'application/json' -p payload.json http://localhost:8081/payments
+ab -n 100000 -c 50 -T 'application/json' -p payload.json http://localhost:8081/payments
 
 
 ```

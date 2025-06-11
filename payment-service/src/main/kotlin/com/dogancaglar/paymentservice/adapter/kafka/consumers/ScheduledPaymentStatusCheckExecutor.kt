@@ -11,7 +11,7 @@ import com.dogancaglar.paymentservice.psp.PSPClient
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
-import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
@@ -65,10 +65,20 @@ class ScheduledPaymentStatusCheckExecutor(
     }
 
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
-        return CompletableFuture.supplyAsync {
-            pspClient.checkPaymentStatus(order.paymentOrderId.toString())
-        }.get(3, TimeUnit.SECONDS)
-        // This should be replaced with your actual PSP integration
+        val executor = Executors.newSingleThreadExecutor()
+
+        return try {
+            executor.submit<PaymentOrderStatus> {
+                val start = System.nanoTime()
+                try {
+                    return@submit pspClient.checkPaymentStatus(order.paymentOrderId.toString())
+                } finally {
+                    val end = System.nanoTime()
+                }
+            }.get(3, TimeUnit.SECONDS)
+        } finally {
+            executor.shutdown()
+        }
     }
 
 }
