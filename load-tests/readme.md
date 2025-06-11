@@ -25,3 +25,10 @@ healthy. This helps you:
 Establish a baseline for your system’s maximum capacity and normal behavior.
 Identify bottlenecks, resource limits, and scaling issues in your own code and infrastructure.
 Ensure your system is stable and resilient under expected peak traffic before introducing failures.
+
+run like this:
+3 virtual users for 2minutes not set default options
+
+```bash
+VUS=3 DURATION=2m k6 run load-tests/baseline-smoke-test.js
+```
