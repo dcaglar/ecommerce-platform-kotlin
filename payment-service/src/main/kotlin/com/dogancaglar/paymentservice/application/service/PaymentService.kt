@@ -1,8 +1,11 @@
 package com.dogancaglar.paymentservice.application.service
 
+import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.adapter.kafka.consumers.RetryMetrics
 import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
+import com.dogancaglar.paymentservice.adapter.psp.PSPStatusMapper
 import com.dogancaglar.paymentservice.application.event.PaymentOrderEvent
 import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.application.helper.PaymentFactory
@@ -11,15 +14,15 @@ import com.dogancaglar.paymentservice.application.mapper.PaymentOrderEventMapper
 import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
 import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrderStatusCheck
+import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.port.*
-import com.dogancaglar.paymentservice.psp.PSPStatusMapper
 import com.dogancaglar.paymentservice.web.dto.PaymentRequestDTO
 import com.dogancaglar.paymentservice.web.dto.PaymentResponseDTO
+import com.dogancaglar.paymentservice.web.mapper.PaymentRequestMapper
 import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.transaction.Transactional
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -29,12 +32,12 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.*
 import kotlin.math.min
 import kotlin.math.pow
 
 @Service
-class PaymentService @Autowired constructor(
-    private val internalPaymentService: InternalPaymentService,
+class PaymentService(
     @Qualifier("paymentRetryQueueAdapter") // <-- matches your @Component name
     private val retryQueuePort: RetryQueuePort<PaymentOrderRetryRequested>,
     val paymentEventPublisher: PaymentEventPublisher,
@@ -62,7 +65,66 @@ class PaymentService @Autowired constructor(
 
     @Transactional
     fun createPayment(request: PaymentRequestDTO): PaymentResponseDTO {
-        return internalPaymentService.createPayment(request)
+        //create domain
+        val paymentDomain = paymentFactory.createFrom(request)
+        //we already have ids for domains
+        val paymentOrderList = mutableListOf<PaymentOrder>()
+        // each order is represent on payment request to PSP
+        for (order in paymentDomain.paymentOrders) {
+            try {
+                paymentOrderList.add(order)
+            } catch (ex: Exception) {
+                logger.warn("PSP call failed for PaymentOrder ${order.paymentOrderId}, falling back to async", ex)
+            }
+
+        }
+        //save paymeetn
+        paymentOutboundPort.save(paymentDomain)
+        //save paymentorders
+
+        paymentOrderOutboundPort.saveAll(paymentOrderList)
+        //build and genereate outboxevent for eachpersistedd payment order domain
+        val outboxBatch = buildOutboxEvents(paymentDomain.paymentOrders)
+        // persist payment domain to db
+        outboxEventPort.saveAll(outboxBatch)
+        return PaymentRequestMapper.toResponse(paymentDomain)
+
+
+    }
+
+
+    private fun buildOutboxEvents(paymentOrders: List<PaymentOrder>): List<OutboxEvent> {
+        return paymentOrders.map { toOutBoxEvent(it) }
+    }
+
+    private fun toOutBoxEvent(paymentOrder: PaymentOrder): OutboxEvent {
+        val paymentOrderCreatedEvent = PaymentOrderEventMapper.toPaymentOrderCreatedEvent(paymentOrder)
+        val envelope = DomainEventEnvelopeFactory.envelopeFor(
+            traceId = LogContext.getTraceId() ?: UUID.randomUUID().toString(),
+            data = paymentOrderCreatedEvent,
+            eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
+            aggregateId = paymentOrder.publicPaymentOrderId
+            //if not pass parenteventid then that means its root paymentordercereatedd
+        )
+        val extraLogFields = mapOf(
+            LogFields.PUBLIC_PAYMENT_ORDER_ID to paymentOrder.publicPaymentOrderId,
+            LogFields.PUBLIC_PAYMENT_ID to paymentOrder.publicPaymentId
+        )
+        LogContext.with(envelope, additionalContext = extraLogFields) {
+            logger.info(
+                "Creating OutboxEvent for eventType={}, aggregateId={}, eventId={}",
+                envelope.eventType,
+                envelope.aggregateId,
+                envelope.eventId
+            )
+        }
+        val jsonPayload = objectMapper.writeValueAsString(envelope)
+        return OutboxEvent.createNew(
+            eventType = envelope.eventType,
+            aggregateId = envelope.aggregateId,
+            payload = jsonPayload,
+            createdAt = LocalDateTime.now(clock),
+        )
     }
 
 
@@ -234,3 +296,4 @@ class ClockConfig {
     @Bean
     fun clock(): Clock = Clock.systemDefaultZone()
 }
+

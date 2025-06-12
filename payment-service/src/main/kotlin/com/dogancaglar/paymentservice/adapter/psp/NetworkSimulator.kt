@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.psp
+package com.dogancaglar.paymentservice.adapter.psp
 
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component

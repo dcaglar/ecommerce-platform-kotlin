@@ -7,7 +7,7 @@ import com.dogancaglar.paymentservice.application.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.application.service.PaymentService
 import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import com.dogancaglar.paymentservice.psp.PSPClient
+import com.dogancaglar.paymentservice.domain.port.PSPClientPort
 import io.micrometer.core.instrument.MeterRegistry
 import jakarta.transaction.Transactional
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -20,7 +20,7 @@ import java.util.concurrent.TimeoutException
 @Component
 class PaymentOrderExecutor(
     private val paymentService: PaymentService,
-    private val pspClient: PSPClient,
+    private val pspClient: PSPClientPort,
     private val meterRegistry: MeterRegistry
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)

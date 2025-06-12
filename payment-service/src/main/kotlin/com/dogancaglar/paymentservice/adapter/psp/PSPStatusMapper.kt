@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.psp
+package com.dogancaglar.paymentservice.adapter.psp
 
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 

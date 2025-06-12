@@ -1,8 +1,8 @@
-package com.dogancaglar.paymentservice.psp
+package com.dogancaglar.paymentservice.adapter.psp
 
 import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import jakarta.annotation.PostConstruct
+import com.dogancaglar.paymentservice.domain.port.PSPClientPort
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import kotlin.random.Random
@@ -10,7 +10,7 @@ import kotlin.random.Random
 @Component
 class PSPClient(
     val simulator: NetworkSimulator, val config: PspSimulationProperties
-) {
+) : PSPClientPort {
 
     val logger = LoggerFactory.getLogger(javaClass)
 
@@ -18,19 +18,19 @@ class PSPClient(
         get() = config.scenarios[config.scenario]
             ?: throw IllegalStateException("No scenario config for ${config.scenario}")
 
-    fun charge(order: PaymentOrder): PaymentOrderStatus {
+    override fun charge(order: PaymentOrder): PaymentOrderStatus {
         simulator.simulate();
         val pspResponse = getPaymentResult()
         return PSPStatusMapper.fromPspStatus(pspResponse.status)
     }
 
-    fun chargeRetry(order: PaymentOrder): PaymentOrderStatus {
+    override fun chargeRetry(order: PaymentOrder): PaymentOrderStatus {
         simulator.simulate();
         val pspResponse = getRetryPaymentResult()
         return PSPStatusMapper.fromPspStatus(pspResponse.status)
     }
 
-    fun checkPaymentStatus(paymentOrderId: String): PaymentOrderStatus {
+    override fun checkPaymentStatus(paymentOrderId: String): PaymentOrderStatus {
         simulator.simulate();
         val pspResponse = getPaymentStatusResult()
         return PSPStatusMapper.fromPspStatus(pspResponse.status)
@@ -66,10 +66,5 @@ class PSPClient(
             else -> PaymentOrderStatus.DECLINED
         } //final declibe
         return PSPResponse(result.toString());
-    }
-
-    @PostConstruct
-    fun log(): Unit {
-        logger.info("PspClient initialized with scenario: ${config.scenario}")
     }
 }

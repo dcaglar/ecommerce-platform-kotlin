@@ -7,7 +7,7 @@ import com.dogancaglar.paymentservice.application.event.PaymentOrderStatusCheckR
 import com.dogancaglar.paymentservice.application.service.PaymentService
 import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import com.dogancaglar.paymentservice.psp.PSPClient
+import com.dogancaglar.paymentservice.domain.port.PSPClientPort
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
@@ -18,7 +18,7 @@ import java.util.concurrent.TimeoutException
 
 @Component
 class ScheduledPaymentStatusCheckExecutor(
-    val pspClient: PSPClient,
+    val pspClient: PSPClientPort,
     val paymentService: PaymentService
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)

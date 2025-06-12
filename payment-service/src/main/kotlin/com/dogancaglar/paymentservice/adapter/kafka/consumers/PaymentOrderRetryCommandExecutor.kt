@@ -7,7 +7,7 @@ import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequest
 import com.dogancaglar.paymentservice.application.service.PaymentService
 import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import com.dogancaglar.paymentservice.psp.PSPClient
+import com.dogancaglar.paymentservice.domain.port.PSPClientPort
 import io.micrometer.core.instrument.DistributionSummary
 import io.micrometer.core.instrument.MeterRegistry
 import jakarta.transaction.Transactional
@@ -21,7 +21,7 @@ import java.util.concurrent.TimeoutException
 @Component
 class PaymentOrderRetryCommandExecutor(
     private val paymentService: PaymentService,
-    val pspClient: PSPClient,
+    val pspClient: PSPClientPort,
     val retryMetrics: RetryMetrics
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -75,7 +75,6 @@ class PaymentOrderRetryCommandExecutor(
         val executor = Executors.newSingleThreadExecutor()
         return try {
             executor.submit<PaymentOrderStatus> {
-                val start = System.nanoTime()
                 try {
                     pspClient.chargeRetry(order)
                 } finally {
