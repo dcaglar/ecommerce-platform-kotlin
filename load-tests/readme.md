@@ -31,4 +31,7 @@ run like this:
 
 ```bash
 VUS=3 DURATION=2m k6 run load-tests/baseline-smoke-test.js
+
+VUS=3 DURATION=2m k6 run load-tests/baseline-smoke-test.js
+
 ```

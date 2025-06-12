@@ -30,7 +30,7 @@ object MetricTagValues {
     object Flows {
         const val OUTBOX = "outbox"
         const val PAYMENT = "payment"
-        
+
         // ... add as needed
     }
 

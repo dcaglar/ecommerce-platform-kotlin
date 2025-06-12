@@ -2,6 +2,8 @@ package com.dogancaglar.paymentservice.psp
 
 import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import jakarta.annotation.PostConstruct
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import kotlin.random.Random
 
@@ -9,6 +11,8 @@ import kotlin.random.Random
 class PSPClient(
     val simulator: NetworkSimulator, val config: PspSimulationProperties
 ) {
+
+    val logger = LoggerFactory.getLogger(javaClass)
 
     private val active: PspSimulationProperties.ScenarioConfig
         get() = config.scenarios[config.scenario]
@@ -62,5 +66,10 @@ class PSPClient(
             else -> PaymentOrderStatus.DECLINED
         } //final declibe
         return PSPResponse(result.toString());
+    }
+
+    @PostConstruct
+    fun log(): Unit {
+        logger.info("PspClient initialized with scenario: ${config.scenario}")
     }
 }

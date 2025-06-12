@@ -8,7 +8,9 @@ enum class PspScenario { NORMAL, PEAK, DEGRADED }
 @Configuration
 @ConfigurationProperties(prefix = "psp.simulation")
 class PspSimulationProperties {
-    var scenario: PspScenario = PspScenario.DEGRADED
+    lateinit var currentScenario: String
+    val scenario: PspScenario
+        get() = PspScenario.valueOf(currentScenario)
 
     // now wrap your existing blocks under a map of named configs
     var scenarios: Map<PspScenario, ScenarioConfig> = emptyMap()

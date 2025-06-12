@@ -17,26 +17,20 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
-/*
-  @Qualifier("paymentRetryStatusAdapter")
-    val paymentRetryStatusAdapter: RetryQueuePort<ScheduledPaymentOrderStatusRequest>,
-    @Qualifier("paymentRetryPaymentAdapter") val paymentRetryPaymentAdapter: RetryQueuePort<PaymentOrderRetryRequested>,
-    val pspClient: PSPClient,
- */
 @Component
 class PaymentOrderExecutor(
     private val paymentService: PaymentService,
-    val pspClient: PSPClient,
-    val meterRegistry: MeterRegistry
+    private val pspClient: PSPClient,
+    private val meterRegistry: MeterRegistry
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @Transactional
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderCreated>>) {
-        // This method is called when a  event is received from Kafka and we set MDC of consumed event this is gonna be parent for the rest
         val envelope = record.value()
         val paymentOrderCreatedEvent = envelope.data
         val order = paymentService.mapEventToDomain(paymentOrderCreatedEvent)
+
         LogContext.with(
             envelope, mapOf(
                 LogFields.TOPIC_NAME to record.topic(),
@@ -47,11 +41,12 @@ class PaymentOrderExecutor(
                 LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.aggregateId
             )
         ) {
-
+            // 1. Skip already-processed orders
             if (order.status != PaymentOrderStatus.INITIATED) {
                 logger.info("⏩ Skipping already processed order with status=${order.status}")
                 return@with
             }
+            // 2. Try-catch-all: nothing leaves this block
             try {
                 val response = safePspCall(order)
                 logger.info("✅ PSP call returned status=$response for paymentOrderId=${order.paymentOrderId}")
@@ -63,23 +58,20 @@ class PaymentOrderExecutor(
                     pspStatus = PaymentOrderStatus.TIMEOUT
                 )
             } catch (e: Exception) {
-                logger.error(
-                    "❌ Unexpected error processing orderId=${order.paymentOrderId}, retrying...: ${e.message}",
-                    e
-                )
+                logger.error("❌ Unexpected error for orderId=${order.paymentOrderId}, marking as UNKNOWN", e)
                 paymentService.processPspResult(
                     event = paymentOrderCreatedEvent,
                     pspStatus = PaymentOrderStatus.UNKNOWN
                 )
-
+            } catch (t: Throwable) { // <--- Catches even OutOfMemory etc., logs, prevents crash
+                logger.error("💥 Fatal throwable for orderId=${order.paymentOrderId}, lost event!", t)
+                // Optionally: send to a "dead letter queue" or alert admin
             }
         }
-
     }
 
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
         val executor = Executors.newSingleThreadExecutor()
-
         return try {
             executor.submit<PaymentOrderStatus> {
                 val start = System.nanoTime()

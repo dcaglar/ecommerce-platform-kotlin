@@ -40,7 +40,6 @@ class PaymentOrderRetryCommandExecutor(
                 LogFields.EVENT_ID to envelope.eventId.toString(),
                 LogFields.TRACE_ID to envelope.traceId,
                 LogFields.PARENT_EVENT_ID to envelope.parentEventId.toString()
-
             )
         ) {
             try {
@@ -61,51 +60,45 @@ class PaymentOrderRetryCommandExecutor(
                 )
             } catch (e: Exception) {
                 logger.error(
-                    "❌ Unexpected error  processing PaymentOrderRetryCommandExecutor orderId=${order.paymentOrderId}, retrying...: ${e.message}",
+                    "❌ Unexpected error processing PaymentOrderRetryCommandExecutor orderId=${order.paymentOrderId}, retrying...: ${e.message}",
                     e
                 )
                 paymentService.processPspResult(
                     event = paymentOrderCreatedEvent,
                     pspStatus = PaymentOrderStatus.UNKNOWN
                 )
-
             }
         }
-
     }
 
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
         val executor = Executors.newSingleThreadExecutor()
-
         return try {
             executor.submit<PaymentOrderStatus> {
                 val start = System.nanoTime()
                 try {
-                    return@submit pspClient.chargeRetry(order)
+                    pspClient.chargeRetry(order)
                 } finally {
-                    val end = System.nanoTime()
-                    retryMetrics.recordRetryAttempt(retryCount = order.retryCount, reason = order.retryReason)
+                    // Only record metric here, don't re-register the DistributionSummary each time!
+                    retryMetrics.recordRetryAttempt(order.retryCount, order.retryReason)
                 }
             }.get(3, TimeUnit.SECONDS)
         } finally {
             executor.shutdown()
         }
     }
-
-
 }
 
-
 @Component
-class RetryMetrics(
-    private val meterRegistry: MeterRegistry
-) {
+class RetryMetrics(meterRegistry: MeterRegistry) {
+    // If you want to tag by reason, you can keep a map or register with a static set of reasons
+    private val retrySummary = DistributionSummary.builder("paymentorder.retry.attempts")
+        .baseUnit("attempts")
+        .description("Number of retry attempts before PaymentOrder succeeded")
+        .register(meterRegistry)
+
     fun recordRetryAttempt(retryCount: Int, reason: String?) {
-        DistributionSummary.builder("paymentorder.retry.attempts")
-            .baseUnit("attempts")
-            .tags("reason", reason)
-            .description("Number of retry attempts before PaymentOrder succeeded")
-            .register(meterRegistry)
-            .record(retryCount.toDouble())
+        // You can add .tag("reason", reason ?: "unknown") if you really want, but beware of unbounded label cardinality!
+        retrySummary.record(retryCount.toDouble())
     }
 }

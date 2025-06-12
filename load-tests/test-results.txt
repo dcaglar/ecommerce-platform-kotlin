@@ -234,3 +234,45 @@ dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % VUS=5 DURATION=20m k6
     NETWORK
     data_received...........................................................: 3.9 MB 3.3 kB/s
     data_sent...............................................................: 11 MB  9.4 kB/s
+
+
+dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin %  VUS=10 DURATION=20m k6 run load-tests/baseline-smoke-test.js
+
+         /\      Grafana   /‾‾/
+    /\  /  \     |\  __   /  /
+   /  \/    \    | |/ /  /   ‾‾\
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/
+
+     execution: local
+        script: load-tests/baseline-smoke-test.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 10 max VUs, 20m30s max duration (incl. graceful stop):
+              * default: 10 looping VUs for 20m0s (gracefulStop: 30s)
+
+
+
+  █ TOTAL RESULTS
+
+    checks_total.......................: 11790   9.824809/s
+    checks_succeeded...................: 100.00% 11790 out of 11790
+    checks_failed......................: 0.00%   0 out of 11790
+
+    ✓ status is 200
+
+    HTTP
+    http_req_duration.......................................................: avg=16.68ms min=3.5ms med=14.37ms max=1.49s p(90)=23.12ms p(95)=27.17ms
+      { expected_response:true }............................................: avg=16.68ms min=3.5ms med=14.37ms max=1.49s p(90)=23.12ms p(95)=27.17ms
+    http_req_failed.........................................................: 0.00%  0 out of 11790
+    http_reqs...............................................................: 11790  9.824809/s
+
+    EXECUTION
+    iteration_duration......................................................: avg=1.01s   min=1s    med=1.01s   max=2.5s  p(90)=1.02s   p(95)=1.02s
+    iterations..............................................................: 11790  9.824809/s
+    vus.....................................................................: 10     min=10         max=10
+    vus_max.................................................................: 10     min=10         max=10
+
+    NETWORK
+    data_received...........................................................: 7.8 MB 6.5 kB/s
+    data_sent...............................................................: 22 MB  19 kB/s

@@ -38,7 +38,7 @@ spring:
           issuer-uri: http://myserver/realms/ecommerce-platform
 psp:
   simulation:
-    scenario: NORMAL  # Default scenario
+    currentScenario: NORMAL  # Default scenario
     scenarios:
       NORMAL:
         timeouts:
