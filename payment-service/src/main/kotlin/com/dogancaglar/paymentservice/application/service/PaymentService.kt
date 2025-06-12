@@ -3,7 +3,9 @@ package com.dogancaglar.paymentservice.application.service
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
+import com.dogancaglar.paymentservice.adapter.kafka.consumers.RetryMetrics
 import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
+import com.dogancaglar.paymentservice.adapter.psp.PSPStatusMapper
 import com.dogancaglar.paymentservice.application.event.PaymentOrderEvent
 import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.application.helper.PaymentFactory
@@ -15,7 +17,6 @@ import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrderStatusCh
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.port.*
-import com.dogancaglar.paymentservice.psp.PSPStatusMapper
 import com.dogancaglar.paymentservice.web.dto.PaymentRequestDTO
 import com.dogancaglar.paymentservice.web.dto.PaymentResponseDTO
 import com.dogancaglar.paymentservice.web.mapper.PaymentRequestMapper
@@ -45,12 +46,13 @@ class PaymentService(
     private val outboxEventPort: OutboxEventPort,
     private val statusCheckOutBoundPort: PaymentOrderStatusCheckOutBoundPort,
     private val idGenerator: IdGeneratorPort,
+    private val retryMetrics: RetryMetrics,
     @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper,
     private val clock: Clock
 ) {
 
     companion object {
-        const val MAX_RETRIES = 5
+        const val MAX_RETRIES = 10
     }
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -130,7 +132,10 @@ class PaymentService(
         val order = paymentOrderFactory.fromEvent(event)
         when {
             pspStatus == PaymentOrderStatus.SUCCESSFUL -> {
-
+                retryMetrics.recordRetryAttempt(
+                    retryCount = order.retryCount,
+                    reason = order.retryReason ?: "unknown", // or another tag if you track more causes
+                )
                 handleSuccessfulPayment(order = order)
             }
 
@@ -151,6 +156,7 @@ class PaymentService(
 
 
     fun handleSuccessfulPayment(order: PaymentOrder) {
+        logger.info("Payment Order is succesfull.")
         val updatedOrder = order.markAsPaid().withUpdatedAt(LocalDateTime.now(clock))
         paymentOrderOutboundPort.save(updatedOrder)
         paymentEventPublisher.publish(
@@ -165,6 +171,7 @@ class PaymentService(
     fun handlePaymentStatusCheckEvent(
         order: PaymentOrder, reason: String? = null, lastError: String? = null
     ) {
+        logger.info("Patment order failed to be processed, marking as pending for retry.")
         val updated = order.markAsPending().incrementRetry().withRetryReason(reason).withLastError(lastError)
             .withUpdatedAt(LocalDateTime.now(clock))
         paymentOrderOutboundPort.save(updated)
@@ -180,7 +187,10 @@ class PaymentService(
     fun handleRetryEvent(
         order: PaymentOrder, reason: String? = null, lastError: String? = null
     ) {
-
+        logger.info(
+            "Handling retry for  paymentOrderId={} with reason='{}', lastError='{}'",
+            order.publicPaymentOrderId, reason ?: "N/A", lastError ?: "N/A"
+        )
         val retryCount = retryQueuePort.getRetryCount(order.paymentOrderId)
         val nextRetryCount = retryCount + 1
         val updated = order.markAsFailed().withRetryReason(reason).withLastError(lastError)
@@ -268,7 +278,7 @@ class PaymentService(
     fun computeEqualJitterBackoff(
         attempt: Int,
         minDelayMs: Long = 2_000L,
-        maxDelayMs: Long = 300_000L,
+        maxDelayMs: Long = 60_000L,
         random: kotlin.random.Random = kotlin.random.Random.Default
     ): Long {
         require(attempt >= 1) { "Attempt must be >= 1" }

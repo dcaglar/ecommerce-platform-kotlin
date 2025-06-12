@@ -7,26 +7,30 @@ import com.dogancaglar.paymentservice.application.event.PaymentOrderStatusCheckR
 import com.dogancaglar.paymentservice.application.service.PaymentService
 import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import com.dogancaglar.paymentservice.psp.PSPClient
+import com.dogancaglar.paymentservice.domain.port.PSPClientPort
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
-import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
+
 @Component
 class ScheduledPaymentStatusCheckExecutor(
-    val pspClient: PSPClient,
+    val pspClient: PSPClientPort,
     val paymentService: PaymentService
 ) {
-
     private val logger = LoggerFactory.getLogger(javaClass)
+
+    // For higher concurrency, inject a shared executor as a constructor parameter or as a class val.
+    // For demo purposes, creating a new executor each time is OK.
+    @jakarta.transaction.Transactional
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderStatusCheckRequested>>) {
-        val eventId = record.key()
         val envelope = record.value()
         val paymentOrderStatusCheckRequested = envelope.data
         val order = paymentService.mapEventToDomain(paymentOrderStatusCheckRequested)
+
         LogContext.with(
             envelope, mapOf(
                 LogFields.TOPIC_NAME to record.topic(),
@@ -35,7 +39,7 @@ class ScheduledPaymentStatusCheckExecutor(
                 LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.data.publicPaymentOrderId,
             )
         ) {
-            logger.info("▶️ [Handle Start] Processing PaymentOrderStatusCheckRequested ")
+            logger.info("▶️ [Handle Start] Processing PaymentOrderStatusCheckRequested")
             try {
                 val response = safePspCall(order)
                 logger.info("✅ PSP status returned status=$response for paymentOrderId=${order.paymentOrderId}")
@@ -58,17 +62,19 @@ class ScheduledPaymentStatusCheckExecutor(
                     event = paymentOrderStatusCheckRequested,
                     pspStatus = PaymentOrderStatus.UNKNOWN
                 )
-
             }
         }
-
     }
 
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
-        return CompletableFuture.supplyAsync {
-            pspClient.checkPaymentStatus(order.paymentOrderId.toString())
-        }.get(3, TimeUnit.SECONDS)
-        // This should be replaced with your actual PSP integration
+        val executor = Executors.newSingleThreadExecutor()
+        return try {
+            executor.submit<PaymentOrderStatus> {
+                // If you want to time the call, do it here.
+                pspClient.checkPaymentStatus(order.paymentOrderId.toString())
+            }.get(3, TimeUnit.SECONDS)
+        } finally {
+            executor.shutdown()
+        }
     }
-
 }

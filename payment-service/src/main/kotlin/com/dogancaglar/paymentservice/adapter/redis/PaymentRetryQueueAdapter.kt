@@ -10,6 +10,9 @@ import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.MeterRegistry
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
 import java.util.*
@@ -17,9 +20,21 @@ import java.util.*
 @Component("paymentRetryQueueAdapter")
 class PaymentRetryQueueAdapter(
     val paymentRetryRedisCache: PaymentRetryRedisCache,
+    meterRegistry: MeterRegistry, //todo val or var ?
     @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper
 ) :
     RetryQueuePort<PaymentOrderRetryRequested> {
+
+    init {
+        Gauge.builder("redis_retry_zset_size") {
+            paymentRetryRedisCache.zsetSize()
+        }
+            .description("Number of entries pending in the Redis retry ZSet")
+            .register(meterRegistry)
+    }
+
+    private val logger = LoggerFactory.getLogger(PaymentRetryQueueAdapter::class.java)
+
     override fun scheduleRetry(
         paymentOrder: PaymentOrder,
         backOffMillis: Long,

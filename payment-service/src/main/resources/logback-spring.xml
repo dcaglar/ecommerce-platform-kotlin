@@ -67,6 +67,7 @@
                         </includeKeys>
                     </mdc>
                     <stackTrace/>
+                    <globalCustomFields>{"service":"payment-service"}</globalCustomFields>
                 </providers>
             </encoder>
         </appender>

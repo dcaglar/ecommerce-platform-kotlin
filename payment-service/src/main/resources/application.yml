@@ -17,6 +17,9 @@ logging:
     org.springframework.boot.context.config: DEBUG
 server:
   port: 8080
+  tomcat: ##expose tomcat metrics
+    mbeanregistry:
+      enabled: true
 spring:
   kafka:
     consumer:
@@ -35,20 +38,93 @@ spring:
           issuer-uri: http://myserver/realms/ecommerce-platform
 psp:
   simulation:
-    timeouts:
-      enabled: true
-      probability: 5  # 5% chance of timeout
-    latency:
-      fast: 50        # 50% of requests: 500–1000ms
-      moderate: 45    # 45% of requests: 1000–2000ms
-      slow: 5         # 5% of requests: 2000–2800ms
-    response:
-      successful: 60      # 60% of requests → SUCCESSFUL
-      retryable: 25       # 25% of requests → FAILED (retryable)
-      statusCheck: 10     # 10% of requests → PENDING (status check needed)
-      nonRetryable: 5     # 5% of requests → FINALIZE_FAILED (permanent failure)
+    currentScenario: NORMAL  # Default scenario
+    scenarios:
+      NORMAL:
+        timeouts:
+          enabled: true
+          probability: 1    # 1% timeouts in normal
+        latency:
+          fast:
+            probability: 70
+            minMs: 50
+            maxMs: 150
+          moderate:
+            probability: 25
+            minMs: 150
+            maxMs: 300
+          slow:
+            probability: 5
+            minMs: 300
+            maxMs: 600
+        response:
+          successful: 80
+          retryable: 15
+          statusCheck: 0
+          nonRetryable: 5
+
+      PEAK:
+        timeouts:
+          enabled: true
+          probability: 25
+        latency:
+          fast:
+            probability: 30
+            minMs: 250
+            maxMs: 500
+          moderate:
+            probability: 50
+            minMs: 501
+            maxMs: 1500
+          slow:
+            probability: 20
+            minMs: 1501
+            maxMs: 2500
+        response:
+          successful: 50
+          retryable: 45
+          statusCheck: 0
+          nonRetryable: 5
+
+      DEGRADED:
+        timeouts:
+          enabled: true
+          probability: 30      # 10% of calls simply time out (higher than normal, less than peak)
+        latency:
+          fast:
+            probability: 20
+            minMs: 2000
+            maxMs: 2200
+          moderate:
+            probability: 20
+            minMs: 2201
+            maxMs: 2600
+          slow:
+            probability: 60
+            minMs: 2601
+            maxMs: 2990
+        response:
+          successful: 50       # Only 65% succeed (down from 80% in normal)
+          retryable: 40        # 25% retryable errors (up from 15%)
+          statusCheck: 0       # Still none, as you wish
+          nonRetryable: 10
 payment-service:
   api-key: secretpaymentapikey12345
 spring.jackson.time-zone: Europe/Amsterdam
 spring.jpa.properties.hibernate.jdbc.time_zone: UTC
 logging.config: classpath:logback-spring.xml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: prometheus,metrics,health,info
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http:
+          server:
+            requests: true
+    sla:
+      http:
+        server:
+          requests: true

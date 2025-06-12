@@ -7,19 +7,22 @@ import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequest
 import com.dogancaglar.paymentservice.application.service.PaymentService
 import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import com.dogancaglar.paymentservice.psp.PSPClient
+import com.dogancaglar.paymentservice.domain.port.PSPClientPort
+import io.micrometer.core.instrument.DistributionSummary
+import io.micrometer.core.instrument.MeterRegistry
 import jakarta.transaction.Transactional
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
-import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
 @Component
 class PaymentOrderRetryCommandExecutor(
     private val paymentService: PaymentService,
-    val pspClient: PSPClient,
+    val pspClient: PSPClientPort,
+    val retryMetrics: RetryMetrics
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -33,14 +36,12 @@ class PaymentOrderRetryCommandExecutor(
                 LogFields.TOPIC_NAME to record.topic(),
                 LogFields.CONSUMER_GROUP to "PAYMENT_RETRY_EXECUTOR",
                 LogFields.PUBLIC_PAYMENT_ID to envelope.data.publicPaymentId,
-                LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.data.publicPaymentOrderId,
+                LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.aggregateId,
                 LogFields.EVENT_ID to envelope.eventId.toString(),
                 LogFields.TRACE_ID to envelope.traceId,
-
-                )
+                LogFields.PARENT_EVENT_ID to envelope.parentEventId.toString()
+            )
         ) {
-            logger.info("▶️ [Handle Start] Processing PaymentOrderRetryCommandExecutor")
-            //todo any check is needed
             try {
                 val response = safePspCall(order)
                 logger.info("✅ PSP call PaymentOrderRetryCommandExecutor returned status=$response for paymentOrderId=${order.paymentOrderId}")
@@ -59,25 +60,44 @@ class PaymentOrderRetryCommandExecutor(
                 )
             } catch (e: Exception) {
                 logger.error(
-                    "❌ Unexpected error  processing PaymentOrderRetryCommandExecutor orderId=${order.paymentOrderId}, retrying...: ${e.message}",
+                    "❌ Unexpected error processing PaymentOrderRetryCommandExecutor orderId=${order.paymentOrderId}, retrying...: ${e.message}",
                     e
                 )
                 paymentService.processPspResult(
                     event = paymentOrderCreatedEvent,
                     pspStatus = PaymentOrderStatus.UNKNOWN
                 )
-
             }
         }
-
     }
 
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
-        return CompletableFuture.supplyAsync {
-            pspClient.chargeRetry(order)
-        }.get(3, TimeUnit.SECONDS)
-        // This should be replaced with your actual PSP integration
+        val executor = Executors.newSingleThreadExecutor()
+        return try {
+            executor.submit<PaymentOrderStatus> {
+                try {
+                    pspClient.chargeRetry(order)
+                } finally {
+                    // Only record metric here, don't re-register the DistributionSummary each time!
+                    retryMetrics.recordRetryAttempt(order.retryCount, order.retryReason)
+                }
+            }.get(3, TimeUnit.SECONDS)
+        } finally {
+            executor.shutdown()
+        }
     }
+}
 
+@Component
+class RetryMetrics(meterRegistry: MeterRegistry) {
+    // If you want to tag by reason, you can keep a map or register with a static set of reasons
+    private val retrySummary = DistributionSummary.builder("paymentorder.retry.attempts")
+        .baseUnit("attempts")
+        .description("Number of retry attempts before PaymentOrder succeeded")
+        .register(meterRegistry)
 
+    fun recordRetryAttempt(retryCount: Int, reason: String?) {
+        // You can add .tag("reason", reason ?: "unknown") if you really want, but beware of unbounded label cardinality!
+        retrySummary.record(retryCount.toDouble())
+    }
 }

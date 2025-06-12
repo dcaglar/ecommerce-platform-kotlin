@@ -60,6 +60,9 @@ services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.2.1
     container_name: zookeeper
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-log:/var/lib/zookeeper/log
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -75,6 +78,8 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.6.0
     container_name: kafka
+    volumes:
+      - kafka-data:/var/lib/kafka/data
     depends_on:
       - zookeeper
     ports:
@@ -99,13 +104,15 @@ services:
   redis:
     image: redis:7
     container_name: redis
+    volumes:
+      - redis-data:/data
+      - ./payment-service/src/main/resources/redis/redis.conf:/usr/local/etc/redis/redis.conf
+
     labels:
       service: redis
       environment: local
     ports:
       - "6379:6379"  # Exposed for Spring Boot to connect
-    volumes:
-      - ./payment-service/src/main/resources/redis/redis.conf:/usr/local/etc/redis/redis.conf
     command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
     restart: unless-stopped
     networks:
@@ -155,7 +162,7 @@ services:
     ports:
       - "9200:9200"  # Exposed for Filebeat, Spring Boot, or browser/curl
     volumes:
-      - elasticsearch-data:/usr/share/elasticsearch/data
+      - esdata:/usr/share/elasticsearch/data
     networks:
       - observability-net
 
@@ -202,15 +209,49 @@ services:
         condition: service_healthy
     command: [ "-c", "/usr/share/filebeat/filebeat.yml" , "--strict.perms=false" ]
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./prometheus/grafana-provisioning/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+      - ./prometheus/grafana-provisioning/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
+      - ./prometheus/grafana-provisioning/dashboards/:/etc/grafana/provisioning/dashboards/
+      - ./prometheus/grafana.ini:/etc/grafana/grafana.ini
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "3000:3000"
+    networks:
+      - monitoring-net
+    depends_on:
+      - prometheus
+
 
     ### 🔁 Named volumes for persistent storage
 
 
 volumes:
-  keycloak_postgres_data:
   payment_postgres_data:
-  elasticsearch-data:
-  filebeat-data:
+  redis-data:
+  kafka-data:
+  zookeeper-data:
+  zookeeper-log:
+  esdata:
+  grafana-data:
+  prometheus-data:
+  keycloak_postgres_data:
 
 ### 🌐 Custom networks per domain
 networks:
@@ -222,3 +263,5 @@ networks:
     external: true
   observability-net:
     driver: bridge
+  monitoring-net:
+    external: true
