@@ -46,6 +46,7 @@ services:
       POSTGRES_DB: payment
       POSTGRES_USER: payment
       POSTGRES_PASSWORD: payment
+      POSTGRES_MAX_CONNECTIONS: 200
     labels:
       service: payment-db
       environment: local

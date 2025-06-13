@@ -2,6 +2,13 @@ kafka:
   bootstrap-servers: kafka:9092
 spring:
   kafka:
+    consumer:
+      heartbeat-interval: 3000
+      session-timeout: 10000
+      max-poll-interval: 300000
+      enable-auto-commit: false
+      properties:
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
     listener:
       micrometer-enabled: true
   datasource:
@@ -9,8 +16,11 @@ spring:
     username: payment
     password: payment
     hikari:
-      maximum-pool-size: 104
+      maximum-pool-size: 120
       minimum-idle: 25
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
 server:
   port: 8080
   data:
