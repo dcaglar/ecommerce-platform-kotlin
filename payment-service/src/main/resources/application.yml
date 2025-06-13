@@ -22,6 +22,9 @@ server:
       enabled: true
 spring:
   kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: com.dogancaglar.paymentservice.config.serialization.EventEnvelopeSerializer
     consumer:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: com.dogancaglar.paymentservice.config.serialization.EventEnvelopeDeserializer
@@ -38,7 +41,7 @@ spring:
           issuer-uri: http://myserver/realms/ecommerce-platform
 psp:
   simulation:
-    currentScenario: NORMAL  # Default scenario
+    currentScenario: PEAK  # Default scenario
     scenarios:
       NORMAL:
         timeouts:
@@ -108,6 +111,8 @@ psp:
           retryable: 40        # 25% retryable errors (up from 15%)
           statusCheck: 0       # Still none, as you wish
           nonRetryable: 10
+  cache:
+    ttl-seconds: 3600  # 1 hour TTL for PSP result cache
 payment-service:
   api-key: secretpaymentapikey12345
 spring.jackson.time-zone: Europe/Amsterdam
@@ -128,3 +133,4 @@ management:
       http:
         server:
           requests: true
+

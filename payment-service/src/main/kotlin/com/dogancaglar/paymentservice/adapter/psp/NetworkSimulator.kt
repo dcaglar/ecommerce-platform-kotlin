@@ -17,7 +17,6 @@ class NetworkSimulator(
     fun simulate() {
         val sc = active
 
-        // 1) timeouts
         if (sc.timeouts.enabled && Random.nextInt(100) < sc.timeouts.probability) {
             logger.warn(
                 "💥 [${

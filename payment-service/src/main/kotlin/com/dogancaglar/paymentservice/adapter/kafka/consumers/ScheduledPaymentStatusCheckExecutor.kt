@@ -15,6 +15,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
+//todo  appply sama logic as in retry command executor
 
 @Component
 class ScheduledPaymentStatusCheckExecutor(
@@ -22,10 +23,10 @@ class ScheduledPaymentStatusCheckExecutor(
     val paymentService: PaymentService
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
+    val executor = Executors.newSingleThreadExecutor()
 
     // For higher concurrency, inject a shared executor as a constructor parameter or as a class val.
     // For demo purposes, creating a new executor each time is OK.
-    @jakarta.transaction.Transactional
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderStatusCheckRequested>>) {
         val envelope = record.value()
         val paymentOrderStatusCheckRequested = envelope.data
@@ -67,7 +68,6 @@ class ScheduledPaymentStatusCheckExecutor(
     }
 
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
-        val executor = Executors.newSingleThreadExecutor()
         return try {
             executor.submit<PaymentOrderStatus> {
                 // If you want to time the call, do it here.
@@ -77,4 +77,5 @@ class ScheduledPaymentStatusCheckExecutor(
             executor.shutdown()
         }
     }
+
 }

@@ -152,8 +152,8 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
-      - ES_JAVA_OPTS=-Xms2g -Xmx2g
-    mem_limit: 3g  # optional Docker hard limit if neede
+      - ES_JAVA_OPTS=-Xms3g -Xmx3g
+    mem_limit: 4g  # optional Docker hard limit if neede
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://elasticsearch:9200 || exit 1" ]
       interval: 10s

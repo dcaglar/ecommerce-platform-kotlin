@@ -8,6 +8,9 @@ spring:
     url: jdbc:postgresql://payment-db:5432/payment
     username: payment
     password: payment
+    hikari:
+      maximum-pool-size: 104
+      minimum-idle: 25
 server:
   port: 8080
   data:
@@ -16,6 +19,7 @@ server:
       lettuce:
         pool:
         max-active: 8
+
         max-idle: 8
         min-idle: 0
         max-wait: -1ms
@@ -27,3 +31,8 @@ server:
 metrics:
   tags:
     application: payment-service
+logging:
+  level:
+    org.springframework.kafka.listener.DeadLetterPublishingRecoverer: DEBUG
+    org.apache.kafka.clients.producer.ProducerConfig: DEBUG
+    org.apache.kafka.clients.producer.KafkaProducer: DEBUG

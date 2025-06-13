@@ -14,10 +14,15 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory
+import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.core.MicrometerConsumerListener
+import org.springframework.kafka.listener.ContainerProperties
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer
+import org.springframework.kafka.listener.DefaultErrorHandler
 import org.springframework.kafka.listener.RecordInterceptor
 import org.springframework.messaging.converter.MappingJackson2MessageConverter
 import org.springframework.messaging.handler.annotation.support.DefaultMessageHandlerMethodFactory
+import org.springframework.util.backoff.FixedBackOff
 import java.util.*
 
 @Configuration
@@ -45,57 +50,70 @@ class KafkaTypedConsumerFactoryConfig(
         record
     }
 
+    @Bean
+    fun errorHandler(kafkaTemplate: KafkaTemplate<String, Any>): DefaultErrorHandler {
+        val recoverer = DeadLetterPublishingRecoverer(kafkaTemplate)
+        val backOff = FixedBackOff(1000L, 3)
+        return DefaultErrorHandler(recoverer, backOff)
+    }
+
     @Bean("payment_order_created_queue-factory")
     fun paymentOrderCreatedFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
-        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>
-    )
-            : ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderCreated>> =
-        createTypedFactory(
-            clientId = EventMetadatas.PaymentOrderCreatedMetadata.eventType,
-            valueType = PaymentOrderCreated::class.java,
-            interceptor = interceptor,
-            defaultKafkaConsumerFactory = customFactory
-        )
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ) = createTypedFactory(
+        clientId = EventMetadatas.PaymentOrderCreatedMetadata.eventType,
+        valueType = PaymentOrderCreated::class.java,
+        interceptor = interceptor,
+        defaultKafkaConsumerFactory = customFactory,
+        errorHandler = errorHandler
+    ).apply {
+        // ADD THIS LINE:
+        setConcurrency(64)
+    }
 
     @Bean("payment_order_retry_request_topic-factory")
     fun paymentRetryRequestedFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
-        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>
-    )
-            : ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderRetryRequested>> =
-        createTypedFactory(
-            clientId = EventMetadatas.PaymentOrderRetryRequestedMetadata.eventType,
-            valueType = PaymentOrderRetryRequested::class.java,
-            interceptor = interceptor,
-            defaultKafkaConsumerFactory = customFactory
-        )
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ) = createTypedFactory(
+        clientId = EventMetadatas.PaymentOrderRetryRequestedMetadata.eventType,
+        valueType = PaymentOrderRetryRequested::class.java,
+        interceptor = interceptor,
+        defaultKafkaConsumerFactory = customFactory,
+        errorHandler = errorHandler
+    ).apply {
+        // ADD THIS LINE:
+        setConcurrency(32)
+    }
 
     @Bean("payment_status_check_scheduler_topic-factory")
     fun paymentStatusCheckExecutorFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
-        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ) = createTypedFactory(
+        EventMetadatas.PaymentOrderStatusCheckScheduledMetadata.eventType,
+        PaymentOrderStatusCheckRequested::class.java,
+        interceptor = interceptor,
+        defaultKafkaConsumerFactory = customFactory,
+        errorHandler = errorHandler
     )
-            : ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderStatusCheckRequested>> =
-        createTypedFactory(
-            EventMetadatas.PaymentOrderStatusCheckScheduledMetadata.eventType,
-            PaymentOrderStatusCheckRequested::class.java,
-            interceptor = interceptor,
-            defaultKafkaConsumerFactory = customFactory
-        )
 
     @Bean("payment_order_succeded_topic-factory")
     fun paymentOrderSucceededFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
-        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ) = createTypedFactory(
+        clientId = EventMetadatas.PaymentOrderSuccededMetaData.eventType,
+        valueType = PaymentOrderSucceeded::class.java,
+        interceptor = interceptor,
+        defaultKafkaConsumerFactory = customFactory,
+        errorHandler = errorHandler
     )
-            : ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderSucceeded>> =
-        createTypedFactory(
-            clientId = EventMetadatas.PaymentOrderSuccededMetaData.eventType,
-            valueType = PaymentOrderSucceeded::class.java,
-            interceptor = interceptor,
-            defaultKafkaConsumerFactory = customFactory
-        )
 
     /* ---------- helper ---------- */
 
@@ -103,28 +121,18 @@ class KafkaTypedConsumerFactoryConfig(
         clientId: String,
         valueType: Class<T>,
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
-        defaultKafkaConsumerFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>
+        defaultKafkaConsumerFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
     ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>> {
-
-        // 1. Create a fresh listener‐container factory
         val factory = ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>>()
-
-        // 2. Reuse your shared consumer factory
         @Suppress("UNCHECKED_CAST")
         factory.consumerFactory = defaultKafkaConsumerFactory
-
-        // 3. Set the client.id so Micrometer tags the client metrics correctly
         factory.containerProperties.clientId = clientId
-
-        // 4. Enable Micrometer’s built-in metrics (listener timers + ConsumerMetrics)
         factory.containerProperties.isMicrometerEnabled = true
-
-        // 5. Attach your MDC interceptor for propagating trace headers
         @Suppress("UNCHECKED_CAST")
-        factory.setRecordInterceptor(
-            interceptor as RecordInterceptor<String, EventEnvelope<T>>
-        )
-
+        factory.setRecordInterceptor(interceptor as RecordInterceptor<String, EventEnvelope<T>>)
+        factory.setCommonErrorHandler(errorHandler)
+        factory.containerProperties.ackMode = ContainerProperties.AckMode.RECORD
         return factory
     }
 
