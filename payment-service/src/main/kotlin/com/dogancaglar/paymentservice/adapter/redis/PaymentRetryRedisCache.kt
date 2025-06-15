@@ -32,7 +32,15 @@ open class PaymentRetryRedisCache(
         redisTemplate.opsForZSet().add(queue, json, retryAt)
     }
 
-    //we will use this to poll due retries and remove them from the queue
+    /**
+     * Polls for due retry events using a two-step process:
+     *  1. Reads all entries from the Redis ZSet whose score (scheduled timestamp) is <= now.
+     *  2. Removes each of those entries from the ZSet (not atomic!).
+     *
+     * ⚠️ Note: This is **NOT atomic**—if multiple app instances call this at the same time,
+     *   the same entry could be processed by more than one instance.
+     *   Fine for single-instance or dev/test, but **not safe for at-least-once delivery in cluster**.
+     */
     fun pollDueRetries(): List<String> {
         val now = System.currentTimeMillis().toDouble()
         //get due items from the sorted set
@@ -43,6 +51,30 @@ open class PaymentRetryRedisCache(
         }
         return dueItems?.toList() ?: emptyList()
     }
+
+    /**
+     * Atomically polls (fetches AND removes) up to [max] due retry events using Redis ZPOPMIN.
+     *  1. Calls ZPOPMIN to pop up to [max] items with the lowest score from the ZSet.
+     *  2. Splits into:
+     *     - "due" items (score <= now, i.e., ready for retry)
+     *     - "not-due" items (score > now, not yet scheduled)
+     *  3. If any "not-due" items were popped, **re-inserts** them back into the ZSet with their original score.
+     *
+     * ✅ This is **atomic** from the Redis perspective: Only your process gets these items.
+     * ⚠️ Requires Redis 5.0+ for ZPOPMIN.
+     * ⚠️ Because ZPOPMIN just pops the lowest-[score] items, if not all are "due" yet,
+     *    you must check scores yourself and reinsert future items.
+     */
+    fun pollDueRetriesAtomic(max: Long = 1000): List<String> {
+        val now = System.currentTimeMillis().toDouble()
+        val connection = redisTemplate.connectionFactory?.connection
+        val raw = connection?.zSetCommands()?.zPopMin(queue.toByteArray(), max)
+        val (due, notDue) = raw?.partition { it.score <= now } ?: Pair(emptyList(), emptyList())
+        // Re-insert not-due items
+        notDue.forEach { connection?.zSetCommands()?.zAdd(queue.toByteArray(), it.score, it.value) }
+        return due.map { String(it.value) }
+    }
+
 
     fun pureRemoveDueRetry(json: String) {
         redisTemplate.opsForZSet().remove(queue, json)

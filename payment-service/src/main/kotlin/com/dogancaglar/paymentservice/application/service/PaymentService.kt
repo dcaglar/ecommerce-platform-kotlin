@@ -129,29 +129,38 @@ class PaymentService(
 
 
     fun processPspResult(event: PaymentOrderEvent, pspStatus: PaymentOrderStatus) {
+        val totalStart = System.currentTimeMillis()
         val order = paymentOrderFactory.fromEvent(event)
-        when {
-            pspStatus == PaymentOrderStatus.SUCCESSFUL -> {
-                retryMetrics.recordRetryAttempt(
-                    retryCount = order.retryCount,
-                    reason = order.retryReason ?: "unknown", // or another tag if you track more causes
-                )
-                handleSuccessfulPayment(order = order)
-            }
 
-            PSPStatusMapper.requiresRetryPayment(pspStatus) -> {
-                handleRetryEvent(order = order, reason = pspStatus.name)
-            }
+        try {
+            when {
+                pspStatus == PaymentOrderStatus.SUCCESSFUL -> {
+                    retryMetrics.recordRetryAttempt(
+                        retryCount = order.retryCount,
+                        reason = order.retryReason ?: "unknown",
+                    )
+                    val dbStart = System.currentTimeMillis()
+                    handleSuccessfulPayment(order = order)
+                    val dbEnd = System.currentTimeMillis()
+                    logger.info("TIMING: processPspResult (DB/write) took ${dbEnd - dbStart} ms for ${order.paymentOrderId}")
+                }
 
-            PSPStatusMapper.requiresStatusCheck(pspStatus) -> {
-                handlePaymentStatusCheckEvent(order)
-            }
+                PSPStatusMapper.requiresRetryPayment(pspStatus) -> {
+                    handleRetryEvent(order = order, reason = pspStatus.name)
+                }
 
-            else -> {
-                handleNonRetryableFailEvent(order)
+                PSPStatusMapper.requiresStatusCheck(pspStatus) -> {
+                    handlePaymentStatusCheckEvent(order)
+                }
+
+                else -> {
+                    handleNonRetryableFailEvent(order)
+                }
             }
+        } finally {
+            val totalEnd = System.currentTimeMillis()
+            logger.info("TIMING: processPspResult (Total) took ${totalEnd - totalStart} ms for ${order.paymentOrderId}")
         }
-        // All event publishing, retry logic, and DB writes live here.
     }
 
 
@@ -189,7 +198,9 @@ class PaymentService(
     ) {
         logger.info(
             "Handling retry for  paymentOrderId={} with reason='{}', lastError='{}'",
-            order.publicPaymentOrderId, reason ?: "N/A", lastError ?: "N/A"
+            order.publicPaymentOrderId,
+            reason ?: "N/A",
+            lastError ?: "N/A"
         )
         val retryCount = retryQueuePort.getRetryCount(order.paymentOrderId)
         val nextRetryCount = retryCount + 1
@@ -200,7 +211,9 @@ class PaymentService(
             val backOffExpMillis = computeEqualJitterBackoff(attempt = nextRetryCount)
             val scheduledAt = System.currentTimeMillis().plus(backOffExpMillis)
             LogContext.withRetryFields(
-                retryCount = nextRetryCount, retryReason = reason, lastErrorMessage = lastError,
+                retryCount = nextRetryCount,
+                retryReason = reason,
+                lastErrorMessage = lastError,
                 backOffInMillis = backOffExpMillis
             ) {
                 logRetrySchedule(order, nextRetryCount, scheduledAt, reason, lastError)
@@ -224,11 +237,7 @@ class PaymentService(
     }
 
     private fun logRetrySchedule(
-        order: PaymentOrder,
-        nextRetryCount: Int,
-        scheduledAt: Long,
-        reason: String?,
-        lastError: String?
+        order: PaymentOrder, nextRetryCount: Int, scheduledAt: Long, reason: String?, lastError: String?
     ) {
         val scheduledLocal = LocalDateTime.ofInstant(Instant.ofEpochMilli(scheduledAt), clock.zone)
         val formattedLocal = scheduledLocal.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))
@@ -254,7 +263,8 @@ class PaymentService(
         paymentOrderOutboundPort.save(updated)
         logger.info(
             "PaymentOrder {} marked as permanently FAILED. Reason='{}'",
-            updated.publicPaymentOrderId, (reason ?: updated.retryReason ?: "N/A")
+            updated.publicPaymentOrderId,
+            (reason ?: updated.retryReason ?: "N/A")
         )
         return updated
     }

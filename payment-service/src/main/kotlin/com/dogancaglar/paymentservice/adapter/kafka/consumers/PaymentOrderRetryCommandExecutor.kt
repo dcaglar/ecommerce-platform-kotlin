@@ -8,25 +8,47 @@ import com.dogancaglar.paymentservice.application.service.PaymentService
 import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.port.PSPClientPort
+import com.dogancaglar.paymentservice.domain.port.PspResultCachePort
 import io.micrometer.core.instrument.DistributionSummary
 import io.micrometer.core.instrument.MeterRegistry
-import jakarta.transaction.Transactional
 import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.common.errors.RetriableException
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
+import org.springframework.dao.TransientDataAccessException
+import org.springframework.kafka.listener.ListenerExecutionFailedException
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.stereotype.Component
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+
+@Configuration
+class ExecutorConfig {
+    @Bean
+    fun pspRetryTaskExecutor(): ThreadPoolTaskExecutor {
+        val executor = ThreadPoolTaskExecutor()
+        executor.corePoolSize = 32
+        executor.maxPoolSize = 32
+        executor.setQueueCapacity(1000)
+        executor.setThreadNamePrefix("psp-retry-")
+        executor.setWaitForTasksToCompleteOnShutdown(true)
+        executor.initialize()
+        return executor
+    }
+}
 
 @Component
 class PaymentOrderRetryCommandExecutor(
     private val paymentService: PaymentService,
     val pspClient: PSPClientPort,
-    val retryMetrics: RetryMetrics
+    val retryMetrics: RetryMetrics,
+    val pspResultCache: PspResultCachePort,
+    @Qualifier("pspRetryTaskExecutor") private val pspRetryExecutor: ThreadPoolTaskExecutor
 ) {
-    private val logger = LoggerFactory.getLogger(javaClass)
 
-    @Transactional
+    private val logger = LoggerFactory.getLogger(javaClass)
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderRetryRequested>>) {
         val envelope = record.value()
         val paymentOrderCreatedEvent = envelope.data
@@ -43,47 +65,59 @@ class PaymentOrderRetryCommandExecutor(
             )
         ) {
             try {
-                val response = safePspCall(order)
-                logger.info("✅ PSP call PaymentOrderRetryCommandExecutor returned status=$response for paymentOrderId=${order.paymentOrderId}")
+                val pspCacheKey = order.paymentOrderId.toString() // or use a more specific key if needed
+                val cachedResult = pspResultCache.get(pspCacheKey)
+                var response: PaymentOrderStatus?
+                if (cachedResult != null) {
+                    logger.info("PSP retry result  found in cache for orderId=${order.paymentOrderId}, skipping PSP call and using cached result.")
+                    // Deserialize cachedResult and use it
+                    response = PaymentOrderStatus.valueOf(cachedResult)
+                } else {
+                    try {
+                        response = safePspCall(order)
+                        //cache result
+                        pspResultCache.put(pspCacheKey, response.name) // or serialize if needed
+                        logger.info("✅ PSP call retry returned status=$response for paymentOrderId=${order.paymentOrderId}")
+                    } catch (e: TimeoutException) {
+                        logger.error("⏱️ PSP call timed out for orderId=${order.paymentOrderId}, will retry...", e)
+                        response = PaymentOrderStatus.TIMEOUT
+                    }
+                }
                 paymentService.processPspResult(
                     event = paymentOrderCreatedEvent,
-                    pspStatus = response
+                    pspStatus = response!!
                 )
-            } catch (e: TimeoutException) {
+                pspResultCache.remove(pspCacheKey) // Clear cache after successful processing
+
+
+            } catch (e: TransientDataAccessException) {
+                logger.error("🔄 Retry Transient DB error for orderId=${order.paymentOrderId}, will be retried/DLQ", e)
+                throw e // retry/DLQ
+            } catch (e: RetriableException) {
                 logger.error(
-                    "⏱️ PSP call PaymentOrderRetryCommandExecutor timed out for orderId=${order.paymentOrderId}, retrying...",
+                    "🔄 Retry Transient Kafka publish error for orderId=${order.paymentOrderId}, will be retried/DLQ",
                     e
                 )
-                paymentService.processPspResult(
-                    event = paymentOrderCreatedEvent,
-                    pspStatus = PaymentOrderStatus.TIMEOUT
-                )
-            } catch (e: Exception) {
+                throw e // retry/DLQ
+            } catch (t: Throwable) {
                 logger.error(
-                    "❌ Unexpected error processing PaymentOrderRetryCommandExecutor orderId=${order.paymentOrderId}, retrying...: ${e.message}",
-                    e
+                    "❌ Non-transient, unexpected, or fatal error for orderId=${order.paymentOrderId}, will be sent to DLQ immediately (no retry)",
+                    t
                 )
-                paymentService.processPspResult(
-                    event = paymentOrderCreatedEvent,
-                    pspStatus = PaymentOrderStatus.UNKNOWN
-                )
+                throw ListenerExecutionFailedException("Non-transient, unexpected, or fatal error, send to DLQ", t)
             }
         }
     }
 
+
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
-        val executor = Executors.newSingleThreadExecutor()
+        val future = pspRetryExecutor.submit<PaymentOrderStatus> { pspClient.chargeRetry(order) }
         return try {
-            executor.submit<PaymentOrderStatus> {
-                try {
-                    pspClient.chargeRetry(order)
-                } finally {
-                    // Only record metric here, don't re-register the DistributionSummary each time!
-                    retryMetrics.recordRetryAttempt(order.retryCount, order.retryReason)
-                }
-            }.get(3, TimeUnit.SECONDS)
+            future.get(3, TimeUnit.SECONDS)
+        } catch (e: TimeoutException) {
+            throw e
         } finally {
-            executor.shutdown()
+            retryMetrics.recordRetryAttempt(order.retryCount, order.retryReason)
         }
     }
 }

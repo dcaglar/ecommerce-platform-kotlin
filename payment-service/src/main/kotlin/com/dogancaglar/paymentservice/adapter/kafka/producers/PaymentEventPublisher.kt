@@ -4,7 +4,7 @@ import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
 import com.dogancaglar.common.logging.LogContext
-import com.fasterxml.jackson.databind.ObjectMapper
+import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
 import org.slf4j.LoggerFactory
@@ -21,9 +21,9 @@ import java.util.*
  */
 @Component
 class PaymentEventPublisher(
-    private val kafkaTemplate: KafkaTemplate<String, String>,
-    @Qualifier("myObjectMapper")
-    private val objectMapper: ObjectMapper
+    @Qualifier("paymentOrderEventKafkaTemplate")
+    private val kafkaTemplate: KafkaTemplate<String, EventEnvelope<*>>,
+    private val meterRegistry: MeterRegistry    // Inject here!
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -52,7 +52,6 @@ class PaymentEventPublisher(
         )
 
         LogContext.with(envelope) {
-            val payload = objectMapper.writeValueAsString(envelope)
             logger.info(
                 envelope.eventType,
                 envelope.eventId,
@@ -60,10 +59,10 @@ class PaymentEventPublisher(
                 envelope.traceId,
                 envelope.aggregateId
             )
-            val record = ProducerRecord<String, String>(
+            val record = ProducerRecord<String, EventEnvelope<*>>(
                 eventMetaData.topic,
                 envelope.aggregateId,  // key
-                payload
+                envelope
             ).apply {
                 headers().add(
                     RecordHeader(
@@ -86,7 +85,7 @@ class PaymentEventPublisher(
                     )
                 }
             }
-            logger.debug("Sending payment ${record.value()}  $record.")
+            logger.debug("Sending payment $record.")
             val future = kafkaTemplate.send(record)
             future.whenComplete { _, ex ->
                 if (ex == null) {
@@ -105,4 +104,3 @@ class PaymentEventPublisher(
         return envelope
     }
 }
-

@@ -1,6 +1,6 @@
-VUS 5 DURATIOIN  5
+23:25-23:30
 
-dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % k6 run load-tests/baseline-smoke-test.js
+dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % VUS=5 DURATION=5 k6 run load-tests/baseline-smoke-test.js
 
          /\      Grafana   /‾‾/
     /\  /  \     |\  __   /  /
@@ -15,136 +15,43 @@ dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % k6 run load-tests/bas
      scenarios: (100.00%) 1 scenario, 5 max VUs, 5m30s max duration (incl. graceful stop):
               * default: 5 looping VUs for 5m0s (gracefulStop: 30s)
 
+WARN[0000] Error from API server                         error="listen tcp 127.0.0.1:6565: bind: address already in use"
 
 
   █ TOTAL RESULTS
 
-    checks_total.......................: 1480    4.920346/s
-    checks_succeeded...................: 100.00% 1480 out of 1480
-    checks_failed......................: 0.00%   0 out of 1480
+    checks_total.......................: 1465    4.866759/s
+    checks_succeeded...................: 100.00% 1465 out of 1465
+    checks_failed......................: 0.00%   0 out of 1465
 
     ✓ status is 200
 
     HTTP
-    http_req_duration.......................................................: avg=14.68ms min=3.25ms med=12.84ms max=75.06ms p(90)=22.66ms p(95)=27.97ms
-      { expected_response:true }............................................: avg=14.68ms min=3.25ms med=12.84ms max=75.06ms p(90)=22.66ms p(95)=27.97ms
-    http_req_failed.........................................................: 0.00%  0 out of 1480
-    http_reqs...............................................................: 1480   4.920346/s
+    http_req_duration.......................................................: avg=25.79ms min=4ms med=19.22ms max=721.04ms p(90)=40.87ms p(95)=55.78ms
+      { expected_response:true }............................................: avg=25.79ms min=4ms med=19.22ms max=721.04ms p(90)=40.87ms p(95)=55.78ms
+    http_req_failed.........................................................: 0.00%  0 out of 1465
+    http_reqs...............................................................: 1465   4.866759/s
 
     EXECUTION
-    iteration_duration......................................................: avg=1.01s   min=1s     med=1.01s   max=1.07s   p(90)=1.02s   p(95)=1.03s
-    iterations..............................................................: 1480   4.920346/s
+    iteration_duration......................................................: avg=1.02s   min=1s  med=1.02s   max=1.72s    p(90)=1.04s   p(95)=1.05s
+    iterations..............................................................: 1465   4.866759/s
     vus.....................................................................: 5      min=5         max=5
     vus_max.................................................................: 5      min=5         max=5
 
     NETWORK
-    data_received...........................................................: 981 kB 3.3 kB/s
-    data_sent...............................................................: 2.8 MB 9.4 kB/s
+    data_received...........................................................: 976 kB 3.2 kB/s
+    data_sent...............................................................: 2.8 MB 9.3 kB/s
 
 
 
 
-running (5m00.8s), 0/5 VUs, 1480 complete and 0 interrupted iterations
-
----------------------------
-dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % VUS=5 DURATION=2m k6 run load-tests/baseline-smoke-test.js
-
-         /\      Grafana   /‾‾/
-    /\  /  \     |\  __   /  /
-   /  \/    \    | |/ /  /   ‾‾\
-  /          \   |   (  |  (‾)  |
- / __________ \  |_|\_\  \_____/
-
-     execution: local
-        script: load-tests/baseline-smoke-test.js
-        output: -
-
-     scenarios: (100.00%) 1 scenario, 5 max VUs, 2m30s max duration (incl. graceful stop):
-              * default: 5 looping VUs for 2m0s (gracefulStop: 30s)
-
-
-
-  █ TOTAL RESULTS
-
-    checks_total.......................: 595     4.921677/s
-    checks_succeeded...................: 100.00% 595 out of 595
-    checks_failed......................: 0.00%   0 out of 595
-
-    ✓ status is 200
-
-    HTTP
-    http_req_duration.......................................................: avg=14.1ms min=5.19ms med=12.93ms max=106.25ms p(90)=19.65ms p(95)=22.86ms
-      { expected_response:true }............................................: avg=14.1ms min=5.19ms med=12.93ms max=106.25ms p(90)=19.65ms p(95)=22.86ms
-    http_req_failed.........................................................: 0.00%  0 out of 595
-    http_reqs...............................................................: 595    4.921677/s
-
-    EXECUTION
-    iteration_duration......................................................: avg=1.01s  min=1s     med=1.01s   max=1.1s     p(90)=1.02s   p(95)=1.02s
-    iterations..............................................................: 595    4.921677/s
-    vus.....................................................................: 5      min=5        max=5
-    vus_max.................................................................: 5      min=5        max=5
-
-    NETWORK
-    data_received...........................................................: 398 kB 3.3 kB/s
-    data_sent...............................................................: 1.1 MB 9.4 kB/s
-
-
-
+running (5m01.0s), 0/5 VUs, 1465 complete and 0 interrupted iterations
+default ✓ [======================================] 5 VUs  5m0s
 
 
 -----------------------
 
-
-
-dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % VUS=5 DURATION=4m k6 run load-tests/baseline-smoke-test.js
-
-         /\      Grafana   /‾‾/
-    /\  /  \     |\  __   /  /
-   /  \/    \    | |/ /  /   ‾‾\
-  /          \   |   (  |  (‾)  |
- / __________ \  |_|\_\  \_____/
-
-     execution: local
-        script: load-tests/baseline-smoke-test.js
-        output: -
-
-     scenarios: (100.00%) 1 scenario, 5 max VUs, 4m30s max duration (incl. graceful stop):
-              * default: 5 looping VUs for 4m0s (gracefulStop: 30s)
-
-
-
-  █ TOTAL RESULTS
-
-    checks_total.......................: 1185    4.919556/s
-    checks_succeeded...................: 100.00% 1185 out of 1185
-    checks_failed......................: 0.00%   0 out of 1185
-
-    ✓ status is 200
-
-    HTTP
-    http_req_duration.......................................................: avg=14.68ms min=4.38ms med=13.19ms max=93.29ms p(90)=22.38ms p(95)=25.77ms
-      { expected_response:true }............................................: avg=14.68ms min=4.38ms med=13.19ms max=93.29ms p(90)=22.38ms p(95)=25.77ms
-    http_req_failed.........................................................: 0.00%  0 out of 1185
-    http_reqs...............................................................: 1185   4.919556/s
-
-    EXECUTION
-    iteration_duration......................................................: avg=1.01s   min=1s     med=1.01s   max=1.09s   p(90)=1.02s   p(95)=1.02s
-    iterations..............................................................: 1185   4.919556/s
-    vus.....................................................................: 5      min=5         max=5
-    vus_max.................................................................: 5      min=5         max=5
-
-    NETWORK
-    data_received...........................................................: 787 kB 3.3 kB/s
-    data_sent...............................................................: 2.3 MB 9.4 kB/s
-
-
-
-
-running (4m00.9s), 0/5 VUs, 1185 complete and 0 interrupted iterations
-default ✓ [======================================] 5 VUs  4m0s
-
-
-
+23:47-23:57
 dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % VUS=5 DURATION=10m k6 run load-tests/baseline-smoke-test.js
 
          /\      Grafana   /‾‾/
@@ -160,41 +67,38 @@ dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % VUS=5 DURATION=10m k6
      scenarios: (100.00%) 1 scenario, 5 max VUs, 10m30s max duration (incl. graceful stop):
               * default: 5 looping VUs for 10m0s (gracefulStop: 30s)
 
+WARN[0000] Error from API server                         error="listen tcp 127.0.0.1:6565: bind: address already in use"
 
 
   █ TOTAL RESULTS
 
-    checks_total.......................: 2960    4.926135/s
-    checks_succeeded...................: 100.00% 2960 out of 2960
-    checks_failed......................: 0.00%   0 out of 2960
+    checks_total.......................: 2945    4.90795/s
+    checks_succeeded...................: 100.00% 2945 out of 2945
+    checks_failed......................: 0.00%   0 out of 2945
 
     ✓ status is 200
 
     HTTP
-    http_req_duration.......................................................: avg=13.25ms min=3.37ms med=12.08ms max=168.34ms p(90)=18.81ms p(95)=22.64ms
-      { expected_response:true }............................................: avg=13.25ms min=3.37ms med=12.08ms max=168.34ms p(90)=18.81ms p(95)=22.64ms
-    http_req_failed.........................................................: 0.00%  0 out of 2960
-    http_reqs...............................................................: 2960   4.926135/s
+    http_req_duration.......................................................: avg=17.43ms min=2.89ms med=15.37ms max=73.63ms p(90)=29.78ms p(95)=35.2ms
+      { expected_response:true }............................................: avg=17.43ms min=2.89ms med=15.37ms max=73.63ms p(90)=29.78ms p(95)=35.2ms
+    http_req_failed.........................................................: 0.00%  0 out of 2945
+    http_reqs...............................................................: 2945   4.90795/s
 
     EXECUTION
-    iteration_duration......................................................: avg=1.01s   min=1s     med=1.01s   max=1.16s    p(90)=1.02s   p(95)=1.02s
-    iterations..............................................................: 2960   4.926135/s
+    iteration_duration......................................................: avg=1.01s   min=1s     med=1.01s   max=1.07s   p(90)=1.03s   p(95)=1.03s
+    iterations..............................................................: 2945   4.90795/s
     vus.....................................................................: 5      min=5         max=5
     vus_max.................................................................: 5      min=5         max=5
 
     NETWORK
     data_received...........................................................: 2.0 MB 3.3 kB/s
-    data_sent...............................................................: 5.6 MB 9.4 kB/s
+    data_sent...............................................................: 5.6 MB 9.3 kB/s
 
 
 
 
-running (10m00.9s), 0/5 VUs, 2960 complete and 0 interrupted iterations
-
-
-
-
-dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % VUS=5 DURATION=20m k6 run load-tests/baseline-smoke-test.js
+00:06 - 00:16
+dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % VUS=10 DURATION=10m k6 run load-tests/baseline-smoke-test.js
 
          /\      Grafana   /‾‾/
     /\  /  \     |\  __   /  /
@@ -206,73 +110,44 @@ dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % VUS=5 DURATION=20m k6
         script: load-tests/baseline-smoke-test.js
         output: -
 
-     scenarios: (100.00%) 1 scenario, 5 max VUs, 20m30s max duration (incl. graceful stop):
-              * default: 5 looping VUs for 20m0s (gracefulStop: 30s)
+     scenarios: (100.00%) 1 scenario, 10 max VUs, 10m30s max duration (incl. graceful stop):
+              * default: 10 looping VUs for 10m0s (gracefulStop: 30s)
 
-
-
-  █ TOTAL RESULTS
-
-    checks_total.......................: 5925    4.936172/s
-    checks_succeeded...................: 100.00% 5925 out of 5925
-    checks_failed......................: 0.00%   0 out of 5925
-
-    ✓ status is 200
-
-    HTTP
-    http_req_duration.......................................................: avg=11.48ms min=2.73ms med=10.52ms max=166.54ms p(90)=16.67ms p(95)=19.29ms
-      { expected_response:true }............................................: avg=11.48ms min=2.73ms med=10.52ms max=166.54ms p(90)=16.67ms p(95)=19.29ms
-    http_req_failed.........................................................: 0.00%  0 out of 5925
-    http_reqs...............................................................: 5925   4.936172/s
-
-    EXECUTION
-    iteration_duration......................................................: avg=1.01s   min=1s     med=1.01s   max=1.16s    p(90)=1.01s   p(95)=1.02s
-    iterations..............................................................: 5925   4.936172/s
-    vus.....................................................................: 5      min=5         max=5
-    vus_max.................................................................: 5      min=5         max=5
-
-    NETWORK
-    data_received...........................................................: 3.9 MB 3.3 kB/s
-    data_sent...............................................................: 11 MB  9.4 kB/s
-
-
-dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin %  VUS=10 DURATION=20m k6 run load-tests/baseline-smoke-test.js
-
-         /\      Grafana   /‾‾/
-    /\  /  \     |\  __   /  /
-   /  \/    \    | |/ /  /   ‾‾\
-  /          \   |   (  |  (‾)  |
- / __________ \  |_|\_\  \_____/
-
-     execution: local
-        script: load-tests/baseline-smoke-test.js
-        output: -
-
-     scenarios: (100.00%) 1 scenario, 10 max VUs, 20m30s max duration (incl. graceful stop):
-              * default: 10 looping VUs for 20m0s (gracefulStop: 30s)
-
+WARN[0000] Error from API server                         error="listen tcp 127.0.0.1:6565: bind: address already in use"
 
 
   █ TOTAL RESULTS
 
-    checks_total.......................: 11790   9.824809/s
-    checks_succeeded...................: 100.00% 11790 out of 11790
-    checks_failed......................: 0.00%   0 out of 11790
+    checks_total.......................: 5880    9.792268/s
+    checks_succeeded...................: 100.00% 5880 out of 5880
+    checks_failed......................: 0.00%   0 out of 5880
 
     ✓ status is 200
 
     HTTP
-    http_req_duration.......................................................: avg=16.68ms min=3.5ms med=14.37ms max=1.49s p(90)=23.12ms p(95)=27.17ms
-      { expected_response:true }............................................: avg=16.68ms min=3.5ms med=14.37ms max=1.49s p(90)=23.12ms p(95)=27.17ms
-    http_req_failed.........................................................: 0.00%  0 out of 11790
-    http_reqs...............................................................: 11790  9.824809/s
+    http_req_duration.......................................................: avg=20.23ms min=2.58ms med=16.33ms max=206.68ms p(90)=34.82ms p(95)=41.18ms
+      { expected_response:true }............................................: avg=20.23ms min=2.58ms med=16.33ms max=206.68ms p(90)=34.82ms p(95)=41.18ms
+    http_req_failed.........................................................: 0.00%  0 out of 5880
+    http_reqs...............................................................: 5880   9.792268/s
 
     EXECUTION
-    iteration_duration......................................................: avg=1.01s   min=1s    med=1.01s   max=2.5s  p(90)=1.02s   p(95)=1.02s
-    iterations..............................................................: 11790  9.824809/s
-    vus.....................................................................: 10     min=10         max=10
-    vus_max.................................................................: 10     min=10         max=10
+    iteration_duration......................................................: avg=1.02s   min=1s     med=1.01s   max=1.2s     p(90)=1.03s   p(95)=1.04s
+    iterations..............................................................: 5880   9.792268/s
+    vus.....................................................................: 10     min=10        max=10
+    vus_max.................................................................: 10     min=10        max=10
 
     NETWORK
-    data_received...........................................................: 7.8 MB 6.5 kB/s
-    data_sent...............................................................: 22 MB  19 kB/s
+    data_received...........................................................: 3.9 MB 6.5 kB/s
+    data_sent...............................................................: 11 MB  19 kB/s
+
+
+
+
+running (10m00.5s), 00/10 VUs, 5880 complete and 0 interrupted iterations
+default ✓ [======================================] 10 VUs  10m0s
+
+
+
+
+
+

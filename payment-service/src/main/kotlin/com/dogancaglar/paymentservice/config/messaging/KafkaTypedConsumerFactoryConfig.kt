@@ -1,143 +1,158 @@
+// KafkaTypedConsumerFactoryConfig.kt
 package com.dogancaglar.paymentservice.config.messaging
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.logging.LogFields
 import com.dogancaglar.paymentservice.application.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.application.event.PaymentOrderStatusCheckRequested
-import com.dogancaglar.paymentservice.application.event.PaymentOrderSucceeded
+import com.dogancaglar.paymentservice.config.serialization.EventEnvelopeDeserializer
 import io.micrometer.core.instrument.MeterRegistry
-import org.slf4j.MDC
-import org.springframework.boot.CommandLineRunner
+import org.apache.kafka.clients.consumer.ConsumerConfig
+import org.apache.kafka.common.TopicPartition
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.boot.autoconfigure.kafka.KafkaProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
-import org.springframework.kafka.core.DefaultKafkaConsumerFactory
-import org.springframework.kafka.core.MicrometerConsumerListener
+import org.springframework.kafka.core.*
+import org.springframework.kafka.listener.ContainerProperties
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer
+import org.springframework.kafka.listener.DefaultErrorHandler
 import org.springframework.kafka.listener.RecordInterceptor
-import org.springframework.messaging.converter.MappingJackson2MessageConverter
 import org.springframework.messaging.handler.annotation.support.DefaultMessageHandlerMethodFactory
-import java.util.*
+import org.springframework.util.backoff.FixedBackOff
 
 @Configuration
-@EnableConfigurationProperties(KafkaProperties::class)
+@EnableConfigurationProperties(DynamicKafkaConsumersProperties::class)
 class KafkaTypedConsumerFactoryConfig(
-    private val consumerProps: KafkaProperties,
-    private val meterRegistry: MeterRegistry,
+    private val dynamicProps: DynamicKafkaConsumersProperties,
+    private val bootKafkaProps: KafkaProperties,
+    private val meterRegistry: MeterRegistry
 ) {
 
     @Bean("custom-kafka-consumer-factory-for-micrometer")
     fun defaultKafkaConsumerFactory(): DefaultKafkaConsumerFactory<String, EventEnvelope<*>> {
-        val cf = DefaultKafkaConsumerFactory<String, EventEnvelope<*>>(consumerProps.toMap())
-        // 🔥 Enables collection of native kafka.consumer.* metrics
-        cf.addListener(MicrometerConsumerListener(meterRegistry))
-        return cf
+        val configs = bootKafkaProps.buildConsumerProperties().toMutableMap()
+        configs[ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG] =
+            org.springframework.kafka.support.serializer.ErrorHandlingDeserializer::class.java
+        configs[org.springframework.kafka.support.serializer.ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS] =
+            EventEnvelopeDeserializer::class.java.name
+
+        return DefaultKafkaConsumerFactory<String, EventEnvelope<*>>(configs).apply {
+            addListener(MicrometerConsumerListener(meterRegistry))
+        }
     }
+
 
     @Bean
-    fun mdcRecordInterceptor(): RecordInterceptor<String, EventEnvelope<*>> = RecordInterceptor { record, _ ->
-        fun header(key: String) = record.headers().lastHeader(key)?.value()?.let { String(it) }
-        listOf(LogFields.TRACE_ID, LogFields.EVENT_ID, LogFields.PARENT_EVENT_ID).forEach { key ->
-            header(key)?.let { MDC.put(key, it) }
+    fun producerFactory(): ProducerFactory<String, Any> {
+        val configs = bootKafkaProps.buildProducerProperties()
+        return org.springframework.kafka.core.DefaultKafkaProducerFactory<String, Any>(configs).apply {
+            addListener(MicrometerProducerListener(meterRegistry)) // <-- This is the key line
         }
-        MDC.put(LogFields.AGGREGATE_ID, record.value()?.aggregateId ?: record.key())
-        record
     }
 
-    @Bean("payment_order_created_queue-factory")
+
+    @Bean
+    fun kafkaTemplate(producerFactory: ProducerFactory<String, Any>): KafkaTemplate<String, Any> =
+        KafkaTemplate(producerFactory)
+
+    @Bean
+    fun errorHandler(kafkaTemplate: KafkaTemplate<String, Any>): DefaultErrorHandler {
+        val recoverer = DeadLetterPublishingRecoverer(kafkaTemplate) { rec, _ ->
+            TopicPartition("${rec.topic()}.DLQ", rec.partition())
+        }
+        return DefaultErrorHandler(recoverer, FixedBackOff(1_000L, 4))
+    }
+
+    private fun <T : Any> createTypedFactory(
+        clientId: String,
+        concurrency: Int,
+        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
+        consumerFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>> =
+        ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>>().apply {
+            this.consumerFactory = consumerFactory
+            containerProperties.clientId = clientId
+            containerProperties.isMicrometerEnabled = true
+            @Suppress("UNCHECKED_CAST")
+            setRecordInterceptor(interceptor as RecordInterceptor<String, EventEnvelope<T>>)
+            setCommonErrorHandler(errorHandler)
+            containerProperties.ackMode = ContainerProperties.AckMode.RECORD
+            setConcurrency(concurrency)
+        }
+
+    @Bean("payment_order_created_topic-factory")
     fun paymentOrderCreatedFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
-        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>
-    )
-            : ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderCreated>> =
-        createTypedFactory(
-            clientId = EventMetadatas.PaymentOrderCreatedMetadata.eventType,
-            valueType = PaymentOrderCreated::class.java,
-            interceptor = interceptor,
-            defaultKafkaConsumerFactory = customFactory
-        )
+        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ) = dynamicProps.dynamicConsumers
+        .first { it.topic == EventMetadatas.PaymentOrderCreatedMetadata.topic }
+        .let { cfg ->
+            createTypedFactory<PaymentOrderCreated>(
+                clientId = cfg.id,
+                concurrency = cfg.concurrency,
+                interceptor = interceptor,
+                consumerFactory = customFactory,
+                errorHandler = errorHandler
+            )
+        }
 
     @Bean("payment_order_retry_request_topic-factory")
     fun paymentRetryRequestedFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
-        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>
-    )
-            : ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderRetryRequested>> =
-        createTypedFactory(
-            clientId = EventMetadatas.PaymentOrderRetryRequestedMetadata.eventType,
-            valueType = PaymentOrderRetryRequested::class.java,
-            interceptor = interceptor,
-            defaultKafkaConsumerFactory = customFactory
-        )
+        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ) = dynamicProps.dynamicConsumers
+        .first { it.topic == EventMetadatas.PaymentOrderRetryRequestedMetadata.topic }
+        .let { cfg ->
+            createTypedFactory<PaymentOrderRetryRequested>(
+                clientId = cfg.id,
+                concurrency = cfg.concurrency,
+                interceptor = interceptor,
+                consumerFactory = customFactory,
+                errorHandler = errorHandler
+            )
+        }
 
     @Bean("payment_status_check_scheduler_topic-factory")
     fun paymentStatusCheckExecutorFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
-        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>
-    )
-            : ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderStatusCheckRequested>> =
-        createTypedFactory(
-            EventMetadatas.PaymentOrderStatusCheckScheduledMetadata.eventType,
-            PaymentOrderStatusCheckRequested::class.java,
-            interceptor = interceptor,
-            defaultKafkaConsumerFactory = customFactory
+        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ) = dynamicProps.dynamicConsumers
+        .first { it.topic == EventMetadatas.PaymentOrderStatusCheckScheduledMetadata.topic }
+        .let { cfg ->
+            createTypedFactory<PaymentOrderStatusCheckRequested>(
+                clientId = cfg.id,
+                concurrency = cfg.concurrency,
+                interceptor = interceptor,
+                consumerFactory = customFactory,
+                errorHandler = errorHandler
+            )
+        }
+
+    @Bean
+    fun mdcRecordInterceptor(): RecordInterceptor<String, EventEnvelope<*>> = RecordInterceptor { record, _ ->
+        fun header(key: String) = record.headers().lastHeader(key)?.value()?.let { String(it) }
+        listOf(
+            com.dogancaglar.common.logging.LogFields.TRACE_ID,
+            com.dogancaglar.common.logging.LogFields.EVENT_ID,
+            com.dogancaglar.common.logging.LogFields.PARENT_EVENT_ID
+        ).forEach { key -> header(key)?.let { org.slf4j.MDC.put(key, it) } }
+        org.slf4j.MDC.put(
+            com.dogancaglar.common.logging.LogFields.AGGREGATE_ID,
+            record.value()?.aggregateId ?: record.key()
         )
-
-    @Bean("payment_order_succeded_topic-factory")
-    fun paymentOrderSucceededFactory(
-        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
-        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>
-    )
-            : ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderSucceeded>> =
-        createTypedFactory(
-            clientId = EventMetadatas.PaymentOrderSuccededMetaData.eventType,
-            valueType = PaymentOrderSucceeded::class.java,
-            interceptor = interceptor,
-            defaultKafkaConsumerFactory = customFactory
-        )
-
-    /* ---------- helper ---------- */
-
-    private fun <T : Any> createTypedFactory(
-        clientId: String,
-        valueType: Class<T>,
-        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
-        defaultKafkaConsumerFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>
-    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>> {
-
-        // 1. Create a fresh listener‐container factory
-        val factory = ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>>()
-
-        // 2. Reuse your shared consumer factory
-        @Suppress("UNCHECKED_CAST")
-        factory.consumerFactory = defaultKafkaConsumerFactory
-
-        // 3. Set the client.id so Micrometer tags the client metrics correctly
-        factory.containerProperties.clientId = clientId
-
-        // 4. Enable Micrometer’s built-in metrics (listener timers + ConsumerMetrics)
-        factory.containerProperties.isMicrometerEnabled = true
-
-        // 5. Attach your MDC interceptor for propagating trace headers
-        @Suppress("UNCHECKED_CAST")
-        factory.setRecordInterceptor(
-            interceptor as RecordInterceptor<String, EventEnvelope<T>>
-        )
-
-        return factory
+        record
     }
 
     @Bean
-    fun timeZoneConfigurer(): CommandLineRunner = CommandLineRunner {
-        TimeZone.setDefault(TimeZone.getTimeZone("Europe/Amsterdam"))
-    }
-
-    @Configuration
-    class MessageHandlerFactoryConfig {
-        @Bean
-        fun messageHandlerMethodFactory() = DefaultMessageHandlerMethodFactory().apply {
-            setMessageConverter(MappingJackson2MessageConverter())
-        }
-    }
+    fun messageHandlerMethodFactory(): DefaultMessageHandlerMethodFactory = DefaultMessageHandlerMethodFactory()
 }

@@ -9,7 +9,7 @@ interface RetryQueuePort<T> {
         lastErrorMessage: String? = "PSP call timed out, retrying"
     )
 
-    fun pollDueRetries(): List<EventEnvelope<T>>
+    fun pollDueRetries(maxBatchSize: Long): List<EventEnvelope<T>>
     fun getRetryCount(paymentOrderId: Long): Int
     fun resetRetryCounter(paymentOrderId: Long)
 

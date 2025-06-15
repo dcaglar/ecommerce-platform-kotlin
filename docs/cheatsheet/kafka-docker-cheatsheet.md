@@ -31,6 +31,39 @@ kafka-topics --bootstrap-server localhost:29092 --list
 kafka-topics --bootstrap-server localhost:29092 --create --topic my-topic --partitions 1 --replication-factor 1
 ```
 
+
+### increase partion
+```sh
+kafka-topics --bootstrap-server localhost:29092 --alter --topic payment_order_created_queue --partitions 32
+```
+
+```sh
+kafka-topics --bootstrap-server localhost:29092 --alter --topic payment_order_retry_request_topic --partitions 32
+```
+
+### how to inspect the exception in the dlq topic
+```sh
+kafka-console-consumer \
+  --bootstrap-server localhost:29092 \
+  --topic payment_order_retry_request_topic-dlt \
+  --from-beginning \
+  --property print.headers=true 
+```
+
+### check the descripton  of the topic
+```sh
+ kafka-topics --bootstrap-server localhost:29092 --describe --topic payment_order_created_queue 
+ ```
+
+```sh
+ kafka-topics --bootstrap-server localhost:29092 --describe --topic payment_order_retry_request_topic 
+ ```
+
+
+
+
+
+
 ### Produce Messages
 ```sh
 echo "hello world" | kafka-console-producer --bootstrap-server localhost:29092 --topic my-topic

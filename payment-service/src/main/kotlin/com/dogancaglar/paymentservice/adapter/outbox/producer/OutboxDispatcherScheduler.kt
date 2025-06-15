@@ -30,6 +30,7 @@ class OutboxDispatcherScheduler(
     companion object {
         private const val INTERVAL_MS = 5_000L
         private const val EVENT_TYPE = MetricTagValues.EventTypes.PAYMENT_ORDER_CREATED
+        private const val BATCH_LIMIT = 5000
     }
 
     // Used for the batch size gauge (we control the value)
@@ -91,7 +92,7 @@ class OutboxDispatcherScheduler(
                 tag(MetricTags.JOB_NAME, MetricTagValues.Jobs.OUTBOX_DISPATCHER)
             )
         ).record(Runnable {
-            val newEvents = outboxEventPort.findByStatus("NEW")
+            val newEvents = outboxEventPort.findByStatusWithLimit("NEW", BATCH_LIMIT)
             batchSize.set(newEvents.size.toDouble()) // Update batch size gauge
 
             val processedCounter = meterRegistry.counter(
