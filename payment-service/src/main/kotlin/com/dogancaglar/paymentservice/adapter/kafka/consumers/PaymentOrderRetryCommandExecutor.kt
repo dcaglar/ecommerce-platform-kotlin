@@ -14,12 +14,30 @@ import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.errors.RetriableException
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
 import org.springframework.dao.TransientDataAccessException
 import org.springframework.kafka.listener.ListenerExecutionFailedException
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.stereotype.Component
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+
+@Configuration
+class ExecutorConfig {
+    @Bean
+    fun pspRetryTaskExecutor(): ThreadPoolTaskExecutor {
+        val executor = ThreadPoolTaskExecutor()
+        executor.corePoolSize = 32
+        executor.maxPoolSize = 32
+        executor.setQueueCapacity(1000)
+        executor.setThreadNamePrefix("psp-retry-")
+        executor.setWaitForTasksToCompleteOnShutdown(true)
+        executor.initialize()
+        return executor
+    }
+}
 
 @Component
 class PaymentOrderRetryCommandExecutor(
@@ -27,10 +45,8 @@ class PaymentOrderRetryCommandExecutor(
     val pspClient: PSPClientPort,
     val retryMetrics: RetryMetrics,
     val pspResultCache: PspResultCachePort,
+    @Qualifier("pspRetryTaskExecutor") private val pspRetryExecutor: ThreadPoolTaskExecutor
 ) {
-
-    val pspRetryExecutor = Executors.newFixedThreadPool(32);
-
 
     private val logger = LoggerFactory.getLogger(javaClass)
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderRetryRequested>>) {

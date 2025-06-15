@@ -65,7 +65,7 @@ class KafkaTopicsConfig(
     @Bean
     fun paymentOrderSuccededTopic(): NewTopic =
         NewTopic(
-            TOPIC_NAMES.PAYMENT_ORDER_SUCCEDED,
+            TOPIC_NAMES.PAYMENT_ORDER_SUCCEEDED,
             kafkaTopicsProperties.payment_order_succeded_topic.partitions,
             kafkaTopicsProperties.payment_order_succeded_topic.replicas
         )
@@ -74,7 +74,7 @@ class KafkaTopicsConfig(
     @Bean
     fun paymentOrderSuccededTopicDLQ(): NewTopic =
         NewTopic(
-            TOPIC_NAMES.PAYMENT_ORDER_SUCCEDED_DLQ,
+            TOPIC_NAMES.PAYMENT_ORDER_SUCCEEDED_DLQ,
             kafkaTopicsProperties.payment_order_succeded_topic_dlq.partitions,
             kafkaTopicsProperties.payment_order_succeded_topic_dlq.replicas
         )

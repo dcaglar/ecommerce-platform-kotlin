@@ -10,20 +10,38 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.port.PSPClientPort
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.stereotype.Component
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
 //todo  appply sama logic as in retry command executor
 
+@Configuration
+class ScheduledExecutorConfig {
+    @Bean
+    fun scheduledStatusCheckTaskExecutor(): ThreadPoolTaskExecutor {
+        val executor = ThreadPoolTaskExecutor()
+        executor.corePoolSize = 1
+        executor.maxPoolSize = 1
+        executor.setQueueCapacity(100)
+        executor.setThreadNamePrefix("scheduled-status-check-")
+        executor.setWaitForTasksToCompleteOnShutdown(true)
+        executor.initialize()
+        return executor
+    }
+}
+
 @Component
 class ScheduledPaymentStatusCheckExecutor(
     val pspClient: PSPClientPort,
-    val paymentService: PaymentService
+    val paymentService: PaymentService,
+    @Qualifier("scheduledStatusCheckTaskExecutor") private val scheduledStatusCheckExecutor: ThreadPoolTaskExecutor
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
-    val executor = Executors.newSingleThreadExecutor()
 
     // For higher concurrency, inject a shared executor as a constructor parameter or as a class val.
     // For demo purposes, creating a new executor each time is OK.
@@ -68,14 +86,9 @@ class ScheduledPaymentStatusCheckExecutor(
     }
 
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
-        return try {
-            executor.submit<PaymentOrderStatus> {
-                // If you want to time the call, do it here.
-                pspClient.checkPaymentStatus(order.paymentOrderId.toString())
-            }.get(3, TimeUnit.SECONDS)
-        } finally {
-            executor.shutdown()
-        }
+        return scheduledStatusCheckExecutor.submit<PaymentOrderStatus> {
+            pspClient.checkPaymentStatus(order.paymentOrderId.toString())
+        }.get(3, TimeUnit.SECONDS)
     }
 
 }
