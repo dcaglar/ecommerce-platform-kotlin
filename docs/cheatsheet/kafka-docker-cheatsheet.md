@@ -34,7 +34,7 @@ kafka-topics --bootstrap-server localhost:29092 --create --topic my-topic --part
 
 ### increase partion
 ```sh
-kafka-topics --bootstrap-server localhost:29092 --alter --topic payment_order_created_queue --partitions 64
+kafka-topics --bootstrap-server localhost:29092 --alter --topic payment_order_created_queue --partitions 32
 ```
 
 ```sh

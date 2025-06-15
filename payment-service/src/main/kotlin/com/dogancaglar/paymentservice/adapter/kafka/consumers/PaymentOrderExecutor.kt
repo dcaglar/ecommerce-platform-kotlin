@@ -13,9 +13,11 @@ import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.errors.RetriableException
 import org.slf4j.LoggerFactory
+import org.springframework.dao.TransientDataAccessException
 import org.springframework.kafka.listener.ListenerExecutionFailedException
 import org.springframework.stereotype.Component
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
 @Component
@@ -23,92 +25,86 @@ class PaymentOrderExecutor(
     private val paymentService: PaymentService,
     private val pspClient: PSPClientPort,
     private val meterRegistry: MeterRegistry,
-    private val pspResultCache: PspResultCachePort
+    private val pspResultCache: PspResultCachePort,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
-    private val pspExecutor = Executors.newFixedThreadPool(64) // or higher
+    val pspExecutor = Executors.newFixedThreadPool(32);
+
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderCreated>>) {
+        val totalStart = System.currentTimeMillis()
         val envelope = record.value()
-        val paymentOrderCreatedEvent = envelope.data
-        val order = paymentService.mapEventToDomain(paymentOrderCreatedEvent)
+        val event = envelope.data
+        val order = paymentService.mapEventToDomain(event)
 
         LogContext.with(
             envelope, mapOf(
                 LogFields.TOPIC_NAME to record.topic(),
-                LogFields.CONSUMER_GROUP to "PAYMENT_ORDER_EXECUTOR",
+                LogFields.CONSUMER_GROUP to "payment-order-executor",
                 LogFields.EVENT_ID to envelope.eventId.toString(),
                 LogFields.TRACE_ID to envelope.traceId,
-                LogFields.PUBLIC_PAYMENT_ID to envelope.data.publicPaymentId,
+                LogFields.PUBLIC_PAYMENT_ID to event.publicPaymentId,
                 LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.aggregateId
             )
         ) {
-            // 1. Skip already-processed orders
             if (order.status != PaymentOrderStatus.INITIATED) {
-                logger.info("⏩ Skipping already processed order with status=${order.status}")
+                logger.info("⏩ Skipping already processed order(status=${order.status})")
                 return@with
             }
-            // 2. Try-catch-all: nothing leaves this block
+
+            val cacheStart = System.currentTimeMillis()
             try {
-                val pspCacheKey = order.paymentOrderId.toString() // or use a more specific key if needed
-                val cachedResult = pspResultCache.get(pspCacheKey)
-                var response: PaymentOrderStatus? = null
-                if (cachedResult != null) {
-                    logger.info("PSP result found in cache for orderId=${order.paymentOrderId}, skipping PSP call and using cached result.")
-                    // Deserialize cachedResult and use it
-                    response = PaymentOrderStatus.valueOf(cachedResult)
+                val key = order.paymentOrderId.toString()
+                val cached = pspResultCache.get(key)
+                val cacheEnd = System.currentTimeMillis()
+                logger.info("TIMING: PSP cache lookup took ${cacheEnd - cacheStart} ms for $key")
+
+                val pspStart = System.currentTimeMillis()
+                val status = if (cached != null) {
+                    logger.info("♻️ Cache hit for $key → $cached")
+                    PaymentOrderStatus.valueOf(cached)
                 } else {
-                    logger.info("✅ PSP call returned status=$response for paymentOrderId=${order.paymentOrderId}")
-                    try {
-                        response = safePspCall(order)
-                        //cache result
-                        pspResultCache.put(pspCacheKey, response.name) // or serialize if needed
-                        logger.info("✅ PSP call returned status=$response for paymentOrderId=${order.paymentOrderId}")
-                    } catch (e: TimeoutException) {
-                        logger.error("⏱️ PSP call timed out for orderId=${order.paymentOrderId}, will retry...", e)
-                        response = PaymentOrderStatus.TIMEOUT
-                    }
+                    val result = safePspCall(order)
+                    pspResultCache.put(key, result.name)
+                    logger.info("✅ PSP returned $result for $key")
+                    result
                 }
+                val pspEnd = System.currentTimeMillis()
+                logger.info("TIMING: PSP call (including cache, if miss) took ${pspEnd - pspStart} ms for $key")
 
-                paymentService.processPspResult(event = paymentOrderCreatedEvent, pspStatus = response!!)
-                pspResultCache.remove(pspCacheKey) // Clear cache after successful processing
+                val dbStart = System.currentTimeMillis()
+                paymentService.processPspResult(event = event, pspStatus = status)
+                pspResultCache.remove(key)
+                val dbEnd = System.currentTimeMillis()
+                logger.info("TIMING: processPspResult (DB/write) took ${dbEnd - dbStart} ms for $key")
 
-            } catch (e: org.springframework.dao.TransientDataAccessException) {
-                logger.error("🔄 Transient DB error for orderId=${order.paymentOrderId}, will be retried/DLQ", e)
-                throw e // retry/DLQ
+                val totalEnd = System.currentTimeMillis()
+                logger.info("TIMING: Total handler time: ${totalEnd - totalStart} ms for $key")
+
+            } catch (e: TransientDataAccessException) {
+                logger.error("🔄 Transient DB error for $order, will retry/DLQ", e)
+                throw e
             } catch (e: RetriableException) {
-                logger.error(
-                    "🔄 Transient Kafka publish error for orderId=${order.paymentOrderId}, will be retried/DLQ",
-                    e
-                )
-                throw e // retry/DLQ
+                logger.error("🔄 Transient Kafka error for $order, will retry/DLQ", e)
+                throw e
             } catch (t: Throwable) {
-                logger.error(
-                    "❌ Non-transient, unexpected, or fatal error for orderId=${order.paymentOrderId}, will be sent to DLQ immediately (no retry)",
-                    t
-                )
-                throw ListenerExecutionFailedException("Non-transient, unexpected, or fatal error, send to DLQ", t)
+                logger.error("❌ Fatal error for $order, sending to DLQ", t)
+                throw ListenerExecutionFailedException("Fatal", t)
             }
         }
     }
 
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
-        val start = System.nanoTime()
-        try {
-            val future = pspExecutor.submit<PaymentOrderStatus> {
-                pspClient.charge(order)
-            }
-            try {
-                return future.get(3, java.util.concurrent.TimeUnit.SECONDS)
-            } catch (e: java.util.concurrent.TimeoutException) {
-                future.cancel(true)
-                throw e
-            }
+        val pspCallStart = System.currentTimeMillis()
+        val future = pspExecutor.submit<PaymentOrderStatus> { pspClient.chargeRetry(order) }
+        return try {
+            future.get(3, TimeUnit.SECONDS)
+        } catch (e: TimeoutException) {
+            future.cancel(true)
+            throw e
         } finally {
-            val end = System.nanoTime()
-            meterRegistry.timer("psp.call.duration", "operation", "charge")
-                .record(end - start, java.util.concurrent.TimeUnit.NANOSECONDS)
+            meterRegistry.counter("SafePspCall.total", "status", "success").increment()
+            val pspCallEnd = System.currentTimeMillis()
+            logger.info("TIMING: Real PSP call took ${pspCallEnd - pspCallStart} ms for paymentOrderId=${order.paymentOrderId}")
         }
     }
 }
-
-

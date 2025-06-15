@@ -129,29 +129,38 @@ class PaymentService(
 
 
     fun processPspResult(event: PaymentOrderEvent, pspStatus: PaymentOrderStatus) {
+        val totalStart = System.currentTimeMillis()
         val order = paymentOrderFactory.fromEvent(event)
-        when {
-            pspStatus == PaymentOrderStatus.SUCCESSFUL -> {
-                retryMetrics.recordRetryAttempt(
-                    retryCount = order.retryCount,
-                    reason = order.retryReason ?: "unknown", // or another tag if you track more causes
-                )
-                handleSuccessfulPayment(order = order)
-            }
 
-            PSPStatusMapper.requiresRetryPayment(pspStatus) -> {
-                handleRetryEvent(order = order, reason = pspStatus.name)
-            }
+        try {
+            when {
+                pspStatus == PaymentOrderStatus.SUCCESSFUL -> {
+                    retryMetrics.recordRetryAttempt(
+                        retryCount = order.retryCount,
+                        reason = order.retryReason ?: "unknown",
+                    )
+                    val dbStart = System.currentTimeMillis()
+                    handleSuccessfulPayment(order = order)
+                    val dbEnd = System.currentTimeMillis()
+                    logger.info("TIMING: processPspResult (DB/write) took ${dbEnd - dbStart} ms for ${order.paymentOrderId}")
+                }
 
-            PSPStatusMapper.requiresStatusCheck(pspStatus) -> {
-                handlePaymentStatusCheckEvent(order)
-            }
+                PSPStatusMapper.requiresRetryPayment(pspStatus) -> {
+                    handleRetryEvent(order = order, reason = pspStatus.name)
+                }
 
-            else -> {
-                handleNonRetryableFailEvent(order)
+                PSPStatusMapper.requiresStatusCheck(pspStatus) -> {
+                    handlePaymentStatusCheckEvent(order)
+                }
+
+                else -> {
+                    handleNonRetryableFailEvent(order)
+                }
             }
+        } finally {
+            val totalEnd = System.currentTimeMillis()
+            logger.info("TIMING: processPspResult (Total) took ${totalEnd - totalStart} ms for ${order.paymentOrderId}")
         }
-        // All event publishing, retry logic, and DB writes live here.
     }
 
 

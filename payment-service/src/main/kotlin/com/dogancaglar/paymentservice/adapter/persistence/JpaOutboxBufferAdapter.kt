@@ -4,6 +4,7 @@ import com.dogancaglar.paymentservice.adapter.persistence.mapper.OutboxEventEnti
 import com.dogancaglar.paymentservice.adapter.persistence.repository.SpringDataOutboxEventJpaRepository
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.domain.port.OutboxEventPort
+import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Repository
 
 @Repository
@@ -13,6 +14,10 @@ class JpaOutboxBufferAdapter(
 
     override fun findByStatus(status: String): List<OutboxEvent> =
         springDataJpaRepository.findByStatus(status).map { OutboxEventEntityMapper.toDomain(it) }
+
+    override fun findByStatusWithLimit(status: String, limit: Int): List<OutboxEvent> =
+        springDataJpaRepository.findByStatusOrderByCreatedAtAsc(status, PageRequest.of(0, limit))
+            .map { OutboxEventEntityMapper.toDomain(it) }
 
     override fun saveAll(events: List<OutboxEvent>): List<OutboxEvent> {
         val entities = events.map { OutboxEventEntityMapper.toEntity(it) }

@@ -1,48 +1,55 @@
-kafka:
-  bootstrap-servers: kafka:9092
+server:
+  port: 8080 # App will listen on port 8080 *inside* the container. Docker maps host port (e.g., 8081:8080) to this.
+#bootstrap:
+#  servers: kafka:9092
 spring:
-  kafka:
-    consumer:
-      heartbeat-interval: 3000
-      session-timeout: 10000
-      max-poll-interval: 300000
-      enable-auto-commit: false
-      properties:
-        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
-    listener:
-      micrometer-enabled: true
+  kafka: #url for kafka in container-since this is used in docker-compose we use the service name
+    bootstrap-servers: kafka:9092
   datasource:
     url: jdbc:postgresql://payment-db:5432/payment
     username: payment
     password: payment
-    hikari:
-      maximum-pool-size: 120
-      minimum-idle: 25
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
-server:
-  port: 8080
   data:
-    redis:
+    redis: #url for redis in container-since this is used in docker-compose we use the service name
+      url: redis://redis:6379
       timeout: 2000ms
       lettuce:
         pool:
-        max-active: 8
-
-        max-idle: 8
-        min-idle: 0
-        max-wait: -1ms
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
   security:
     oauth2:
       resourceserver:
         jwt:
           issuer-uri: http://keycloak:8080/realms/ecommerce-platform
-metrics:
-  tags:
-    application: payment-service
-logging:
-  level:
-    org.springframework.kafka.listener.DeadLetterPublishingRecoverer: DEBUG
-    org.apache.kafka.clients.producer.ProducerConfig: DEBUG
-    org.apache.kafka.clients.producer.KafkaProducer: DEBUG
+
+
+kafka:
+  topics:
+    payment_order_created_topic:
+      partitions: 16
+      replicas: 1
+    payment_order_created_topic_dlq:
+      partitions: 16
+      replicas: 1
+    payment_order_retry_request_topic:
+      partitions: 16
+      replicas: 1
+    payment_order_retry_request_topic_dlq:
+      partitions: 16
+      replicas: 1
+    payment_status_check_scheduler_topic:
+      partitions: 1
+      replicas: 1
+    payment_status_check_scheduler_topic_dlq:
+      partitions: 1
+      replicas: 1
+    payment_order_succeded_topic:
+      partitions: 16
+      replicas: 1
+    payment_order_succeded_topic_dlq:
+      partitions: 16
+      replicas: 1
+

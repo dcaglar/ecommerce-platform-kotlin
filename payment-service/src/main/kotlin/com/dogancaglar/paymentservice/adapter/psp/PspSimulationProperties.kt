@@ -3,14 +3,14 @@ package com.dogancaglar.paymentservice.adapter.psp
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Configuration
 
-enum class PspScenario { NORMAL, PEAK, DEGRADED }
+enum class PspScenario { NORMAL, PEAK, DEGRADED, BEST_PSP_EVER }
 
 @Configuration
 @ConfigurationProperties(prefix = "psp.simulation")
 class PspSimulationProperties {
-    lateinit var currentScenario: String
+    var currentScenario: String? = null
     val scenario: PspScenario
-        get() = PspScenario.valueOf(currentScenario)
+        get() = PspScenario.valueOf(currentScenario ?: PspScenario.NORMAL.name)
 
     // now wrap your existing blocks under a map of named configs
     var scenarios: Map<PspScenario, ScenarioConfig> = emptyMap()

@@ -4,9 +4,11 @@ import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
 import com.dogancaglar.common.logging.LogContext
+import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Component
 import java.nio.charset.StandardCharsets
@@ -19,7 +21,9 @@ import java.util.*
  */
 @Component
 class PaymentEventPublisher(
-    private val kafkaTemplate: KafkaTemplate<String, EventEnvelope<*>>
+    @Qualifier("paymentOrderEventKafkaTemplate")
+    private val kafkaTemplate: KafkaTemplate<String, EventEnvelope<*>>,
+    private val meterRegistry: MeterRegistry    // Inject here!
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)

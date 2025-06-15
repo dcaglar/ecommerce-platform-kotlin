@@ -30,7 +30,7 @@ run like this:
 3 virtual users for 2minutes not set default options
 
 ```bash
-VUS=10 DURATION=2m k6 run load-tests/baseline-smoke-test.js
+VUS=40 DURATION=10m k6 run load-tests/baseline-smoke-test.js
 
 VUS=3 DURATION=2m k6 run load-tests/baseline-smoke-test.js
 

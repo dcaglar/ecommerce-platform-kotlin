@@ -26,10 +26,13 @@ class PaymentOrderRetryCommandExecutor(
     private val paymentService: PaymentService,
     val pspClient: PSPClientPort,
     val retryMetrics: RetryMetrics,
-    val pspResultCache: PspResultCachePort
+    val pspResultCache: PspResultCachePort,
 ) {
+
+    val pspRetryExecutor = Executors.newFixedThreadPool(32);
+
+
     private val logger = LoggerFactory.getLogger(javaClass)
-    val pspExecutor = Executors.newFixedThreadPool(32)
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderRetryRequested>>) {
         val envelope = record.value()
         val paymentOrderCreatedEvent = envelope.data
@@ -90,14 +93,16 @@ class PaymentOrderRetryCommandExecutor(
         }
     }
 
+
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
-        return pspExecutor.submit<PaymentOrderStatus> {
-            try {
-                pspClient.chargeRetry(order)
-            } finally {
-                retryMetrics.recordRetryAttempt(order.retryCount, order.retryReason)
-            }
-        }.get(3, TimeUnit.SECONDS)
+        val future = pspRetryExecutor.submit<PaymentOrderStatus> { pspClient.chargeRetry(order) }
+        return try {
+            future.get(3, TimeUnit.SECONDS)
+        } catch (e: TimeoutException) {
+            throw e
+        } finally {
+            retryMetrics.recordRetryAttempt(order.retryCount, order.retryReason)
+        }
     }
 }
 

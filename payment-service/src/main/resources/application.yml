@@ -1,47 +1,77 @@
-kafka:
-  dynamic-consumers:
-    - id: payment-retry-executor
-      topic: payment_order_retry_request_topic
-      group-id: payment-retry-executor-group
-      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderRetryCommandExecutor
-    - id: payment-order-executor
-      topic: payment_order_created_queue
-      group-id: payment-order-group
-      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderExecutor
-    - id: payment-status-check-executor-scheduler
-      topic: payment_status_check_scheduler_topic
-      group-id: payment-status-check-executor-group
-      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.ScheduledPaymentStatusCheckExecutor
-logging:
-  level:
-    org.springframework.boot.context.config: DEBUG
 server:
-  port: 8080
-  tomcat: ##expose tomcat metrics
+  port: xxxx
+  tomcat:
     mbeanregistry:
       enabled: true
+app:
+  cache:
+    ttl-seconds: 3600  # 1 hour redis  TTL for PSP result cache
+  payment-service:
+    api-key: secretpaymentapikey12345
+
+  kafka: # Kafka configuration for dynamic consumers
+    dynamic-consumers:
+      - id: payment-order-executor
+        topic: payment_order_created_topic
+        group-id: payment-order-group
+        class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderExecutor
+        concurrency: 16
+
+      - id: payment-retry-executor
+        topic: payment_order_retry_request_topic
+        group-id: payment-retry-executor-group
+        class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderRetryCommandExecutor
+        concurrency: 16
+
+      - id: payment-status-check-executor-scheduler
+        topic: payment_status_check_scheduler_topic
+        group-id: payment-status-check-executor-group
+        class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.ScheduledPaymentStatusCheckExecutor
+        concurrency: 1
+
 spring:
-  kafka:
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: com.dogancaglar.paymentservice.config.serialization.EventEnvelopeSerializer
-    consumer:
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: com.dogancaglar.paymentservice.config.serialization.EventEnvelopeDeserializer
-  liquibase:
-    change-log: classpath:db/changelog/changelog-master.xml
+  datasource:
+    url: jdbc://127/0.0.1:5432/payment
+    username: payment
+    password: payment
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 20
+      connection-timeout: 3000
+      idle-timeout: 600000
+      max-lifetime: 1800000
   jpa:
     hibernate:
       ddl-auto: none  # ❌ Disable automatic table creation
       open-in-view: false
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://myserver/realms/ecommerce-platform
+  liquibase:
+    change-log: classpath:db/changelog/changelog-master.xml
+  redis:
+    url: xxxxx
+    timeout: 2000ms
+    lettuce:
+      pool:
+      max-active: 8
+      max-idle: 8
+      min-idle: 0
+      max-wait: -1ms
+  kafka: # auto-create both source & DLQ topics with matching partitions
+    bootstrap-servers: xxxxx
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      heartbeat-interval: 3000
+      session-timeout: 10000s
+      max-poll-interval: 300000
+      #      auto-offset-reset: earliest # ❌ Do not reset offsets automatically,default is latest
+      #      enable-auto-commit: false
+      properties: #maybe change partition assignment strategy
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+        spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.config.serialization.EventEnvelopeDeserializer
+    listener:
+      micrometer-enabled: true
 psp:
   simulation:
-    currentScenario: PEAK  # Default scenario
+    currentScenario: BEST_PSP_EVER  # Default scenario
     scenarios:
       NORMAL:
         timeouts:
@@ -107,30 +137,76 @@ psp:
             minMs: 2601
             maxMs: 2990
         response:
-          successful: 50       # Only 65% succeed (down from 80% in normal)
-          retryable: 40        # 25% retryable errors (up from 15%)
-          statusCheck: 0       # Still none, as you wish
+          successful: 50
+          retryable: 40
+          statusCheck: 0
           nonRetryable: 10
-  cache:
-    ttl-seconds: 3600  # 1 hour TTL for PSP result cache
-payment-service:
-  api-key: secretpaymentapikey12345
-spring.jackson.time-zone: Europe/Amsterdam
-spring.jpa.properties.hibernate.jdbc.time_zone: UTC
-logging.config: classpath:logback-spring.xml
+      BEST_PSP_EVER:
+        timeouts:
+          enabled: false
+          probability: 0      # 10% of calls simply time out (higher than normal, less than peak)
+        latency:
+          fast:
+            probability: 100
+            minMs: 1
+            maxMs: 2
+          moderate:
+            probability: 0
+            minMs: 2201
+            maxMs: 2600
+          slow:
+            probability: 0
+            minMs: 2601
+            maxMs: 2990
+        response:
+          successful: 100
+          retryable: 0
+          statusCheck: 0
+          nonRetryable: 0
+
+
+# management, endpoints, metrics, server, health
 management:
   endpoints:
     web:
       exposure:
-        include: prometheus,metrics,health,info
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
   metrics:
+    export:
+      prometheus:
+        enabled: true
+    sla:
+      http.server.requests: 100ms,500ms,1s,2s,5s
     distribution:
       percentiles-histogram:
-        http:
-          server:
-            requests: true
-    sla:
-      http:
-        server:
-          requests: true
+        http.server.requests: true
+        jdbc.connections: true
+        kafka.consumer.records-lag: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+        jdbc.connections: 0.95,0.99
+        kafka.consumer.records-lag: 0.5,0.99
+    enable:
+      all: true
+    tags:
+      application: ${spring.application.name:payment-service}
+      profile: ${spring.profiles.active:dev}
+  health:
+    probes:
+      enabled: true
 
+
+
+metrics:
+  tags:
+    application: payment-service
+
+
+spring.jackson.time-zone: Europe/Amsterdam
+spring.jpa.properties.hibernate.jdbc.time_zone: UTC
+logging.config: classpath:logback-spring.xml
