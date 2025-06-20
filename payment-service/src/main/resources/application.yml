@@ -36,7 +36,7 @@ spring:
     password: payment
     hikari:
       maximum-pool-size: 110
-      minimum-idle: 20
+      minimum-idle: 70
       connection-timeout: 5000
       idle-timeout: 600000
       max-lifetime: 1800000
