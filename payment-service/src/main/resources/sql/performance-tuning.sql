@@ -17,9 +17,15 @@ SELECT
     min_exec_time,
     max_exec_time
 FROM pg_stat_statements
+where query ilike '%outbox_event%' or query ilike '%payments%' or query ilike '%payment_orders%'
 ORDER BY mean_exec_time DESC
 LIMIT 10;
 
+
+EXPLAIN ANALYZE
+SELECT count(*) FROM outbox_event WHERE status = 'NEW'
+
+EXPLAIN ANALYZE SELECT * FROM outbox_event    WHERE status = 'NEW'ORDER BY created_at FOR UPDATE SKIP LOCKED  LIMIT 300;
 
 
 --to reset statts

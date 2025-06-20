@@ -123,9 +123,6 @@ hikari active connections from 70 to 90
 
 
 
-03:49 starting
-
-k6 run -e RPS=150 -e VUS=5  load-tests/baseline-smoke-test.js
 
 
 
@@ -304,9 +301,16 @@ started at 04:46
 
 
 
-increase @Scheduled(fixedDelay = 5_000) to 10_00
+16:!6
+posgtgre max 125
+      maximum-pool-size: 110
+      minimum-idle: 20
+      connection-timeout: 3000
+      Scheduled (3000)
+      batchsize 250
+      threadcount 8
 
-started  04:%7
+
 
 
 

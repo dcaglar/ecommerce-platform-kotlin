@@ -19,8 +19,9 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
+
 @Service
-class OutboxDispatcherService(
+class OutboxDispatcherJob(
     private val outboxEventPort: OutboxEventPort,
     private val paymentEventPublisher: PaymentEventPublisher,
     private val meterRegistry: MeterRegistry,
@@ -29,13 +30,13 @@ class OutboxDispatcherService(
     private val taskScheduler: ThreadPoolTaskScheduler // <-- inject the shared scheduler!
 ) {
     companion object {
-        private const val THREAD_COUNT = 6
+        private const val THREAD_COUNT = 8
         private const val BATCH_SIZE = 500
     }
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    @Scheduled(fixedDelay = 10_000)
+    @Scheduled(fixedDelay = 5000)
     fun dispatchBatches() {
         logger.info("Starting outbox event dispatch batches ")
         repeat(THREAD_COUNT) {
