@@ -2,6 +2,7 @@ package com.dogancaglar.paymentservice.web.dto
 
 data class PaymentResponseDTO(
     val id: String,
+    val paymentId: String,
     val buyerId: String,
     val orderId: String,
     val totalAmount: AmountDto,

@@ -1,32 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <databaseChangeLog
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
-    <changeSet id="create-outbox-event-table" author="dogancaglar">
-        <createTable tableName="outbox_event">
-            <column name="id" type="UUID">
-                <constraints primaryKey="true" nullable="false"/>
-            </column>
-            <column name="event_type" type="VARCHAR(255)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="aggregate_id" type="VARCHAR(255)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="payload" type="TEXT">
-                <constraints nullable="false"/>
-            </column>
-            <column name="status" type="VARCHAR(50)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="created_at" type="TIMESTAMP">
-                <constraints nullable="false"/>
-            </column>
-        </createTable>
-        <rollback>
-            <dropTable tableName="outbox_event"/>
-        </rollback>
+
+    <changeSet id="01-create-outbox-event-partitioned-parent-table" author="dogancaglar">
+        <sql>
+            CREATE TABLE IF NOT EXISTS outbox_event (
+            id uuid NOT NULL,
+            event_type varchar(255) NOT NULL,
+            aggregate_id varchar(255) NOT NULL,
+            payload text NOT NULL,
+            status varchar(50) NOT NULL,
+            created_at timestamp NOT NULL,
+            PRIMARY KEY (id, created_at)
+            ) PARTITION BY RANGE (created_at);
+        </sql>
     </changeSet>
+
+    <changeSet id="02-create-index-outbox-event-createdat" author="dogancaglar">
+        <createIndex indexName="idx_outbox_event_createdat" tableName="outbox_event">
+            <column name="created_at"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="03-create-index-outbox-event-status" author="dogancaglar">
+        <createIndex indexName="idx_outbox_event_status" tableName="outbox_event">
+            <column name="status"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="04-create-index-outbox-status-createdat" author="dogancaglar">
+        <createIndex indexName="idx_outbox_status_createdat" tableName="outbox_event">
+            <column name="status"/>
+            <column name="created_at"/>
+        </createIndex>
+    </changeSet>
+
 </databaseChangeLog>

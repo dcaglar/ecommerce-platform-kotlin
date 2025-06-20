@@ -5,6 +5,7 @@ import com.dogancaglar.paymentservice.adapter.persistence.repository.SpringDataO
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.domain.port.OutboxEventPort
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
 
 @Repository
@@ -32,6 +33,15 @@ class JpaOutboxBufferAdapter(
 
     override fun countByStatus(status: String): Long {
         return springDataJpaRepository.countByStatus(status)
+    }
+
+    override fun findBatchForDispatch(
+        @Param("status") status: String,
+        @Param("batchSize") batchSize: Int
+    ): List<OutboxEvent> {
+        return springDataJpaRepository.findBatchForDispatch(status, batchSize)
+            .map { OutboxEventEntityMapper.toDomain(it) }
+
     }
 
 

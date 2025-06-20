@@ -46,7 +46,7 @@ services:
       POSTGRES_DB: payment
       POSTGRES_USER: payment
       POSTGRES_PASSWORD: payment
-      POSTGRES_MAX_CONNECTIONS: 120
+      POSTGRES_MAX_CONNECTIONS: 200
     labels:
       service: payment-db
       environment: local
@@ -56,6 +56,10 @@ services:
       - "5434:5432"  # Exposed for Spring Boot to connect
     networks:
       - payment-net
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
 
   ### 📨 Messaging Stack
   zookeeper:

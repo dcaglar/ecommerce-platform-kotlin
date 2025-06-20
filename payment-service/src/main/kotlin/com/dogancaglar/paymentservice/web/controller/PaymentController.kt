@@ -23,7 +23,10 @@ class PaymentController(
     @PostMapping
     @PreAuthorize("hasAuthority('payment:write')")
     fun createPayment(@Valid @RequestBody request: PaymentRequestDTO): ResponseEntity<PaymentResponseDTO> {
-        logger.info("📥 Received payment request for order: ${request.orderId}")
+        logger.info("📥 Sending payment request for order: ${request.orderId}")
+        val responseDTO = paymentService.createPayment(request);
+        logger.info("📥 Received payment request for order: ${responseDTO.orderId} , payment id is  ${responseDTO.paymentId}")
+        //todo remember to change  to http 201 or 202
         return ResponseEntity.ok(paymentService.createPayment(request))
     }
 }
