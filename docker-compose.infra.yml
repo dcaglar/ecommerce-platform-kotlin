@@ -134,6 +134,19 @@ services:
     restart: always
     networks:
       - messaging-net
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.63.0
+    container_name: redis_exporter
+    restart: unless-stopped
+    ports:
+      - "9121:9121" # 9121 is default; expose as needed
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+    depends_on:
+      - redis
+    networks:
+      - messaging-net
+      - monitoring-net
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
