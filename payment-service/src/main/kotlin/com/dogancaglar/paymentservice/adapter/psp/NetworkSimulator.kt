@@ -16,7 +16,7 @@ class NetworkSimulator(
 
     fun simulate() {
         val sc = active
-
+        logger.info("Selected scenario: ${config.scenario}")
         if (sc.timeouts.enabled && Random.nextInt(100) < sc.timeouts.probability) {
             logger.warn(
                 "💥 [${

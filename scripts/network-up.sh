@@ -13,7 +13,7 @@ echo "🔧 Creating external Docker networks (if not already present)..."
 # Check if Docker is running
 if ! docker info > /dev/null 2>&1; then
   echo "❌ Docker is not running. Please start Docker Desktop or the Docker daemon."
-  exit 1
+  exit 1.
 fi
 
 for network in "${EXTERNAL_NETWORKS[@]}"; do

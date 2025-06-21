@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
@@ -45,6 +46,7 @@ class ScheduledPaymentStatusCheckExecutor(
 
     // For higher concurrency, inject a shared executor as a constructor parameter or as a class val.
     // For demo purposes, creating a new executor each time is OK.
+    @Transactional
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderStatusCheckRequested>>) {
         val envelope = record.value()
         val paymentOrderStatusCheckRequested = envelope.data

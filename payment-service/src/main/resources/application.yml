@@ -1,5 +1,5 @@
 server:
-  port: xxxx
+  port: 8080
   tomcat:
     mbeanregistry:
       enabled: true
@@ -35,8 +35,8 @@ spring:
     username: payment
     password: payment
     hikari:
-      maximum-pool-size: 50
-      minimum-idle: 20
+      maximum-pool-size: 110
+      minimum-idle: 80
       connection-timeout: 3000
       idle-timeout: 600000
       max-lifetime: 1800000
@@ -71,23 +71,23 @@ spring:
       micrometer-enabled: true
 psp:
   simulation:
-    currentScenario: BEST_PSP_EVER  # Default scenario
+    currentScenario: BEST_PSP_EVER
     scenarios:
       NORMAL:
         timeouts:
           enabled: true
-          probability: 1    # 1% timeouts in normal
+          probability: 1       # 1% of requests time out
         latency:
           fast:
-            probability: 70
+            probability: 70    # 70% are fast (50–150ms)
             minMs: 50
             maxMs: 150
           moderate:
-            probability: 25
+            probability: 25    # 25% are moderate (150–300ms)
             minMs: 150
             maxMs: 300
           slow:
-            probability: 5
+            probability: 5     # 5% are slow (300–600ms)
             minMs: 300
             maxMs: 600
         response:
@@ -95,22 +95,21 @@ psp:
           retryable: 15
           statusCheck: 0
           nonRetryable: 5
-
       PEAK:
         timeouts:
           enabled: true
-          probability: 25
+          probability: 25      # 25% timeouts
         latency:
           fast:
-            probability: 30
+            probability: 30    # 30% fast (250–500ms)
             minMs: 250
             maxMs: 500
           moderate:
-            probability: 50
+            probability: 50    # 50% moderate (501–1500ms)
             minMs: 501
             maxMs: 1500
           slow:
-            probability: 20
+            probability: 20    # 20% slow (1501–2500ms)
             minMs: 1501
             maxMs: 2500
         response:
@@ -118,22 +117,21 @@ psp:
           retryable: 45
           statusCheck: 0
           nonRetryable: 5
-
       DEGRADED:
         timeouts:
           enabled: true
-          probability: 30      # 10% of calls simply time out (higher than normal, less than peak)
+          probability: 30      # 30% timeouts
         latency:
           fast:
-            probability: 20
+            probability: 20    # 20% fast (2000–2200ms)
             minMs: 2000
             maxMs: 2200
           moderate:
-            probability: 20
+            probability: 20    # 20% moderate (2201–2600ms)
             minMs: 2201
             maxMs: 2600
           slow:
-            probability: 60
+            probability: 60    # 60% slow (2601–2990ms)
             minMs: 2601
             maxMs: 2990
         response:
@@ -144,20 +142,20 @@ psp:
       BEST_PSP_EVER:
         timeouts:
           enabled: false
-          probability: 0      # 10% of calls simply time out (higher than normal, less than peak)
+          probability: 0
         latency:
           fast:
-            probability: 100
+            probability: 100   # 100% fast (1–2ms)
             minMs: 1
             maxMs: 2
           moderate:
             probability: 0
-            minMs: 2201
-            maxMs: 2600
+            minMs: 0
+            maxMs: 0
           slow:
             probability: 0
-            minMs: 2601
-            maxMs: 2990
+            minMs: 0
+            maxMs: 0
         response:
           successful: 100
           retryable: 0
@@ -192,7 +190,30 @@ management:
         jdbc.connections: 0.95,0.99
         kafka.consumer.records-lag: 0.5,0.99
     enable:
-      all: true
+      # Only enable the metrics needed for your Grafana dashboard
+      http.server.requests: true
+      tomcat.threads: true
+      hikaricp.connections: true
+      hikaricp.connections.acquire: true
+      outbox.event.backlog: true
+      outbox.dispatched: true
+      outbox.dispatcher.duration: true
+      kafka.consumer.fetch.manager.records.lag: true
+      kafka.producer.topic.record.send: true
+      process.cpu.usage: true
+      jvm.threads.live: true
+      jvm.memory.used: true
+      jvm.memory.max: true
+      jvm.gc.pause: true
+      scheduler.active.threads: true
+      scheduler.pool.size.threads: true
+      redis.retry.events.processed: true
+      redis.retry.events.failed: true
+      redis.retry.batch.size: true
+      redis.retry.dispatch.execution: true
+      kafka.consumer.fetch.manager.records.consumed: true
+      kafka.consumer.fetch.manager.fetch.latency: true
+      kafka.consumer.io.time: true
     tags:
       application: ${spring.application.name:payment-service}
       profile: ${spring.profiles.active:dev}
@@ -206,7 +227,10 @@ metrics:
   tags:
     application: payment-service
 
-
-spring.jackson.time-zone: Europe/Amsterdam
+spring.jackson.time-zone: UTC
 spring.jpa.properties.hibernate.jdbc.time_zone: UTC
 logging.config: classpath:logback-spring.xml
+outbox-dispatcher:
+  thread-count: 10
+  batch-size: 5000
+  pool-size: 10

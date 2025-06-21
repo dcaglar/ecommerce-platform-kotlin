@@ -4,7 +4,7 @@
         xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
-    <changeSet id="create-payment-table-table" author="yourname">
+    <changeSet id="create-payment-table-table" author="dogancaglar">
         <createTable tableName="payments">
             <column name="payment_order_id" type="BIGINT">
                 <constraints primaryKey="true" nullable="false"/>

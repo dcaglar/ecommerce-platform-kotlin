@@ -30,37 +30,57 @@ This project simulates a real-world multi-seller eCommerce platform where:
 ---
 
 ```mermaid
+%%{init: { 
+  "themeVariables": { "fontSize": "32px", "nodeTextSize": "32px" }, 
+  "flowchart": { "nodeSpacing": 80, "rankSpacing": 90 },
+  "theme": "default"
+}}%%
 flowchart LR
-subgraph Client Layer
-A["REST Controller<br/>(PaymentController)"]:::controller
-end
+%% SRE-Style Custom Palette
+    classDef controller fill: #e3f0fd, stroke: #4285F4, stroke-width: 3px;
+    classDef service fill: #e6f5ea, stroke: #34A853, stroke-width: 3px;
+    classDef domain fill: #fef7e0, stroke: #FBBC05, stroke-width: 3px;
+    classDef adapter fill: #f3e8fd, stroke: #A142F4, stroke-width: 3px;
+    classDef infra fill: #fde8e6, stroke: #EA4335, stroke-width: 3px;
+    classDef legend fill: #fff, stroke: #aaa, stroke-width: 1px;
+    subgraph Legend [Legend: Layer Color Coding]
+        L1[Controller: Blue]:::controller
+        L2[Service: Green]:::service
+        L3[Domain: Yellow]:::domain
+        L4[Adapter: Purple]:::adapter
+        L5[Infra: Red]:::infra
+    end
 
-subgraph Application Layer
-B["PaymentService<br/>(Orchestrator)"]:::service
-C[DomainEventEnvelopeFactory]:::service
-D[PaymentOrderOutboxDispatcherScheduler]:::service
-E[PaymentOrderEventPublisher]:::service
-end
+    subgraph Client_Layer ["Client Layer"]
+        A["REST Controller<br/>(PaymentController)"]:::controller
+    end
 
-subgraph Domain Layer
-F["Domain Models<br/>• Payment  • PaymentOrder"]:::domain
-G["Ports / Interfaces<br/>• PaymentOutboundPort<br/>• PaymentOrderOutboundPort<br/>• OutboxEventPort<br/>• IdGeneratorPort"]:::domain
-H["Retry Logic & Backoff<br/>(encapsulated in PaymentOrder)"]:::domain
-end
+    subgraph Application_Layer ["Application Layer"]
+        B["PaymentService<br/>(Orchestrator)"]:::service
+        C[DomainEventEnvelopeFactory]:::service
+        D[PaymentOrderOutboxDispatcherScheduler]:::service
+        E[PaymentOrderEventPublisher]:::service
+    end
 
-subgraph Adapter Layer
-I["Persistence Adapters<br/>• JPA Repositories"]:::adapter
-J["Redis Adapters<br/>• ID Generator  • Retry ZSet"]:::adapter
-K["Kafka Consumer<br/>(PaymentOrderExecutor)"]:::adapter
-M["Retry Scheduler Job<br/>(Redis → PaymentOrderRetryRequested)"]:::adapter
-N["PSP Client<br/>(Mock PSP)"]:::adapter
-end
+    subgraph Domain_Layer ["Domain Layer"]
+        F["Domain Models<br/>• Payment • PaymentOrder"]:::domain
+        G["Ports / Interfaces<br/>• PaymentOutboundPort<br/>• PaymentOrderOutboundPort<br/>• OutboxEventPort<br/>• IdGeneratorPort"]:::domain
+        H["Retry Logic & Backoff<br/>(in PaymentOrder)"]:::domain
+    end
 
-subgraph Infrastructure
-DB[(PostgreSQL)]:::infra
-REDIS[(Redis)]:::infra
-KAFKA[(Kafka)]:::infra
-PSP_API[(Mock PSP Endpoint)]:::infra
+    subgraph Adapter_Layer ["Adapter Layer"]
+        I["Persistence Adapters<br/>• JPA Repositories"]:::adapter
+        J["Redis Adapters<br/>• ID Generator • Retry ZSet"]:::adapter
+        K["Kafka Consumer<br/>(PaymentOrderExecutor)"]:::adapter
+        M["Retry Scheduler Job<br/>(Redis → PaymentOrderRetryRequested)"]:::adapter
+        N["PSP Client<br/>(Mock PSP)"]:::adapter
+    end
+
+subgraph Infrastructure_Layer ["Infrastructure"]
+DB[(🗄️ PostgreSQL)]:::infra
+REDIS[(📦 Redis)]:::infra
+KAFKA[(🟪 Kafka)]:::infra
+PSP_API[(💳 Mock PSP Endpoint)]:::infra
 end
 
 %% Relationships
@@ -82,18 +102,7 @@ I --> DB
 J --> REDIS
 N --> PSP_API
 
-%% Styling
-classDef controller   fill:#e8f0fe, stroke:#4b7bec, stroke-width:1px;
-classDef service      fill:#e6ffe6, stroke:#43a047, stroke-width:1px;
-classDef domain       fill:#fff4e6, stroke:#f39c12, stroke-width:1px;
-classDef adapter      fill:#f3e5f5, stroke:#8e24aa, stroke-width:1px;
-classDef infra        fill:#fce4ec, stroke:#d81b60, stroke-width:1px;
-
-class A controller
-class B,C,D,E service
-class F,G,H domain
-class I,J,K,M,N adapter
-class DB,REDIS,KAFKA,PSP_API infra
+Legend --- Client_Layer
 ```
 
 ## Project Structure
@@ -186,58 +195,38 @@ Handles the full lifecycle of payment processing for multi-seller orders:
 
 ## 🚧 Roadmap
 
-## Roadmap
+Roadmap
 
-Updated Roadmap (Containerization moved up, dual outbox event support)
-
-- 🟦 1. Enforce Controlled Construction for Domain & Event Classes✅
-  Make constructors for Payment, PaymentOrder, and EventEnvelope<T> private or protected.
-  Require creation via factory methods (e.g., PaymentFactory, DomainEventEnvelopeFactory).
-  Refactor usage across all modules.
-- 🟩 2. Align Entity Instantiation with Domain Factories✅
-  Use factory/mapping methods for all JPA/entity reconstruction.✅
-  Keep domain and persistence logic separate.()✅
-- 🟨 3. Complete Structured Logging and ELK Stack Setup ✅
-  JSON logs, traceability, Kibana dashboards.
-- 🟧 4. Implement and Refactor Retry Payment Logic in PaymentOrder✅
-  Move retry/backoff logic into the domain model.✅
-- 🟧 5. Use Redis ZSet and a scheduled job for retry scheduling.✅
-  -log retry as a searchable event.✅
-- 🟦 6. Containerize Spring Boot Apps.✅
-  Write Dockerfile(s), test with Docker Compose.
-  Ensure profiles/secrets are runtime-injectable.
-- 🟥 7. Build Monitoring Dashboards and Basic Metrics (Prometheus/Grafana)
-  Expose essential service metrics for operations.
-- 🟩 8. Implement Dual Outbox Event Tables/Flows
-  Separate Payment-level and PaymentOrder-level outbox tables.
-  Create PaymentCreated and also emit PamyentCompleted events in an effcient manner.
-  Implement outbox polling/dispatch for both.
-  Ensure causal event flow and idempotency.
-- 🟨 9. Enable Basic Kubernetes Deployment (Docker Desktop/Minikube)
-  Write and test deployment/service YAML.
-  Verify health in a local k8s cluster.
-- 🟧 10. Build Dummy Wallet and Shipment Services
-  Event choreography across bounded contexts.
-- 🟫 11. Add Elasticsearch Read Model for Payment Queries
-  Enable fast search/filter by payment/order.
-- 🟫 12. Add OAuth2 Security to All APIs
-  Integrate Keycloak (or Auth0).
-  Add token validation to all REST endpoints.
-- 🟥 13. Harden Retry and DLQ Handling
-  Add DLQ topic(s) and alerting on failures.
-  Ensure resilience for transient errors.
-- 🟦 14. Implement Node Affinity & Resource Management for K8s
-  Set resource requests/limits, node selectors.
-- 🟩 15. Add Alerting and Advanced Monitoring
-  Slack/email alerts for key events/errors.
-  SLO/SLA tracking.
-- 🟨 16. Scale Kafka Consumers (Horizontal Concurrency Tuning)
-  Enable more consumer instances for high throughput.
-- 🟨 17. Implement Circuit Breaker Patterns
-  Add resilience4j or similar for external service calls.
-- 18- mode mircrometer realted logic out of business callass. USE AOP,DECATORATOR
-
-Basic CI/CD with GitHub Actions
+Updated Roadmap (Containerization moved up, dual outbox event support, Kafka partitioning milestone added):
+• 🟦 1. Enforce Controlled Construction for Domain & Event Classes✅
+• 🟩 2. Align Entity Instantiation with Domain Factories✅
+• 🟨 3. Complete Structured Logging and ELK Stack Setup ✅
+• 🟧 4. Implement and Refactor Retry Payment Logic in PaymentOrder✅
+• 🟧 5. Use Redis ZSet and a scheduled job for retry scheduling.✅
+• 🟦 6. Containerize Spring Boot Apps.✅
+• 🟥 7. Build Monitoring Dashboards and Basic Metrics (Prometheus/Grafana)
+Metrics and Monitoring
+• Prometheus Redis Exporter:
+For real SRE-style monitoring, run Redis Exporter with Prometheus.
+• It gives you:
+• 🟩 7.5. Kafka Partitioning by Aggregate ID (paymentOrderId)
+• Repartitioned all payment-order event topics by aggregateId (paymentOrderId) to guarantee per-order event ordering.
+• Enables safe horizontal scaling (one consumer per partition) and preserves state machine transitions for each payment
+order.
+• Simplified consumer logic and minimized risk of subtle, order-dependent bugs in orchestration flows.
+• Key lesson: Scalability, parallelism, and correctness require infrastructure-level event ordering—this milestone marks
+robust event choreography in a high-throughput, distributed system.
+• 🟩 8. Implement Dual Outbox Event Tables/Flows
+• 🟨 9. Enable Basic Kubernetes Deployment (Docker Desktop/Minikube)
+• 🟧 10. Build Dummy Wallet and Shipment Services
+• 🟫 11. Add Elasticsearch Read Model for Payment Queries
+• 🟫 12. Add OAuth2 Security to All APIs
+• 🟥 13. Harden Retry and DLQ Handling
+• 🟦 14. Implement Node Affinity & Resource Management for K8s
+• 🟩 15. Add Alerting and Advanced Monitoring
+• 🟨 16. Scale Kafka Consumers (Horizontal Concurrency Tuning)
+• 🟨 17. Implement Circuit Breaker Patterns
+• 18- Move Micrometer-related logic out of business classes. Use AOP/decorator.
 
 ## 🧪 Testing Strategy
 
@@ -255,3 +244,11 @@ cd ecommerce-platform-kotlin
 docker-compose up -d
 cd payment-service
 ./mvnw spring-boot:run
+
+
+
+
+
+
+
+

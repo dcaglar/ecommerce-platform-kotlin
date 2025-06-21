@@ -43,6 +43,7 @@ This directory contains helper scripts to manage your modular eCommerce infrastr
 ./infra-cleanup.sh   # or ./infra-purge.sh
 ./network-up.sh      # (optional, if you want to recreate networks)
 ./infra-up.sh
+./app-up.sh
 ```
 
 > **Warning:** `infra-cleanup.sh` and `infra-purge.sh` will delete all persistent data and config for infra containers.

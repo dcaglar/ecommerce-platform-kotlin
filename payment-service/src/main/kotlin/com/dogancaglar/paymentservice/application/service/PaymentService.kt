@@ -168,7 +168,8 @@ class PaymentService(
         logger.info("Payment Order is succesfull.")
         val updatedOrder = order.markAsPaid().withUpdatedAt(LocalDateTime.now(clock))
         paymentOrderOutboundPort.save(updatedOrder)
-        paymentEventPublisher.publish(
+        // Publish the success event synchronously to ensure it is processed immediately
+        paymentEventPublisher.publishSync(
             eventMetaData = EventMetadatas.PaymentOrderSuccededMetaData,
             aggregateId = updatedOrder.publicPaymentOrderId,
             data = PaymentOrderEventMapper.toPaymentOrderSuccededEvent(updatedOrder),
@@ -304,6 +305,6 @@ class PaymentService(
 @Configuration
 class ClockConfig {
     @Bean
-    fun clock(): Clock = Clock.systemDefaultZone()
+    fun clock(): Clock = Clock.systemUTC()
 }
 

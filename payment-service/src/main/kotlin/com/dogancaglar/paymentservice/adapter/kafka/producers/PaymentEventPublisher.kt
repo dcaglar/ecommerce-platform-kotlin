@@ -19,17 +19,15 @@ import java.util.*
  * adding correlation headers so consumer interceptors can propagate
  * trace information to the MDC before logging.
  */
+
 @Component
 class PaymentEventPublisher(
     @Qualifier("paymentOrderEventKafkaTemplate")
     private val kafkaTemplate: KafkaTemplate<String, EventEnvelope<*>>,
-    private val meterRegistry: MeterRegistry    // Inject here!
+    private val meterRegistry: MeterRegistry
 ) {
-
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    //if we are publishing a follwup event, then just call  with dont set trace or parentEventId they are already in predecesor evet
-    //if parentid is not being passsed that means its the outboxenvelope intiating the transaction
     fun <T> publish(
         preSetEventIdFromCaller: UUID? = null,
         aggregateId: String,
@@ -38,19 +36,9 @@ class PaymentEventPublisher(
         traceId: String? = null,
         parentEventId: UUID? = null
     ): EventEnvelope<T> {
-        val preSetEventId = preSetEventIdFromCaller
-        val resolvedTraceId = traceId ?: LogContext.getTraceId()
-        ?: error("Missing traceId: either pass explicitly or set via LogContext.with(...)")
-        val resolvedParentId = parentEventId ?: LogContext.getEventId()
-        val envelope = DomainEventEnvelopeFactory.envelopeFor(
-            preSetEventId = preSetEventId,
-            traceId = resolvedTraceId,
-            data = data,
-            eventMetaData = eventMetaData,
-            aggregateId = aggregateId,
-            parentEventId = resolvedParentId
+        val envelope = buildEnvelope(
+            preSetEventIdFromCaller, aggregateId, eventMetaData, data, traceId, parentEventId
         )
-
         LogContext.with(envelope) {
             logger.info(
                 envelope.eventType,
@@ -59,37 +47,16 @@ class PaymentEventPublisher(
                 envelope.traceId,
                 envelope.aggregateId
             )
-            val record = ProducerRecord<String, EventEnvelope<*>>(
-                eventMetaData.topic,
-                envelope.aggregateId,  // key
-                envelope
-            ).apply {
-                headers().add(
-                    RecordHeader(
-                        "traceId",
-                        envelope.traceId.toByteArray(StandardCharsets.UTF_8)
-                    )
-                )
-                headers().add(
-                    RecordHeader(
-                        "eventId",
-                        envelope.eventId.toString().toByteArray(StandardCharsets.UTF_8)
-                    )
-                )
-                envelope.parentEventId?.let {
-                    headers().add(
-                        RecordHeader(
-                            "parentEventId",
-                            it.toString().toByteArray(StandardCharsets.UTF_8)
-                        )
-                    )
-                }
-            }
-            logger.debug("Sending payment $record.")
+            val record = buildRecord(eventMetaData, envelope)
+            logger.info("Sending payment $record.")
             val future = kafkaTemplate.send(record)
             future.whenComplete { _, ex ->
                 if (ex == null) {
-                    logger.debug("📨 Event published to topic={} eventId={}", eventMetaData.topic, envelope.eventId)
+                    logger.info(
+                        "📨 Event published to topic={} eventId={} traceId=${envelope.traceId},parentEventId=${envelope.parentEventId}",
+                        eventMetaData.topic,
+                        envelope.eventId
+                    )
                 } else {
                     logger.error(
                         "❌ Failed to publish eventId={} to topic={}: {}",
@@ -103,4 +70,98 @@ class PaymentEventPublisher(
         }
         return envelope
     }
+
+    fun <T> publishSync(
+        preSetEventIdFromCaller: UUID? = null,
+        aggregateId: String,
+        eventMetaData: EventMetadata<T>,
+        data: T,
+        traceId: String? = null,
+        parentEventId: UUID? = null,
+        timeoutSeconds: Long = 5
+    ): EventEnvelope<T> {
+        val envelope = buildEnvelope(
+            preSetEventIdFromCaller, aggregateId, eventMetaData, data, traceId, parentEventId
+        )
+        LogContext.with(envelope) {
+            logger.info(
+                envelope.eventType,
+                envelope.eventId,
+                envelope.parentEventId,
+                envelope.traceId,
+                envelope.aggregateId
+            )
+            val record = buildRecord(eventMetaData, envelope)
+            logger.debug("Sending payment $record [SYNC].")
+            try {
+                val future = kafkaTemplate.send(record)
+                // This will throw if Kafka send fails or times out
+                future.get(timeoutSeconds, java.util.concurrent.TimeUnit.SECONDS)
+                logger.debug("📨 [SYNC] Event published to topic={} eventId={}", eventMetaData.topic, envelope.eventId)
+            } catch (ex: Exception) {
+                logger.error(
+                    "❌ [SYNC] Failed to publish eventId={} to topic={}: {}",
+                    envelope.eventId,
+                    eventMetaData.topic,
+                    ex.message,
+                    ex
+                )
+                throw ex // bubble up to handler, causing a retry
+            }
+        }
+        return envelope
+    }
+
+    private fun <T> buildEnvelope(
+        preSetEventIdFromCaller: UUID?,
+        aggregateId: String,
+        eventMetaData: EventMetadata<T>,
+        data: T,
+        traceId: String?,
+        parentEventId: UUID?
+    ): EventEnvelope<T> {
+        val preSetEventId = preSetEventIdFromCaller
+        val resolvedTraceId = traceId ?: LogContext.getTraceId()
+        ?: error("Missing traceId: either pass explicitly or set via LogContext.with(...)")
+        val resolvedParentId = parentEventId ?: LogContext.getEventId()
+        return DomainEventEnvelopeFactory.envelopeFor(
+            preSetEventId = preSetEventId,
+            traceId = resolvedTraceId,
+            data = data,
+            eventMetaData = eventMetaData,
+            aggregateId = aggregateId,
+            parentEventId = resolvedParentId
+        )
+    }
+
+    private fun <T> buildRecord(
+        eventMetaData: EventMetadata<T>,
+        envelope: EventEnvelope<T>
+    ): ProducerRecord<String, EventEnvelope<*>> =
+        ProducerRecord<String, EventEnvelope<*>>(
+            eventMetaData.topic,
+            envelope.aggregateId,
+            envelope
+        ).apply {
+            headers().add(
+                RecordHeader(
+                    "traceId",
+                    envelope.traceId.toByteArray(StandardCharsets.UTF_8)
+                )
+            )
+            headers().add(
+                RecordHeader(
+                    "eventId",
+                    envelope.eventId.toString().toByteArray(StandardCharsets.UTF_8)
+                )
+            )
+            envelope.parentEventId?.let {
+                headers().add(
+                    RecordHeader(
+                        "parentEventId",
+                        it.toString().toByteArray(StandardCharsets.UTF_8)
+                    )
+                )
+            }
+        }
 }
