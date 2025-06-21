@@ -101,7 +101,7 @@ class PaymentOrderExecutor(
         val pspCallStart = System.currentTimeMillis()
         val future = pspExecutor.submit<PaymentOrderStatus> { pspClient.charge(order) }
         return try {
-            future.get(3, TimeUnit.SECONDS)
+            future.get(1, TimeUnit.SECONDS)
         } catch (e: TimeoutException) {
             logger.warn("PSP call timed out for paymentOrderId=${order.paymentOrderId}, scheduling retry")
             future.cancel(true) // Attempt to interrupt the task if it times out

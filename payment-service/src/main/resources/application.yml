@@ -71,7 +71,7 @@ spring:
       micrometer-enabled: true
 psp:
   simulation:
-    currentScenario: BEST_PSP_EVER
+    currentScenario: NORMAL
     scenarios:
       NORMAL:
         timeouts:

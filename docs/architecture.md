@@ -1,6 +1,6 @@
 # ecommerce-platform-kotlin · Architecture Guide
 
-*Last updated: 2025‑06‑21 – maintained by ****Doğan Çağlar***
+\*Last updated: 2025‑06‑21 – maintained by \****Doğan Çağlar***
 
 ---
 
@@ -8,21 +8,23 @@
 
 1. [Purpose & Audience](#1--purpose--audience)
 2. [System Context](#2--system-context)
-1. [High‑Level Context Diagram](#21-highlevel-context-diagram)
-2. [Bounded Context Map](#22-bounded-context-map)
+    1. [High‑Level Context Diagram](#21-highlevel-context-diagram)
+    2. [Bounded Context Map](#22-bounded-context-map)
 3. [Core Design Principles](#3--core-design-principles)
 4. [Architectural Overview](#4--architectural-overview)
-1. [Layering & Hexagonal Architecture](#41-layering--hexagonal-architecture)
-2. [Service & Executor Landscape](#42-service--executor-landscape)
+    1. [Layering & Hexagonal Architecture](#41-layering--hexagonal-architecture)
+    2. [Service & Executor Landscape](#42-service--executor-landscape)
+    3. [Payment‑Service Layer Diagram](#43-payment-service-layer-diagram)
+    4. [Payment‑Service Layer Diagram (Alt)](#44-payment-service-layer-diagram-alt)
 5. [Cross‑Cutting Concerns](#5--crosscutting-concerns)
-1. [Outbox Pattern](#51-outbox-pattern)
-2. [Retry & Status‑Check Strategy](#52-retry--statuscheck-strategy)
-3. [Idempotency](#53-idempotency)
-4. [Unique ID Generation](#54-unique-id-generation)
+    1. [Outbox Pattern](#51-outbox-pattern)
+    2. [Retry & Status‑Check Strategy](#52-retry--statuscheck-strategy)
+    3. [Idempotency](#53-idempotency)
+    4. [Unique ID Generation](#54-unique-id-generation)
 6. [Quality Attributes](#6--quality-attributes)
-1. [Observability](#61-observability)
-2. [Security](#62-security)
-3. [Cloud‑Native & Deployment](#63-cloudnative--deployment)
+    1. [Observability](#61-observability)
+    2. [Security](#62-security)
+    3. [Cloud‑Native & Deployment](#63-cloudnative--deployment)
 7. [Roadmap](#7--roadmap)
 8. [Glossary](#8--glossary)
 9. [References](#9--references)
@@ -126,151 +128,166 @@ All modules share a consistent 4‑layer structure:
 ### 4.2 Service & Executor Landscape
 
 ```mermaid
-%%{init:{"theme":"default","flowchart":{"rankSpacing":80}}}%%
+%%{init: { 
+  "themeVariables": { "fontSize": "32px", "nodeTextSize": "32px" }, 
+  "flowchart": { "nodeSpacing": 80, "rankSpacing": 90 },
+  "theme": "default"
+}}%%
 flowchart LR
-    classDef svc fill: #e6f5ea, stroke: #34A853, stroke-width: 3px;
-    classDef exec fill: #e3f0fd, stroke: #4285F4, stroke-width: 3px;
-    PaymentAPI[Payment API]:::svc
-    PaymentOrderExec[PaymentOrder Executor]:::exec
-    RetryExec[Retry Executor]:::exec
-    StatusCheckExec[Status‑Check Executor]:::exec
+%% SRE-Style Custom Palette
+    classDef controller fill: #e3f0fd, stroke: #4285F4, stroke-width: 3px;
+    classDef service fill: #e6f5ea, stroke: #34A853, stroke-width: 3px;
+    classDef domain fill: #fef7e0, stroke: #FBBC05, stroke-width: 3px;
+    classDef adapter fill: #f3e8fd, stroke: #A142F4, stroke-width: 3px;
+    classDef infra fill: #fde8e6, stroke: #EA4335, stroke-width: 3px;
+    classDef legend fill: #fff, stroke: #aaa, stroke-width: 1px;
+    subgraph Legend [Legend: Layer Color Coding]
+        L1[Controller: Blue]:::controller
+        L2[Service: Green]:::service
+        L3[Domain: Yellow]:::domain
+        L4[Adapter: Purple]:::adapter
+        L5[Infra: Red]:::infra
+    end
 
-PaymentAPI -->|writes events|K1((Kafka))
-PaymentOrderExec --> K1
-RetryExec --> K1
-StatusCheckExec --> K1
+    subgraph Client_Layer ["Client Layer"]
+        A["REST Controller<br/>(PaymentController)"]:::controller
+    end
+
+    subgraph Application_Layer ["Application Layer"]
+        B["PaymentService<br/>(Orchestrator)"]:::service
+        C[DomainEventEnvelopeFactory]:::service
+        D[PaymentOrderOutboxDispatcherScheduler]:::service
+        E[PaymentOrderEventPublisher]:::service
+    end
+
+    subgraph Domain_Layer ["Domain Layer"]
+        F["Domain Models<br/>• Payment • PaymentOrder"]:::domain
+        G["Ports / Interfaces<br/>• PaymentOutboundPort<br/>• PaymentOrderOutboundPort<br/>• OutboxEventPort<br/>• IdGeneratorPort"]:::domain
+        H["Retry Logic & Backoff<br/>(in PaymentOrder)"]:::domain
+    end
+
+    subgraph Adapter_Layer ["Adapter Layer"]
+        I["Persistence Adapters<br/>• JPA Repositories"]:::adapter
+        J["Redis Adapters<br/>• ID Generator • Retry ZSet"]:::adapter
+        K["Kafka Consumer<br/>(PaymentOrderExecutor)"]:::adapter
+        M["Retry Scheduler Job<br/>(Redis → PaymentOrderRetryRequested)"]:::adapter
+        N["PSP Client<br/>(Mock PSP)"]:::adapter
+    end
+
+subgraph Infrastructure_Layer ["Infrastructure"]
+DB[(🗄️ PostgreSQL)]:::infra
+REDIS[(📦 Redis)]:::infra
+KAFKA[(🟪 Kafka)]:::infra
+PSP_API[(💳 Mock PSP Endpoint)]:::infra
+end
+
+%% Relationships
+A --> B
+B --> F
+B --> J
+B --> I
+B --> G
+B --> C
+B --> D
+D --> E
+E --> KAFKA
+M --> E
+KAFKA --> K
+K --> N
+K --> H
+H --> J
+I --> DB
+J --> REDIS
+N --> PSP_API
+
+Legend --- Client_Layer
+```
+
+```mermaid
+flowchart TD
+%% User initiates a payment
+    A1["User/API\nPOST /payments"] --> A2["PaymentService\nReceive PaymentRequest"]
+%% Store payment state and outbox event
+    A2 --> B1["DB Transaction:\n• Save Payment\n• Save PaymentOrder(s)\n• Outbox: PaymentOrderCreated"]
+    B1 --> B2["Respond 202 Accepted"]
+    B1 -->|Outbox Dispatcher| C1["Kafka Topic:\npayment_order_created"]
+%% Consumers of payment_order_created
+    C1 -->|For each PaymentOrder| D1["PaymentOrderExecutor\nHandles PSP Call"]
+    C1 --> D2["EmailService\nSend Confirmation"]
+%% PSP execution, produces success/failure events
+    D1 -->|Success| E1["Kafka Topic:\npayment_order_succeeded"]
+    D1 -->|Retryable Failure| F1["Kafka Topic:\npayment_order_retry_requested"]
+    D1 -->|Non - Retryable Failure| E2["Kafka Topic:\npayment_order_failed"]
+%% Retry logic
+    F1 --> G1["PaymentOrderRetryExecutor"]
+    G1 -->|Success| E1
+    G1 -->|Still Failing| E2
+%% Status check scheduling
+    D1 -->|Needs Status Check| H1["Kafka Topic:\npayment_order_status_check"]
+    H1 --> H2["PaymentStatusCheckExecutor"]
+    H2 -->|Final Result| E1
+    H2 -->|Failure| E2
+%% All events flow into a central topic for projection/aggregation
+    E1 --> Z1["Kafka Topic:\npayment_order_events"]
+    E2 --> Z1
+    F1 --> Z1
+%% Aggregator consumer projects overall payment result
+    Z1 --> Y1["PaymentResultAggregatorConsumer\nAggregates per paymentId"]
+%% Aggregator emits the final payment result
+    Y1 -->|All SUCCEEDED| Y2["Kafka Topic:\npayment_succeeded"]
+    Y1 -->|Any FAILED| Y3["Kafka Topic:\npayment_failed"]
+%% Downstream consumers react to aggregate payment result
+    Y2 --> K1["ShipmentService\nStart Fulfillment"]
+    Y2 --> K2["WalletService\nUpdate Balance"]
+    Y3 --> K3["Support/Analytics\nAlert or Compensate"]
 ```
 
 > **Target Evolution**: Each executor becomes an independently deployable Spring Boot app. All share the
 `payment-domain` library to avoid code duplication and network latency.
 
----
+### 4.3 Payment‑Service Layer Diagram
 
-## 5 · Cross‑Cutting Concerns
-
-### 5.1 Outbox Pattern
-
-Reliable event publication is achieved via **dual tables** and a polling dispatcher.
+Paymentorder life cycle in the payment-service
 
 ```mermaid
-sequenceDiagram
-    participant API as Payment API
-    participant DB as PostgreSQL + Outbox
-    participant DSP as Outbox Dispatcher
-    participant K as Kafka
-    API ->> DB: INSERT payment + outbox row (same TX)
-    DSP --> DB: poll NEW rows
-    DSP ->> K: publish EventEnvelope
-    DSP -->> DB: mark row = PUBLISHED
+%%{init: {
+  "themeVariables": { "fontSize": "32px", "nodeTextSize": "32px" },
+  "flowchart": { "nodeSpacing": 80, "rankSpacing": 90 },
+  "theme": "default"
+}}%%
+flowchart LR
+%% SRE-Style Custom Palette
+    classDef controller fill: #e3f0fd, stroke: #4285F4, stroke-width: 3px;
+    classDef service fill: #e6f5ea, stroke: #34A853, stroke-width: 3px;
+    classDef domain fill: #fef7e0, stroke: #FBBC05, stroke-width: 3px;
+    classDef adapter fill: #f3e8fd, stroke: #A142F4, stroke-width: 3px;
+    classDef infra fill: #fde8e6, stroke: #EA4335, stroke-width: 3px;
+    classDef legend fill: #fff, stroke: #aaa, stroke-width: 1px;
+    subgraph Legend [Legend: Layer Color Coding]
+        L1[Controller: Blue]:::controller
+        L2[Service: Green]:::service
+        L3[Domain: Yellow]:::domain
+        L4[Adapter: Purple]:::adapter
+        L5[Infra: Red]:::infra
+    end
+
+    subgraph Client_Layer ["Client Layer"]
+        A["REST Controller<br/>(PaymentController)"]:::controller
+    end
+
+    subgraph Application_Layer ["Application Layer"]
+        B["PaymentService<br/>(Orchestrator)"]:::service
+        C[DomainEventEnvelopeFactory]:::service
+        D[PaymentOrderOutboxDispatcherScheduler]:::service
+        E[PaymentOrderEventPublisher]:::service
+    end
+
+    subgraph Domain_Layer ["Domain Layer"]
+        F["Domain Models<br/>• Payment • PaymentOrder"]:::domain
+        G["Ports / Interfaces<br/>• PaymentOutboundPort<br/>• PaymentOrderOutboundPort<br/>• OutboxEventPort<br/>• IdGeneratorPort"]:::domain
+        H["Retry Logic & Backoff<br/>(in PaymentOrder)"]:::domain
+    end
+
+subgraph Adapter_Layer ["Adapter Layer"]
+I["Persistence Adapters]
 ```
-
-**Tables**
-
-| Outbox Table           | Example Events        | Dispatcher Bean                |
-|------------------------|-----------------------|--------------------------------|
-| `outbox_payment`       | `PaymentCreated`      | `PaymentOutboxDispatcher`      |
-| `outbox_payment_order` | `PaymentOrderCreated` | `PaymentOrderOutboxDispatcher` |
-
-### 5.2 Retry & Status‑Check Strategy
-
-| Scenario                 | Persistence                           | Trigger                | Action                                                          |
-|--------------------------|---------------------------------------|------------------------|-----------------------------------------------------------------|
-| **Transient PSP error**  | Redis ZSet `payment:retry`            | `PaymentOrderExecutor` | Exponential back‑off; republishes `PaymentOrderRetryRequested`. |
-| **Pending PSP status**   | PG table `payment_order_status_check` | Scheduled job          | Publishes `PaymentOrderStatusCheckRequested`.                   |
-| **Max retries exceeded** | DLQ topic                             | –                      | PaymentOrder marked `FAILED_FINALIZED`; alert emitted.          |
-
-**Update Policy**
-
-```
-PaymentOrder is updated *only* when:
-  • PSP result = SUCCESS
-  • PSP result = FINALIZED_FAILED
-  • Retries > = 5 (give‑up)
-  • Status‑check result = SUCCESS or FINALIZED_FAILED
-
-All finalized Payment results are first pushed to Redis (result queue).
-A batch job drains this queue, persists rows in bulk, and publishes
-`PaymentResult` events (Kafka & Redis) for downstream services.
-```
-
-### 5.3 Idempotency
-
-- Duplicate outbox rows safely re‑published while `status!=PUBLISHED`.
-- Kafka consumers skip a message when the aggregate is already in the expected state or `eventId` is known.
-- Database constraints enforce uniqueness on natural keys.
-
-```kotlin
-if (order.status == SUCCESSFUL) return  // duplicate message
-```
-
-### 5.4 Unique ID Generation
-
-Sequential cluster‑unique IDs are pre‑allocated via `Redis INCR`. At startup, a migrator seeds the counter from
-`MAX(id)` in Postgres to avoid gaps.
-
-- Stable IDs available for logs, foreign keys, and partition keys.
-- Enables idempotent upserts and instant public IDs for clients.
-
----
-
-## 6 · Quality Attributes
-
-### 6.1 Observability
-
-| Layer   | Tooling                                         |
-|---------|-------------------------------------------------|
-| Logs    | Logback ➜ Filebeat ➜ Elasticsearch ➜ **Kibana** |
-| Metrics | Micrometer ➜ **Prometheus** ➜ Grafana           |
-| Tracing | OpenTelemetry ➜ **Jaeger/Tempo** (planned)      |
-
-Structured log fields: `traceId`, `eventId`, `parentEventId`, `aggregateId`.
-
-### 6.2 Security
-
-- Spring profiles: `local`, `k8s`, `prod`.
-- Secrets: `.gitignored` Yaml files (local) vs. **Kubernetes Secrets** (k8s/prod).
-- OAuth2 with **Keycloak** (planned).
-
-### 6.3 Cloud‑Native & Deployment
-
-- Container images published to GHCR.
-- Helm charts per app; Kustomize overlays for environments.
-- Horizontal Pod Autoscaling based on Kafka lag & Prometheus metrics.
-
----
-
-## 7 · Roadmap
-
-- **Q3 2025** – Split executors into standalone Spring Boot apps.
-- **Q3 2025** – Extract `payment-domain` into a shared library.
-- **Q4 2025** – Roll out OpenTelemetry tracing end‑to‑end.
-- **Q4 2025** – Introduce fine‑grained Kubernetes resource limits & auto‑scaling policies.
-
----
-
-## 8 · Glossary
-
-| Term                  | Meaning                                                                   |
-|-----------------------|---------------------------------------------------------------------------|
-| **Aggregate**         | A cluster of domain objects treated as a single unit for data changes.    |
-| **Executor**          | Stateless service that consumes Kafka events and executes business logic. |
-| **Outbox Dispatcher** | Background worker that moves rows from DB outbox tables to Kafka.         |
-
----
-
-## 9 · References
-
-- Eric Evans – *Domain‑Driven Design*
-- **Spring Boot**, **Spring Kafka**, **Micrometer** docs
-- *Designing Event‑Driven Microservices* (Red Hat)
-- OpenTelemetry specification
-
----
-
-## 10 · Changelog
-
-| Date       | Author    | Change                                                                                        |
-|------------|-----------|-----------------------------------------------------------------------------------------------|
-| 2025‑06‑21 | D. Çağlar | Document restructured, Table of Contents added, diagrams modularized, retry policy clarified. |
-| 2025‑06‑01 | D. Çağlar | Initial draft.                                                                                |
-

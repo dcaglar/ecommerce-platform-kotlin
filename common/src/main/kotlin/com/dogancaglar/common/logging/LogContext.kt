@@ -34,6 +34,22 @@ object LogContext {
         }
     }
 
+
+    // New: Fully explicit context map
+    fun with(
+        context: Map<String, String>,
+        block: () -> Unit
+    ) {
+        val previous = MDC.getCopyOfContextMap()
+        try {
+            context.forEach(MDC::put)
+            block()
+        } finally {
+            if (previous != null) MDC.setContextMap(previous) else MDC.clear()
+        }
+    }
+
+
     fun withRetryFields(
         retryCount: Int,
         retryReason: String? = null,
