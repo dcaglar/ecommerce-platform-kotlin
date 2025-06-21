@@ -36,8 +36,8 @@ spring:
     password: payment
     hikari:
       maximum-pool-size: 110
-      minimum-idle: 70
-      connection-timeout: 5000
+      minimum-idle: 80
+      connection-timeout: 3000
       idle-timeout: 600000
       max-lifetime: 1800000
   jpa:
@@ -190,7 +190,30 @@ management:
         jdbc.connections: 0.95,0.99
         kafka.consumer.records-lag: 0.5,0.99
     enable:
-      all: true
+      # Only enable the metrics needed for your Grafana dashboard
+      http.server.requests: true
+      tomcat.threads: true
+      hikaricp.connections: true
+      hikaricp.connections.acquire: true
+      outbox.event.backlog: true
+      outbox.dispatched: true
+      outbox.dispatcher.duration: true
+      kafka.consumer.fetch.manager.records.lag: true
+      kafka.producer.topic.record.send: true
+      process.cpu.usage: true
+      jvm.threads.live: true
+      jvm.memory.used: true
+      jvm.memory.max: true
+      jvm.gc.pause: true
+      scheduler.active.threads: true
+      scheduler.pool.size.threads: true
+      redis.retry.events.processed: true
+      redis.retry.events.failed: true
+      redis.retry.batch.size: true
+      redis.retry.dispatch.execution: true
+      kafka.consumer.fetch.manager.records.consumed: true
+      kafka.consumer.fetch.manager.fetch.latency: true
+      kafka.consumer.io.time: true
     tags:
       application: ${spring.application.name:payment-service}
       profile: ${spring.profiles.active:dev}
@@ -207,10 +230,7 @@ metrics:
 spring.jackson.time-zone: UTC
 spring.jpa.properties.hibernate.jdbc.time_zone: UTC
 logging.config: classpath:logback-spring.xml
-
-logging:
-  level:
-    root: INFO
-    org.springframework: INFO
-    org.springframework.boot: DEBUG
-    org.springframework.web: DEBUG
+outbox-dispatcher:
+  thread-count: 10
+  batch-size: 5000
+  pool-size: 10

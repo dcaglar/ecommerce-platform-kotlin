@@ -3,6 +3,11 @@ server:
 #bootstrap:
 #  servers: kafka:9092
 spring:
+  tomcat:
+    threads:
+      max: 50         # Max concurrent requests
+      min-spare: 10
+    accept-count: 200
   kafka: #url for kafka in container-since this is used in docker-compose we use the service name
     bootstrap-servers: kafka:9092
   datasource:

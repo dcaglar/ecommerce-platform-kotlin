@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.config.scheduling
 
 import io.micrometer.core.instrument.MeterRegistry
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
@@ -9,9 +10,11 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 @Configuration
 class ThreadPoolConfig(private val meterRegistry: MeterRegistry) {
     @Bean("outboxTaskScheduler")
-    fun outboxTaskScheduler(): ThreadPoolTaskScheduler {
+    fun outboxTaskScheduler(
+        @Value("\${outbox-dispatcher.pool-size:8}") poolSize: Int
+    ): ThreadPoolTaskScheduler {
         val scheduler = ThreadPoolTaskScheduler()
-        scheduler.poolSize = Runtime.getRuntime().availableProcessors().coerceAtMost(16) // auto-tune to 8-16
+        scheduler.poolSize = poolSize
         scheduler.setThreadNamePrefix("scheduled-task-outbox-dispatched-")
         scheduler.setWaitForTasksToCompleteOnShutdown(true)
 
@@ -38,6 +41,16 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry) {
     }
 
     @Bean
+    fun taskScheduler(): ThreadPoolTaskScheduler {
+        val scheduler = ThreadPoolTaskScheduler()
+        scheduler.poolSize = 2 // or any number you want
+        scheduler.setThreadNamePrefix("my-scheduled-task-spring")
+        scheduler.initialize()
+        return scheduler
+    }
+
+
+    @Bean
     fun paymentOrderExecutorPoolConfig(): ThreadPoolTaskExecutor {
         val executor = ThreadPoolTaskExecutor()
         executor.corePoolSize = 16       // Match Kafka consumer concurrency (partitions)
@@ -61,4 +74,3 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry) {
         return executor
     }
 }
-

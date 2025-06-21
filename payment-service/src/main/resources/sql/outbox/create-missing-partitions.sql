@@ -1,7 +1,7 @@
 DO $$
 DECLARE
-    partition_time TIMESTAMP := '2025-06-20 15:00:00';  -- Start time (inclusive)
-    end_time TIMESTAMP := '2025-06-20 16:00:00';        -- End time (inclusive)
+    partition_time TIMESTAMP := '2025-06-20 23:00:00';  -- Start time (inclusive)
+    end_time TIMESTAMP := '2025-06-21 00:00:00';        -- End time (inclusive)
     partition_name TEXT;
     create_sql TEXT;
 BEGIN

@@ -14,10 +14,13 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
+import java.time.Instant
 
 
 @Service
@@ -27,21 +30,23 @@ class OutboxDispatcherJob(
     private val meterRegistry: MeterRegistry,
     private val objectMapper: ObjectMapper,
     @Qualifier("outboxTaskScheduler") // <-- use the shared scheduler bean
-    private val taskScheduler: ThreadPoolTaskScheduler // <-- inject the shared scheduler!
+    private val taskScheduler: ThreadPoolTaskScheduler, // <-- inject the shared scheduler!
+    @Value("\${outbox-dispatcher.thread-count:8}")
+    private val threadCount: Int,
+    @Value("\${outbox-dispatcher.batch-size:250}")
+    private val batchSize: Int,
+    private val clock: Clock
 ) {
-    companion object {
-        private const val THREAD_COUNT = 8
-        private const val BATCH_SIZE = 500
-    }
-
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @Scheduled(fixedDelay = 5000)
     fun dispatchBatches() {
         logger.info("Starting outbox event dispatch batches ")
-        repeat(THREAD_COUNT) {
-            logger.info("Starting outbox event dispatch worker #$it")
-            taskScheduler.submit { dispatchBatchWorker(it) }
+        repeat(threadCount) { workerId ->
+            val delayMs = 500 * workerId // e.g. 0, 300, 600, ...
+            taskScheduler.schedule({
+                dispatchBatchWorker(workerId)
+            }, Instant.now(clock).plusMillis(delayMs.toLong()))
         }
     }
 
@@ -50,7 +55,7 @@ class OutboxDispatcherJob(
         val start = System.currentTimeMillis()
         val threadName = Thread.currentThread().name
         logger.info("Started dispatchBatchWorker method for $workedId on $threadName ")
-        val events = outboxEventPort.findBatchForDispatch("NEW", BATCH_SIZE)
+        val events = outboxEventPort.findBatchForDispatch("NEW", batchSize)
         logger.info("Found ${events.size} events to dispatch in worker $workedId on $threadName")
         if (events.isEmpty()) {
             logger.info("No events to dispatch in worker $workedId, exiting. on $threadName")

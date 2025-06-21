@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.domain.model
 
+import java.time.Clock
 import java.time.LocalDateTime
 import java.util.*
 
@@ -23,7 +24,10 @@ class OutboxEvent private constructor(
 
     companion object {
         fun createNew(
-            eventType: String, aggregateId: String, payload: String, createdAt: LocalDateTime = LocalDateTime.now()
+            eventType: String,
+            aggregateId: String,
+            payload: String,
+            createdAt: LocalDateTime = LocalDateTime.now(Clock.systemUTC())
         ): OutboxEvent {
             return OutboxEvent(
                 eventId = UUID.randomUUID(),
