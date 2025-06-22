@@ -14,11 +14,11 @@ if ! docker info > /dev/null 2>&1; then
   exit 1
 fi
 
-docker compose -f ../docker-compose.infra.yml up -d
+docker compose -f docker-compose.infra.yml up -d
 STATUS=$?
 if [ $STATUS -eq 0 ]; then
   echo "✅ Infra is up."
-  docker compose -f ../docker-compose.infra.yml ps
+  docker compose -f docker-compose.infra.yml ps
 else
   echo "❌ Failed to start infra containers."
 fi

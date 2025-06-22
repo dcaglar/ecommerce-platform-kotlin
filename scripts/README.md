@@ -73,3 +73,11 @@ This directory contains helper scripts to manage your modular eCommerce infrastr
 
 For more details, see the main project README or the documentation in the `docs/` folder.
 ./in
+
+const secretsFile = open('./secrets.txt');
+
+docker run --rm -i \
+--network auth-net \
+-v "$PWD/load-tests:/scripts" \
+-v "$PWD/keycloak/secrets.txt:/scripts/secrets.txt" \
+grafana/k6 run /scripts/baseline-smoke-test.js

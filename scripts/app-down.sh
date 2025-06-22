@@ -14,11 +14,11 @@ if ! docker info > /dev/null 2>&1; then
   exit 1
 fi
 
-docker compose -f ../docker-compose.app.yml down
+docker compose -f docker-compose.app.yml down
 STATUS=$?
 if [ $STATUS -eq 0 ]; then
   echo "✅ App containers stopped."
-  docker compose -f ../docker-compose.app.yml ps
+  docker compose -f docker-compose.app.yml ps
 else
   echo "❌ Failed to stop app containers."
 fi

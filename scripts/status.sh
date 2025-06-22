@@ -15,8 +15,8 @@ if ! docker info > /dev/null 2>&1; then
 fi
 
 echo "\n🔎 Infra containers (docker-compose.infra.yml):"
-docker compose -f ../docker-compose.infra.yml ps
+docker compose -f docker-compose.infra.yml ps
 
 echo "\n🔎 App containers (docker-compose.app.yml):"
-docker compose -f ../docker-compose.app.yml ps
+docker compose -f docker-compose.app.yml ps
 

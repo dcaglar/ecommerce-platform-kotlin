@@ -98,7 +98,7 @@ class PaymentRetryQueueAdapter(
                 val envelope: EventEnvelope<PaymentOrderRetryRequested> =
                     objectMapper.readValue(json, object : TypeReference<EventEnvelope<PaymentOrderRetryRequested>>() {})
                 val deserializeEnd = System.currentTimeMillis()
-                logger.info("TIMING: pollDueRetries | deserialization: ${deserializeEnd - deserializeStart} ms for paymentOrderId=${envelope.data.publicPaymentOrderId}")
+                logger.debug("TIMING: pollDueRetries | deserialization: ${deserializeEnd - deserializeStart} ms for paymentOrderId=${envelope.data.publicPaymentOrderId}")
                 envelope
             } catch (e: Exception) {
                 logger.error("❌ Failed to deserialize retry event from Redis", e)
@@ -106,7 +106,7 @@ class PaymentRetryQueueAdapter(
             }
         }
         val totalEnd = System.currentTimeMillis()
-        logger.info(
+        logger.debug(
             "TIMING: pollDueRetries | redis poll: ${pollEnd - totalStart} ms | total: ${totalEnd - totalStart} ms | polled count: ${dueItems.size}"
         )
         return dueEnvelopes

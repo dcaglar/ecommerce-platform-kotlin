@@ -41,7 +41,7 @@ class OutboxDispatcherJob(
 
     @Scheduled(fixedDelay = 5000)
     fun dispatchBatches() {
-        logger.info("Starting outbox event dispatch batches ")
+        logger.debug("Starting outbox event dispatch batches ")
         repeat(threadCount) { workerId ->
             val delayMs = 500 * workerId // e.g. 0, 300, 600, ...
             taskScheduler.schedule({
@@ -54,11 +54,11 @@ class OutboxDispatcherJob(
     fun dispatchBatchWorker(workedId: Int) {
         val start = System.currentTimeMillis()
         val threadName = Thread.currentThread().name
-        logger.info("Started dispatchBatchWorker method for $workedId on $threadName ")
+        logger.debug("Started dispatchBatchWorker method for $workedId on $threadName ")
         val events = outboxEventPort.findBatchForDispatch("NEW", batchSize)
-        logger.info("Found ${events.size} events to dispatch in worker $workedId on $threadName")
+        logger.debug("Found ${events.size} events to dispatch in worker $workedId on $threadName")
         if (events.isEmpty()) {
-            logger.info("No events to dispatch in worker $workedId, exiting. on $threadName")
+            logger.debug("No events to dispatch in worker $workedId, exiting. on $threadName")
             return
         }
 
@@ -94,7 +94,7 @@ class OutboxDispatcherJob(
         if (succeeded.isNotEmpty()) {
             outboxEventPort.saveAll(succeeded)
             meterRegistry.counter(OUTBOX_DISPATCHED_TOTAL).increment(succeeded.size.toDouble())
-            logger.info("Successfully dispatched ${succeeded.size} events in worker $workedId on $threadName")
+            logger.debug("Successfully dispatched ${succeeded.size} events in worker $workedId on $threadName")
         } else {
             logger.warn("No events were successfully dispatched in worker $workedId on $threadName")
         }

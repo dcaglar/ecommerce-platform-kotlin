@@ -15,11 +15,11 @@ if ! docker info > /dev/null 2>&1; then
   exit 1
 fi
 
-docker compose -f ../docker-compose.app.yml --profile "$PROFILE" up --build -d
+docker compose -f docker-compose.app.yml --profile "$PROFILE" up --build -d
 STATUS=$?
 if [ $STATUS -eq 0 ]; then
   echo "✅ App is up (profile=$PROFILE)."
-  docker compose -f ../docker-compose.app.yml ps
+  docker compose -f docker-compose.app.yml ps
 else
   echo "❌ Failed to start app containers."
 fi

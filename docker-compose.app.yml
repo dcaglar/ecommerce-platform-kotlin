@@ -19,6 +19,7 @@ services:
       - messaging-net
       - payment-net
       - monitoring-net
+      - auth-net
 
 networks:
   messaging-net:
@@ -26,4 +27,6 @@ networks:
   payment-net:
     external: true
   monitoring-net:
+    external: true
+  auth-net:
     external: true

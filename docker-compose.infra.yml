@@ -32,12 +32,33 @@ services:
       KC_DB_PASSWORD: keycloak
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"   # <--- ADD THIS LINE
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/localhost/8080; echo -e \"GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3; grep \"HTTP/1.1 200 OK\" <&3"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
     command: start-dev
     ports:
       - "8082:8080"  # Exposed for browser access to Keycloak
     networks:
       - auth-net
-
+  keycloak-provisioner:
+    image: alpine:3.20
+    container_name: keycloak-provisioner
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - auth-net
+    volumes:
+      - ./keycloak/provision-keycloak.sh:/provision-keycloak.sh:ro
+      - ./keycloak:/output
+    command: /bin/sh -c "apk add --no-cache curl jq && sh /provision-keycloak.sh"
   ### 🏦 Payment Database
   payment-db:
     image: postgres:15
@@ -275,12 +296,12 @@ volumes:
 ### 🌐 Custom networks per domain
 networks:
   auth-net:
-    driver: bridge
+    external: true
   payment-net:
     external: true
   messaging-net:
     external: true
-  observability-net:
-    driver: bridge
   monitoring-net:
     external: true
+  observability-net:
+    driver: bridge

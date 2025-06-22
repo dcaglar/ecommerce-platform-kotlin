@@ -6,7 +6,7 @@ if [[ "$1" == "-h" || "$1" == "--help" ]]; then
   exit 0
 fi
 
-EXTERNAL_NETWORKS=("payment-net" "messaging-net" "monitoring-net")
+EXTERNAL_NETWORKS=("payment-net" "messaging-net" "monitoring-net" "auth-net")
 
 echo "🔧 Creating external Docker networks (if not already present)..."
 

@@ -236,16 +236,6 @@ robust event choreography in a high-throughput, distributed system.
 
 ---
 
-## 🚀 Getting Started
-
-```bash
-git clone https://github.com/dcaglar/ecommerce-platform-kotlin.git
-cd ecommerce-platform-kotlin
-docker-compose up -d
-cd payment-service
-./mvnw spring-boot:run
-
-
 
 
 
