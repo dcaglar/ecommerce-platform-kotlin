@@ -203,6 +203,13 @@ N --> PSP_API
 Legend --- Client_Layer
 ```
 
+> **Target Evolution**: Each executor becomes an independently deployable Spring Boot app. All share the
+`payment-domain` library to avoid code duplication and network latency.
+
+### 4.3 Payment‑Service Layer Diagram
+
+Paymentorder life cycle in the payment-service
+
 ```mermaid
 flowchart TD
 %% User initiates a payment
@@ -240,54 +247,4 @@ flowchart TD
     Y2 --> K1["ShipmentService\nStart Fulfillment"]
     Y2 --> K2["WalletService\nUpdate Balance"]
     Y3 --> K3["Support/Analytics\nAlert or Compensate"]
-```
-
-> **Target Evolution**: Each executor becomes an independently deployable Spring Boot app. All share the
-`payment-domain` library to avoid code duplication and network latency.
-
-### 4.3 Payment‑Service Layer Diagram
-
-Paymentorder life cycle in the payment-service
-
-```mermaid
-%%{init: {
-  "themeVariables": { "fontSize": "32px", "nodeTextSize": "32px" },
-  "flowchart": { "nodeSpacing": 80, "rankSpacing": 90 },
-  "theme": "default"
-}}%%
-flowchart LR
-%% SRE-Style Custom Palette
-    classDef controller fill: #e3f0fd, stroke: #4285F4, stroke-width: 3px;
-    classDef service fill: #e6f5ea, stroke: #34A853, stroke-width: 3px;
-    classDef domain fill: #fef7e0, stroke: #FBBC05, stroke-width: 3px;
-    classDef adapter fill: #f3e8fd, stroke: #A142F4, stroke-width: 3px;
-    classDef infra fill: #fde8e6, stroke: #EA4335, stroke-width: 3px;
-    classDef legend fill: #fff, stroke: #aaa, stroke-width: 1px;
-    subgraph Legend [Legend: Layer Color Coding]
-        L1[Controller: Blue]:::controller
-        L2[Service: Green]:::service
-        L3[Domain: Yellow]:::domain
-        L4[Adapter: Purple]:::adapter
-        L5[Infra: Red]:::infra
-    end
-
-    subgraph Client_Layer ["Client Layer"]
-        A["REST Controller<br/>(PaymentController)"]:::controller
-    end
-
-    subgraph Application_Layer ["Application Layer"]
-        B["PaymentService<br/>(Orchestrator)"]:::service
-        C[DomainEventEnvelopeFactory]:::service
-        D[PaymentOrderOutboxDispatcherScheduler]:::service
-        E[PaymentOrderEventPublisher]:::service
-    end
-
-    subgraph Domain_Layer ["Domain Layer"]
-        F["Domain Models<br/>• Payment • PaymentOrder"]:::domain
-        G["Ports / Interfaces<br/>• PaymentOutboundPort<br/>• PaymentOrderOutboundPort<br/>• OutboxEventPort<br/>• IdGeneratorPort"]:::domain
-        H["Retry Logic & Backoff<br/>(in PaymentOrder)"]:::domain
-    end
-
-subgraph Adapter_Layer ["Adapter Layer"]
-I["Persistence Adapters]
 ```
