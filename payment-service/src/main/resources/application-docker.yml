@@ -57,4 +57,9 @@ kafka:
     payment_order_succeded_topic_dlq:
       partitions: 16
       replicas: 1
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.security.web.access: DEBUG
+    org.springframework.security.authentication: DEBUG
 

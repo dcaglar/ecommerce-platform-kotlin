@@ -17,7 +17,7 @@ VOLUMES=(
 )
 
 BACKUP_DIR=~/docker-backups
-COMPOSE_FILE=../docker-compose.infra.yml
+COMPOSE_FILE=docker-compose.infra.yml
 
 function check_docker() {
   if ! docker info > /dev/null 2>&1; then

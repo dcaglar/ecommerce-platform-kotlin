@@ -11,29 +11,37 @@ import org.springframework.security.web.SecurityFilterChain
 @Configuration
 @EnableWebSecurity
 class SecurityConfig {
-/*
+    /*
+        @Bean
+        fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
+            http
+                .authorizeHttpRequests { requests ->
+                    requests.anyRequest().authenticated()  // Use authorizeHttpRequests instead of authorizeRequests
+                }
+                .oauth2ResourceServer {
+                    it.jwt { jwt -> jwt.jwtAuthenticationConverter(keycloakJwtAuthenticationConverter()) }
+                }
+
+            return http.build()
+        }*/
+
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         http
             .authorizeHttpRequests { requests ->
-                requests.anyRequest().authenticated()  // Use authorizeHttpRequests instead of authorizeRequests
+                requests
+                    .requestMatchers(org.springframework.http.HttpMethod.POST, "/payments").authenticated()
+                    .anyRequest().permitAll()
             }
-            .oauth2ResourceServer {
-                it.jwt { jwt -> jwt.jwtAuthenticationConverter(keycloakJwtAuthenticationConverter()) }
-            }
-
-        return http.build()
-    }*/
-
-    @Bean
-    fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
-        http
-            .authorizeHttpRequests { it.anyRequest().permitAll() }
             .csrf { it.disable() }
             .cors { it.disable() }
             .httpBasic { it.disable() }
             .formLogin { it.disable() }
-            .oauth2ResourceServer { it.disable() } // If you use Bearer tokens
+            .oauth2ResourceServer {
+                it.jwt { jwtConfigurer ->
+                    jwtConfigurer.jwtAuthenticationConverter(keycloakJwtAuthenticationConverter())
+                }
+            }
         return http.build()
     }
 
