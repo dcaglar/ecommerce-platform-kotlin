@@ -236,48 +236,6 @@ robust event choreography in a high-throughput, distributed system.
 
 ---
 
-## 🚀 Getting Started
-
-```bash  Start infrastructure and application
-git clone https://github.com/dcaglar/ecommerce-platform-kotlin.git
-cd scripts
-./infra-up.sh # Start all infrastructure components (PostgreSQL, Redis, Kafka,Elasticsearch,FileBeat,Kibana,Grafana,Promotheus Keycloak)
-./app-up.sh # Start  payment-service and common modueles
-```
-
-### 🧪 Get Token to authenticate your request to call payment-service APIs
-
-```bash
- curl -X POST http://localhost:8082/realms/ecommerce-platform/protocol/openid-connect/token \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "client_id=payment-service" \
-  -d "client_secret=rCdBBSxTe7w6P5Ts7CssmvVX37YM9wkf" \
-  -d "grant_type=password" \
-  -d "username=dogan" \
-  -d "password=password"
-```
-
----
-
-## 📦 Example API Request
-
-```bash
-curl -X POST http://localhost:8080/customers \
-  -H "Authorization: Bearer <your_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "firstName": "Ada",
-        "lastName": "Lovelace",
-        "email": "ada@example.com"
-      }'
-```
-
-./infra-up.sh 
-
-
-
-
-
 
 
 

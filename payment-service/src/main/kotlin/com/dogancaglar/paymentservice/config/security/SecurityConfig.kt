@@ -11,20 +11,6 @@ import org.springframework.security.web.SecurityFilterChain
 @Configuration
 @EnableWebSecurity
 class SecurityConfig {
-    /*
-        @Bean
-        fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
-            http
-                .authorizeHttpRequests { requests ->
-                    requests.anyRequest().authenticated()  // Use authorizeHttpRequests instead of authorizeRequests
-                }
-                .oauth2ResourceServer {
-                    it.jwt { jwt -> jwt.jwtAuthenticationConverter(keycloakJwtAuthenticationConverter()) }
-                }
-
-            return http.build()
-        }*/
-
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         http

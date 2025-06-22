@@ -1,25 +1,22 @@
 import http from 'k6/http';
-import { check, sleep } from 'k6';
+import { check } from 'k6';
 
+// --- Configurable via env vars ---
 const vus = __ENV.VUS ? parseInt(__ENV.VUS) : 5;
 const duration = __ENV.DURATION ? __ENV.DURATION : '5m';
 const rps = __ENV.RPS ? __ENV.RPS : '100';
 
 export let options = {
-    /*
-    vus: vus, // Number of virtual users (can be set via env var VUS)
-    duration: duration, // Test duration (can be set via env var DURATION)
-    */
     scenarios: {
-            constant_request_rate: {
-              executor: "constant-arrival-rate",
-              rate: rps, // requests per second
-              timeUnit: "1s",
-              duration: duration,
-              preAllocatedVUs: vus,
-              maxVUs: 300,
-            }
-          }
+        constant_request_rate: {
+            executor: "constant-arrival-rate",
+            rate: rps,
+            timeUnit: "1s",
+            duration: duration,
+            preAllocatedVUs: vus,
+            maxVUs: 300,
+        }
+    }
 };
 
 const BASE_URL = 'http://localhost:8081/payments';
@@ -27,26 +24,27 @@ const KEYCLOAK_URL = 'http://localhost:8082';
 const REALM = 'ecommerce-platform';
 const CLIENT_ID = 'payment-service';
 
-// Read secret from file
+// --- Read and sanitize secret from file ---
 const secretsFile = open('../keycloak/secrets.txt');
-const PAYMENT_SERVICE_CLIENT_SECRET = secretsFile.match(/PAYMENT_SERVICE_CLIENT_SECRET=(.*)/)[1];
+// Remove \r and \n for maximum cross-OS safety
+const PAYMENT_SERVICE_CLIENT_SECRET = secretsFile.match(/PAYMENT_SERVICE_CLIENT_SECRET=(.*)/)[1].replace(/[\r\n]+$/, '');
 
-// Get token
-function getToken() {
-    const res = http.post(`${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/token`,
-        {
-            grant_type: 'client_credentials',
-            client_id: CLIENT_ID,
-            client_secret: PAYMENT_SERVICE_CLIENT_SECRET
-        },
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-    );
-    return res.json('access_token');
+if (!PAYMENT_SERVICE_CLIENT_SECRET) {
+    console.error("Client secret is empty! Please check secrets.txt");
+    throw new Error("Missing client secret");
 }
 
+// --- Get token (client_credentials) ---
+const ACCESS_TOKEN = open('../keycloak/access.token').replace(/[\r\n]+$/, '');
+
+if (!ACCESS_TOKEN) {
+    console.error("access.token is empty! Please run get-token.sh before running k6.");
+    throw new Error("Missing access token");
+}
+
+// --- k6 Setup: Get one token and pass it to all VUs ---
 export function setup() {
-    const token = getToken();
-    return { authToken: token };
+    return { authToken: ACCESS_TOKEN };
 }
 
 function randomId(prefix) {
@@ -57,6 +55,7 @@ function randomAmount(min, max) {
     return parseFloat((Math.random() * (max - min) + min).toFixed(2));
 }
 
+// --- k6 main function: makes payment requests ---
 export default function (data) {
     const AUTH_TOKEN = data.authToken;
     const paymentOrderCount = Math.floor(Math.random() * 3) + 1; // 1-3 payment orders
@@ -65,7 +64,7 @@ export default function (data) {
         paymentOrders.push({
             sellerId: randomId('SELLER'),
             amount: {
-                value: randomAmount(10, 200), // random amount between 10 and 200
+                value: randomAmount(10, 200),
                 currency: 'EUR',
             },
         });
@@ -87,7 +86,8 @@ export default function (data) {
         },
     };
     const res = http.post(BASE_URL, payload, params);
-    // Debug: log token and response for troubleshooting 401
+
+    // --- Log for 401/debug ---
     if (res.status !== 200) {
         console.error('Token used:', AUTH_TOKEN);
         console.error('Request payload:', payload);

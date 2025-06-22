@@ -69,8 +69,7 @@ create_client() {
   curl -sf -X PUT "$KEYCLOAK_URL/admin/realms/$REALM/clients/$CLIENT_ID" \
     -H "Authorization: Bearer $KC_TOKEN" \
     -H "Content-Type: application/json" \
-    -d '{"publicClient": false, "serviceAccountsEnabled": true, "directAccessGrantsEnabled": false}' || true
-
+    -d '{"publicClient": false, "serviceAccountsEnabled": true, "directAccessGrantsEnabled": false, "attributes": {"access.token.lifespan": "2592000"}}' || true
   if [ -z "$CLIENT_ID" ] || [ "$CLIENT_ID" = "null" ]; then
     log "❌ Could not find or create client $NAME. Exiting."
     exit 2
@@ -90,8 +89,37 @@ get_client_secret() {
   echo "$SECRET"
 }
 
+assign_realm_role_to_service_account() {
+  CLIENT_ID="$1"
+  ROLE_NAME="$2"
+  # Get service account user id
+  SERVICE_ACCOUNT_ID=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/clients/$CLIENT_ID/service-account-user" \
+    -H "Authorization: Bearer $KC_TOKEN" | jq -r .id)
+  if [ -z "$SERVICE_ACCOUNT_ID" ] || [ "$SERVICE_ACCOUNT_ID" = "null" ]; then
+    log "❗ Service account user for client $CLIENT_ID not found."
+    return 1
+  fi
+  # Get role id
+  ROLE=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/roles/$ROLE_NAME" \
+    -H "Authorization: Bearer $KC_TOKEN")
+  if [ -z "$ROLE" ] || [ "$ROLE" = "null" ]; then
+    log "❗ Role $ROLE_NAME not found."
+    return 1
+  fi
+  # Assign role
+  curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/users/$SERVICE_ACCOUNT_ID/role-mappings/realm" \
+    -H "Authorization: Bearer $KC_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "[$ROLE]" || log "ℹ️  Role $ROLE_NAME may already be assigned to $CLIENT_ID"
+  log "✅ Role $ROLE_NAME assigned to service-account-$CLIENT_ID"
+}
+
+
 ORDER_CLIENT_ID=$(create_client "order-service")
 PAYMENT_CLIENT_ID=$(create_client "payment-service")
+
+# Assign payment:write role to payment-service service account
+assign_realm_role_to_service_account "$PAYMENT_CLIENT_ID" "payment:write"
 
 ORDER_SECRET=$(get_client_secret "$ORDER_CLIENT_ID")
 PAYMENT_SECRET=$(get_client_secret "$PAYMENT_CLIENT_ID")

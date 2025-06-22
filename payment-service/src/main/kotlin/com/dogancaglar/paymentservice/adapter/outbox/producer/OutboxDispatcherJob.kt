@@ -56,7 +56,7 @@ class OutboxDispatcherJob(
         val threadName = Thread.currentThread().name
         logger.debug("Started dispatchBatchWorker method for $workedId on $threadName ")
         val events = outboxEventPort.findBatchForDispatch("NEW", batchSize)
-        logger.info("Found ${events.size} events to dispatch in worker $workedId on $threadName")
+        logger.debug("Found ${events.size} events to dispatch in worker $workedId on $threadName")
         if (events.isEmpty()) {
             logger.debug("No events to dispatch in worker $workedId, exiting. on $threadName")
             return
