@@ -112,6 +112,7 @@ This project follows a modular multi-module Maven layout designed for scalabilit
 For detailed folder and package structure, see [docs/folder-structure.md](./docs/folder-structure.md).  
 For architectural principles and deployment plans, and detailed diagrams
 see [docs/architecture.md](./docs/architecture.md).
+For quick start instructions, see [docs/how-to-start.md](./docs/how-to-start.md).
 
 ## ✅ Current Focus: `payment-service`
 
