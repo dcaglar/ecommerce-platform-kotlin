@@ -53,8 +53,8 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry) {
     @Bean
     fun paymentOrderExecutorPoolConfig(): ThreadPoolTaskExecutor {
         val executor = ThreadPoolTaskExecutor()
-        executor.corePoolSize = 16       // Match Kafka consumer concurrency (partitions)
-        executor.maxPoolSize = 16
+        executor.corePoolSize = 8       // Match Kafka consumer concurrency (partitions)
+        executor.maxPoolSize = 8
         executor.setQueueCapacity(32)    // Optional small buffer
         executor.setThreadNamePrefix("payment-order-psp-")
         executor.setWaitForTasksToCompleteOnShutdown(true)

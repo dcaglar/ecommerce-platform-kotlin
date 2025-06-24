@@ -73,6 +73,7 @@ services:
       environment: local
     volumes:
       - payment_postgres_data:/var/lib/postgresql/data
+      - ./postgredb/init-primary.sh:/docker-entrypoint-initdb.d/init-primary.sh
     ports:
       - "5434:5432"  # Exposed for Spring Boot to connect
     networks:
@@ -80,8 +81,33 @@ services:
     command:
       - "postgres"
       - "-c"
+      - "wal_level=replica"
+      - "-c"
+      - "max_wal_senders=10"
+      - "-c"
+      - "max_replication_slots=10"
+      - "-c"
+      - "hot_standby=on"
+      - "-c"
       - "shared_preload_libraries=pg_stat_statements"
-
+  payment-db-replica:
+    image: postgres:15
+    container_name: payment-db-replica
+    environment:
+      POSTGRES_DB: payment
+      POSTGRES_USER: replica
+      POSTGRES_PASSWORD: replica_password
+    ports:
+      - "5435:5432"
+    networks:
+      - payment-net
+    depends_on:
+      - payment-db
+    volumes:
+      - payment-db-replica-data:/var/lib/postgresql/data
+      - ./postgredb/init-replica.sh:/init-replica.sh
+      - ./postgredb/grant-replica-select.sql:/docker-entrypoint-initdb.d/grant-replica-select.sql
+    entrypoint: [ "/bin/bash", "/init-replica.sh" ]
   ### 📨 Messaging Stack
   zookeeper:
     image: confluentinc/cp-zookeeper:7.2.1
@@ -284,6 +310,7 @@ services:
 
 volumes:
   payment_postgres_data:
+  payment-db-replica-data:
   redis-data:
   kafka-data:
   zookeeper-data:

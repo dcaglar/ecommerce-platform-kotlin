@@ -13,7 +13,7 @@ app:
     dynamic-consumers:
       - id: payment-order-executor
         topic: payment_order_created_topic
-        group-id: payment-order-group
+        group-id: payment-order-executor-group
         class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderExecutor
         concurrency: 16
 

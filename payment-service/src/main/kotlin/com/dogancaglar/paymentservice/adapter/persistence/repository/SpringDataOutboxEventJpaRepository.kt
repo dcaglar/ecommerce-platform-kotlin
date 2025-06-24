@@ -21,7 +21,6 @@ interface SpringDataOutboxEventJpaRepository : JpaRepository<OutboxEventEntity, 
     SELECT * FROM outbox_event
     WHERE status = :status
     ORDER BY created_at
-    FOR UPDATE SKIP LOCKED
     LIMIT :batchSize
     """,
         nativeQuery = true

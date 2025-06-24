@@ -2,9 +2,9 @@ server:
   port: 8080
 spring:
   kafka:
-      consumer:
-          key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-          value-deserializer: com.dogancaglar.paymentservice.config.serialization.EventEnvelopeDeserializer
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: com.dogancaglar.paymentservice.config.serialization.EventEnvelopeDeserializer
   liquibase:
     change-log: classpath:db/changelog/changelog-master.xml
   datasource:
@@ -39,12 +39,12 @@ kafka:
       class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderRetryCommandExecutor
     - id: payment-order-executor
       topic: payment_order_created_queue
-      group-id: payment-order-group
+      group-id: payment-order-executor-group
       class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderExecutor
-#    - id: payment-status-check-scheduler
-#      topic: payment_status_check_scheduler_topic
-#      group-id: payment-status-check-scheduler-group
-#      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderStatusCheckScheduler
+    #    - id: payment-status-check-scheduler
+    #      topic: payment_status_check_scheduler_topic
+    #      group-id: payment-status-check-scheduler-group
+    #      class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderStatusCheckScheduler
     - id: payment-status-check-executor-scheduler
       topic: due_payment_status_check_topic
       group-id: payment-status-check-executor-group

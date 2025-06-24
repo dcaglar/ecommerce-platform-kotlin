@@ -26,6 +26,7 @@ import java.time.Instant
 @Service
 class OutboxDispatcherJob(
     private val outboxEventPort: OutboxEventPort,
+    private val outboxReplicaPoller: OutboxReplicaPoller,
     private val paymentEventPublisher: PaymentEventPublisher,
     private val meterRegistry: MeterRegistry,
     private val objectMapper: ObjectMapper,
@@ -37,6 +38,7 @@ class OutboxDispatcherJob(
     private val batchSize: Int,
     private val clock: Clock
 ) {
+
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @Scheduled(fixedDelay = 5000)

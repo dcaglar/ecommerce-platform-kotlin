@@ -95,7 +95,7 @@ class KafkaTypedConsumerFactoryConfig(
         .let { cfg ->
             createTypedFactory<PaymentOrderCreated>(
                 clientId = cfg.id,
-                concurrency = cfg.concurrency,
+                concurrency = 16,
                 interceptor = interceptor,
                 consumerFactory = customFactory,
                 errorHandler = errorHandler
@@ -113,7 +113,7 @@ class KafkaTypedConsumerFactoryConfig(
         .let { cfg ->
             createTypedFactory<PaymentOrderRetryRequested>(
                 clientId = cfg.id,
-                concurrency = cfg.concurrency,
+                concurrency = 16,
                 interceptor = interceptor,
                 consumerFactory = customFactory,
                 errorHandler = errorHandler

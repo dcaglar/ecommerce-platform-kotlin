@@ -14,4 +14,5 @@
     <include file="20250526-remove-sellerid-payment.xml" relativeToChangelogFile="true"/>
     <include file="20250601-create-payment-order-status-checks.xml" relativeToChangelogFile="true"/>
     <include file="20250615-add-pk-on-payment-id.xml" relativeToChangelogFile="true"/>
+    <include file="20250624-grant-select-on-replicate-user.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>
