@@ -32,6 +32,10 @@ app:
 spring:
   jpa:
     properties:
+      hibernate.jdbc.batch_size: 250
+      hibernate.order_updates: true
+      hibernate.jdbc.batch_versioned_data: true
+      hibernate.order_inserts: true
       hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: none  # ❌ Disable automatic table creation

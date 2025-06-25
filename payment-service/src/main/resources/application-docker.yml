@@ -5,7 +5,7 @@ server:
 spring:
   tomcat:
     threads:
-      max: 50         # Max concurrent requests
+      max: 20         # Max concurrent requests
       min-spare: 10
     accept-count: 200
   kafka: #url for kafka in container-since this is used in docker-compose we use the service name
@@ -18,9 +18,10 @@ spring:
       pool-name: payment-master
       maximum-pool-size: 80
       minimum-idle: 40
-      connection-timeout: 5000
-      idle-timeout: 600000
+      connection-timeout: 5000            # ms
+      idle-timeout: 600000           # ms
       max-lifetime: 1800000
+
   replica-datasource:
     url: jdbc:postgresql://payment-db-replica:5432/payment?options=-c%20timezone=UTC    # replica
     username: replica

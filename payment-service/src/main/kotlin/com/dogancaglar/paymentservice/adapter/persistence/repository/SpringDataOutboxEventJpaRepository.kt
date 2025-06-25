@@ -5,6 +5,7 @@ import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
+import java.time.LocalDateTime
 import java.util.*
 
 interface SpringDataOutboxEventJpaRepository : JpaRepository<OutboxEventEntity, UUID> {
@@ -28,5 +29,21 @@ interface SpringDataOutboxEventJpaRepository : JpaRepository<OutboxEventEntity, 
     fun findBatchForDispatch(
         @Param("status") status: String,
         @Param("batchSize") batchSize: Int
+    ): List<OutboxEventEntity>
+
+
+    @Query(
+        """
+      SELECT * FROM outbox_event
+      WHERE status = 'NEW'
+        AND created_at  > :cursor
+      ORDER BY created_at
+      LIMIT :batch
+    """,
+        nativeQuery = true
+    )
+    fun findBatchAfter(
+        @Param("cursor") cursor: LocalDateTime,
+        @Param("batch") batch: Int
     ): List<OutboxEventEntity>
 }

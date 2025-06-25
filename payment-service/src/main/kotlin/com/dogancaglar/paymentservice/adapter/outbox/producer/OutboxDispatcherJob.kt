@@ -21,100 +21,95 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Instant
-
+import java.time.ZoneOffset
+import java.util.concurrent.TimeUnit
 
 @Service
 class OutboxDispatcherJob(
-    private val outboxEventPort: OutboxEventPort,
-    private val outboxReplicaReadService: OutboxReplicaReadService,
-    private val paymentEventPublisher: PaymentEventPublisher,
-    private val meterRegistry: MeterRegistry,
-    private val objectMapper: ObjectMapper,
-    @Qualifier("outboxTaskScheduler") // <-- use the shared scheduler bean
-    private val taskScheduler: ThreadPoolTaskScheduler, // <-- inject the shared scheduler!
-    @Value("\${outbox-dispatcher.thread-count:8}")
-    private val threadCount: Int,
-    @Value("\${outbox-dispatcher.batch-size:250}")
-    private val batchSize: Int,
+    private val outboxEventPort: OutboxEventPort,                     // master ( @Primary )
+    @Qualifier("outboxEventReader") private val replicaPort: OutboxEventPort, // replica
+    private val publisher: PaymentEventPublisher,
+    private val meter: MeterRegistry,
+    private val mapper: ObjectMapper,
+    @Qualifier("outboxTaskScheduler") private val scheduler: ThreadPoolTaskScheduler,
+    @Value("\${outbox-dispatcher.thread-count:8}") private val threads: Int,
+    @Value("\${outbox-dispatcher.batch-size:2000}") private val batch: Int,
     private val clock: Clock
 ) {
 
-    private val logger = LoggerFactory.getLogger(javaClass)
+    private val log = LoggerFactory.getLogger(javaClass)
 
-    @Scheduled(fixedDelay = 5000)
-    fun dispatchBatches() {
-        logger.debug("Starting outbox event dispatch batches ")
-        repeat(threadCount) { workerId ->
-            val delayMs = 500 * workerId // e.g. 0, 300, 600, ...
-            taskScheduler.schedule({
-                dispatchBatchWorker(workerId)
-            }, Instant.now(clock).plusMillis(delayMs.toLong()))
+    /* ─────────── scheduler entry ─────────── */
+    @Scheduled(fixedDelay = 5_000)
+    fun dispatchLoops() =
+        repeat(threads) { id ->
+            scheduler.schedule(
+                { worker(id) },
+                Instant.now(clock).plusMillis((500L * id))
+            )
         }
-    }
 
-    @Transactional
-    fun dispatchBatchWorker(workedId: Int) {
+    /* ─────────── one worker pass ─────────── */
+    fun worker(id: Int) {
         val start = System.currentTimeMillis()
-        val threadName = Thread.currentThread().name
-        logger.debug("Started dispatchBatchWorker method for $workedId on $threadName ")
-        val events = outboxReplicaReadService.pollBatch("NEW", batchSize)
-        logger.debug("Found ${events.size} events to dispatch in worker $workedId on $threadName")
-        if (events.isEmpty()) {
-            logger.debug("No events to dispatch in worker $workedId, exiting. on $threadName")
-            return
-        }
 
-        val succeeded = mutableListOf<OutboxEvent>()
-        val failed = mutableListOf<OutboxEvent>()
+        /* ① read cursor & poll replica */
+        val cursor = replicaPort.read().atOffset(ZoneOffset.UTC)      // Instant → OffsetDateTime (UTC)
+            .toLocalDateTime()
+        val events = replicaPort.findBatchAfter(cursor, batch)
+        if (events.isEmpty()) return
 
-        for (event in events) {
+        /* ② publish */
+        val ok = mutableListOf<OutboxEvent>();
+        val ko = mutableListOf<OutboxEvent>()
+        var maxTs = cursor
+
+        events.forEach { ev ->
             try {
-                //todo do we have to set LogContext here?
-                val envelopeType = objectMapper.typeFactory
+                val type = mapper.typeFactory
                     .constructParametricType(EventEnvelope::class.java, PaymentOrderCreated::class.java)
-                val envelope: EventEnvelope<PaymentOrderCreated> =
-                    objectMapper.readValue(event.payload, envelopeType)
+                val env: EventEnvelope<PaymentOrderCreated> = mapper.readValue(ev.payload, type)
 
-                paymentEventPublisher.publish(
-                    preSetEventIdFromCaller = envelope.eventId,
-                    aggregateId = envelope.aggregateId,
+                publisher.publish(
+                    preSetEventIdFromCaller = env.eventId,
+                    aggregateId = env.aggregateId,
                     eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
-                    data = envelope.data,
-                    traceId = envelope.traceId,
-                    parentEventId = envelope.eventId
+                    data = env.data,
+                    traceId = env.traceId,
+                    parentEventId = env.eventId
                 )
-                event.markAsSent()
-                succeeded.add(event)
+                ev.markAsSent()
+                ok += ev
+                if (ev.createdAt > maxTs) maxTs = ev.createdAt
             } catch (ex: Exception) {
-                failed.add(event)
-                logger.error("Failed to publish event on $threadName ${event.eventId}: ${ex.message}", ex)
-                // Optionally log the error for monitoring
-                // logger.error("Failed to publish event ${event.id}", ex)
+                ko += ev
+                log.error("Publish failed for {}", ev.eventId, ex)
             }
         }
-        // Only persist the succeeded events
-        if (succeeded.isNotEmpty()) {
-            outboxEventPort.saveAll(succeeded)
-            meterRegistry.counter(OUTBOX_DISPATCHED_TOTAL).increment(succeeded.size.toDouble())
-            logger.debug("Successfully dispatched ${succeeded.size} events in worker $workedId on $threadName")
-        } else {
-            logger.warn("No events were successfully dispatched in worker $workedId on $threadName")
-        }
 
+        /* ③ persist SENT rows in ONE master transaction */
+        persistSent(ok)
 
-        if (failed.isNotEmpty()) {
-            logger.warn("Failed to dispatch ${failed.size} events in worker $workedId")
-            meterRegistry.counter(OUTBOX_DISPATCH_FAILED_TOTAL).increment(failed.size.toDouble())
+        /* ④ advance cursor only if something was sent */
+        if (ok.isNotEmpty()) replicaPort.write(maxTs.atZone(clock.zone).toInstant())
+
+        /* ⑤ metrics */
+        recordMetrics(ok.size, ko.size)
+        meter.timer(OUTBOX_DISPATCHER_DURATION, "thread", "worker-$id")
+            .record(System.currentTimeMillis() - start, TimeUnit.MILLISECONDS)
+    }
+
+    /* master commit */
+    @Transactional("transactionManager")
+    fun persistSent(rows: List<OutboxEvent>) {
+        if (rows.isNotEmpty()) outboxEventPort.saveAll(rows)
+    }
+
+    private fun recordMetrics(ok: Int, ko: Int) {
+        if (ok > 0) meter.counter(OUTBOX_DISPATCHED_TOTAL).increment(ok.toDouble())
+        if (ko > 0) meter.counter(OUTBOX_DISPATCH_FAILED_TOTAL).increment(ko.toDouble())
+        meter.gauge(OUTBOX_EVENT_BACKLOG, outboxEventPort) {
+            replicaPort.countByStatus("NEW").toDouble()
         }
-        // Update backlog gauge
-        meterRegistry.gauge(OUTBOX_EVENT_BACKLOG, outboxEventPort) { _ ->
-            outboxReplicaReadService.countByStatus("NEW").toDouble()
-        }
-        val end = System.currentTimeMillis()
-        val durationMs = end - start
-        logger.info("DispatchBatchWorker #$workedId completed in ${durationMs}ms on $threadName")
-        // Optionally, record as a metric:
-        meterRegistry.timer(OUTBOX_DISPATCHER_DURATION, "thread", threadName)
-            .record(durationMs, java.util.concurrent.TimeUnit.MILLISECONDS)
     }
 }

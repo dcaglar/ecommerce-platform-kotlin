@@ -2,21 +2,23 @@ package com.dogancaglar.paymentservice.adapter.outbox.producer
 
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.domain.port.OutboxEventPort
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDateTime
 
 @Service
-class OutboxReplicaReadService(
-    private val outboxEventPort: OutboxEventPort
+class ReplicaReadService(
+    @Qualifier("outboxEventReader")             // ← replica
+    private val reader: OutboxEventPort
 ) {
-    @Transactional("replicaTransactionManager", readOnly = true)
-    fun pollBatch(status: String, batchSize: Int): List<OutboxEvent> {
-        return outboxEventPort.findBatchForDispatch(status, batchSize)
+    fun pollBatch(cursor: LocalDateTime, batchSize: Int): List<OutboxEvent> {
+        return reader.findBatchAfter(cursor, batchSize)
     }
 
     @Transactional("replicaTransactionManager", readOnly = true)
     fun countByStatus(status: String): Long {
-        return outboxEventPort.countByStatus(status)
+        return reader.countByStatus(status)
     }
 
 
