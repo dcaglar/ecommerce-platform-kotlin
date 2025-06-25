@@ -14,7 +14,6 @@ spring:
     url: jdbc:postgresql://payment-db:5432/payment?options=-c%20timezone=UTC
     username: payment
     password: payment
-    driver-class-name: org.postgresql.Driver
     hikari:
       pool-name: payment-master
       maximum-pool-size: 80
@@ -23,10 +22,9 @@ spring:
       idle-timeout: 600000
       max-lifetime: 1800000
   replica-datasource:
-    url: jdbc:postgresql://payment-db:5435/payment?options=-c%20timezone=UTC    # replica
+    url: jdbc:postgresql://payment-db-replica:5432/payment?options=-c%20timezone=UTC    # replica
     username: replica
     password: replica_password
-    driver-class-name: org.postgresql.Driver
     hikari:
       pool-name: payment-replica
       maximum-pool-size: 80

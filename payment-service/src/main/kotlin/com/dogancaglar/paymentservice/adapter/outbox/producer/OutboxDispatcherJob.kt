@@ -26,7 +26,7 @@ import java.time.Instant
 @Service
 class OutboxDispatcherJob(
     private val outboxEventPort: OutboxEventPort,
-    private val outboxReplicaPoller: OutboxReplicaPoller,
+    private val outboxReplicaReadService: OutboxReplicaReadService,
     private val paymentEventPublisher: PaymentEventPublisher,
     private val meterRegistry: MeterRegistry,
     private val objectMapper: ObjectMapper,
@@ -57,7 +57,7 @@ class OutboxDispatcherJob(
         val start = System.currentTimeMillis()
         val threadName = Thread.currentThread().name
         logger.debug("Started dispatchBatchWorker method for $workedId on $threadName ")
-        val events = outboxEventPort.findBatchForDispatch("NEW", batchSize)
+        val events = outboxReplicaReadService.pollBatch("NEW", batchSize)
         logger.debug("Found ${events.size} events to dispatch in worker $workedId on $threadName")
         if (events.isEmpty()) {
             logger.debug("No events to dispatch in worker $workedId, exiting. on $threadName")
@@ -108,7 +108,7 @@ class OutboxDispatcherJob(
         }
         // Update backlog gauge
         meterRegistry.gauge(OUTBOX_EVENT_BACKLOG, outboxEventPort) { _ ->
-            outboxEventPort.countByStatus("NEW").toDouble()
+            outboxReplicaReadService.countByStatus("NEW").toDouble()
         }
         val end = System.currentTimeMillis()
         val durationMs = end - start

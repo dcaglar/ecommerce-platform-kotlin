@@ -30,33 +30,15 @@ app:
         concurrency: 1
 
 spring:
-  datasource:
-    url: jdbc://127/0.0.1:5432/payment
-    username: payment
-    password: payment
-    hikari:
-      maximum-pool-size: 110
-      minimum-idle: 80
-      connection-timeout: 3000
-      idle-timeout: 600000
-      max-lifetime: 1800000
   jpa:
+    properties:
+      hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: none  # ❌ Disable automatic table creation
       open-in-view: false
   liquibase:
     change-log: classpath:db/changelog/changelog-master.xml
-  redis:
-    url: xxxxx
-    timeout: 2000ms
-    lettuce:
-      pool:
-      max-active: 8
-      max-idle: 8
-      min-idle: 0
-      max-wait: -1ms
   kafka: # auto-create both source & DLQ topics with matching partitions
-    bootstrap-servers: xxxxx
     consumer:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       heartbeat-interval: 3000

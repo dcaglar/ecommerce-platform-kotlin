@@ -16,7 +16,7 @@ class PaymentEntity(
     @Column(name = "public_payment_id", nullable = false, unique = true)
     val publicPaymentId: String,
 
-    @Column(nullable = false)
+    @Column(name = "buyer_id", nullable = false)
     val buyerId: String,
 
     @Column(name = "amount_value", nullable = false)
@@ -25,14 +25,15 @@ class PaymentEntity(
     @Column(name = "amount_currency", nullable = false)
     val totalAmountCurrency: String,
 
-    @Column(nullable = false)
+    @Column(name = "order_id", nullable = false)
     val orderId: String,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     val status: PaymentStatus,
-    @Column(nullable = false)
+    @Column(name = "created_at", nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()
+
 ) {
     constructor(paymentId: Long, publicPaymentId: String) : this(
         paymentId = paymentId,

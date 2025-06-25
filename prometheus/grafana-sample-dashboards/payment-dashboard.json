@@ -541,32 +541,7 @@
           },
           "unit": "percent"
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "DB Pool Utilization"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 9,
@@ -595,8 +570,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "(hikaricp_connections_active/hikaricp_connections_max)*100",
-          "legendFormat": "DB Pool Utilization",
+          "editorMode": "code",
+          "expr": "(hikaricp_connections_active{pool=~\"payment-(master|replica)\"}\n/ hikaricp_connections_max{pool=~\"payment-(master|replica)\"}) * 100",
+          "legendFormat": " {{pool}}",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -695,8 +672,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "hikaricp_connections_pending",
-          "legendFormat": "Pending Connections",
+          "editorMode": "code",
+          "expr": "hikaricp_connections_pending{pool=~\"payment-(master|replica)\"}",
+          "legendFormat": "{{pool}}",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -797,8 +776,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "hikaricp_connections_acquire_seconds_max*1000",
-          "legendFormat": "Acquire Time (max)",
+          "expr": "hikaricp_connections_acquire_seconds_max{pool=~\"payment-(master|replica)\"}*1000",
+          "legendFormat": "{{pool}}",
           "range": true,
           "refId": "A"
         }
@@ -3146,13 +3125,13 @@
     "list": []
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Payment Dashboard",
-  "uid": "20250615df",
-  "version": 20,
+  "title": "asdPayment Dashboard",
+  "uid": "20250615dfasd",
+  "version": 4,
   "weekStart": ""
 }

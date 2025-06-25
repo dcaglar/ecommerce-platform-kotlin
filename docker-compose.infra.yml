@@ -67,7 +67,7 @@ services:
       POSTGRES_DB: payment
       POSTGRES_USER: payment
       POSTGRES_PASSWORD: payment
-      POSTGRES_MAX_CONNECTIONS: 200
+      POSTGRES_MAX_CONNECTIONS: 100
     labels:
       service: payment-db
       environment: local
@@ -97,10 +97,15 @@ services:
       POSTGRES_DB: payment
       POSTGRES_USER: replica
       POSTGRES_PASSWORD: replica_password
+      POSTGRES_MAX_CONNECTIONS: 50
     ports:
       - "5435:5432"
     networks:
       - payment-net
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
     depends_on:
       - payment-db
     volumes:
