@@ -23,3 +23,16 @@ object TOPIC_NAMES {
 
 
 }
+
+object CONSUMER_GROUPS {
+    const val PAYMENT_ORDER_CREATED = "payment-order-created-consumer-group"
+    const val PAYMENT_ORDER_RETRY = "payment-order-retry-consumer-group"
+    const val PAYMENT_STATUS_CHECK_SCHEDULER = "payment-status-check-scheduler-consumer-group"
+    const val PAYMENT_ORDER_SUCCEEDED = "payment-order-succeeded-consumer-group"
+
+    //DLQ
+    const val PAYMENT_ORDER_CREATED_DLQ = "payment-order-created-dlq-consumer-group"
+    const val PAYMENT_ORDER_RETRY_DLQ = "payment-order-retry-dlq-consumer-group"
+    const val PAYMENT_STATUS_CHECK_SCHEDULER_DLQ = "payment-status-check-scheduler-dlq-consumer-group"
+    const val PAYMENT_ORDER_SUCCEEDED_DLQ = "payment-order-succeeded-dlq-consumer-group"
+}

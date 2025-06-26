@@ -12,12 +12,20 @@ class OutboxEvent private constructor(
     private var status: String,
     val createdAt: LocalDateTime
 ) {
-    fun markAsSent() {
-        if (status == "NEW") {
-            status = "SENT"
-        } else {
-            error("OutboxEvent must be NEW to mark as SENT")
+
+    fun markAsProcessing() {
+        require(status == "NEW") {
+            "OutboxEvent must be NEW to mark as PROCESSING, was $status"
         }
+        status = "PROCESSING"
+    }
+
+    fun markAsSent() {
+        // ↑ was `require(status == "NEW")`
+        require(status == "PROCESSING" || status == "NEW") {
+            "OutboxEvent must be PROCESSING/NEW to mark as SENT, was $status"
+        }
+        status = "SENT"
     }
 
     fun getStatus(): String = status

@@ -1,47 +1,35 @@
 package com.dogancaglar.paymentservice.adapter.persistence.entity
 
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
-import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
-@Entity
-@Table(name = "payments")
 class PaymentEntity(
-
-    @Id
-    @Column(name = "payment_id")  // 👈 Add this line
     val paymentId: Long,
-
-    @Column(name = "public_payment_id", nullable = false, unique = true)
     val publicPaymentId: String,
-
-    @Column(nullable = false)
     val buyerId: String,
-
-    @Column(name = "amount_value", nullable = false)
-    val totalAmountValue: BigDecimal,
-
-    @Column(name = "amount_currency", nullable = false)
-    val totalAmountCurrency: String,
-
-    @Column(nullable = false)
     val orderId: String,
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    val amountValue: BigDecimal,
+    val amountCurrency: String,
     val status: PaymentStatus,
-    @Column(nullable = false)
-    val createdAt: LocalDateTime = LocalDateTime.now()
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+    val updatedAt: LocalDateTime? = null,
+    val retryCount: Int? = null,
+    val retryReason: String? = null,
+    val lastErrorMessage: String? = null
 ) {
     constructor(paymentId: Long, publicPaymentId: String) : this(
         paymentId = paymentId,
         publicPaymentId = publicPaymentId,
         buyerId = "",
-        totalAmountValue = BigDecimal.ZERO,
-        totalAmountCurrency = "EUR",
         orderId = "",
+        amountValue = BigDecimal.ZERO,
+        amountCurrency = "EUR",
         status = PaymentStatus.INITIATED,
-        createdAt = LocalDateTime.now()
+        createdAt = LocalDateTime.now(),
+        updatedAt = null,
+        retryCount = null,
+        retryReason = null,
+        lastErrorMessage = null
     )
 }
