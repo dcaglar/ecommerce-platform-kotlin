@@ -62,6 +62,7 @@ spring:
       heartbeat-interval: 3000
       session-timeout: 10000s
       max-poll-interval: 300000
+      max-poll-records: 200
       #      auto-offset-reset: earliest # ❌ Do not reset offsets automatically,default is latest
       #      enable-auto-commit: false
       properties: #maybe change partition assignment strategy

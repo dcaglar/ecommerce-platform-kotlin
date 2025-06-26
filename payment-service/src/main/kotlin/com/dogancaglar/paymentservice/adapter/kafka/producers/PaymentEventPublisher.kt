@@ -36,9 +36,11 @@ class PaymentEventPublisher(
         traceId: String? = null,
         parentEventId: UUID? = null
     ): EventEnvelope<T> {
+        logger.info("PUBLISH-Before buildEnvelope")
         val envelope = buildEnvelope(
             preSetEventIdFromCaller, aggregateId, eventMetaData, data, traceId, parentEventId
         )
+        logger.info("📨PUBLISSH After build envelope before build record")
         LogContext.with(envelope) {
             logger.info(
                 envelope.eventType,
@@ -48,14 +50,12 @@ class PaymentEventPublisher(
                 envelope.aggregateId
             )
             val record = buildRecord(eventMetaData, envelope)
-            logger.info("Sending payment $record.")
+            logger.info("PUBISH Sending payment $record.")
             val future = kafkaTemplate.send(record)
             future.whenComplete { _, ex ->
                 if (ex == null) {
                     logger.info(
-                        "📨 Event published to topic={} eventId={} traceId=${envelope.traceId},parentEventId=${envelope.parentEventId}",
-                        eventMetaData.topic,
-                        envelope.eventId
+                        "📨 Event published to traceid logcontext.traceid=${LogContext.getTraceId()} traceIdFromEnvelope=${envelope.traceId},parentEventId=${envelope.parentEventId}"
                     )
                 } else {
                     logger.error(
@@ -80,35 +80,32 @@ class PaymentEventPublisher(
         parentEventId: UUID? = null,
         timeoutSeconds: Long = 5
     ): EventEnvelope<T> {
+        logger.info("PUBLISSYNC-Before buildEnvelope")
         val envelope = buildEnvelope(
             preSetEventIdFromCaller, aggregateId, eventMetaData, data, traceId, parentEventId
         )
-        LogContext.with(envelope) {
+        logger.info("📨PUBLISSYNC After build envelope before build record")
+
+        val record = buildRecord(eventMetaData, envelope)
+        logger.info("📨 PUBLISH SYNC After build buildrecord")
+        try {
+            val future = kafkaTemplate.send(record)
+            // This will throw if Kafka send fails or times out
+            future.get(timeoutSeconds, java.util.concurrent.TimeUnit.SECONDS)
             logger.info(
-                envelope.eventType,
-                envelope.eventId,
-                envelope.parentEventId,
-                envelope.traceId,
-                envelope.aggregateId
+                "📨 PUBLISH SYNC Event published to traceid logcontext.traceid=${LogContext.getTraceId()} traceIdFromEnvelope=${envelope.traceId},parentEventId=${envelope.parentEventId}"
             )
-            val record = buildRecord(eventMetaData, envelope)
-            logger.debug("Sending payment $record [SYNC].")
-            try {
-                val future = kafkaTemplate.send(record)
-                // This will throw if Kafka send fails or times out
-                future.get(timeoutSeconds, java.util.concurrent.TimeUnit.SECONDS)
-                logger.debug("📨 [SYNC] Event published to topic={} eventId={}", eventMetaData.topic, envelope.eventId)
-            } catch (ex: Exception) {
-                logger.error(
-                    "❌ [SYNC] Failed to publish eventId={} to topic={}: {}",
-                    envelope.eventId,
-                    eventMetaData.topic,
-                    ex.message,
-                    ex
-                )
-                throw ex // bubble up to handler, causing a retry
-            }
+        } catch (ex: Exception) {
+            logger.error(
+                "❌ [SYNC] Failed to publish eventId={} to topic={}: {}",
+                envelope.eventId,
+                eventMetaData.topic,
+                ex.message,
+                ex
+            )
+            throw ex // bubble up to handler, causing a retry
         }
+
         return envelope
     }
 

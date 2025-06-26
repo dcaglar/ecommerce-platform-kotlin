@@ -53,19 +53,8 @@
                     <loggerName/>
                     <message/>
                     <!-- Export your MDC keys (e.g. traceId, userId) up to top level -->
-                    <mdc>
-                        <includeKeys>
-                            <key>traceId</key>
-                            <key>eventId</key>
-                            <key>parentEventId</key>
-                            <key>aggregateId</key>
-                            <key>eventType</key>
-                            <key>retryCount</key>
-                            <key>retryBackoffMillis</key>
-                            <key>retryReason</key>
-                            <key>retryErrorMessage</key>
-                        </includeKeys>
-                    </mdc>
+                    <mdc includes="traceId,eventId,parentEventId,aggregateId,eventType,
+               retryCount,retryBackoffMillis,retryReason,retryErrorMessage"/>
                     <stackTrace/>
                     <globalCustomFields>{"service":"payment-service"}</globalCustomFields>
                 </providers>

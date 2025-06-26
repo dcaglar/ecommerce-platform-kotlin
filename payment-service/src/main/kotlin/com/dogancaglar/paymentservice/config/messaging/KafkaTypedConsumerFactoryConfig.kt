@@ -8,20 +8,28 @@ import com.dogancaglar.paymentservice.application.event.PaymentOrderStatusCheckR
 import com.dogancaglar.paymentservice.config.serialization.EventEnvelopeDeserializer
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.ConsumerConfig
+import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.errors.RetriableException
+import org.apache.kafka.common.errors.SerializationException
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.core.convert.ConversionException
+import org.springframework.dao.*
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.kafka.core.*
 import org.springframework.kafka.listener.ContainerProperties
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer
 import org.springframework.kafka.listener.DefaultErrorHandler
 import org.springframework.kafka.listener.RecordInterceptor
+import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries
+import org.springframework.kafka.support.serializer.DeserializationException
 import org.springframework.messaging.handler.annotation.support.DefaultMessageHandlerMethodFactory
-import org.springframework.util.backoff.FixedBackOff
+import org.springframework.messaging.handler.annotation.support.MethodArgumentNotValidException
+import java.sql.SQLTransientException
 
 @Configuration
 @EnableConfigurationProperties(DynamicKafkaConsumersProperties::class)
@@ -59,11 +67,47 @@ class KafkaTypedConsumerFactoryConfig(
         KafkaTemplate(producerFactory)
 
     @Bean
-    fun errorHandler(kafkaTemplate: KafkaTemplate<String, Any>): DefaultErrorHandler {
+    fun kafkaExponentialBackOff(): ExponentialBackOffWithMaxRetries =
+        ExponentialBackOffWithMaxRetries(4).apply {
+            initialInterval = 2_000L
+            multiplier = 2.0
+            maxInterval = 30_000L
+        }
+
+    @Bean
+    fun errorHandler(
+        kafkaTemplate: KafkaTemplate<String, Any>,
+        kafkaExponentialBackOff: ExponentialBackOffWithMaxRetries
+    ): DefaultErrorHandler {
         val recoverer = DeadLetterPublishingRecoverer(kafkaTemplate) { rec, _ ->
             TopicPartition("${rec.topic()}.DLQ", rec.partition())
         }
-        return DefaultErrorHandler(recoverer, FixedBackOff(1_000L, 4))
+        return DefaultErrorHandler(recoverer, kafkaExponentialBackOff).apply {
+            // Retryable exceptions
+            addRetryableExceptions(
+                RetriableException::class.java,
+                TransientDataAccessException::class.java,
+                CannotAcquireLockException::class.java,
+                SQLTransientException::class.java,
+            )
+            // Non-retryable exceptions
+            addNotRetryableExceptions(
+                IllegalArgumentException::class.java,
+                NullPointerException::class.java,
+                ClassCastException::class.java,
+                ConversionException::class.java,
+                DeserializationException::class.java,
+                SerializationException::class.java,
+                MethodArgumentNotValidException::class.java,
+                // Data duplicates & constraint violations
+                DuplicateKeyException::class.java,
+                DataIntegrityViolationException::class.java,
+                NonTransientDataAccessException::class.java,
+                IllegalArgumentException::class.java,
+                KafkaException::class.java,
+                org.springframework.kafka.KafkaException::class.java
+            )
+        }
     }
 
     private fun <T : Any> createTypedFactory(
@@ -80,11 +124,12 @@ class KafkaTypedConsumerFactoryConfig(
             @Suppress("UNCHECKED_CAST")
             setRecordInterceptor(interceptor as RecordInterceptor<String, EventEnvelope<T>>)
             setCommonErrorHandler(errorHandler)
-            containerProperties.ackMode = ContainerProperties.AckMode.RECORD
+            containerProperties.ackMode = ContainerProperties.AckMode.MANUAL_IMMEDIATE
             setConcurrency(concurrency)
+            isBatchListener = true
         }
 
-    @Bean("payment_order_created_topic-factory")
+    @Bean("${TOPIC_NAMES.PAYMENT_ORDER_CREATED}-factory")
     fun paymentOrderCreatedFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
@@ -95,14 +140,14 @@ class KafkaTypedConsumerFactoryConfig(
         .let { cfg ->
             createTypedFactory<PaymentOrderCreated>(
                 clientId = cfg.id,
-                concurrency = cfg.concurrency,
+                concurrency = 16,
                 interceptor = interceptor,
                 consumerFactory = customFactory,
                 errorHandler = errorHandler
             )
         }
 
-    @Bean("payment_order_retry_request_topic-factory")
+    @Bean("${TOPIC_NAMES.PAYMENT_ORDER_RETRY}-factory")
     fun paymentRetryRequestedFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
@@ -120,7 +165,7 @@ class KafkaTypedConsumerFactoryConfig(
             )
         }
 
-    @Bean("payment_status_check_scheduler_topic-factory")
+    @Bean("${TOPIC_NAMES.PAYMENT_STATUS_CHECK_SCHEDULER}-factory")
     fun paymentStatusCheckExecutorFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")

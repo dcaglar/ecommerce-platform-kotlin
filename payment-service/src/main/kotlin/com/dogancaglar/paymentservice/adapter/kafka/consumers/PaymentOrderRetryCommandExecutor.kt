@@ -1,10 +1,11 @@
 package com.dogancaglar.paymentservice.adapter.kafka.consumers
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.logging.LogFields
-import com.dogancaglar.paymentservice.adapter.kafka.base.BaseSingleKafkaConsumer
+import com.dogancaglar.paymentservice.adapter.kafka.base.BaseBatchKafkaConsumer
 import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.application.service.PaymentService
+import com.dogancaglar.paymentservice.config.messaging.CONSUMER_GROUPS
+import com.dogancaglar.paymentservice.config.messaging.TOPIC_NAMES
 import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.port.PSPClientPort
@@ -12,15 +13,21 @@ import com.dogancaglar.paymentservice.domain.port.PspResultCachePort
 import io.micrometer.core.instrument.DistributionSummary
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.errors.RetriableException
+import org.apache.kafka.common.errors.SerializationException
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.dao.TransientDataAccessException
+import org.springframework.dao.*
 import org.springframework.kafka.annotation.KafkaListener
-import org.springframework.kafka.listener.ListenerExecutionFailedException
+import org.springframework.kafka.support.Acknowledgment
+import org.springframework.kafka.support.converter.ConversionException
+import org.springframework.kafka.support.serializer.DeserializationException
+import org.springframework.messaging.handler.annotation.support.MethodArgumentNotValidException
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.sql.SQLTransientException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
@@ -41,30 +48,15 @@ class PaymentOrderRetryCommandExecutor(
         return true
     }
 
-    override fun domainContext(
-        envelope: EventEnvelope<PaymentOrderRetryRequested>,
-        record: ConsumerRecord<String, EventEnvelope<PaymentOrderRetryRequested>>
-    ): Map<String, String> {
-        val event = envelope.data
-        return mapOf(
-            LogFields.CONSUMER_GROUP to "PAYMENT_RETRY_EXECUTOR",
-            LogFields.PUBLIC_PAYMENT_ID to event.publicPaymentId,
-            LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.aggregateId,
-            LogFields.PARENT_EVENT_ID to envelope.parentEventId?.toString().orEmpty()
-        )
-    }
-
     @Transactional
-    override fun consume(
-        envelope: EventEnvelope<PaymentOrderRetryRequested>,
-        record: ConsumerRecord<String, EventEnvelope<PaymentOrderRetryRequested>>
-    ) {
+    fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderRetryRequested>>) {
+        val totalStart = System.currentTimeMillis()
+        val envelope = record.value()
         val event = envelope.data
         val order = paymentService.mapEventToDomain(event)
-        val key = order.paymentOrderId.toString()
         val cacheStart = System.currentTimeMillis()
         try {
-            val totalStart = System.currentTimeMillis()
+            val key = order.paymentOrderId.toString()
             val cachedResult = pspResultCache.get(key)
             val cacheEnd = System.currentTimeMillis()
             logger.info("TIMING: PSP cache lookup took ${cacheEnd - cacheStart} ms for $key")
@@ -84,30 +76,70 @@ class PaymentOrderRetryCommandExecutor(
 
             val dbStart = System.currentTimeMillis()
             paymentService.processPspResult(event = event, pspStatus = status)
-            pspResultCache.remove(key)
             val dbEnd = System.currentTimeMillis()
             logger.info("TIMING: processPspResult (DB/write) took ${dbEnd - dbStart} ms for $key")
 
             val totalEnd = System.currentTimeMillis()
             logger.info("TIMING: Total handler time: ${totalEnd - totalStart} ms for $key")
 
-        } catch (e: TransientDataAccessException) {
-            logger.error("🔄 Retry Transient DB error for orderId=${order.paymentOrderId}, will be retried/DLQ", e)
-            throw e
-        } catch (e: RetriableException) {
-            logger.error(
-                "🔄 Retry Transient Kafka publish error for orderId=${order.paymentOrderId}, will be retried/DLQ",
-                e
-            )
-            throw e
-        } catch (t: Throwable) {
-            logger.error(
-                "❌ Non-transient, unexpected, or fatal error for orderId=${order.paymentOrderId}, will be sent to DLQ immediately (no retry)",
-                t
-            )
-            throw ListenerExecutionFailedException("Non-transient, unexpected, or fatal error, send to DLQ", t)
+        } catch (e: Exception) {
+            when (e) {
+                is RetriableException,
+                is TransientDataAccessException,
+                is CannotAcquireLockException,
+                is SQLTransientException -> {
+                    logger.warn("Retryable exception occurred, will be retried or sent to DLQ", e)
+                    throw e
+                }
+
+                is IllegalArgumentException,
+                is NullPointerException,
+                is ClassCastException,
+                is ConversionException,
+                is DeserializationException,
+                is SerializationException,
+                is MethodArgumentNotValidException,
+                is DuplicateKeyException,
+                is DataIntegrityViolationException,
+                is KafkaException,
+                is org.springframework.kafka.KafkaException,
+                is NonTransientDataAccessException -> {
+                    logger.error("Non-retryable exception occurred", e)
+                    throw e
+                }
+
+                else -> {
+                    logger.error("unexpected error occurred while processing record ${record.value().eventId}", e)
+                }
+            }
+
         }
     }
+
+
+    @KafkaListener(
+        topics = [TOPIC_NAMES.PAYMENT_ORDER_RETRY],
+        containerFactory = "${TOPIC_NAMES.PAYMENT_ORDER_RETRY}-factory",
+        groupId = "${CONSUMER_GROUPS.PAYMENT_ORDER_RETRY}",
+        concurrency = "16"
+    )
+    fun handleBatchListener(
+        records: List<ConsumerRecord<String, EventEnvelope<PaymentOrderRetryRequested>>>,
+        acknowledgment: Acknowledgment
+    ) {
+        super.handleBatch(records, acknowledgment)
+        acknowledgment.acknowledge()
+    }
+
+    override fun consume(
+        record: ConsumerRecord<String, EventEnvelope<PaymentOrderRetryRequested>>,
+    ) {
+        val future = pspRetryExecutor.submit {
+            handle(record)
+        }
+        future.get()
+    }
+
 
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
         val future = pspRetryExecutor.submit<PaymentOrderStatus> { pspClient.chargeRetry(order) }
@@ -119,15 +151,6 @@ class PaymentOrderRetryCommandExecutor(
         } finally {
             retryMetrics.recordRetryAttempt(order.retryCount, order.retryReason)
         }
-    }
-
-    @KafkaListener(
-        topics = ["payment_order_retry_request_topic"],
-        groupId = "payment-retry-executor-group",
-        containerFactory = "payment_order_retry_request_topic-factory"
-    )
-    fun onMessage(record: ConsumerRecord<String, EventEnvelope<PaymentOrderRetryRequested>>) {
-        handle(record)
     }
 
 }

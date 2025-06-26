@@ -24,6 +24,7 @@ abstract class AbstractKafkaConsumer<T : Any> {
         additionalContext: Map<String, String> = emptyMap(),
         block: () -> Unit
     ) {
+        logger.info("Setting log context for event: ${envelope.eventType}, traceId: ${envelope.traceId}, eventId: ${envelope.eventId}")
         LogContext.with(envelope, additionalContext, block)
     }
 }
