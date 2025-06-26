@@ -2,10 +2,10 @@ package com.dogancaglar.paymentservice.adapter.persistence.maintenance
 
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
-import jakarta.persistence.EntityManager
 import org.slf4j.LoggerFactory
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -15,7 +15,7 @@ import java.time.format.DateTimeFormatter
 
 @Component
 class OutboxPartitionCreator(
-    private val entityManager: EntityManager,
+    private val jdbcTemplate: JdbcTemplate,
     private val meterRegistry: MeterRegistry,
     private val clock: Clock,
 ) {
@@ -77,7 +77,7 @@ class OutboxPartitionCreator(
         var success = false
         val zoneId = clock.zone
         try {
-            entityManager.createNativeQuery(sql).executeUpdate()
+            jdbcTemplate.execute(sql)
             logger.info("Ensured partition exists: $partitionName for [$fromStr, $toStr)")
             meterRegistry.counter("outbox_partition_creator.success").increment()
             success = true
@@ -139,7 +139,7 @@ class OutboxPartitionCreator(
         """.trimIndent()
 
         try {
-            entityManager.createNativeQuery(sql).executeUpdate()
+            jdbcTemplate.execute(sql)
             logger.info("Pruned old partitions up to $currWindowStart")
             meterRegistry.counter("outbox_partition_prune.success").increment()
         } catch (e: Exception) {

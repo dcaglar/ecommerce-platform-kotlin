@@ -31,6 +31,8 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry) {
             scheduler
         ) { it.poolSize.toDouble() }
 
+
+
         meterRegistry.gauge(
             "scheduler_outbox_queue_size",
             listOf(io.micrometer.core.instrument.Tag.of("name", "outbox-dispatch")),

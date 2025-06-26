@@ -21,12 +21,12 @@ import com.dogancaglar.paymentservice.web.dto.PaymentRequestDTO
 import com.dogancaglar.paymentservice.web.dto.PaymentResponseDTO
 import com.dogancaglar.paymentservice.web.mapper.PaymentRequestMapper
 import com.fasterxml.jackson.databind.ObjectMapper
-import jakarta.transaction.Transactional
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
@@ -48,6 +48,7 @@ class PaymentService(
     private val idGenerator: IdGeneratorPort,
     private val retryMetrics: RetryMetrics,
     @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper,
+    private val pspResultCache: PspResultCachePort,
     private val clock: Clock
 ) {
 
@@ -135,10 +136,7 @@ class PaymentService(
         try {
             when {
                 pspStatus == PaymentOrderStatus.SUCCESSFUL -> {
-                    retryMetrics.recordRetryAttempt(
-                        retryCount = order.retryCount,
-                        reason = order.retryReason ?: "unknown",
-                    )
+                    //keeep cache
                     val dbStart = System.currentTimeMillis()
                     handleSuccessfulPayment(order = order)
                     val dbEnd = System.currentTimeMillis()
@@ -197,6 +195,7 @@ class PaymentService(
     fun handleRetryEvent(
         order: PaymentOrder, reason: String? = null, lastError: String? = null
     ) {
+        pspResultCache.remove(order.paymentOrderId.toString());
         logger.info(
             "Handling retry for  paymentOrderId={} with reason='{}', lastError='{}'",
             order.publicPaymentOrderId,
@@ -307,4 +306,3 @@ class ClockConfig {
     @Bean
     fun clock(): Clock = Clock.systemUTC()
 }
-

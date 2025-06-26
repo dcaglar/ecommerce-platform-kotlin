@@ -8,5 +8,6 @@ interface OutboxEventPort {
     fun save(event: OutboxEvent): OutboxEvent
     fun countByStatus(status: String): Long
     fun findByStatusWithLimit(status: String, limit: Int): List<OutboxEvent>
-    fun findBatchForDispatch(status: String, batchSize: Int): List<OutboxEvent>
+    fun findBatchForDispatch(batchSize: Int): List<OutboxEvent>
+    fun deleteByStatus(status: String): Int
 }

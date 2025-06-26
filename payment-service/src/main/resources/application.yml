@@ -51,10 +51,10 @@ spring:
     timeout: 2000ms
     lettuce:
       pool:
-      max-active: 8
-      max-idle: 8
-      min-idle: 0
-      max-wait: -1ms
+        max-active: 64
+        max-idle: 64
+        min-idle: 8
+        max-wait: 2000ms
   kafka: # auto-create both source & DLQ topics with matching partitions
     bootstrap-servers: xxxxx
     consumer:
@@ -234,3 +234,7 @@ outbox-dispatcher:
   thread-count: 10
   batch-size: 5000
   pool-size: 10
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.dogancaglar.paymentservice.adapter.persistence.entity
+  type-handlers-package: com.dogancaglar.paymentservice.adapter.persistence.typehandler

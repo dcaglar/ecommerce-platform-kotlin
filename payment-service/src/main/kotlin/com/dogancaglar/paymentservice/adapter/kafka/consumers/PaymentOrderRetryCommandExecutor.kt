@@ -30,8 +30,9 @@ class PaymentOrderRetryCommandExecutor(
     private val pspClient: PSPClientPort,
     private val retryMetrics: RetryMetrics,
     private val pspResultCache: PspResultCachePort,
-    @Qualifier("paymentOrderRetryExecutorPoolConfig") private val pspRetryExecutor: ThreadPoolTaskExecutor
-) : BaseSingleKafkaConsumer<PaymentOrderRetryRequested>() {
+    @Qualifier("paymentOrderRetryExecutorPoolConfig") private val pspRetryExecutor: ThreadPoolTaskExecutor,
+    @Qualifier("externalPspExecutorPoolConfig") private val externalPspExecutorPoolConig: ThreadPoolTaskExecutor
+) : BaseBatchKafkaConsumer<PaymentOrderRetryRequested>() {
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -128,6 +129,7 @@ class PaymentOrderRetryCommandExecutor(
     fun onMessage(record: ConsumerRecord<String, EventEnvelope<PaymentOrderRetryRequested>>) {
         handle(record)
     }
+
 }
 
 
