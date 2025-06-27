@@ -1,17 +1,17 @@
 package com.dogancaglar.paymentservice.adapter.persistence.mapper
 
+import com.dogancaglar.payment.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.adapter.persistence.entity.PaymentOrderEntity
-import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
 
 object PaymentOrderEntityMapper {
 
     fun toEntity(order: PaymentOrder): PaymentOrderEntity {
         return PaymentOrderEntity(
-            paymentOrderId = order.paymentOrderId,
+            paymentOrderId = order.paymentOrderId.value,
             publicPaymentOrderId = order.publicPaymentOrderId,
-            paymentId = order.paymentId,
+            paymentId = order.paymentId.value,
             publicPaymentId = order.publicPaymentId,
-            sellerId = order.sellerId,
+            sellerId = order.sellerId.value,
             amountValue = order.amount.value,
             amountCurrency = order.amount.currency,
             status = order.status,

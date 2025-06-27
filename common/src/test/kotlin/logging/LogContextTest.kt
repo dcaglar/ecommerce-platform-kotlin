@@ -17,7 +17,7 @@ class LogContextTest {
     @Test
     fun `should populate MDC for envelope and restore previous context`() {
         // given – an outer trace already in MDC (simulates a nested scope)
-        MDC.put(LogFields.TRACE_ID, "outer-trace")
+        MDC.put(GenericLogFields.TRACE_ID, "outer-trace")
 
         val envelope = EventEnvelope(
             traceId = "trace-123",
@@ -31,14 +31,14 @@ class LogContextTest {
         // when
         LogContext.with(envelope) {
             // inside scope
-            assertThat(MDC.get(LogFields.TRACE_ID)).isEqualTo("trace-123")
-            assertThat(MDC.get(LogFields.EVENT_ID)).isEqualTo(envelope.eventId.toString())
-            assertThat(MDC.get(LogFields.AGGREGATE_ID)).isEqualTo("payment-123")
+            assertThat(MDC.get(GenericLogFields.TRACE_ID)).isEqualTo("trace-123")
+            assertThat(MDC.get(GenericLogFields.EVENT_ID)).isEqualTo(envelope.eventId.toString())
+            assertThat(MDC.get(GenericLogFields.AGGREGATE_ID)).isEqualTo("payment-123")
         }
 
         // then – previous value should be restored, not cleared
-        assertThat(MDC.get(LogFields.TRACE_ID)).isEqualTo("outer-trace")
-        assertThat(MDC.get(LogFields.EVENT_ID)).isNull()
-        assertThat(MDC.get(LogFields.AGGREGATE_ID)).isNull()
+        assertThat(MDC.get(GenericLogFields.TRACE_ID)).isEqualTo("outer-trace")
+        assertThat(MDC.get(GenericLogFields.EVENT_ID)).isNull()
+        assertThat(MDC.get(GenericLogFields.AGGREGATE_ID)).isNull()
     }
 }

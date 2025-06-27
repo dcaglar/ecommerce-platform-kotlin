@@ -4,6 +4,7 @@ import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
 import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.payment.application.port.outbound.EventPublisherPort
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
@@ -25,16 +26,16 @@ class PaymentEventPublisher(
     @Qualifier("paymentOrderEventKafkaTemplate")
     private val kafkaTemplate: KafkaTemplate<String, EventEnvelope<*>>,
     private val meterRegistry: MeterRegistry
-) {
+) : EventPublisherPort {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    fun <T> publish(
-        preSetEventIdFromCaller: UUID? = null,
+    override fun <T> publish(
+        preSetEventIdFromCaller: UUID?,
         aggregateId: String,
         eventMetaData: EventMetadata<T>,
         data: T,
-        traceId: String? = null,
-        parentEventId: UUID? = null
+        traceId: String?,
+        parentEventId: UUID?
     ): EventEnvelope<T> {
         logger.info("PUBLISH-Before buildEnvelope")
         val envelope = buildEnvelope(
@@ -71,14 +72,14 @@ class PaymentEventPublisher(
         return envelope
     }
 
-    fun <T> publishSync(
-        preSetEventIdFromCaller: UUID? = null,
+    override fun <T> publishSync(
+        preSetEventIdFromCaller: UUID?,
         aggregateId: String,
         eventMetaData: EventMetadata<T>,
         data: T,
-        traceId: String? = null,
-        parentEventId: UUID? = null,
-        timeoutSeconds: Long = 5
+        traceId: String?,
+        parentEventId: UUID?,
+        timeoutSeconds: Long
     ): EventEnvelope<T> {
         logger.info("PUBLISSYNC-Before buildEnvelope")
         val envelope = buildEnvelope(

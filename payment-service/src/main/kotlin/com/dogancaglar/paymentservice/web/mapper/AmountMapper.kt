@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.web.mapper
 
-import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.payment.domain.model.Amount
 import com.dogancaglar.paymentservice.web.dto.AmountDto
 import com.dogancaglar.paymentservice.web.dto.CurrencyEnum
 

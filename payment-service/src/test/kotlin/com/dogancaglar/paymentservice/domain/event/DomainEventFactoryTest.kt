@@ -1,10 +1,10 @@
 package com.dogancaglar.paymentservice.domain.event
 
+import com.dogancaglar.application.PaymentOrderCreated
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.logging.LogFields
-import com.dogancaglar.paymentservice.application.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
+import com.dogancaglar.common.logging.GenericLogFields
+import com.dogancaglar.payment.application.events.EventMetadatas
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -19,7 +19,7 @@ class DomainEventFactoryTest {
     fun `should create EventEnvelope with generated eventId and traceid from mdc`() {
         // given
         val traceIdFromMDC = "test-traceid"
-        MDC.put(LogFields.TRACE_ID, traceIdFromMDC)
+        MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
             // when
             val envelope: EventEnvelope<PaymentOrderCreated> = DomainEventEnvelopeFactory.envelopeFor(
@@ -43,7 +43,7 @@ class DomainEventFactoryTest {
 
             // then
             assertThat(envelope.eventId).isNotNull
-            assertThat (envelope.traceId).isEqualTo(traceIdFromMDC)
+            assertThat(envelope.traceId).isEqualTo(traceIdFromMDC)
             assertThat(envelope.eventType).isEqualTo("payment_order_created")
         } finally {
             MDC.clear()
@@ -53,9 +53,9 @@ class DomainEventFactoryTest {
     @Test
     fun `should generate new traceId when not present in MDC`() {
         // when
-        assertThrows <IllegalStateException> {
+        assertThrows<IllegalStateException> {
             DomainEventEnvelopeFactory.envelopeFor(
-                traceId = MDC.get(LogFields.TRACE_ID) ?: throw IllegalStateException("TraceId missing"),
+                traceId = MDC.get(GenericLogFields.TRACE_ID) ?: throw IllegalStateException("TraceId missing"),
                 data = PaymentOrderCreated(
                     paymentOrderId = "po-1",
                     publicPaymentOrderId = "paymentorder-1",
@@ -79,7 +79,7 @@ class DomainEventFactoryTest {
     @Test
     fun `should generate unique eventId and same traceid each time`() {
         val traceIdFromMDC = "test-traceid"
-        MDC.put(LogFields.TRACE_ID, traceIdFromMDC)
+        MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
             val event1 = DomainEventEnvelopeFactory.envelopeFor(
                 traceId = traceIdFromMDC,
@@ -129,7 +129,7 @@ class DomainEventFactoryTest {
     fun `envelopeFor should create EventEnvelope with correct fields`() {
 
         val traceIdFromMDC = "test-traceid"
-        MDC.put(LogFields.TRACE_ID, traceIdFromMDC)
+        MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
             val event = PaymentOrderCreated(
                 paymentOrderId = "po-1001",
@@ -165,7 +165,7 @@ class DomainEventFactoryTest {
     @Test
     fun `should set parentEventId when provided`() {
         val traceIdFromMDC = "test-traceid"
-        MDC.put(LogFields.TRACE_ID, traceIdFromMDC)
+        MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
             val parentId = UUID.randomUUID()
             val event = PaymentOrderCreated(

@@ -25,5 +25,5 @@ interface PaymentOrderMapper {
     fun getMaxPaymentOrderId(): Long?
 
     fun insert(paymentOrder: PaymentOrderEntity): Int
-    fun upsert(paymentOrder: PaymentOrderEntity): Int
+    fun upsert(paymentOrder: PaymentOrderEntity): Unit
 }

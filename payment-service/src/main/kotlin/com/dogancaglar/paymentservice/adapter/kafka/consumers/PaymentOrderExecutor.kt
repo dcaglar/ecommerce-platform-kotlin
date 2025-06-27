@@ -1,15 +1,16 @@
 package com.dogancaglar.paymentservice.adapter.kafka.consumers
 
+import com.dogancaglar.application.PaymentOrderCreated
+import com.dogancaglar.common.event.CONSUMER_GROUPS
 import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.common.event.TOPICS
+import com.dogancaglar.payment.application.port.outbound.PaymentGatewayPort
+import com.dogancaglar.payment.application.port.outbound.PspResultCachePort
+import com.dogancaglar.payment.domain.factory.PaymentOrderFactory
+import com.dogancaglar.payment.domain.model.PaymentOrder
+import com.dogancaglar.payment.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.adapter.kafka.base.BaseBatchKafkaConsumer
-import com.dogancaglar.paymentservice.application.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.application.service.PaymentService
-import com.dogancaglar.paymentservice.config.messaging.CONSUMER_GROUPS
-import com.dogancaglar.paymentservice.config.messaging.TOPIC_NAMES
-import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import com.dogancaglar.paymentservice.domain.port.PSPClientPort
-import com.dogancaglar.paymentservice.domain.port.PspResultCachePort
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.KafkaException
@@ -34,7 +35,8 @@ import java.util.concurrent.TimeoutException
 @Component
 class PaymentOrderExecutor(
     private val paymentService: PaymentService,
-    private val pspClient: PSPClientPort,
+    private val paymentOrderFactory: PaymentOrderFactory,
+    private val pspClient: PaymentGatewayPort,
     private val meterRegistry: MeterRegistry,
     private val pspResultCache: PspResultCachePort,
     @Qualifier("paymentOrderExecutorPoolConfig") private val pspExecutor: ThreadPoolTaskExecutor,
@@ -47,7 +49,7 @@ class PaymentOrderExecutor(
         val totalStart = System.currentTimeMillis()
         val envelope = record.value()
         val event = envelope.data
-        val order = paymentService.mapEventToDomain(event)
+        val order = paymentOrderFactory.fromEvent(event)
         logger.info("Processing payment order :paymentordercreated")
         if (order.status != PaymentOrderStatus.INITIATED) {
             logger.info("⏩ Skipping already processed order(status=${order.status})")
@@ -56,7 +58,7 @@ class PaymentOrderExecutor(
 
         val cacheStart = System.currentTimeMillis()
         try {
-            val key = order.paymentOrderId.toString()
+            val key = order.paymentOrderId
             val cachedResult = pspResultCache.get(key)
             val cacheEnd = System.currentTimeMillis()
             logger.info("TIMING: PSP cache lookup took ${cacheEnd - cacheStart} ms for $key")
@@ -146,8 +148,8 @@ class PaymentOrderExecutor(
 
 
     @KafkaListener(
-        topics = [TOPIC_NAMES.PAYMENT_ORDER_CREATED],
-        containerFactory = "${TOPIC_NAMES.PAYMENT_ORDER_CREATED}-factory",
+        topics = [TOPICS.PAYMENT_ORDER_CREATED],
+        containerFactory = "${TOPICS.PAYMENT_ORDER_CREATED}-factory",
         groupId = "${CONSUMER_GROUPS.PAYMENT_ORDER_CREATED}",
         concurrency = "16"
     )

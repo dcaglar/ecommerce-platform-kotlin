@@ -57,6 +57,8 @@ spring:
         max-wait: 2000ms
   kafka: # auto-create both source & DLQ topics with matching partitions
     bootstrap-servers: xxxxx
+    producer:
+      value-serializer: com.dogancaglar.paymentservice.config.serialization.EventEnvelopeSerializer
     consumer:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       heartbeat-interval: 3000

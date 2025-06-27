@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.config.messaging
 
+import com.dogancaglar.common.event.TOPICS
 import org.apache.kafka.clients.admin.NewTopic
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -14,7 +15,7 @@ class KafkaTopicsConfig(
     @Bean
     fun paymentOrderCreatedTopic(): NewTopic =
         NewTopic(
-            TOPIC_NAMES.PAYMENT_ORDER_CREATED,
+            TOPICS.PAYMENT_ORDER_CREATED,
             kafkaTopicsProperties.payment_order_created_topic.partitions,
             kafkaTopicsProperties.payment_order_created_topic.replicas
         )
@@ -23,7 +24,7 @@ class KafkaTopicsConfig(
     @Bean
     fun paymentOrderCreatedTopicDLQ(): NewTopic =
         NewTopic(
-            TOPIC_NAMES.PAYMENT_ORDER_CREATED_DLQ,
+            TOPICS.PAYMENT_ORDER_CREATED_DLQ,
             kafkaTopicsProperties.payment_order_created_topic_dlq.partitions,
             kafkaTopicsProperties.payment_order_created_topic_dlq.replicas
         )
@@ -31,7 +32,7 @@ class KafkaTopicsConfig(
     @Bean
     fun paymentOrderRetryRequestTopic(): NewTopic =
         NewTopic(
-            TOPIC_NAMES.PAYMENT_ORDER_RETRY,
+            TOPICS.PAYMENT_ORDER_RETRY,
             kafkaTopicsProperties.payment_order_retry_request_topic.partitions,
             kafkaTopicsProperties.payment_order_retry_request_topic.replicas
         )
@@ -39,7 +40,7 @@ class KafkaTopicsConfig(
     @Bean
     fun paymentOrderRetryRequestTopicDLQ(): NewTopic =
         NewTopic(
-            TOPIC_NAMES.PAYMENT_ORDER_RETRY_DLQ,
+            TOPICS.PAYMENT_ORDER_RETRY_DLQ,
             kafkaTopicsProperties.payment_order_retry_request_topic_dlq.partitions,
             kafkaTopicsProperties.payment_order_retry_request_topic_dlq.replicas
         )
@@ -47,7 +48,7 @@ class KafkaTopicsConfig(
     @Bean
     fun paymentOrderStatusCheckTopic(): NewTopic =
         NewTopic(
-            TOPIC_NAMES.PAYMENT_STATUS_CHECK_SCHEDULER,
+            TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER,
             kafkaTopicsProperties.payment_status_check_scheduler_topic.partitions,
             kafkaTopicsProperties.payment_status_check_scheduler_topic.replicas
         )
@@ -56,7 +57,7 @@ class KafkaTopicsConfig(
     @Bean
     fun paymentOrderStatusCheckTopicDLQ(): NewTopic =
         NewTopic(
-            TOPIC_NAMES.PAYMENT_STATUS_CHECK_SCHEDULER_DLQ,
+            TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER_DLQ,
             kafkaTopicsProperties.payment_status_check_scheduler_topic_dlq.partitions,
             kafkaTopicsProperties.payment_status_check_scheduler_topic_dlq.replicas
         )
@@ -65,7 +66,7 @@ class KafkaTopicsConfig(
     @Bean
     fun paymentOrderSuccededTopic(): NewTopic =
         NewTopic(
-            TOPIC_NAMES.PAYMENT_ORDER_SUCCEEDED,
+            TOPICS.PAYMENT_ORDER_SUCCEEDED,
             kafkaTopicsProperties.payment_order_succeded_topic.partitions,
             kafkaTopicsProperties.payment_order_succeded_topic.replicas
         )
@@ -74,7 +75,7 @@ class KafkaTopicsConfig(
     @Bean
     fun paymentOrderSuccededTopicDLQ(): NewTopic =
         NewTopic(
-            TOPIC_NAMES.PAYMENT_ORDER_SUCCEEDED_DLQ,
+            TOPICS.PAYMENT_ORDER_SUCCEEDED_DLQ,
             kafkaTopicsProperties.payment_order_succeded_topic_dlq.partitions,
             kafkaTopicsProperties.payment_order_succeded_topic_dlq.replicas
         )

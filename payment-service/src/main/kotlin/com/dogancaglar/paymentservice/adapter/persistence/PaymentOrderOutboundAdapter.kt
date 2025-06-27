@@ -1,15 +1,17 @@
 package com.dogancaglar.paymentservice.adapter.persistence
 
+import com.dogancaglar.payment.domain.model.PaymentOrder
+import com.dogancaglar.payment.domain.model.vo.PaymentId
+import com.dogancaglar.payment.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.adapter.persistence.mapper.PaymentOrderEntityMapper
 import com.dogancaglar.paymentservice.adapter.persistence.repository.PaymentOrderMapper
-import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.port.PaymentOrderOutboundPort
+import com.dogancaglar.port.PaymentOrderRepository
 import org.springframework.stereotype.Repository
 
 @Repository
 class PaymentOrderOutboundAdapter(
     private val paymentOrderMapper: PaymentOrderMapper
-) : PaymentOrderOutboundPort {
+) : PaymentOrderRepository {
     override fun save(paymentOrder: PaymentOrder) {
         val entity = PaymentOrderEntityMapper.toEntity(paymentOrder)
         paymentOrderMapper.upsert(entity)
@@ -20,19 +22,20 @@ class PaymentOrderOutboundAdapter(
         entities.forEach { paymentOrderMapper.upsert(it) }
     }
 
-    override fun countByPaymentId(paymentId: Long): Long {
-        return paymentOrderMapper.countByPaymentId(paymentId)
+    override fun countByPaymentId(paymentId: PaymentId): Long {
+        return paymentOrderMapper.countByPaymentId(paymentId.value)
     }
 
-    override fun countByPaymentIdAndStatusIn(paymentId: Long, statuses: List<String>): Long {
-        return paymentOrderMapper.countByPaymentIdAndStatusIn(paymentId, statuses)
+    override fun countByPaymentIdAndStatusIn(paymentId: PaymentId, statuses: List<String>): Long {
+        return paymentOrderMapper.countByPaymentIdAndStatusIn(paymentId.value, statuses)
     }
 
-    override fun existsByPaymentIdAndStatus(paymentId: Long, status: String): Boolean {
-        return paymentOrderMapper.existsByPaymentIdAndStatus(paymentId, status)
+    override fun existsByPaymentIdAndStatus(paymentId: PaymentId, status: String): Boolean {
+        return paymentOrderMapper.existsByPaymentIdAndStatus(paymentId.value, status)
     }
 
-    override fun getMaxPaymentOrderId(): Long {
-        return paymentOrderMapper.getMaxPaymentOrderId() ?: 0
+    override fun getMaxPaymentOrderId(): PaymentOrderId {
+        val maxPAymentOrderIdLong = paymentOrderMapper.getMaxPaymentOrderId() ?: 0
+        return PaymentOrderId(maxPAymentOrderIdLong)
     }
 }

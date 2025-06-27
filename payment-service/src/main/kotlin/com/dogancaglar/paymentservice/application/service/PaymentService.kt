@@ -1,5 +1,35 @@
 package com.dogancaglar.paymentservice.application.service
 
+import com.dogancaglar.payment.application.events.PaymentOrderEvent
+import com.dogancaglar.payment.application.port.inbound.CreatePaymentUseCase
+import com.dogancaglar.payment.application.port.outbound.ProcessPspResultUseCase
+import com.dogancaglar.payment.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.web.dto.PaymentRequestDTO
+import com.dogancaglar.paymentservice.web.dto.PaymentResponseDTO
+import com.dogancaglar.paymentservice.web.mapper.PaymentRequestMapper
+import org.springframework.stereotype.Service
+
+@Service
+class PaymentService(
+    private val createPaymentUseCase: CreatePaymentUseCase,
+    private val processPspResultUseCase: ProcessPspResultUseCase
+) {
+    fun createPayment(request: PaymentRequestDTO): PaymentResponseDTO {
+        val command = PaymentRequestMapper.toCommand(request)
+        val payment = createPaymentUseCase.create(command)
+        return PaymentRequestMapper.toResponse(payment)
+    }
+
+    fun processPspResult(event: PaymentOrderEvent, pspStatus: PaymentOrderStatus) {
+        processPspResultUseCase.processPspResult(event, pspStatus)
+    }
+
+}
+
+
+/*
+package com.dogancaglar.paymentservice.application.service
+
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.common.logging.LogFields
@@ -269,7 +299,6 @@ class PaymentService(
         return updated
     }
 
-
     fun mapEventToDomain(event: PaymentOrderEvent): PaymentOrder {
         return paymentOrderFactory.fromEvent(event)
     }
@@ -301,8 +330,4 @@ class PaymentService(
 }
 
 
-@Configuration
-class ClockConfig {
-    @Bean
-    fun clock(): Clock = Clock.systemUTC()
-}
+ */

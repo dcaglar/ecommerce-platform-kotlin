@@ -1,9 +1,10 @@
 package com.dogancaglar.paymentservice.application.startup
 
-import com.dogancaglar.paymentservice.config.id.IdNamespaces
-import com.dogancaglar.paymentservice.domain.port.IdGeneratorPort
-import com.dogancaglar.paymentservice.domain.port.PaymentOrderOutboundPort
-import com.dogancaglar.paymentservice.domain.port.PaymentOutboundPort
+
+import com.dogancaglar.payment.domain.port.PaymentRepository
+import com.dogancaglar.payment.domain.port.id.IdGeneratorPort
+import com.dogancaglar.payment.domain.port.id.IdNamespaces
+import com.dogancaglar.port.PaymentOrderRepository
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
@@ -11,8 +12,8 @@ import org.springframework.stereotype.Component
 @Component
 class RedisIdResyncStartup(
     private val idGeneratorPort: IdGeneratorPort,
-    private val paymentOrderOutboundPort: PaymentOrderOutboundPort,
-    private val paymentOutboundPort: PaymentOutboundPort
+    private val paymmentRepository: PaymentRepository,
+    private val paymentOrderRepository: PaymentOrderRepository
 ) {
 
     private val logger = LoggerFactory.getLogger(RedisIdResyncStartup::class.java)
@@ -20,11 +21,11 @@ class RedisIdResyncStartup(
     @PostConstruct
     fun syncRedisIdWithDatabase() {
         try {
-            val maxPaymentOrderIdInDb = paymentOrderOutboundPort.getMaxPaymentOrderId()
-            val floor = maxPaymentOrderIdInDb + 100 // Give some breathing space
+            val maxPaymentOrderIdInDb = paymentOrderRepository.getMaxPaymentOrderId()
+            val floor = maxPaymentOrderIdInDb.value + 100 // Give some breathing space
 
-            val maxPaymentIdInDb = paymentOutboundPort.getMaxPaymentId()
-            val floorIdInDb = maxPaymentIdInDb.plus(100) // Give some breathing space
+            val maxPaymentIdInDb = paymmentRepository.getMaxPaymentId()
+            val floorIdInDb = maxPaymentIdInDb.value.plus(100) // Give some breathing space
             logger.info(
                 "🔁 Resyncing Redis ID generator ${
                     IdNamespaces.PAYMENT_ORDER
