@@ -1,13 +1,14 @@
 package com.dogancaglar.paymentservice.adapter.redis
 
+import com.dogancaglar.application.PaymentOrderRetryRequested
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
-import com.dogancaglar.paymentservice.application.mapper.PaymentOrderEventMapper
-import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
-import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.port.RetryQueuePort
+import com.dogancaglar.payment.application.events.EventMetadatas
+import com.dogancaglar.payment.application.mapper.PaymentOrderEventMapper
+import com.dogancaglar.payment.application.port.outbound.RetryQueuePort
+import com.dogancaglar.payment.domain.model.PaymentOrder
+import com.dogancaglar.payment.domain.model.vo.PaymentOrderId
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.micrometer.core.instrument.Gauge
@@ -43,7 +44,7 @@ class PaymentRetryQueueAdapter(
         val totalStart = System.currentTimeMillis()
         try {
             val retryCountStart = System.currentTimeMillis()
-            val retryCount = paymentRetryRedisCache.incrementAndGetRetryCount(paymentOrder.paymentOrderId)
+            val retryCount = paymentRetryRedisCache.incrementAndGetRetryCount(paymentOrder.paymentOrderId.value)
             val retryCountEnd = System.currentTimeMillis()
 
             val retryAt = System.currentTimeMillis() + backOffMillis
@@ -112,11 +113,11 @@ class PaymentRetryQueueAdapter(
         return dueEnvelopes
     }
 
-    override fun getRetryCount(paymentOrderId: Long): Int {
-        return paymentRetryRedisCache.getRetryCount(paymentOrderId)
+    override fun getRetryCount(paymentOrderId: PaymentOrderId): Int {
+        return paymentRetryRedisCache.getRetryCount(paymentOrderId.value)
     }
 
-    override fun resetRetryCounter(paymentOrderId: Long) {
-        paymentRetryRedisCache.resetRetryCounter(paymentOrderId)
+    override fun resetRetryCounter(paymentOrderId: PaymentOrderId) {
+        paymentRetryRedisCache.resetRetryCounter(paymentOrderId.value)
     }
 }

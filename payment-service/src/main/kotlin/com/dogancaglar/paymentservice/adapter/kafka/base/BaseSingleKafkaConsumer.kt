@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.kafka.base
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.logging.LogFields
+import com.dogancaglar.common.logging.GenericLogFields
 import org.apache.kafka.clients.consumer.ConsumerRecord
 
 abstract class BaseSingleKafkaConsumer<T : Any> {
@@ -17,11 +17,11 @@ abstract class BaseSingleKafkaConsumer<T : Any> {
             withLogContext(
                 envelope, mapOf(
                     // Add standard fields, can be extended in subclass if needed
-                    LogFields.TOPIC_NAME to record.topic(),
-                    LogFields.EVENT_ID to envelope.eventId.toString(),
-                    LogFields.AGGREGATE_ID to envelope.aggregateId,
-                    LogFields.TRACE_ID to envelope.traceId,
-                    LogFields.EVENT_TYPE to envelope.eventType
+                    GenericLogFields.TOPIC_NAME to record.topic(),
+                    GenericLogFields.EVENT_ID to envelope.eventId.toString(),
+                    GenericLogFields.AGGREGATE_ID to envelope.aggregateId,
+                    GenericLogFields.TRACE_ID to envelope.traceId,
+                    GenericLogFields.EVENT_TYPE to envelope.eventType
                 )
             ) {
                 consume(envelope, record)
@@ -49,10 +49,10 @@ abstract class BaseSingleKafkaConsumer<T : Any> {
         envelope: EventEnvelope<T>,
         record: ConsumerRecord<String, EventEnvelope<T>>
     ): Map<String, String> = mapOf(
-        LogFields.TOPIC_NAME to record.topic(),
-        LogFields.EVENT_ID to envelope.eventId.toString(),
-        LogFields.AGGREGATE_ID to envelope.aggregateId,
-        LogFields.TRACE_ID to envelope.traceId
+        GenericLogFields.TOPIC_NAME to record.topic(),
+        GenericLogFields.EVENT_ID to envelope.eventId.toString(),
+        GenericLogFields.AGGREGATE_ID to envelope.aggregateId,
+        GenericLogFields.TRACE_ID to envelope.traceId
         // add more here if you want (partition, offset, etc)
     )
 

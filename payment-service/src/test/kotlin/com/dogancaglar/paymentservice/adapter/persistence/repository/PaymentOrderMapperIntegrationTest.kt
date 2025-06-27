@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.persistence.repository
 
+import com.dogancaglar.payment.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.adapter.persistence.entity.PaymentOrderEntity
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest

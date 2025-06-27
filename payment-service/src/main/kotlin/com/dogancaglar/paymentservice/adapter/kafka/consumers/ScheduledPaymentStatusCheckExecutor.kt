@@ -1,16 +1,15 @@
 package com.dogancaglar.paymentservice.adapter.kafka.consumers
 
+import com.dogancaglar.application.PaymentOrderStatusCheckRequested
+import com.dogancaglar.common.event.CONSUMER_GROUPS
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.common.logging.LogFields
+import com.dogancaglar.common.event.TOPICS
+import com.dogancaglar.payment.application.port.outbound.PaymentGatewayPort
+import com.dogancaglar.payment.domain.factory.PaymentOrderFactory
+import com.dogancaglar.payment.domain.model.PaymentOrder
+import com.dogancaglar.payment.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.adapter.kafka.base.BaseBatchKafkaConsumer
-import com.dogancaglar.paymentservice.application.event.PaymentOrderStatusCheckRequested
 import com.dogancaglar.paymentservice.application.service.PaymentService
-import com.dogancaglar.paymentservice.config.messaging.CONSUMER_GROUPS
-import com.dogancaglar.paymentservice.config.messaging.TOPIC_NAMES
-import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import com.dogancaglar.paymentservice.domain.port.PSPClientPort
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.errors.RetriableException
@@ -51,8 +50,9 @@ class ScheduledExecutorConfig {
 
 @Component
 class ScheduledPaymentStatusCheckExecutor(
-    val pspClient: PSPClientPort,
+    val paymentGatewayPort: PaymentGatewayPort,
     val paymentService: PaymentService,
+    val paymetOrderFactory: PaymentOrderFactory,
     @Qualifier("scheduledStatusCheckTaskExecutor") private val scheduledStatusCheckExecutor: ThreadPoolTaskExecutor,
     @Qualifier("externalPspExecutorPoolConfig") private val externalPspExecutorPoolConig: ThreadPoolTaskExecutor
 ) : BaseBatchKafkaConsumer<PaymentOrderStatusCheckRequested>() {
@@ -64,59 +64,49 @@ class ScheduledPaymentStatusCheckExecutor(
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderStatusCheckRequested>>) {
         val envelope = record.value()
         val paymentOrderStatusCheckRequested = envelope.data
-        val order = paymentService.mapEventToDomain(paymentOrderStatusCheckRequested)
-
-        LogContext.with(
-            envelope, mapOf(
-                LogFields.TOPIC_NAME to record.topic(),
-                LogFields.CONSUMER_GROUP to "payment-status-queue",
-                LogFields.PUBLIC_PAYMENT_ID to envelope.data.publicPaymentId,
-                LogFields.PUBLIC_PAYMENT_ORDER_ID to envelope.data.publicPaymentOrderId,
+        val order = paymetOrderFactory.fromEvent(paymentOrderStatusCheckRequested)
+        logger.info("▶️ [Handle Start] Processing PaymentOrderStatusCheckRequested")
+        try {
+            val response = safePspCall(order)
+            logger.info("✅ PSP status returned status=$response for paymentOrderId=${order.paymentOrderId}")
+            paymentService.processPspResult(
+                event = paymentOrderStatusCheckRequested,
+                pspStatus = response,
             )
-        ) {
-            logger.info("▶️ [Handle Start] Processing PaymentOrderStatusCheckRequested")
-            try {
-                val response = safePspCall(order)
-                logger.info("✅ PSP status returned status=$response for paymentOrderId=${order.paymentOrderId}")
-                paymentService.processPspResult(
-                    event = paymentOrderStatusCheckRequested,
-                    pspStatus = response,
-                )
-            } catch (e: TimeoutException) {
-                logger.error("⏱️ PSP status timed out for orderId=${order.paymentOrderId}, retrying...", e)
-                paymentService.processPspResult(
-                    event = paymentOrderStatusCheckRequested,
-                    pspStatus = PaymentOrderStatus.TIMEOUT
-                )
-            } catch (e: Exception) {
-                when (e) {
-                    is RetriableException,
-                    is TransientDataAccessException,
-                    is CannotAcquireLockException,
-                    is SQLTransientException -> {
-                        logger.warn("Retryable exception occurred, will be retried or sent to DLQ", e)
-                        throw e
-                    }
+        } catch (e: TimeoutException) {
+            logger.error("⏱️ PSP status timed out for orderId=${order.paymentOrderId}, retrying...", e)
+            paymentService.processPspResult(
+                event = paymentOrderStatusCheckRequested,
+                pspStatus = PaymentOrderStatus.TIMEOUT
+            )
+        } catch (e: Exception) {
+            when (e) {
+                is RetriableException,
+                is TransientDataAccessException,
+                is CannotAcquireLockException,
+                is SQLTransientException -> {
+                    logger.warn("Retryable exception occurred, will be retried or sent to DLQ", e)
+                    throw e
+                }
 
-                    is IllegalArgumentException,
-                    is NullPointerException,
-                    is ClassCastException,
-                    is ConversionException,
-                    is DeserializationException,
-                    is SerializationException,
-                    is MethodArgumentNotValidException,
-                    is DuplicateKeyException,
-                    is DataIntegrityViolationException,
-                    is KafkaException,
-                    is org.springframework.kafka.KafkaException,
-                    is NonTransientDataAccessException -> {
-                        logger.error("Non-retryable exception occurred", e)
-                        throw e
-                    }
+                is IllegalArgumentException,
+                is NullPointerException,
+                is ClassCastException,
+                is ConversionException,
+                is DeserializationException,
+                is SerializationException,
+                is MethodArgumentNotValidException,
+                is DuplicateKeyException,
+                is DataIntegrityViolationException,
+                is KafkaException,
+                is org.springframework.kafka.KafkaException,
+                is NonTransientDataAccessException -> {
+                    logger.error("Non-retryable exception occurred", e)
+                    throw e
+                }
 
-                    else -> {
-                        logger.error("unexpected error occurred while processing record ${record.value().eventId}", e)
-                    }
+                else -> {
+                    logger.error("unexpected error occurred while processing record ${record.value().eventId}", e)
                 }
             }
         }
@@ -124,7 +114,7 @@ class ScheduledPaymentStatusCheckExecutor(
 
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
         return externalPspExecutorPoolConig.submit<PaymentOrderStatus> {
-            pspClient.checkPaymentStatus(order.paymentOrderId.toString())
+            paymentGatewayPort.checkPaymentStatus(order.paymentOrderId.toString())
         }.get(3, TimeUnit.SECONDS)
     }
 
@@ -135,8 +125,8 @@ class ScheduledPaymentStatusCheckExecutor(
 
 
     @KafkaListener(
-        topics = [TOPIC_NAMES.PAYMENT_STATUS_CHECK_SCHEDULER],
-        containerFactory = "${TOPIC_NAMES.PAYMENT_STATUS_CHECK_SCHEDULER}-factory",
+        topics = [TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER],
+        containerFactory = "${TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER}-factory",
         groupId = "${CONSUMER_GROUPS.PAYMENT_STATUS_CHECK_SCHEDULER}",
     )
     fun handleBatchListener(

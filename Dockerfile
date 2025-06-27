@@ -6,6 +6,8 @@ WORKDIR /app
 COPY pom.xml ./
 COPY payment-service/pom.xml payment-service/
 COPY common/pom.xml common/
+COPY payment-domain/pom.xml payment-domain/
+COPY payment-application/pom.xml payment-application/
 
 # Download all dependencies for all modules
 RUN --mount=type=cache,target=/root/.m2 \

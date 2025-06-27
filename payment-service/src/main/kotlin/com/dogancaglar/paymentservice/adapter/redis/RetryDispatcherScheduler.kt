@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.redis
 
+import com.dogancaglar.payment.application.events.EventMetadatas
 import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
-import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled

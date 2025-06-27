@@ -1,79 +1,33 @@
 package com.dogancaglar.paymentservice.application.mapper
 
-import com.dogancaglar.paymentservice.application.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
-import com.dogancaglar.paymentservice.application.event.PaymentOrderStatusCheckRequested
-import com.dogancaglar.paymentservice.application.event.PaymentOrderSucceeded
-import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrder
-import java.time.LocalDateTime
+import com.dogancaglar.payment.application.events.PaymentOrderEvent
+import com.dogancaglar.payment.domain.model.Amount
+import com.dogancaglar.payment.domain.model.PaymentOrder
+import com.dogancaglar.payment.domain.model.PaymentOrderStatus
+import com.dogancaglar.payment.domain.model.vo.PaymentId
+import com.dogancaglar.payment.domain.model.vo.PaymentOrderId
+import com.dogancaglar.payment.domain.model.vo.SellerId
+import org.springframework.stereotype.Component
 
-object PaymentOrderEventMapper {
-    fun toPaymentOrderRetryRequestEvent(
-        order: PaymentOrder,
-        newRetryCount: Int,
-        retryReason: String? = "UNKNOWN",
-        lastErrorMessage: String? = "N/A"
-    ): PaymentOrderRetryRequested {
-        return PaymentOrderRetryRequested(
-            paymentOrderId = order.paymentOrderId.toString(),
-            publicPaymentOrderId = order.publicPaymentOrderId,
-            paymentId = order.paymentId.toString(),
-            publicPaymentId = order.publicPaymentId,
-            sellerId = order.sellerId,
-            retryCount = newRetryCount,
-            retryReason = retryReason,
-            lastErrorMessage = lastErrorMessage,
-            createdAt = LocalDateTime.now(),
-            status = order.status.name,
-            updatedAt = LocalDateTime.now(),
-            amountValue = order.amount.value,
-            currency = order.amount.currency,
-        )
+@Component
+class PaymentOrderEventMapper {
+    fun mapEventToDomain(event: PaymentOrderEvent): PaymentOrder {
+        return fromEvent(event)
     }
 
-    fun toPaymentOrderCreatedEvent(order: PaymentOrder): PaymentOrderCreated {
-        return PaymentOrderCreated(
-            paymentOrderId = order.paymentOrderId.toString(),
-            publicPaymentOrderId = order.publicPaymentOrderId,
-            paymentId = order.paymentId.toString(),
-            publicPaymentId = order.publicPaymentId,
-            sellerId = order.sellerId,
-            retryCount = 0,
-            createdAt = LocalDateTime.now(),
-            status = order.status.name,
-            amountValue = order.amount.value,
-            currency = order.amount.currency,
+    fun fromEvent(event: PaymentOrderEvent): PaymentOrder =
+        PaymentOrder.reconstructFromPersistence(
+            paymentOrderId = PaymentOrderId(event.paymentOrderId.toLong()),
+            publicPaymentOrderId = event.publicPaymentOrderId,
+            paymentId = PaymentId(event.paymentId.toLong()),
+            publicPaymentId = event.publicPaymentId,
+            sellerId = SellerId(event.sellerId),
+            amount = Amount(event.amountValue, event.currency),
+            status = PaymentOrderStatus.valueOf(event.status),
+            createdAt = event.createdAt,
+            updatedAt = event.updatedAt,
+            retryCount = event.retryCount,
+            retryReason = event.retryReason,
+            lastErrorMessage = event.lastErrorMessage
         )
-    }
-
-
-    fun toPaymentOrderSuccededEvent(order: PaymentOrder): PaymentOrderSucceeded {
-        return PaymentOrderSucceeded(
-            paymentOrderId = order.paymentOrderId.toString(),
-            publicPaymentOrderId = order.publicPaymentOrderId,
-            paymentId = order.paymentId.toString(),
-            publicPaymentId = order.publicPaymentId,
-            sellerId = order.sellerId,
-            amountValue = order.amount.value,
-            currency = order.amount.currency,
-        )
-    }
-
-
-    fun toPaymentOrderStatusCheckRequested(order: PaymentOrder): PaymentOrderStatusCheckRequested {
-        return PaymentOrderStatusCheckRequested(
-            paymentOrderId = order.paymentOrderId.toString(),
-            publicPaymentOrderId = order.publicPaymentOrderId,
-            paymentId = order.paymentId.toString(),
-            publicPaymentId = order.publicPaymentId,
-            sellerId = order.sellerId,
-            retryCount = order.retryCount,
-            retryReason = order.retryReason,
-            createdAt = LocalDateTime.now(),
-            status = order.status.name,
-            updatedAt = LocalDateTime.now(),
-            amountValue = order.amount.value,
-            currency = order.amount.currency,
-        )
-    }
 }

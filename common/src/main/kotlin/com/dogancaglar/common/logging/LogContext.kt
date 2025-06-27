@@ -8,8 +8,8 @@ import java.util.*
 
 object LogContext {
     private val logger = LoggerFactory.getLogger(LogContext::class.java)
-    fun getTraceId(): String? = MDC.get(LogFields.TRACE_ID)
-    fun getEventId(): UUID? = UUID.fromString(MDC.get(LogFields.EVENT_ID))
+    fun getTraceId(): String? = MDC.get(GenericLogFields.TRACE_ID)
+    fun getEventId(): UUID? = UUID.fromString(MDC.get(GenericLogFields.EVENT_ID))
 
     fun <T> with(
         envelope: EventEnvelope<T>,
@@ -19,12 +19,12 @@ object LogContext {
         // capture outer MDC (if any)
         val previous = MDC.getCopyOfContextMap()
         try {
-            MDC.put(LogFields.TRACE_ID, envelope.traceId)
-            MDC.put(LogFields.EVENT_ID, envelope.eventId.toString())
-            MDC.put(LogFields.AGGREGATE_ID, envelope.aggregateId)
-            MDC.put(LogFields.EVENT_TYPE, envelope.eventType)
+            MDC.put(GenericLogFields.TRACE_ID, envelope.traceId)
+            MDC.put(GenericLogFields.EVENT_ID, envelope.eventId.toString())
+            MDC.put(GenericLogFields.AGGREGATE_ID, envelope.aggregateId)
+            MDC.put(GenericLogFields.EVENT_TYPE, envelope.eventType)
             envelope.parentEventId?.let {
-                MDC.put(LogFields.PARENT_EVENT_ID, it.toString())
+                MDC.put(GenericLogFields.PARENT_EVENT_ID, it.toString())
             }
             additionalContext.forEach(MDC::put)
             block()
@@ -59,10 +59,10 @@ object LogContext {
     ) {
         val previous = MDC.getCopyOfContextMap()?.let { Collections.unmodifiableMap(it) }
         try {
-            MDC.put(LogFields.RETRY_COUNT, retryCount.toString())
-            retryReason?.let { MDC.put(LogFields.RETRY_REASON, it) }
-            lastErrorMessage?.let { MDC.put(LogFields.RETRY_ERROR_MESSAGE, it) }
-            MDC.put(LogFields.RETRY_BACKOFF_MILLIS, backOffInMillis.toString())
+            MDC.put(GenericLogFields.RETRY_COUNT, retryCount.toString())
+            retryReason?.let { MDC.put(GenericLogFields.RETRY_REASON, it) }
+            lastErrorMessage?.let { MDC.put(GenericLogFields.RETRY_ERROR_MESSAGE, it) }
+            MDC.put(GenericLogFields.RETRY_BACKOFF_MILLIS, backOffInMillis.toString())
             block()
         } finally {
             MDC.setContextMap(previous ?: emptyMap())

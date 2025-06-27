@@ -1,10 +1,12 @@
 // KafkaTypedConsumerFactoryConfig.kt
 package com.dogancaglar.paymentservice.config.messaging
 
+import com.dogancaglar.application.PaymentOrderCreated
+import com.dogancaglar.application.PaymentOrderRetryRequested
+import com.dogancaglar.application.PaymentOrderStatusCheckRequested
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.application.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.application.event.PaymentOrderRetryRequested
-import com.dogancaglar.paymentservice.application.event.PaymentOrderStatusCheckRequested
+import com.dogancaglar.common.event.TOPICS
+import com.dogancaglar.payment.application.events.EventMetadatas
 import com.dogancaglar.paymentservice.config.serialization.EventEnvelopeDeserializer
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -129,7 +131,7 @@ class KafkaTypedConsumerFactoryConfig(
             isBatchListener = true
         }
 
-    @Bean("${TOPIC_NAMES.PAYMENT_ORDER_CREATED}-factory")
+    @Bean("${TOPICS.PAYMENT_ORDER_CREATED}-factory")
     fun paymentOrderCreatedFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
@@ -147,7 +149,7 @@ class KafkaTypedConsumerFactoryConfig(
             )
         }
 
-    @Bean("${TOPIC_NAMES.PAYMENT_ORDER_RETRY}-factory")
+    @Bean("${TOPICS.PAYMENT_ORDER_RETRY}-factory")
     fun paymentRetryRequestedFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
@@ -165,7 +167,7 @@ class KafkaTypedConsumerFactoryConfig(
             )
         }
 
-    @Bean("${TOPIC_NAMES.PAYMENT_STATUS_CHECK_SCHEDULER}-factory")
+    @Bean("${TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER}-factory")
     fun paymentStatusCheckExecutorFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
@@ -187,12 +189,12 @@ class KafkaTypedConsumerFactoryConfig(
     fun mdcRecordInterceptor(): RecordInterceptor<String, EventEnvelope<*>> = RecordInterceptor { record, _ ->
         fun header(key: String) = record.headers().lastHeader(key)?.value()?.let { String(it) }
         listOf(
-            com.dogancaglar.common.logging.LogFields.TRACE_ID,
-            com.dogancaglar.common.logging.LogFields.EVENT_ID,
-            com.dogancaglar.common.logging.LogFields.PARENT_EVENT_ID
+            com.dogancaglar.common.logging.GenericLogFields.TRACE_ID,
+            com.dogancaglar.common.logging.GenericLogFields.EVENT_ID,
+            com.dogancaglar.common.logging.GenericLogFields.PARENT_EVENT_ID
         ).forEach { key -> header(key)?.let { org.slf4j.MDC.put(key, it) } }
         org.slf4j.MDC.put(
-            com.dogancaglar.common.logging.LogFields.AGGREGATE_ID,
+            com.dogancaglar.common.logging.GenericLogFields.AGGREGATE_ID,
             record.value()?.aggregateId ?: record.key()
         )
         record

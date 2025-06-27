@@ -32,6 +32,9 @@ It declares that this module is:
     <modules>
         <module>common</module>
         <module>payment-service</module>
+        <module>payment-domain</module>
+        <!-- <module>payment-consumers</module>-->
+        <module>payment-application</module>
     </modules>
 
     <properties>
@@ -39,16 +42,42 @@ It declares that this module is:
         <kotlin.version>1.9.25</kotlin.version>
         <postgresql.version>42.7.3</postgresql.version>
         <liquibase.version>4.26.0</liquibase.version>
+        <mybatis.version>3.0.3</mybatis.version>
         <logstash.version>7.4</logstash.version>
         <spring-boot.version>3.5.0</spring-boot.version>
-        <sulki.ulid.version>8.3.0</sulki.ulid.version>
+        <!-- Build plugins -->
+        <kotlin.maven.plugin.version>${kotlin.version}</kotlin.maven.plugin.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
+        <!--test dependencies-->
+        <maven.surefire.version>3.2.5</maven.surefire.version>
+        <assertj.version>3.25.3</assertj.version>
+        <mockito.kotlin.version>5.2.1</mockito.kotlin.version>
     </properties>
 
     <dependencyManagement>
+
         <dependencies>
             <!-- Spring Boot BOM (already managed by parent, no need to re-import) -->
             <!-- Spring Kafka -->
             <!-- PostgreSQL -->
+            <dependency>
+                <groupId>com.dogancaglar</groupId>
+                <artifactId>common</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>com.dogancaglar</groupId>
+                <artifactId>payment-domain</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.dogancaglar</groupId>
+                <artifactId>payment-application</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            </dependency>
+
             <dependency>
                 <groupId>org.postgresql</groupId>
                 <artifactId>postgresql</artifactId>
@@ -83,11 +112,7 @@ It declares that this module is:
                 <artifactId>kotlin-spring</artifactId>
                 <version>${kotlin.version}</version>
             </dependency>
-            <dependency>
-                <groupId>de.huxhorn.sulky</groupId>
-                <artifactId>de.huxhorn.sulky.ulid</artifactId>
-                <version>${sulki.ulid.version}</version>
-            </dependency>
+
             <!-- Logstash encoder -->
             <dependency>
                 <groupId>net.logstash.logback</groupId>
@@ -105,51 +130,43 @@ It declares that this module is:
 
             <!-- Spring Boot dependencies-->
             <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-test</artifactId>
-                <version>${spring-boot.version}</version>
-                <scope>test</scope>
-                <exclusions>
-                    <!-- Optional: exclude legacy JUnit 4 -->
-                    <exclusion>
-                        <groupId>junit</groupId>
-                        <artifactId>junit</artifactId>
-                    </exclusion>
-                </exclusions>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>5.10.0</version>
             </dependency>
+
             <dependency>
                 <groupId>org.jetbrains.kotlin</groupId>
                 <artifactId>kotlin-test</artifactId>
                 <version>${kotlin.version}</version>
-                <scope>test</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-test-junit5</artifactId>
+                <version>${kotlin.version}</version>
             </dependency>
 
 
-            <!-- ✅ AssertJ (if you want to pin a specific version explicitly) -->
             <dependency>
                 <groupId>org.assertj</groupId>
                 <artifactId>assertj-core</artifactId>
-                <version>3.25.3</version> <!-- Use latest -->
-                <scope>test</scope>
+                <version>${assertj.version}</version>
             </dependency>
-
-            <!-- ✅ Mockito Kotlin Support (Optional but clean for Kotlin mocking) -->
             <dependency>
                 <groupId>org.mockito.kotlin</groupId>
                 <artifactId>mockito-kotlin</artifactId>
-                <version>5.2.1</version>
-                <scope>test</scope>
+                <version>${mockito.kotlin.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.mybatis.spring.boot</groupId>
                 <artifactId>mybatis-spring-boot-starter</artifactId>
-                <version>3.0.3</version>
+                <version>${mybatis.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.mybatis.spring.boot</groupId>
                 <artifactId>mybatis-spring-boot-starter-test</artifactId>
-                <version>3.0.3</version>
-                <scope>test</scope>
+                <version>${mybatis.version}</version>
             </dependency>
         </dependencies>
 
@@ -189,6 +206,10 @@ It declares that this module is:
                             <version>${kotlin.version}</version>
                         </dependency>
                     </dependencies>
+                </plugin>
+                <plugin>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven.surefire.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>

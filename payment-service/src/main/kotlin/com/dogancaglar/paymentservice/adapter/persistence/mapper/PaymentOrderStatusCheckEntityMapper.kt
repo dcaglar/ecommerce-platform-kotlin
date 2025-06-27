@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.persistence.mapper
 
+import com.dogancaglar.payment.domain.model.PaymentOrderStatusCheck
 import com.dogancaglar.paymentservice.adapter.persistence.entity.PaymentOrderStatusCheckEntity
-import com.dogancaglar.paymentservice.domain.internal.model.PaymentOrderStatusCheck
 
 object PaymentOrderStatusCheckEntityMapper {
 

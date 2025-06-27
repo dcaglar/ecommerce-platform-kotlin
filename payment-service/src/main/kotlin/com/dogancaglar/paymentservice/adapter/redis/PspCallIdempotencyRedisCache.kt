@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.redis
 
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.payment.domain.model.PaymentOrderStatus
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Repository

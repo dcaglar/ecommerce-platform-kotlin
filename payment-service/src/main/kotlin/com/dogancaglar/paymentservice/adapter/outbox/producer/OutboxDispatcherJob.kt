@@ -1,15 +1,15 @@
 package com.dogancaglar.paymentservice.adapter.outbox.producer
 
+import com.dogancaglar.application.PaymentOrderCreated
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
-import com.dogancaglar.paymentservice.application.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.config.messaging.EventMetadatas
+import com.dogancaglar.payment.application.events.EventMetadatas
+import com.dogancaglar.payment.application.events.OutboxEvent
+import com.dogancaglar.payment.application.port.outbound.EventPublisherPort
+import com.dogancaglar.payment.application.port.outbound.OutboxEventPort
 import com.dogancaglar.paymentservice.config.metrics.MetricNames.OUTBOX_DISPATCHED_TOTAL
 import com.dogancaglar.paymentservice.config.metrics.MetricNames.OUTBOX_DISPATCHER_DURATION
 import com.dogancaglar.paymentservice.config.metrics.MetricNames.OUTBOX_DISPATCH_FAILED_TOTAL
 import com.dogancaglar.paymentservice.config.metrics.MetricNames.OUTBOX_EVENT_BACKLOG
-import com.dogancaglar.paymentservice.domain.model.OutboxEvent
-import com.dogancaglar.paymentservice.domain.port.OutboxEventPort
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
@@ -25,8 +25,8 @@ import java.time.Instant
 
 @Service
 class OutboxDispatcherJob(
-    private val outboxEventPort: OutboxEventPort,
-    private val paymentEventPublisher: PaymentEventPublisher,
+    private val outboxEventPort: OutboxEventPort, // <-- use the shared outbox event port bean
+    private val paymentEventPublisher: EventPublisherPort,
     private val meterRegistry: MeterRegistry,
     private val objectMapper: ObjectMapper,
     @Qualifier("outboxTaskScheduler") // <-- use the shared scheduler bean
