@@ -1,0 +1,199 @@
+server:
+  port: 8080
+app:
+  cache:
+    ttl-seconds: 3600  # 1 hour redis  TTL for PSP result cache
+  payment-service:
+    api-key: secretpaymentapikey12345
+
+  kafka: # Kafka configuration for dynamic consumers
+    dynamic-consumers:
+      - id: payment-order-executor
+        topic: payment_order_created_topic
+        group-id: payment-order-group
+        class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderExecutor
+        concurrency: 16
+
+      - id: payment-retry-executor
+        topic: payment_order_retry_request_topic
+        group-id: payment-retry-executor-group
+        class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.PaymentOrderRetryCommandExecutor
+        concurrency: 16
+
+      - id: payment-status-check-executor-scheduler
+        topic: payment_status_check_scheduler_topic
+        group-id: payment-status-check-executor-group
+        class-name: com.dogancaglar.paymentservice.adapter.kafka.consumers.ScheduledPaymentStatusCheckExecutor
+        concurrency: 1
+
+spring:
+  datasource:
+    url: jdbc://127/0.0.1:5432/payment
+    username: payment
+    password: payment
+    hikari:
+      maximum-pool-size: 12
+      minimum-idle: 4
+      connection-timeout: 3000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    hibernate:
+      ddl-auto: none  # ❌ Disable automatic table creation
+      open-in-view: false
+  redis:
+    url: xxxxx
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 64
+        max-idle: 64
+        min-idle: 8
+        max-wait: 2000ms
+  kafka: # auto-create both source & DLQ topics with matching partitions
+    bootstrap-servers: xxxxx
+    producer:
+      value-serializer: com.dogancaglar.infrastructure.config.kafka.serialization.EventEnvelopeSerializer
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      heartbeat-interval: 3000
+      session-timeout: 10000s
+      max-poll-interval: 300000
+      max-poll-records: 32
+      #      auto-offset-reset: earliest # ❌ Do not reset offsets automatically,default is latest
+      #      enable-auto-commit: false
+      properties: #maybe change partition assignment strategy
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+        spring.deserializer.value.delegate.class: com.dogancaglar.infrastructure.config.kafka.deserialization.EventEnvelopeDeserializer
+    listener:
+      micrometer-enabled: true
+psp:
+  simulation:
+    currentScenario: NORMAL
+    scenarios:
+      NORMAL:
+        timeouts:
+          enabled: true
+          probability: 1       # 1% of requests time out
+        latency:
+          fast:
+            probability: 70    # 70% are fast (50–150ms)
+            minMs: 50
+            maxMs: 150
+          moderate:
+            probability: 25    # 25% are moderate (150–300ms)
+            minMs: 150
+            maxMs: 300
+          slow:
+            probability: 5     # 5% are slow (300–600ms)
+            minMs: 300
+            maxMs: 600
+        response:
+          successful: 80
+          retryable: 15
+          statusCheck: 0
+          nonRetryable: 5
+      PEAK:
+        timeouts:
+          enabled: true
+          probability: 25      # 25% timeouts
+        latency:
+          fast:
+            probability: 30    # 30% fast (250–500ms)
+            minMs: 250
+            maxMs: 500
+          moderate:
+            probability: 50    # 50% moderate (501–1500ms)
+            minMs: 501
+            maxMs: 1500
+          slow:
+            probability: 20    # 20% slow (1501–2500ms)
+            minMs: 1501
+            maxMs: 2500
+        response:
+          successful: 50
+          retryable: 45
+          statusCheck: 0
+          nonRetryable: 5
+      DEGRADED:
+        timeouts:
+          enabled: true
+          probability: 30      # 30% timeouts
+        latency:
+          fast:
+            probability: 20    # 20% fast (2000–2200ms)
+            minMs: 2000
+            maxMs: 2200
+          moderate:
+            probability: 20    # 20% moderate (2201–2600ms)
+            minMs: 2201
+            maxMs: 2600
+          slow:
+            probability: 60    # 60% slow (2601–2990ms)
+            minMs: 2601
+            maxMs: 2990
+        response:
+          successful: 50
+          retryable: 40
+          statusCheck: 0
+          nonRetryable: 10
+      BEST_PSP_EVER:
+        timeouts:
+          enabled: false
+          probability: 0
+        latency:
+          fast:
+            probability: 100   # 100% fast (1–2ms)
+            minMs: 1
+            maxMs: 2
+          moderate:
+            probability: 0
+            minMs: 0
+            maxMs: 0
+          slow:
+            probability: 0
+            minMs: 0
+            maxMs: 0
+        response:
+          successful: 100
+          retryable: 0
+          statusCheck: 0
+          nonRetryable: 0
+
+
+# management, endpoints, metrics, server, health
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus,health"
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    enable:
+      http: false # Disable HTTP metrics
+      jvm: true   # Enable JVM (memory, threads, GC, etc.)
+      kafka: true # Enable Kafka metrics
+      hikari: true # Enable HikariCP metrics
+      executor: true # Enable thread pool metrics
+  health:
+    probes:
+      enabled: true
+metrics:
+  tags:
+    application: payment-consumers
+
+spring.jackson.time-zone: UTC
+spring.jpa.properties.hibernate.jdbc.time_zone: UTC
+logging.config: classpath:logback-spring.xml
+mybatis:
+  base-package: com.dogancaglar.infrastructure.persistence.repository
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.dogancaglar.infrastructure.persistence.entity
+  type-handlers-package: com.dogancaglar.infrastructure.persistence.typehandler

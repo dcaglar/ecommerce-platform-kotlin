@@ -4,19 +4,44 @@ This directory contains helper scripts to manage your modular eCommerce infrastr
 
 ## Scripts Overview
 
-| Script             | Description                                                                |
-|--------------------|----------------------------------------------------------------------------|
-| `network-up.sh`    | Create required Docker networks (idempotent)                               |
-| `infra-up.sh`      | Start infrastructure containers                                            |
-| `infra-down.sh`    | Stop infra containers (keep data/volumes)                                  |
-| `infra-cleanup.sh` | Stop and remove infra containers + volumes (with confirmation)             |
-| `infra-purge.sh`   | **Dangerous**: remove all infra containers and volumes (with confirmation) |
-| `app-up.sh`        | Start app containers with optional profile (`./app-up.sh docker`)          |
-| `app-down.sh`      | Stop app containers                                                        |
-| `compose-up.sh`    | Bring up full stack (network + infra + app)                                |
-| `compose-down.sh`  | Bring down full stack (app + infra)                                        |
-| `logs.sh`          | Tail logs from payment-service container                                   |
-| `status.sh`        | Show status of app and infra containers                                    |
+| Script              | Description                                                                |
+|---------------------|----------------------------------------------------------------------------|
+| `network-up.sh`     | Create required Docker networks (idempotent)                               |
+| `infra-up.sh`       | Start infrastructure containers                                            |
+| `infra-down.sh`     | Stop infra containers (keep data/volumes)                                  |
+| `infra-cleanup.sh`  | Stop and remove infra containers + volumes (with confirmation)             |
+| `infra-purge.sh`    | **Dangerous**: remove all infra containers and volumes (with confirmation) |
+| `app-up.sh`         | Start app containers with optional profile (`./app-up.sh docker`)          |
+| `app-down.sh`       | Stop app containers                                                        |
+| `compose-up.sh`     | Bring up full stack (network + infra + app)                                |
+| `compose-down.sh`   | Bring down full stack (app + infra)                                        |
+| `logs.sh`           | Tail logs from payment-service container                                   |
+| `status.sh`         | Show status of app and infra containers                                    |
+| `scale-consumer.sh` | Scale the number of payment-consumers service instances up or down         |
+
+## Scaling payment-consumers
+
+You can scale the payment-consumers service (for Kafka partition parallelism) using the `scale-consumer.sh` script:
+
+- **Set a specific number of instances (e.g., 8):**
+  ```sh
+  ./scale-consumer.sh 8
+  ```
+- **Increase the number of instances by 1:**
+  ```sh
+  ./scale-consumer.sh --up
+  ```
+- **Decrease the number of instances by 1:**
+  ```sh
+  ./scale-consumer.sh --down
+  ```
+- **Show usage instructions:**
+  ```sh
+  ./scale-consumer.sh --help
+  ```
+
+> Note: Scaling works only if the `container_name` and `ports` sections are not set for payment-consumers in your
+> docker-compose.app.yml.
 
 ## Typical Workflow
 

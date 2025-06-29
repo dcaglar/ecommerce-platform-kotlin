@@ -3,9 +3,14 @@ server:
 #bootstrap:
 #  servers: kafka:9092
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://keycloak:8080/realms/ecommerce-platform
   tomcat:
     threads:
-      max: 50         # Max concurrent requests
+      max: 40         # Max concurrent requests
       min-spare: 10
     accept-count: 200
   kafka: #url for kafka in container-since this is used in docker-compose we use the service name
@@ -24,12 +29,6 @@ spring:
           max-idle: 8
           min-idle: 0
           max-wait: -1ms
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://keycloak:8080/realms/ecommerce-platform
-
 
 kafka:
   topics:
@@ -58,3 +57,26 @@ kafka:
       partitions: 16
       replicas: 1
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus,health"
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    enable:
+      http: false
+      jvm: true
+      kafka: true
+      hikari: true
+      executor: true
+  health:
+    probes:
+      enabled: true

@@ -17,7 +17,6 @@ annotation class ValidEnum(
 )
 
 
-
 class EnumValidator : ConstraintValidator<ValidEnum, String> {
     private lateinit var acceptedValues: Set<String>
 

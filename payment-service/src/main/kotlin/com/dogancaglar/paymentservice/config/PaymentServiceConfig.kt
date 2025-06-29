@@ -1,19 +1,19 @@
 package com.dogancaglar.paymentservice.config
 
 
-import com.dogancaglar.com.dogancaglar.payment.application.port.out.SerializationPort
-import com.dogancaglar.payment.application.port.outbound.OutboxEventPort
+import com.dogancaglar.infrastructure.adapter.persistance.OutboxBufferAdapter
+import com.dogancaglar.infrastructure.adapter.persistance.PaymentOrderOutboundAdapter
+import com.dogancaglar.infrastructure.adapter.persistance.PaymentOrderStatusCheckAdapter
+import com.dogancaglar.infrastructure.adapter.persistance.PaymentOutboundAdapter
+import com.dogancaglar.infrastructure.adapter.producers.PaymentEventPublisher
+import com.dogancaglar.infrastructure.adapter.serialization.JacksonSerializationAdapter
+import com.dogancaglar.infrastructure.redis.PaymentRetryQueueAdapter
+import com.dogancaglar.infrastructure.redis.PspResultRedisCacheAdapter
+import com.dogancaglar.infrastructure.redis.id.RedisIdGeneratorPortAdapter
 import com.dogancaglar.payment.application.service.CreatePaymentService
 import com.dogancaglar.payment.application.service.ProcessPaymentService
 import com.dogancaglar.payment.domain.factory.PaymentFactory
 import com.dogancaglar.payment.domain.factory.PaymentOrderFactory
-import com.dogancaglar.payment.domain.port.PaymentRepository
-import com.dogancaglar.payment.domain.port.id.IdGeneratorPort
-import com.dogancaglar.paymentservice.adapter.kafka.producers.PaymentEventPublisher
-import com.dogancaglar.paymentservice.adapter.persistence.PaymentOrderStatusCheckAdapter
-import com.dogancaglar.paymentservice.adapter.redis.PaymentRetryQueueAdapter
-import com.dogancaglar.paymentservice.adapter.redis.PspResultRedisCacheAdapter
-import com.dogancaglar.port.PaymentOrderRepository
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.time.Clock
@@ -22,11 +22,11 @@ import java.time.Clock
 class PaymentServiceConfig {
     @Bean
     fun createPaymentService(
-        idGeneratorPort: IdGeneratorPort,
-        paymentRepository: PaymentRepository,
-        paymentOrderRepository: PaymentOrderRepository,
-        outboxEventPort: OutboxEventPort,
-        serializationPort: SerializationPort,
+        idGeneratorPort: RedisIdGeneratorPortAdapter,
+        paymentRepository: PaymentOutboundAdapter,
+        paymentOrderRepository: PaymentOrderOutboundAdapter,
+        outboxEventPort: OutboxBufferAdapter,
+        serializationPort: JacksonSerializationAdapter,
         clock: Clock,
     ): CreatePaymentService {
         return CreatePaymentService(
@@ -39,15 +39,14 @@ class PaymentServiceConfig {
         )
     }
 
-
     @Bean
-    fun createProcessPaymentService(
-        paymentOrderRepository: PaymentOrderRepository,
+    fun processPaymentService(
+        paymentOrderRepository: PaymentOrderOutboundAdapter,
         paymentEventPublisher: PaymentEventPublisher,
         paymentRetryQueueAdapter: PaymentRetryQueueAdapter,
         paymentOrderStatusCheckAdapter: PaymentOrderStatusCheckAdapter,
         pspResultRedisCacheAdapter: PspResultRedisCacheAdapter,
-        outboxEventPort: OutboxEventPort,
+        outboxEventPort: OutboxBufferAdapter,
         clock: Clock,
     ): ProcessPaymentService {
         return ProcessPaymentService(
@@ -59,6 +58,7 @@ class PaymentServiceConfig {
             clock = clock
         )
     }
+
 
     @Bean
     fun createPaymentFactory(clock: Clock) =
