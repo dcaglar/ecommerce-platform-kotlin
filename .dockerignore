@@ -5,3 +5,9 @@ target
 *.log
 node_modules
 .DS_Store
+**/target
+**/.idea
+**/.git
+**/.DS_Store
+**/test
+**/build

@@ -109,10 +109,7 @@ open class ProcessPaymentService(
     ) {
         pspResultCache.remove(order.paymentOrderId);
         logger.info(
-            "Handling retry for  paymentOrderId={} with reason='{}', lastError='{}'",
-            order.publicPaymentOrderId,
-            reason ?: "N/A",
-            lastError ?: "N/A"
+            "Handling retry for  paymentOrderId=${order.paymentOrderId} with reason $reason and lastError $lastError",
         )
         val retryCount = retryQueuePort.getRetryCount(order.paymentOrderId)
         val nextRetryCount = retryCount + 1

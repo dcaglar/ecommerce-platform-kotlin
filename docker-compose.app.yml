@@ -6,7 +6,7 @@ services:
     container_name: payment-service
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: payment-service/Dockerfile
     environment:
       JAVA_OPTS: -JAVA_TOOL_OPTIONS=-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Duser.timezone=UTC
       SPRING_PROFILES_ACTIVE: docker
@@ -20,6 +20,31 @@ services:
       - payment-net
       - monitoring-net
       - auth-net
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  payment-consumers:
+    labels:
+      service: payment-consumers
+      environment: test
+    build:
+      context: .
+      dockerfile: payment-consumers/Dockerfile
+    environment:
+      JAVA_OPTS: -JAVA_TOOL_OPTIONS=-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=9011 -Dcom.sun.management.jmxremote.rmi.port=9011 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Duser.timezone=UTC
+      SPRING_PROFILES_ACTIVE: docker
+    networks:
+      - messaging-net
+      - payment-net
+      - monitoring-net
+      - auth-net
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 networks:
   messaging-net:

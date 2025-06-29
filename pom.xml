@@ -33,8 +33,9 @@ It declares that this module is:
         <module>common</module>
         <module>payment-service</module>
         <module>payment-domain</module>
-        <!-- <module>payment-consumers</module>-->
+        <module>payment-consumers</module>
         <module>payment-application</module>
+        <module>payment-infrastructure</module>
     </modules>
 
     <properties>
@@ -77,7 +78,11 @@ It declares that this module is:
                 <artifactId>payment-application</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
             </dependency>
-
+            <dependency>
+                <groupId>com.dogancaglar</groupId>
+                <artifactId>payment-infrastructure</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            </dependency>
             <dependency>
                 <groupId>org.postgresql</groupId>
                 <artifactId>postgresql</artifactId>

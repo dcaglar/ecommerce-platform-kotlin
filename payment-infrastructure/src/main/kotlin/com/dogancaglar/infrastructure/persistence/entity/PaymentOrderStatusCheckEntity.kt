@@ -1,0 +1,13 @@
+package com.dogancaglar.infrastructure.persistence.entity
+
+import java.time.LocalDateTime
+
+data class PaymentOrderStatusCheckEntity(
+    val id: Long = 0,
+    val paymentOrderId: Long,
+    val scheduledAt: LocalDateTime,
+    val attempt: Int = 1,
+    val status: String = "SCHEDULED",
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+    val updatedAt: LocalDateTime = LocalDateTime.now()
+)

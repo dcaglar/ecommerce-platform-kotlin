@@ -2,7 +2,6 @@ global:
   scrape_interval: 30s
   evaluation_interval: 30s
 
-
 scrape_configs:
   - job_name: 'redis'
     static_configs:
@@ -11,3 +10,8 @@ scrape_configs:
     metrics_path: '/actuator/prometheus'
     static_configs:
       - targets: [ 'payment-service:8080' ]
+  - job_name: 'payment-consumers'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'payment-consumers:8080' ]
+

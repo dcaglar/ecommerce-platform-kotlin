@@ -17,7 +17,7 @@ object PaymentOrderEventMapper {
         return PaymentOrderRetryRequested(
             paymentOrderId = order.paymentOrderId.value.toString(),
             publicPaymentOrderId = order.publicPaymentOrderId,
-            paymentId = order.paymentId.toString(),
+            paymentId = order.paymentId.value.toString(),
             publicPaymentId = order.publicPaymentId,
             sellerId = order.sellerId.value,
             retryCount = newRetryCount,

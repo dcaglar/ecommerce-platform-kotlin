@@ -2,6 +2,7 @@ package com.dogancaglar.paymentservice.config.security
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter
@@ -16,7 +17,7 @@ class SecurityConfig {
         http
             .authorizeHttpRequests { requests ->
                 requests
-                    .requestMatchers(org.springframework.http.HttpMethod.POST, "/payments").authenticated()
+                    .requestMatchers(HttpMethod.POST, "/payments").authenticated()
                     .anyRequest().permitAll()
             }
             .csrf { it.disable() }

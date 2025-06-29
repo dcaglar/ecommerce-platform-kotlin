@@ -1,7 +1,7 @@
 mybatis:
   mapper-locations: classpath:mapper/*.xml
-  type-aliases-package: com.dogancaglar.paymentservice.adapter.persistence.entity
-  type-handlers-package: com.dogancaglar.paymentservice.adapter.persistence.typehandler
+  type-aliases-package: com.dogancaglar.infrastracture.persistence.entity
+  type-handlers-package: com.dogancaglar.infrastracture.persistence.typehandler
 spring:
   liquibase:
     enabled: false
