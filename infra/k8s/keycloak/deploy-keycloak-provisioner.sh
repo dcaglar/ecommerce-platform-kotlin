@@ -3,8 +3,10 @@ set -e
 
 NAMESPACE="auth"
 CONFIGMAP_NAME="keycloak-provision-script"
-SCRIPT_FILE_PATH="keycloak/provision-keycloak.sh"
-JOB_FILE_PATH="./infra/k8s/keycloak/keycloak-provisioner-job.yaml"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$SCRIPT_DIR/.."
+SCRIPT_FILE_PATH="$REPO_ROOT/keycloak/provision-keycloak.sh"
+JOB_FILE_PATH="$REPO_ROOT/infra/k8s/keycloak/keycloak-provisioner-job.yaml"
 
 echo "Checking if namespace $NAMESPACE exists..."
 if ! kubectl get ns $NAMESPACE >/dev/null 2>&1; then

@@ -1,144 +1,47 @@
 server:
   port: 8080
-  tomcat:
-    mbeanregistry:
-      enabled: true
-app:
-  cache:
-    ttl-seconds: 3600  # 1 hour redis  TTL for PSP result cache
-  payment-service:
-    api-key: secretpaymentapikey12345
 spring:
+  kafka:
+  # Only the bootstrap-servers should be overridden in profiles
   datasource:
-    url: jdbc://127/0.0.1:5432/payment
-    username: payment
-    password: payment
-    hikari:
-      maximum-pool-size: 16
-      minimum-idle: 10
-      connection-timeout: 3000
-      idle-timeout: 600000
-      max-lifetime: 1800000
-  jpa:
-    hibernate:
-      ddl-auto: none  # ❌ Disable automatic table creation
-      open-in-view: false
+  # Only the url, username, password should be overridden in profiles
+  data:
+    redis:
+    # Only the url should be overridden in profiles
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+        # Only the issuer-uri should be overridden in profiles
   liquibase:
     enabled: true
-    change-log: classpath:db/changelog/changelog-master.xml
-  redis:
-    url: xxxxx
-    timeout: 2000ms
-    lettuce:
-      pool:
-        max-active: 64
-        max-idle: 64
-        min-idle: 8
-        max-wait: 2000ms
-  kafka: # auto-create both source & DLQ topics with matching partitions
-    bootstrap-servers: xxxxx
-    producer:
-      value-serializer: com.dogancaglar.infrastructure.config.kafka.serialization.EventEnvelopeSerializer
-      #      auto-offset-reset: earliest # ❌ Do not reset offsets automatically,default is latest
-      #      enable-auto-commit: false
-      properties: #maybe change partition assignment strategy
-        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
-        spring.deserializer.value.delegate.class: com.dogancaglar.infrastructure.config.kafka.deserialization.EventEnvelopeDeserializer
-psp:
-  simulation:
-    currentScenario: NORMAL
-    scenarios:
-      NORMAL:
-        timeouts:
-          enabled: true
-          probability: 1       # 1% of requests time out
-        latency:
-          fast:
-            probability: 70    # 70% are fast (50–150ms)
-            minMs: 50
-            maxMs: 150
-          moderate:
-            probability: 25    # 25% are moderate (150–300ms)
-            minMs: 150
-            maxMs: 300
-          slow:
-            probability: 5     # 5% are slow (300–600ms)
-            minMs: 300
-            maxMs: 600
-        response:
-          successful: 80
-          retryable: 15
-          statusCheck: 0
-          nonRetryable: 5
-      PEAK:
-        timeouts:
-          enabled: true
-          probability: 25      # 25% timeouts
-        latency:
-          fast:
-            probability: 30    # 30% fast (250–500ms)
-            minMs: 250
-            maxMs: 500
-          moderate:
-            probability: 50    # 50% moderate (501–1500ms)
-            minMs: 501
-            maxMs: 1500
-          slow:
-            probability: 20    # 20% slow (1501–2500ms)
-            minMs: 1501
-            maxMs: 2500
-        response:
-          successful: 50
-          retryable: 45
-          statusCheck: 0
-          nonRetryable: 5
-      DEGRADED:
-        timeouts:
-          enabled: true
-          probability: 30      # 30% timeouts
-        latency:
-          fast:
-            probability: 20    # 20% fast (2000–2200ms)
-            minMs: 2000
-            maxMs: 2200
-          moderate:
-            probability: 20    # 20% moderate (2201–2600ms)
-            minMs: 2201
-            maxMs: 2600
-          slow:
-            probability: 60    # 60% slow (2601–2990ms)
-            minMs: 2601
-            maxMs: 2990
-        response:
-          successful: 50
-          retryable: 40
-          statusCheck: 0
-          nonRetryable: 10
-      BEST_PSP_EVER:
-        timeouts:
-          enabled: false
-          probability: 0
-        latency:
-          fast:
-            probability: 100   # 100% fast (1–2ms)
-            minMs: 1
-            maxMs: 2
-          moderate:
-            probability: 0
-            minMs: 0
-            maxMs: 0
-          slow:
-            probability: 0
-            minMs: 0
-            maxMs: 0
-        response:
-          successful: 100
-          retryable: 0
-          statusCheck: 0
-          nonRetryable: 0
-
-
-# management, endpoints, metrics, server, health
+    change-log: classpath:db/changelog/changelog.master.xml
+kafka:
+  topics:
+    payment_order_created_topic:
+      partitions: 16
+      replicas: 1
+    payment_order_created_topic_dlq:
+      partitions: 16
+      replicas: 1
+    payment_order_retry_request_topic:
+      partitions: 16
+      replicas: 1
+    payment_order_retry_request_topic_dlq:
+      partitions: 16
+      replicas: 1
+    payment_status_check_scheduler_topic:
+      partitions: 1
+      replicas: 1
+    payment_status_check_scheduler_topic_dlq:
+      partitions: 1
+      replicas: 1
+    payment_order_succeded_topic:
+      partitions: 16
+      replicas: 1
+    payment_order_succeded_topic_dlq:
+      partitions: 16
+      replicas: 1
 management:
   endpoints:
     web:
@@ -153,64 +56,12 @@ management:
     export:
       prometheus:
         enabled: true
-    sla:
-      http.server.requests: 100ms,500ms,1s,2s,5s
-    distribution:
-      percentiles-histogram:
-        http.server.requests: true
-        jdbc.connections: true
-        kafka.consumer.records-lag: true
-      percentiles:
-        http.server.requests: 0.5,0.95,0.99
-        jdbc.connections: 0.95,0.99
-        kafka.consumer.records-lag: 0.5,0.99
     enable:
-      # Only enable the metrics needed for your Grafana dashboard
-      http.server.requests: true
-      tomcat.threads: true
-      hikaricp.connections: true
-      hikaricp.connections.acquire: true
-      outbox.event.backlog: true
-      outbox.dispatched: true
-      outbox.dispatcher.duration: true
-      kafka.consumer.fetch.manager.records.lag: true
-      kafka.producer.topic.record.send: true
-      process.cpu.usage: true
-      jvm.threads.live: true
-      jvm.memory.used: true
-      jvm.memory.max: true
-      jvm.gc.pause: true
-      scheduler.active.threads: true
-      scheduler.pool.size.threads: true
-      redis.retry.events.processed: true
-      redis.retry.events.failed: true
-      redis.retry.batch.size: true
-      redis.retry.dispatch.execution: true
-      kafka.consumer.fetch.manager.records.consumed: true
-      kafka.consumer.fetch.manager.fetch.latency: true
-      kafka.consumer.io.time: true
-    tags:
-      application: ${spring.application.name:payment-service}
-      profile: ${spring.profiles.active:docker}
+      http: false
+      jvm: true
+      kafka: true
+      hikari: true
+      executor: true
   health:
     probes:
       enabled: true
-
-
-
-metrics:
-  tags:
-    application: payment-service
-
-spring.jackson.time-zone: UTC
-spring.jpa.properties.hibernate.jdbc.time_zone: UTC
-logging.config: classpath:logback-spring.xml
-outbox-dispatcher:
-  thread-count: 10
-  batch-size: 5000
-  pool-size: 10
-mybatis:
-  base-package: com.dogancaglar.infrastructure.persistence.repository
-  mapper-locations: classpath*:mapper/**/*.xml
-  type-aliases-package: com.dogancaglar.infrastructure.persistence.entity
-  type-handlers-package: com.dogancaglar.infrastructure.persistence.typehandler

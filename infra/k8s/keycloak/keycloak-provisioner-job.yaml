@@ -14,9 +14,15 @@ spec:
           volumeMounts:
             - name: script
               mountPath: /scripts
+            - name: output
+              mountPath: /output
       volumes:
         - name: script
           configMap:
             name: keycloak-provision-script
             defaultMode: 0775
+        - name: output
+          hostPath:
+            path: /Users/dogancaglar/IdeaProjects/ecommerce-platform-kotlin/keycloak/output
+            type: DirectoryOrCreate
       restartPolicy: Never

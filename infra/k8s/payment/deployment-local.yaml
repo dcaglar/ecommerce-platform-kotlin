@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: payment
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+    spec:
+      containers:
+        - name: payment-service
+          image: payment-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: kuberneteslocal
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: /config/
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: pkc-ewzgj.europe-west4.gcp.confluent.cloud:9092
+            - name: SPRING_DATASOURCE_USERNAME
+              value: payment
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-service-secret
+                  key: SPRING_DATASOURCE_PASSWORD
+            - name: SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: payment-service-secret
+                  key: SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config/application-kuberneteslocal.yml
+              subPath: application-kuberneteslocal.yml
+      volumes:
+        - name: config-volume
+          configMap:
+            name: payment-service-config
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "1"
+          memory: "1.2Gi"

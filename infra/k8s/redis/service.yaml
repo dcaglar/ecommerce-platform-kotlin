@@ -4,7 +4,11 @@ metadata:
   name: redis
   namespace: payment
 spec:
+  type: LoadBalancer
   ports:
-    - port: 6379
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+      nodePort: 30002
   selector:
     app: redis

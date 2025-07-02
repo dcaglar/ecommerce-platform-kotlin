@@ -67,4 +67,32 @@
         </root>
     </springProfile>
 
+
+    <springProfile name="kubernetes">
+        <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                <providers>
+                    <!-- @timestamp is Elasticsearch’s standard field name -->
+                    <timestamp>
+                        <fieldName>@timestamp</fieldName>
+                    </timestamp>
+                    <logLevel/>
+                    <threadName/>
+                    <loggerName/>
+                    <message/>
+                    <!-- Export your MDC keys (e.g. traceId, userId) up to top level -->
+                    <mdc includes="traceId,eventId,parentEventId,aggregateId,eventType,
+               retryCount,retryBackoffMillis,retryReason,retryErrorMessage"/>
+                    <stackTrace/>
+                    <globalCustomFields>{"service":"payment-consumers"}</globalCustomFields>
+                </providers>
+            </encoder>
+        </appender>
+
+        <!-- Root logger at INFO for containers -->
+        <root level="INFO">
+            <appender-ref ref="JSON"/>
+        </root>
+    </springProfile>
+
 </configuration>

@@ -48,7 +48,7 @@ The token will be saved to: `keycloak/access.token`
 Use the token from above for a sample request:
 
 ```bash
-curl -i -X POST http://localhost:8081/payments \
+curl -i -X POST http://localhost:30000/payments \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/access.token)" \
   -d '{

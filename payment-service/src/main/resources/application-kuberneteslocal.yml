@@ -1,0 +1,88 @@
+server:
+  port: 8080
+spring:
+  kafka:
+    properties:
+      session:
+        timeout:
+          ms: 45000
+      sasl:
+        mechanism: PLAIN
+        jaas:
+          config: ${SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG} # This will be injected from a Kubernetes Secret
+      client:
+        id: ccloud-springboot-client-f556835c-00a8-47cc-86e7-db5386c816d4
+      security:
+        protocol: SASL_SSL
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+  datasource:
+    url: jdbc:postgresql://payment-db:5432/payment?options=-c%20timezone=UTC
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD} # This will be injected from a Kubernetes Secret
+  data:
+    redis:
+      url: redis://redis:6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://keycloak:8080/realms/ecommerce-platform
+liquibase:
+  enabled: true
+  change-log: classpath:db/changelog/changelog.master.xml
+kafka:
+  topics:
+    payment_order_created_topic:
+      partitions: 16
+      replicas: 3
+    payment_order_created_topic_dlq:
+      partitions: 16
+      replicas: 3
+    payment_order_retry_request_topic:
+      partitions: 16
+      replicas: 3
+    payment_order_retry_request_topic_dlq:
+      partitions: 16
+      replicas: 3
+    payment_status_check_scheduler_topic:
+      partitions: 16
+      replicas: 3
+    payment_status_check_scheduler_topic_dlq:
+      partitions: 16
+      replicas: 3
+    payment_order_succeded_topic:
+      partitions: 16
+      replicas: 3
+    payment_order_succeded_topic_dlq:
+      partitions: 16
+      replicas: 3
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus,health"
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    enable:
+      http: false
+      jvm: true
+      kafka: true
+      hikari: true
+      executor: true
+  health:
+    probes:
+      enabled: true
