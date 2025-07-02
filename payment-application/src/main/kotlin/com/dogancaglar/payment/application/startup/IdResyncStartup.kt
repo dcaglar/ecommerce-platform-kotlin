@@ -1,5 +1,4 @@
-package com.dogancaglar.paymentservice.application.startup
-
+package com.dogancaglar.payment.application.startup
 
 import com.dogancaglar.payment.domain.port.PaymentRepository
 import com.dogancaglar.payment.domain.port.id.IdGeneratorPort
@@ -10,22 +9,22 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
 @Component
-class RedisIdResyncStartup(
+class IdResyncStartup(
     private val idGeneratorPort: IdGeneratorPort,
-    private val paymmentRepository: PaymentRepository,
-    private val paymentOrderRepository: PaymentOrderRepository
+    private val paymentOrderRepository: PaymentOrderRepository,
+    private val paymentRepository: PaymentRepository
 ) {
 
-    private val logger = LoggerFactory.getLogger(RedisIdResyncStartup::class.java)
+    private val logger = LoggerFactory.getLogger(IdResyncStartup::class.java)
 
     @PostConstruct
     fun syncRedisIdWithDatabase() {
         try {
-            val maxPaymentOrderIdInDb = paymentOrderRepository.getMaxPaymentOrderId()
-            val floor = maxPaymentOrderIdInDb.value + 100 // Give some breathing space
+            val maxPaymentOrderIdInDb = paymentOrderRepository.getMaxPaymentOrderId().value.toLong()
+            val floor = maxPaymentOrderIdInDb + 100 // Give some breathing space
 
-            val maxPaymentIdInDb = paymmentRepository.getMaxPaymentId()
-            val floorIdInDb = maxPaymentIdInDb.value.plus(100) // Give some breathing space
+            val maxPaymentIdInDb = paymentRepository.getMaxPaymentId().value.toLong()
+            val floorIdInDb = maxPaymentIdInDb.plus(100) // Give some breathing space
             logger.info(
                 "🔁 Resyncing Redis ID generator ${
                     IdNamespaces.PAYMENT_ORDER

@@ -1,19 +1,15 @@
 server:
   port: 8080
-#bootstrap:
-#  servers: kafka:9092
 spring:
   kafka:
-    bootstrap-servers: localhost:29092  # Host port mapped to Kafka inside the container (see docker-compose: "29092:29092")
-
+    bootstrap-servers: localhost:29092
   datasource:
-    url: jdbc:postgresql://localhost:5434/payment  # Host port mapped to payment-db inside the container ("5434:5432")
+    url: jdbc:postgresql://localhost:5434/payment
     username: payment
     password: payment
-
   data:
     redis:
-      url: redis://localhost:6379  # Host port mapped to redis ("6379:6379")
+      url: redis://localhost:6379
       timeout: 2000ms
       lettuce:
         pool:
@@ -21,9 +17,8 @@ spring:
           max-idle: 8
           min-idle: 0
           max-wait: -1mss
-
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8082/realms/ecommerce-platform # Host port mapped to Keycloak ("8082:8080")
+          issuer-uri: http://localhost:8082/realms/ecommerce-platform

@@ -2,20 +2,29 @@ server:
   port: 8080
 spring:
   kafka:
-  # Only the bootstrap-servers should be overridden in profiles
+    bootstrap-servers: pkc-ewzgj.europe-west4.gcp.confluent.cloud:9092
   datasource:
-  # Only the url, username, password should be overridden in profiles
+    url: jdbc:postgresql://payment-db:5432/payment?options=-c%20timezone=UTC
+    username: payment
+    password: payment
   data:
     redis:
-    # Only the url should be overridden in profiles
+      url: redis://redis:6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
   security:
     oauth2:
       resourceserver:
         jwt:
-        # Only the issuer-uri should be overridden in profiles
-  liquibase:
-    enabled: true
-    change-log: classpath:db/changelog/changelog.master.xml
+          issuer-uri: http://keycloak:8080/realms/ecommerce-platform
+liquibase:
+  enabled: true
+  change-log: classpath:db/changelog/changelog.master.xml
 kafka:
   topics:
     payment_order_created_topic:
@@ -65,3 +74,4 @@ management:
   health:
     probes:
       enabled: true
+

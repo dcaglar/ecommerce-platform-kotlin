@@ -44,29 +44,36 @@ else
   done
 fi
 
-# Delete Compute Engine VM instances
-echo "Deleting Compute Engine VM instances..."
-vms=$(gcloud compute instances list --project "$PROJECT_ID" --zones "$ZONE" --format="value(name)")
-if [ -z "$vms" ]; then
-  echo "No VM instances found."
-else
-  for vm in $vms; do
-    echo "Deleting VM instance $vm..."
-    gcloud compute instances delete "$vm" --zone "$ZONE" --project "$PROJECT_ID" --quiet || true
-  done
-fi
+# Get all zones in the region
+ZONES=$(gcloud compute zones list --filter="region:$(gcloud compute regions describe $REGION --format='value(selfLink)')" --format="value(name)")
 
-# Delete persistent disks (zonal)
-echo "Deleting persistent disks..."
-disks=$(gcloud compute disks list --project "$PROJECT_ID" --zones "$ZONE" --format="value(name)")
-if [ -z "$disks" ]; then
-  echo "No persistent disks found."
-else
-  for disk in $disks; do
-    echo "Deleting disk $disk..."
-    gcloud compute disks delete "$disk" --zone "$ZONE" --project "$PROJECT_ID" --quiet || true
-  done
-fi
+# Delete Compute Engine VM instances in all zones of the region
+echo "Deleting Compute Engine VM instances in region: $REGION ..."
+for Z in $ZONES; do
+  vms=$(gcloud compute instances list --project "$PROJECT_ID" --filter="zone:(https://www.googleapis.com/compute/v1/projects/$PROJECT_ID/zones/$Z)" --format="value(name)")
+  if [ -z "$vms" ]; then
+    echo "No VM instances found in zone $Z."
+  else
+    for vm in $vms; do
+      echo "Deleting VM instance $vm in zone $Z ..."
+      gcloud compute instances delete "$vm" --zone "$Z" --project "$PROJECT_ID" --quiet || true
+    done
+  fi
+done
+
+# Delete persistent disks in all zones of the region
+echo "Deleting persistent disks in region: $REGION ..."
+for Z in $ZONES; do
+  disks=$(gcloud compute disks list --project "$PROJECT_ID" --filter="zone:(https://www.googleapis.com/compute/v1/projects/$PROJECT_ID/zones/$Z)" --format="value(name)")
+  if [ -z "$disks" ]; then
+    echo "No persistent disks found in zone $Z."
+  else
+    for disk in $disks; do
+      echo "Deleting disk $disk in zone $Z ..."
+      gcloud compute disks delete "$disk" --zone "$Z" --project "$PROJECT_ID" --quiet || true
+    done
+  fi
+done
 
 # Release static external IP addresses
 echo "Releasing static external IPs..."

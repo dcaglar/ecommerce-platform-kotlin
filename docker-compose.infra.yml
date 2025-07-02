@@ -82,52 +82,52 @@ services:
       - "-c"
       - "shared_preload_libraries=pg_stat_statements"
 
-  ### 📨 Messaging Stack
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.2.1
-    container_name: zookeeper
-    volumes:
-      - zookeeper-data:/var/lib/zookeeper/data
-      - zookeeper-log:/var/lib/zookeeper/log
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    labels:
-      service: zookeper
-      environment: local
-    ports:
-      - "2181:2181"  # Optional: expose for debugging Kafka/Zookeeper
-    restart: unless-stopped
-    networks:
-      - messaging-net
-
-  kafka:
-    image: confluentinc/cp-kafka:7.6.0
-    container_name: kafka
-    volumes:
-      - kafka-data:/var/lib/kafka/data
-    depends_on:
-      - zookeeper
-    ports:
-      - "9092:9092"     # for container-to-container communication
-      - "29092:29092"   # for access from localhost (host machine)
-    labels:
-      service: kafka
-      environment: local
-    environment:
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
-    networks:
-      - messaging-net
+  #  ### 📨 Messaging Stack
+  #  zookeeper:
+  #    image: confluentinc/cp-zookeeper:7.2.1
+  #    container_name: zookeeper
+  #    volumes:
+  #      - zookeeper-data:/var/lib/zookeeper/data
+  #      - zookeeper-log:/var/lib/zookeeper/log
+  #    environment:
+  #      ZOOKEEPER_CLIENT_PORT: 2181
+  #      ZOOKEEPER_TICK_TIME: 2000
+  #    labels:
+  #      service: zookeper
+  #      environment: local
+  #    ports:
+  #      - "2181:2181"  # Optional: expose for debugging Kafka/Zookeeper
+  #    restart: unless-stopped
+  #    networks:
+  #      - messaging-net
+  #
+  #  kafka:
+  #    image: confluentinc/cp-kafka:7.6.0
+  #    container_name: kafka
+  #    volumes:
+  #      - kafka-data:/var/lib/kafka/data
+  #    depends_on:
+  #      - zookeeper
+  #    ports:
+  #      - "9092:9092"     # for container-to-container communication
+  #      - "29092:29092"   # for access from localhost (host machine)
+  #    labels:
+  #      service: kafka
+  #      environment: local
+  #    environment:
+  #      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  #      KAFKA_BROKER_ID: 1
+  #      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+  #      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+  #      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+  #      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+  #      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+  #      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+  #      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+  #      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+  #      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+  #    networks:
+  #      - messaging-net
   redis:
     image: redis:7
     container_name: redis
@@ -168,21 +168,21 @@ services:
     networks:
       - messaging-net
       - monitoring-net
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui
-    labels:
-      service: kafka-ui
-      environment: local
-    ports:
-      - "8088:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-    networks:
-      - messaging-net
-    depends_on:
-      - kafka
+  #  kafka-ui:
+  #    image: provectuslabs/kafka-ui:latest
+  #    container_name: kafka-ui
+  #    labels:
+  #      service: kafka-ui
+  #      environment: local
+  #    ports:
+  #      - "8088:8080"
+  #    environment:
+  #      KAFKA_CLUSTERS_0_NAME: local
+  #      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+  #    networks:
+  #      - messaging-net
+  #    depends_on:
+  #      - kafka
 
 
   ### 📊 Observability Stack

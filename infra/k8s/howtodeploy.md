@@ -1,3 +1,9 @@
+--cheeatsheet
+1004 ./keycloak/get-token.shkubectl apply -f kafka/statefulset.yaml\n
+1005 kubectl apply -f kafka/statefulset.yaml\n
+1006 kubectl apply -f kafka/statefulset.yaml\n
+1007 cd ~/IdeaProjects/ecommerce-platform-kotlin/infra/k8s
+
 kubectl logs -n payment payment-service-576dd67876-drfdw
 
 --build paymentservice script

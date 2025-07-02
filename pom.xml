@@ -31,11 +31,11 @@ It declares that this module is:
     <version>1.0.0-SNAPSHOT</version>
     <modules>
         <module>common</module>
-        <module>payment-service</module>
         <module>payment-domain</module>
-        <module>payment-consumers</module>
         <module>payment-application</module>
         <module>payment-infrastructure</module>
+        <module>payment-service</module>
+        <module>payment-consumers</module>
     </modules>
 
     <properties>

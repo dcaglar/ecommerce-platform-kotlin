@@ -1,17 +1,17 @@
 resource "google_container_cluster" "primary" {
   name                     = "dev-gke-cluster"
-  location                 = var.zone
+  location                 = var.region
   initial_node_count = 1    # <-- add this line
   remove_default_node_pool = true
-
-  logging_service    = "none"
-  monitoring_service = "none"
+  deletion_protection      = false
+  logging_service          = "none"
+  monitoring_service       = "none"
 }
 
 resource "google_container_node_pool" "primary_nodes" {
   name       = "dev-node-pool"
   cluster    = google_container_cluster.primary.name
-  location   = var.zone
+  location   = var.region
   node_count = 1
 
   autoscaling {
