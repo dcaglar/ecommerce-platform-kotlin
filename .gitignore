@@ -43,3 +43,4 @@
 # Keycloak client secrets and access tokens
 keycloak/secrets.txt
 keycloak/access.token
+/local-dir/
