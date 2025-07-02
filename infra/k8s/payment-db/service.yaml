@@ -4,7 +4,10 @@ metadata:
   name: payment-db
   namespace: payment
 spec:
+  type: LoadBalancer
   ports:
     - port: 5432
+      targetPort: 5432
+      protocol: TCP
   selector:
     app: payment-db
