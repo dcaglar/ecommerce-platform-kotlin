@@ -12,7 +12,8 @@
         <result property="sellerId" column="seller_id"/>
         <result property="amountValue" column="amount_value"/>
         <result property="amountCurrency" column="amount_currency"/>
-        <result property="status" column="status"/>
+        <result property="status" column="status"
+                typeHandler="com.dogancaglar.infrastructure.persistence.typehandler.PaymentOrderStatusTypeHandler"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
         <result property="retryCount" column="retry_count"/>
@@ -21,7 +22,9 @@
     </resultMap>
 
     <select id="findByPaymentId" resultMap="PaymentOrderResultMap">
-        SELECT * FROM payment_orders WHERE payment_id = #{paymentId}
+        SELECT payment_order_id, public_payment_order_id, payment_id, public_payment_id, seller_id, amount_value,
+        amount_currency, status, created_at, updated_at, retry_count, retry_reason, last_error_message FROM
+        payment_orders WHERE payment_id = #{paymentId}
     </select>
 
     <select id="countByPaymentId" resultType="long">

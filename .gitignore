@@ -44,3 +44,10 @@
 keycloak/secrets.txt
 keycloak/access.token
 /local-dir/
+
+# Ignore generated payment config scripts and configmaps
+infra/k8s/payment/configmap/payment-service-configmap.yaml
+/infra/k8s/overlays/gke/secrets/
+/infra/k8s/overlays/local/dex-auth/secrets/
+/mygcp-appendonly-command/
+/infra/scripts/kubernetes/secrets/

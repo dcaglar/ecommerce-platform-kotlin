@@ -1,0 +1,4 @@
+resources:
+  - payment-db-statefulset.yaml
+  - payment-db-service.yaml
+  - payment-pg-pvc.yaml

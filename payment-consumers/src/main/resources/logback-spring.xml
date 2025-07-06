@@ -4,43 +4,24 @@
     <!-- Common timestamp-based naming for the file appender -->
     <timestamp key="date" datePattern="yyyy-MM-dd"/>
 
-    <!-- ===================================== -->
-    <!--       LOCAL PROFILE (developer)      -->
-    <!-- ===================================== -->
-    <springProfile name="local">
-        <!-- Rolling file: logs/app-local-<date>.<index>.log.gz -->
-        <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-            <file>logs/app-local.log</file>
-            <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-                <!-- e.g. logs/app-local-2025-06-07.0.log.gz -->
-                <fileNamePattern>logs/app-local-${date}.%i.log.gz</fileNamePattern>
-                <maxFileSize>10MB</maxFileSize>
-                <maxHistory>30</maxHistory>
-            </rollingPolicy>
-            <encoder>
-                <pattern>[%d{ISO8601}] %-5level [%thread] %logger{36} - %msg%n</pattern>
-            </encoder>
-        </appender>
+    <!-- Console (colorized if your terminal supports it) -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%cyan([%d{HH:mm:ss.SSS}]) %highlight(%-5level) [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
 
-        <!-- Console (colorized if your terminal supports it) -->
-        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-            <encoder>
-                <pattern>%cyan([%d{HH:mm:ss.SSS}]) %highlight(%-5level) [%thread] %logger{36} - %msg%n</pattern>
-            </encoder>
-        </appender>
-
-        <!-- Root logger at DEBUG for local dev -->
-        <root level="DEBUG">
-            <appender-ref ref="FILE"/>
-            <appender-ref ref="STDOUT"/>
-        </root>
-    </springProfile>
+    <!-- Root logger at DEBUG for local dev -->
+    <root level="DEBUG">
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="STDOUT"/>
+    </root>
 
 
     <!-- ===================================== -->
     <!--       DOCKER PROFILE (production)    -->
     <!-- ===================================== -->
-    <springProfile name="docker">
+    <springProfile name="local">
         <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
             <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
                 <providers>
@@ -56,7 +37,7 @@
                     <mdc includes="traceId,eventId,parentEventId,aggregateId,eventType,
                retryCount,retryBackoffMillis,retryReason,retryErrorMessage"/>
                     <stackTrace/>
-                    <globalCustomFields>{"service":"payment-consumers"}</globalCustomFields>
+                    <globalCustomFields>{"service":"payment-service"}</globalCustomFields>
                 </providers>
             </encoder>
         </appender>
@@ -67,12 +48,13 @@
         </root>
     </springProfile>
 
-
+    <!-- ===================================== -->
+    <!--    KUBERNETES PROFILE (production)   -->
+    <!-- ===================================== -->
     <springProfile name="kubernetes">
         <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
             <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
                 <providers>
-                    <!-- @timestamp is Elasticsearch’s standard field name -->
                     <timestamp>
                         <fieldName>@timestamp</fieldName>
                     </timestamp>
@@ -80,16 +62,12 @@
                     <threadName/>
                     <loggerName/>
                     <message/>
-                    <!-- Export your MDC keys (e.g. traceId, userId) up to top level -->
-                    <mdc includes="traceId,eventId,parentEventId,aggregateId,eventType,
-               retryCount,retryBackoffMillis,retryReason,retryErrorMessage"/>
+                    <mdc includes="traceId,eventId,parentEventId,aggregateId,eventType,retryCount,retryBackoffMillis,retryReason,retryErrorMessage"/>
                     <stackTrace/>
-                    <globalCustomFields>{"service":"payment-consumers"}</globalCustomFields>
+                    <globalCustomFields>{"service":"payment-consumer"}</globalCustomFields>
                 </providers>
             </encoder>
         </appender>
-
-        <!-- Root logger at INFO for containers -->
         <root level="INFO">
             <appender-ref ref="JSON"/>
         </root>

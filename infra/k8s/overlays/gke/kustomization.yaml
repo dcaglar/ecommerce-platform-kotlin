@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Reference base group kustomizations
+  - ../../base/ingress
+  - ../../base/keycloak
+  - ../../base/messaging
+  - ../../base/monitoring
+  - ../../base/observability
+  - ../../base/payment-db
+  - ../../base/payment-service
+  - ../../base/payment-consumers
+
+  # ...any other groups
+
+  # Reference all secrets/configs that are generated for this env
+  - secrets/keycloak-db-credentials.yaml
+  - secrets/payment-db-credentials.yaml
+  - secrets/kafka-credentials.yaml
+  # ...other environment-specific resources
+
+namespace: default  # Or use 'platform' or whatever your global namespace is (or omit for multi-namespace setups)

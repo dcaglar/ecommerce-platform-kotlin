@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: payment-db
+spec:
+  serviceName: payment-db-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-db
+  template:
+    metadata:
+      labels:
+        app: payment-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: payment-db-credentials
+          env:
+            - name: POSTGRES_MAX_CONNECTIONS
+              value: "200"
+          args:
+            - "-c"
+            - "shared_preload_libraries=pg_stat_statements"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: payment-pg-pvc

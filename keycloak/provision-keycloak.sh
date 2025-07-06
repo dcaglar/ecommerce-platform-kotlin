@@ -1,26 +1,31 @@
-#!/bin/sh
-set -e -f -x
+#!/opt/homebrew/bin/bash
 
-KEYCLOAK_URL="http://keycloak:8080"
+set -euo pipefail
+
+# --- Configurable Vars ---
+KEYCLOAK_URL="http://127.0.0.1:63158"
 REALM="ecommerce-platform"
 ADMIN_USER="admin"
 ADMIN_PASS="admin"
+OUTPUT_DIR="$(dirname "$0")/output"
+
+mkdir -p "$OUTPUT_DIR"
 
 log() { echo "[$(date +'%H:%M:%S')] $*" >&2; }
 
-log "⏳ Waiting for Keycloak to be ready..."
-READY=0
+# --- Wait for Keycloak to be Ready ---
+log "⏳ Waiting for Keycloak to be ready at $KEYCLOAK_URL..."
 for i in $(seq 1 30); do
   if curl -s "$KEYCLOAK_URL/health/ready" | grep -q UP; then
     log "✅ Keycloak is ready!"
-    READY=1
     break
   fi
-  log "Keycloak is not ready yet, waiting... ($i/30)"
+  log "Keycloak not ready yet, waiting ($i/30)..."
   sleep 2
 done
 
-log "🔐 Getting admin token..."
+# --- Authenticate as Admin ---
+log "🔐 Authenticating as admin..."
 KC_TOKEN=$(curl -s \
   -d "client_id=admin-cli" \
   -d "username=$ADMIN_USER" \
@@ -29,122 +34,103 @@ KC_TOKEN=$(curl -s \
   "$KEYCLOAK_URL/realms/master/protocol/openid-connect/token" \
   | jq -r .access_token)
 
-if [ -z "$KC_TOKEN" ] || [ "$KC_TOKEN" = "null" ]; then
+if [[ -z "$KC_TOKEN" || "$KC_TOKEN" == "null" ]]; then
   log "❌ Failed to get admin token. Exiting."
   exit 1
 fi
 
-log "🛠️ Creating realm (if not exists)..."
+# --- Create Realm ---
+log "🛠️ Ensuring realm '$REALM' exists..."
 curl -sf -X POST "$KEYCLOAK_URL/admin/realms" \
   -H "Authorization: Bearer $KC_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"realm":"'"$REALM"'","enabled":true}' || log "ℹ️  Realm may already exist"
+  -d '{"realm":"'"$REALM"'","enabled":true}' || log "ℹ️ Realm may already exist"
 
-log "🛠️ Creating 'payment:write' role (if not exists)..."
+# --- Create Role ---
+ROLE_NAME="payment:write"
+log "🛠️ Ensuring role '$ROLE_NAME' exists..."
 curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/roles" \
   -H "Authorization: Bearer $KC_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name": "payment:write"}' || log "ℹ️  Role payment:write may already exist"
+  -d '{"name":"'"$ROLE_NAME"'"}' || log "ℹ️ Role may already exist"
 
+# --- Functions for Client Management ---
 get_client_id() {
-  CLIENT_ID=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/clients?clientId=$1" \
-    -H "Authorization: Bearer $KC_TOKEN" | jq -r '.[0].id')
-  echo "$CLIENT_ID"
+  local name="$1"
+  curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/clients?clientId=$name" \
+    -H "Authorization: Bearer $KC_TOKEN" | jq -r '.[0].id'
 }
 
 create_client() {
-  NAME="$1"
-  log "🛠️ Creating client '$NAME' (if not exists)..."
-  # Try to create the client, ignore errors
+  local name="$1"
+  log "🛠️ Ensuring client '$name' exists..."
   curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/clients" \
     -H "Authorization: Bearer $KC_TOKEN" \
     -H "Content-Type: application/json" \
-    -d '{"clientId":"'"$NAME"'","enabled":true,"protocol":"openid-connect","publicClient":false,"serviceAccountsEnabled":true,"directAccessGrantsEnabled":false}' \
+    -d '{"clientId":"'"$name"'","enabled":true,"protocol":"openid-connect","publicClient":false,"serviceAccountsEnabled":true,"directAccessGrantsEnabled":false}' \
     || true
-
-  # Always fetch the client ID after attempting to create
-  CLIENT_ID=$(get_client_id "$NAME")
-
-  # Ensure client is confidential (publicClient: false)
-  curl -sf -X PUT "$KEYCLOAK_URL/admin/realms/$REALM/clients/$CLIENT_ID" \
-    -H "Authorization: Bearer $KC_TOKEN" \
-    -H "Content-Type: application/json" \
-    -d '{"publicClient": false, "serviceAccountsEnabled": true, "directAccessGrantsEnabled": false, "attributes": {"access.token.lifespan": "2592000"}}' || true
-  if [ -z "$CLIENT_ID" ] || [ "$CLIENT_ID" = "null" ]; then
-    log "❌ Could not find or create client $NAME. Exiting."
+  local client_id
+  client_id=$(get_client_id "$name")
+  if [[ -z "$client_id" || "$client_id" == "null" ]]; then
+    log "❌ Could not find or create client $name. Exiting."
     exit 2
   fi
-  echo "$CLIENT_ID"
+  # Set client to confidential and set long token lifespan
+  curl -sf -X PUT "$KEYCLOAK_URL/admin/realms/$REALM/clients/$client_id" \
+    -H "Authorization: Bearer $KC_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"publicClient":false,"serviceAccountsEnabled":true,"directAccessGrantsEnabled":false,"attributes":{"access.token.lifespan":"2592000"}}' || true
+  echo "$client_id"
 }
 
 get_client_secret() {
-  # Not all clients have a secret; must be confidential
-  CLIENT_ID="$1"
-  SECRET=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/clients/$CLIENT_ID/client-secret" \
-    -H "Authorization: Bearer $KC_TOKEN" | jq -r .value)
-  if [ -z "$SECRET" ] || [ "$SECRET" = "null" ]; then
-    log "❗ Could not retrieve secret for client id $CLIENT_ID"
-    SECRET="(not set or client not confidential)"
-  fi
-  echo "$SECRET"
+  local client_id="$1"
+  curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/clients/$client_id/client-secret" \
+    -H "Authorization: Bearer $KC_TOKEN" | jq -r .value
 }
 
-assign_realm_role_to_service_account() {
-  CLIENT_ID="$1"
-  ROLE_NAME="$2"
+assign_role_to_service_account() {
+  local client_id="$1"
+  local role_name="$2"
   # Get service account user id
-  SERVICE_ACCOUNT_ID=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/clients/$CLIENT_ID/service-account-user" \
+  local sa_id
+  sa_id=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/clients/$client_id/service-account-user" \
     -H "Authorization: Bearer $KC_TOKEN" | jq -r .id)
-  if [ -z "$SERVICE_ACCOUNT_ID" ] || [ "$SERVICE_ACCOUNT_ID" = "null" ]; then
-    log "❗ Service account user for client $CLIENT_ID not found."
+  if [[ -z "$sa_id" || "$sa_id" == "null" ]]; then
+    log "❗ Service account user for client $client_id not found."
     return 1
   fi
-  # Get role id
-  ROLE=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/roles/$ROLE_NAME" \
+  # Get role as object
+  local role_obj
+  role_obj=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/roles/$role_name" \
     -H "Authorization: Bearer $KC_TOKEN")
-  if [ -z "$ROLE" ] || [ "$ROLE" = "null" ]; then
-    log "❗ Role $ROLE_NAME not found."
+  if [[ -z "$role_obj" || "$role_obj" == "null" ]]; then
+    log "❗ Role $role_name not found."
     return 1
   fi
   # Assign role
-  curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/users/$SERVICE_ACCOUNT_ID/role-mappings/realm" \
+  curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/users/$sa_id/role-mappings/realm" \
     -H "Authorization: Bearer $KC_TOKEN" \
     -H "Content-Type: application/json" \
-    -d "[$ROLE]" || log "ℹ️  Role $ROLE_NAME may already be assigned to $CLIENT_ID"
-  log "✅ Role $ROLE_NAME assigned to service-account-$CLIENT_ID"
+    -d "[$role_obj]" || log "ℹ️ Role $role_name may already be assigned"
+  log "✅ Role $role_name assigned to service-account-$client_id"
 }
 
+# --- Provision Clients & Roles ---
+declare -A CLIENTS=(
+  [order-service]="ORDER_SERVICE_CLIENT_SECRET"
+  [payment-service]="PAYMENT_SERVICE_CLIENT_SECRET"
+)
 
-ORDER_CLIENT_ID=$(create_client "order-service")
-PAYMENT_CLIENT_ID=$(create_client "payment-service")
-
-# Assign payment:write role to payment-service service account
-assign_realm_role_to_service_account "$PAYMENT_CLIENT_ID" "payment:write"
-
-ORDER_SECRET=$(get_client_secret "$ORDER_CLIENT_ID")
-PAYMENT_SECRET=$(get_client_secret "$PAYMENT_CLIENT_ID")
-
-log "🔑 order-service secret:    $ORDER_SECRET"
-log "🔑 payment-service secret:  $PAYMENT_SECRET"
-
-# Write secrets to a file for developer onboarding
-echo "ORDER_SERVICE_CLIENT_SECRET=$ORDER_SECRET" > /output/secrets.txt
-echo "PAYMENT_SERVICE_CLIENT_SECRET=$PAYMENT_SECRET" >> /output/secrets.txt
-log "🔒 Client secrets written to /output/secrets.txt (on host: keycloak/secrets.txt)"
-
-for CLIENT in order-service payment-service; do
-  log "🧑‍💻 Assigning 'payment:write' role to $CLIENT service account..."
-  SERVICE_ACCOUNT_ID=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/users?username=service-account-$CLIENT" \
-    -H "Authorization: Bearer $KC_TOKEN" | jq -r '.[0].id')
-  if [ -z "$SERVICE_ACCOUNT_ID" ] || [ "$SERVICE_ACCOUNT_ID" = "null" ]; then
-    log "❗ Service account user for $CLIENT not found."
-    continue
-  fi
-  curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/users/$SERVICE_ACCOUNT_ID/role-mappings/realm" \
-    -H "Authorization: Bearer $KC_TOKEN" \
-    -H "Content-Type: application/json" \
-    -d '[{"name": "payment:write"}]' || log "ℹ️  Role may already be assigned to $CLIENT"
-  log "✅ Role payment:write assigned to service-account-$CLIENT"
+SECRETS_OUT="$OUTPUT_DIR/secrets.txt"
+echo -n > "$SECRETS_OUT"
+for client in "${!CLIENTS[@]}"; do
+  client_id=$(create_client "$client")
+  secret=$(get_client_secret "$client_id")
+  log "🔑 $client secret: $secret"
+  assign_role_to_service_account "$client_id" "$ROLE_NAME"
+  echo "${CLIENTS[$client]}=$secret" >> "$SECRETS_OUT"
 done
 
+log "🔒 Client secrets written to $SECRETS_OUT"
 log "🎉 Keycloak provisioning complete!"
