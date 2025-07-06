@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../../base/messaging
+
+
+# Only ConfigMap, no secrets needed for Redis (unless you want auth/password)
+# If you want to add a ConfigMap for redis.conf, do:
+configMapGenerator:
+  - name: redis-config
+    files:
+      - redis.conf=secrets/redis.conf

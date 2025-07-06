@@ -15,9 +15,6 @@ class OutboxBufferAdapter(
         outboxEventMapper.findByStatus(status)
             .map { entity: OutboxEventEntity -> OutboxEventEntityMapper.toDomain(entity) }
 
-    override fun findByStatusWithLimit(status: String, limit: Int): List<OutboxEvent> =
-        outboxEventMapper.findByStatusWithLimit(status, limit)
-            .map { entity: OutboxEventEntity -> OutboxEventEntityMapper.toDomain(entity) }
 
     override fun saveAll(events: List<OutboxEvent>): List<OutboxEvent> {
         val entities: List<OutboxEventEntity> = events.map { event -> OutboxEventEntityMapper.toEntity(event) }
@@ -40,6 +37,4 @@ class OutboxBufferAdapter(
         outboxEventMapper.findBatchForDispatch(batchSize)
             .map { entity: OutboxEventEntity -> OutboxEventEntityMapper.toDomain(entity) }
 
-    override fun deleteByStatus(status: String): Int =
-        outboxEventMapper.deleteByStatus(status)
 }

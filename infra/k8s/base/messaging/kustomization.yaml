@@ -1,0 +1,4 @@
+resources:
+  - redis-deployment.yaml
+  - redis-service.yaml
+  - redis-pvc.yaml

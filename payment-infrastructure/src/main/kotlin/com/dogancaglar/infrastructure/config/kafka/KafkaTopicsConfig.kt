@@ -1,4 +1,4 @@
-package com.dogancaglar.infrastructure
+package com.dogancaglar.infrastructure.config.kafka
 
 import com.dogancaglar.common.event.TOPICS
 import org.apache.kafka.clients.admin.NewTopic

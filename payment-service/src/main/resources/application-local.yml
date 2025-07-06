@@ -2,23 +2,61 @@ server:
   port: 8080
 spring:
   kafka:
-    bootstrap-servers: localhost:29092
+    properties:
+      session:
+        timeout:
+          ms: 45000
+      sasl:
+        mechanism: PLAIN
+        jaas:
+          config: ${SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG} # This will be injected from a Kubernetes Secret
+      client:
+        id: ccloud-springboot-client-f556835c-00a8-47cc-86e7-db5386c816d4
+      security:
+        protocol: SASL_SSL
+    bootstrap-servers: pkc-ewzgj.europe-west4.gcp.confluent.cloud:9092
   datasource:
-    url: jdbc:postgresql://localhost:5434/payment
+    url: ${SPRING_DATASOURCE_URL}
     username: payment
-    password: payment
+    password: ${SPRING_DATASOURCE_PASSWORD} # This will be injected from a Kubernetes Secret
   data:
     redis:
-      url: redis://localhost:6379
+      url: redis://redis:6379
       timeout: 2000ms
       lettuce:
         pool:
           max-active: 8
           max-idle: 8
           min-idle: 0
-          max-wait: -1mss
+          max-wait: -1ms
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8082/realms/ecommerce-platform
+          issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}
+kafka:
+  topics:
+    payment_order_created_topic:
+      partitions: 16
+      replicas: 3
+    payment_order_created_topic_dlq:
+      partitions: 16
+      replicas: 3
+    payment_order_retry_request_topic:
+      partitions: 16
+      replicas: 3
+    payment_order_retry_request_topic_dlq:
+      partitions: 16
+      replicas: 3
+    payment_status_check_scheduler_topic:
+      partitions: 16
+      replicas: 3
+    payment_status_check_scheduler_topic_dlq:
+      partitions: 16
+      replicas: 3
+    payment_order_succeded_topic:
+      partitions: 16
+      replicas: 3
+    payment_order_succeded_topic_dlq:
+      partitions: 16
+      replicas: 3

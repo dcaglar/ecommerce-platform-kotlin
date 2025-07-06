@@ -12,6 +12,41 @@ class OutboxEventEntity(
     var status: String = "NEW",
     val createdAt: LocalDateTime = LocalDateTime.now(UTC)
 ) {
+    constructor(
+        eventId: UUID?,
+        eventType: String,
+        aggregateId: String,
+        payload: String,
+        status: String,
+        createdAt: java.sql.Timestamp
+    ) : this(
+        eventId,
+        eventType,
+        aggregateId,
+        payload,
+        status,
+        createdAt.toInstant().atOffset(UTC).toLocalDateTime()
+    )
+
+    constructor(
+        eventId: String?,
+        eventType: String,
+        aggregateId: String,
+        payload: String,
+        status: String,
+        createdAt: java.sql.Timestamp
+    ) : this(
+        eventId?.let { UUID.fromString(it) },
+        eventType,
+        aggregateId,
+        payload,
+        status,
+        createdAt.toInstant().atOffset(UTC).toLocalDateTime()
+    )
+
+    /*
+    java.util.UUID, java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.sql.Timestamp
+     */
     fun markAsSent() {
         this.status = "SENT"
     }
