@@ -24,16 +24,6 @@ const KEYCLOAK_URL = 'http://localhost:8082';
 const REALM = 'ecommerce-platform';
 const CLIENT_ID = 'payment-service';
 
-// --- Read and sanitize secret from file ---
-const secretsFile = open('../keycloak/secrets.txt');
-// Remove \r and \n for maximum cross-OS safety
-const PAYMENT_SERVICE_CLIENT_SECRET = secretsFile.match(/PAYMENT_SERVICE_CLIENT_SECRET=(.*)/)[1].replace(/[\r\n]+$/, '');
-
-if (!PAYMENT_SERVICE_CLIENT_SECRET) {
-    console.error("Client secret is empty! Please check secrets.txt");
-    throw new Error("Missing client secret");
-}
-
 // --- Get token (client_credentials) ---
 const ACCESS_TOKEN = open('../keycloak/access.token').replace(/[\r\n]+$/, '');
 

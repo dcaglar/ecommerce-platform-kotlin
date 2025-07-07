@@ -51,3 +51,10 @@ infra/k8s/payment/configmap/payment-service-configmap.yaml
 /infra/k8s/overlays/local/dex-auth/secrets/
 /mygcp-appendonly-command/
 /infra/scripts/kubernetes/secrets/
+/infra/k8s/overlays/local/payment-service/secrets/
+/infra/k8s/overlays/local/payment-db/secrets/
+/infra/k8s/overlays/local/payment-consumers/secrets/
+/infra/k8s/overlays/local/observability/secrets/
+/infra/k8s/overlays/local/monitoring/secrets/
+/infra/k8s/overlays/local/messaging/secrets/
+/infra/k8s/overlays/local/keycloak/secrets/

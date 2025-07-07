@@ -233,7 +233,7 @@ services:
     image: docker.elastic.co/beats/filebeat:8.13.4
     container_name: filebeat
     labels:
-      service: filebeat
+      service: filebeats
       environment: local
     user: root
     volumes:

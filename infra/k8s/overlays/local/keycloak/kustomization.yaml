@@ -5,3 +5,8 @@ resources:
 
 generatorOptions:
   disableNameSuffixHash: true
+
+secretGenerator:
+  - name: keycloak-db-credentials
+    envs:
+      - secrets/keycloak-db-credentials.env

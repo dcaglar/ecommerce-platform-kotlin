@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # --- Configurable Vars ---
-KEYCLOAK_URL="http://127.0.0.1:63158"
+KEYCLOAK_URL="http://keycloak:8080"
 REALM="ecommerce-platform"
 ADMIN_USER="admin"
 ADMIN_PASS="admin"

@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: filebeat
+spec:
+  selector:
+    matchLabels:
+      app: filebeat
+  template:
+    metadata:
+      labels:
+        app: filebeat
+    spec:
+      serviceAccountName: filebeat
+      containers:
+        - name: filebeat
+          image: docker.elastic.co/beats/filebeat:8.13.4
+          args: [
+            "-c", "/usr/share/filebeat/filebeat.yml",
+            "--strict.perms=false"
+          ]
+          securityContext:
+            runAsUser: 0
+          env:
+            - name: ELASTICSEARCH_HOSTS
+              value: "http://elasticsearch-client:9200"
+            - name: KIBANA_HOST
+              value: "http://kibana:5601"
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - |
+                  curl -fs http://elasticsearch-client:9200 >/dev/null || exit 1
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 8
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 512Mi
+          volumeMounts:
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: filebeat-config
+              mountPath: /usr/share/filebeat/filebeat.yml
+              subPath: filebeat.yml
+            - name: data
+              mountPath: /usr/share/filebeat/data
+            - name: dockerlog
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+      volumes:
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: filebeat-config
+          configMap:
+            name: filebeat-config
+        - name: data
+          hostPath:
+            path: /var/lib/filebeat-data
+            type: DirectoryOrCreate
+        - name: dockerlog
+          hostPath:
+            path: /var/lib/docker/containers
