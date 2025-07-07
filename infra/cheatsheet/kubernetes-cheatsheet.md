@@ -71,13 +71,15 @@ kubectl scale deployment <deployment-name> --replicas=<num> -n <namespace>
 ## Troubleshooting
 
 ```sh
+
+
 # Get pod details
 kubectl describe pod <pod-name> -n <namespace>
 
 # Get logs
 kubectl logs <pod-name> -n <namespace>
 
-# Exec into a pod
+kubectl exec -it -n payment filebeat-sbnm4  -- bash
 kubectl exec -it <pod-name> -n <namespace> -- /bin/sh
 
 # Get resource usage (if metrics-server is installed)

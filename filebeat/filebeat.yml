@@ -17,12 +17,12 @@ output.elasticsearch:
 
 setup.template.name: "ecommerce-logs"
 setup.template.pattern: "ecommerce-logs-*"
-setup.ilm.enabled: false
-setup.dashboards.enabled: false
+setup.ilm.enabled: true
+setup.dashboards.enabled: true
 setup.template.enabled: true
 
 setup.kibana:
   host: "http://kibana:5601"
 
 logging.level: info
-monitoring.enabled: true
+monitoring.enabled: false

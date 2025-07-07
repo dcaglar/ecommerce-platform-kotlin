@@ -2,25 +2,30 @@
 
 set -e
 
-# Usage: k8s-delete-apps.sh <overlay> <namespace>
+# --- Location awareness ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$SCRIPT_DIR/../../.."
+cd "$REPO_ROOT"
 
-OVERLAY=$1
-NS=$2
+ENV=${1:-local}
+COMPONENT=${2:-all}
+NS=${3:-payment}
 
-if [ -z "$OVERLAY" ] || [ -z "$NS" ]; then
-  echo "Usage: $0 <overlay> <namespace>"
-  exit 1
+OVERLAY="$REPO_ROOT/infra/k8s/overlays/$ENV/$COMPONENT"
+
+if [ ! -d "$OVERLAY" ]; then
+  echo "❌ Overlay path does not exist: $OVERLAY"
+  exit 2
 fi
 
 # Optional: Delete any overlay secrets yaml files
 if [ -d "$OVERLAY/secrets" ]; then
   for s in "$OVERLAY"/secrets/*.yaml; do
-    [ -f "$s" ] && echo "🗑️  Deleting secret: $s" && kubectl delete -f "$s" -n "$NS" || true
+    [ -f "$s" ] && echo "🗑️  Deleting secret: $s" && kubectl delete -f "$s" -n "$NS" --ignore-not-found || true
   done
 fi
 
-kubectl delete -k "$OVERLAY" -n "$NS" || true
+kubectl delete -k "$OVERLAY" -n "$NS" --ignore-not-found || true
 
 echo ""
 echo "🗑️  Deleted: $OVERLAY from namespace $NS"
-

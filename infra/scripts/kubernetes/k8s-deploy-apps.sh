@@ -8,7 +8,7 @@ cd "$REPO_ROOT"
 
 ENV=${1:-local}
 COMPONENT=${2:-all}
-NS=${3:-default}
+NS=${3:-payment}
 
 OVERLAY="$REPO_ROOT/infra/k8s/overlays/$ENV/$COMPONENT"
 

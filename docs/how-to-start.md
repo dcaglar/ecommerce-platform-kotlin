@@ -13,12 +13,12 @@ cd ecommerce-platform-kotlin
 
 ---
 
-## 2️⃣ Start Infrastructure
+## 2️⃣ Start Local Kubernetes Cluster
 
-Spin up all dependencies (Keycloak, Kafka, Redis, Postgres, etc.):
+Spin up all dependencies (Keycloak, Kafka, Redis, Postgres and payment-service , payment-consumer etc.):
 
 ```bash
-./scripts/infra-up.sh
+ k8s-deploy-apps.sh local all payment
 ```
 
 ---
@@ -35,41 +35,35 @@ Spin up all dependencies (Keycloak, Kafka, Redis, Postgres, etc.):
 
 **Option 1: Port-forward Keycloak and generate token locally**
 
-1. Port-forward Keycloak:
+1. Start all app and infra services:
+   ```bash
+      `infra/scripts/kubernetes`/k8s-deploy-apps.sh local all payment
+   ```
+
+
+2. Port-forward Keycloak so that you can access it locally
    ```bash
    kubectl port-forward svc/keycloak 8080:8080 -n payment
+   kubectl port-forward svc/keycloak 8081:8080 -n payment
    ```
-2. In a new terminal, set the Keycloak URL in your token script:
+3. Add the keycloak and payment.local entries to your `/etc/hosts` file via following script
    ```bash
-   export KC_URL="http://localhost:8080"
-   ./keycloak/get-token.sh
+    infra/scripts/kubernetes/add-local-domains.sh 
    ```
-   The token will be saved to: `keycloak/access.token`
-
-**Option 2: Generate token from inside the cluster**
-
-1. Start a debug pod:
+4. In a new terminal,run 1st commmand for creation of realms, roles, clients, and their configurations,
+   and second one to generate oauth access token for the payment service client
+   so that you can generate a token for the payment service to authenticate your requests:
    ```bash
-   kubectl run -it --rm --restart=Never debug --image=alpine --namespace=payment -- sh
-   apk add --no-cache curl bash jq
-   # Copy get-token.sh and secrets.txt into the pod, then run:
-   export KC_URL="http://keycloak:8080"
-   bash /get-token.sh
+    keycloak/provision-keycloak.sh 
+    keycloak get_token.sh
    ```
-2. Copy the generated token to your local machine if needed.
 
----
+The token will be saved to: `keycloak/access.token`
 
-## 5️⃣ Test the Payment API
-
-Use the token from above for a sample request:
-
-> **Note:** Make sure you have run `sudo minikube tunnel` in a separate terminal and
-> added  `127.0.0.1 payment.local` `127.0.0.1 keyclock`
-> your `/etc/hosts` file.
+5. Test the Payment API
 
 ```bash
-curl -i -X POST http://payment.local/payments \
+curl -i -X POST http://localhost:8081/payments \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/access.token)" \
   -d '{
@@ -82,7 +76,8 @@ curl -i -X POST http://payment.local/payments \
       { "sellerId": "SELLER-003", "amount": { "value": 120.00, "currency": "EUR" }}
     ]
   }'
-```
+  
+  ```
 
 ---
 
@@ -110,6 +105,6 @@ k6 run load-tests/baseline-smoke-test.js
 
 - **No manual Keycloak setup required** (realm, client, roles provisioned automatically).
 - Tokens/secrets are handled by scripts in `keycloak/`.
-- If you change configs, re-run `infra-up.sh` and `get-token.sh`.
+- If you change keycloak configs, re-run `deploy-apps.sh local keyclok payment` to apply changes.
 - For load testing, always generate tokens using the same Keycloak URL as your payment-service expects (see above for
   port-forwarding).

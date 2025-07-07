@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: filebeat-config
+  labels:
+    app: filebeat
+data:
+  filebeat.yml: |-
+    filebeat.inputs:
+      - type: filestream
+        id: payment-logs
+        ignore_older: 24h
+        paths:
+          - /var/log/containers/*payment-service*.log
+          - /var/log/containers/*payment-db*.log
+        prospector.scanner.symlinks: true
+        parsers:
+          - container: ~          # split CRI log line into fields
+        processors:
+          - add_kubernetes_metadata: ~
+          - decode_json_fields:
+              fields: [ "log", "message" ]  # Try both fields for compatibility
+              target: ""
+              overwrite_keys: true
+              max_depth: 1
+              process_array: false
+    queue.mem:
+      events: 4096
+      flush.min_events: 512
+    setup.ilm.enabled: false               # disable ILM so custom index works
+    setup.template.enabled: true           # leave these three as-is
+    setup.template.name: "ecommerce-logs"
+    setup.template.pattern: "ecommerce-logs-*"
+
+    output.elasticsearch:
+      hosts: ["http://elasticsearch-client:9200"]
+      index: "ecommerce-logs-%{+yyyy.MM.dd}"
+      bulk_max_size: 2048
