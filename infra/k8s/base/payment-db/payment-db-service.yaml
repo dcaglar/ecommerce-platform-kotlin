@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-db
+spec:
+  type: ClusterIP
+  selector:
+    app: payment-db
+  ports:
+    - port: 5432
+      targetPort: 5432
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-db-headless
+spec:
+  clusterIP: None
+  selector:
+    app: payment-db
+  ports:
+    - port: 5432
+      targetPort: 5432

@@ -14,10 +14,10 @@ fi
 
 SERVICE_DIR="$(dirname "$0")/../../../payment-service"
 REPO_ROOT="$(dirname "$0")/../../.."
+
 cd "$SERVICE_DIR"
-
-
 cd "$REPO_ROOT"
+
 # Build Docker image from root, specifying Dockerfile in payment-service
 docker build -f payment-service/Dockerfile -t "$DOCKERHUB_USER/payment-service:$TAG" .
 

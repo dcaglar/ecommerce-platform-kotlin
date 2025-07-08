@@ -1,27 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration scan="true">
 
-    <!-- Common timestamp-based naming for the file appender -->
+    <!-- ──────────────────────────────── -->
+    <!-- Shared bits (apply in all envs) -->
+    <!-- ──────────────────────────────── -->
     <timestamp key="date" datePattern="yyyy-MM-dd"/>
+    <!-- DEFAULT ROOT (used when *no* active Spring profile matches below) -->
 
-    <!-- Console (colorized if your terminal supports it) -->
+    <!-- Default root logger and appender for all profiles (fallback) -->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%cyan([%d{HH:mm:ss.SSS}]) %highlight(%-5level) [%thread] %logger{36} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
-
-    <!-- Root logger at DEBUG for local dev -->
-    <root level="DEBUG">
-        <appender-ref ref="FILE"/>
+    <root level="INFO">
         <appender-ref ref="STDOUT"/>
     </root>
 
-
-    <!-- ===================================== -->
-    <!--       DOCKER PROFILE (production)    -->
-    <!-- ===================================== -->
-    <springProfile name="local">
+    <!-- ──────────────────────────────── -->
+    <!--  ►  Container / Kubernetes JSON  -->
+    <!-- ──────────────────────────────── -->
+    <!--  You said you pass  -spring.profiles.active=local  inside k8s,
+          so make the *local* profile output JSON suited for Filebeat.      -->
+    <springProfile name="local,gke">
         <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
             <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
                 <providers>
@@ -37,8 +38,7 @@
                     <mdc includes="traceId,eventId,parentEventId,aggregateId,eventType,
                retryCount,retryBackoffMillis,retryReason,retryErrorMessage"/>
                     <stackTrace/>
-                    <globalCustomFields>{"app":"your-app-name"}</globalCustomFields>
-                    <globalCustomFields>{"service":"payment-service"}</globalCustomFields>
+                    <globalCustomFields>{"app":"payment-consumers"}</globalCustomFields>
                 </providers>
             </encoder>
         </appender>
@@ -49,29 +49,5 @@
         </root>
     </springProfile>
 
-    <!-- ===================================== -->
-    <!--    KUBERNETES PROFILE (production)   -->
-    <!-- ===================================== -->
-    <springProfile name="kubernetes">
-        <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
-            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
-                <providers>
-                    <timestamp>
-                        <fieldName>@timestamp</fieldName>
-                    </timestamp>
-                    <logLevel/>
-                    <threadName/>
-                    <loggerName/>
-                    <message/>
-                    <mdc includes="traceId,eventId,parentEventId,aggregateId,eventType,retryCount,retryBackoffMillis,retryReason,retryErrorMessage"/>
-                    <stackTrace/>
-                    <globalCustomFields>{"service":"payment-consumer"}</globalCustomFields>
-                </providers>
-            </encoder>
-        </appender>
-        <root level="INFO">
-            <appender-ref ref="JSON"/>
-        </root>
-    </springProfile>
 
 </configuration>
