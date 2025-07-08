@@ -1,24 +1,42 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: payment-service
+  name: payment-consumers
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: payment-service
+      app: payment-consumers
   template:
     metadata:
       labels:
-        app: payment-service
+        app: payment-consumers
     spec:
+      initContainers:
+        - name: wait-for-payment-service
+          image: curlimages/curl:8.8.0
+          imagePullPolicy: IfNotPresent
+          command: [ "/bin/sh", "-c" ]
+          args:
+            - |
+              until curl -sf http://payment-service:8080/actuator/health | grep -q '"status":"UP"'; do
+                echo "Waiting for payment-service to be healthy...";
+                sleep 3;
+              done
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
       containers:
-        - name: payment-service
-          image: dcaglar1987/payment-service:v1.0.0
+        - name: payment-consumers
+          image: dcaglar1987/payment-consumers:v1.0.0
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8080  # REST API
-            - containerPort: 9010  # JMX
+            - containerPort: 8080
+            - containerPort: 9010
           env:
             - name: JAVA_OPTS
               value: "-JAVA_TOOL_OPTIONS=-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Duser.timezone=UTC"
@@ -27,12 +45,12 @@ spec:
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: payment-db-credentials
+                  name: payment-consumer-app-db-credentials
                   key: POSTGRES_USER
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: payment-db-credentials
+                  name: payment-consumer-app-db-credentials
                   key: POSTGRES_PASSWORD
             - name: SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG
               valueFrom:
@@ -41,11 +59,11 @@ spec:
                   key: KAFKA_JAAS_CONFIG
           envFrom:
             - configMapRef:
-                name: payment-service-config        # Non-secret config values (ConfigMap)
+                name: payment-consumers-config
             - secretRef:
-                name: payment-db-credentials       # DB credentials (Secret)
+                name: payment-consumer-app-db-credentials
             - secretRef:
-                name: kafka-credentials            # Kafka credentials (Secret)
+                name: kafka-credentials
           livenessProbe:
             httpGet:
               path: /actuator/health

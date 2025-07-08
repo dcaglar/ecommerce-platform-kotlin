@@ -6,7 +6,7 @@ resources:
   - ../messaging
   - ../payment-db
   - ../payment-service
-  - ../ingress
+  - ../payment-consumers
   - ../observability
 
 secretGenerator:

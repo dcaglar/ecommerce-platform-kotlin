@@ -1,4 +1,4 @@
-# Kubernetes Cheatsheet
+x# Kubernetes Cheatsheet
 
 ## Basic Commands
 
@@ -78,6 +78,7 @@ kubectl describe pod <pod-name> -n <namespace>
 
 # Get logs
 kubectl logs <pod-name> -n <namespace>
+kubectl logs payment-consumers -n payment
 
 kubectl exec -it -n payment filebeat-sbnm4  -- bash
 kubectl exec -it <pod-name> -n <namespace> -- /bin/sh

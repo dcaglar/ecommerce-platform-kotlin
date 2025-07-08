@@ -1,0 +1,4 @@
+resources:
+  - deployment.yaml
+  - service.yaml
+# Ingress is now managed in the overlay, not in the base.

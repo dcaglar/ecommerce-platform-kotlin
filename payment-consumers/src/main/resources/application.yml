@@ -1,6 +1,7 @@
 server:
   port: 8080
 spring:
+  jpa.open-in-view: false
   kafka:
   # Only the bootstrap-servers should be overridden in profiles
   datasource:
@@ -8,11 +9,9 @@ spring:
   data:
     redis:
     # Only the url should be overridden in profiles
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-        # Only the issuer-uri should be overridden in profiles
+
+mybatis:
+  mapper-locations: classpath*:mapper/*.xml
 management:
   endpoints:
     web:

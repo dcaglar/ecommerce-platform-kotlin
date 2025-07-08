@@ -1,2 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
 resources:
   - ../../../base/payment-consumers
+
+
+configMapGenerator:
+  - name: payment-consumers-config
+    envs:
+      - config/payment-consumers-config.env
+generatorOptions:
+  disableNameSuffixHash: true
+
+
+secretGenerator:
+  - name: payment-consumer-app-db-credentials
+    envs:
+      - secrets/payment-consumer-app-db-credentials.env
+
