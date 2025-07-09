@@ -1,10 +1,12 @@
 package com.dogancaglar.paymentservice.application.exception
 
 import jakarta.servlet.http.HttpServletRequest
+import jakarta.validation.ConstraintViolationException
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -70,6 +72,38 @@ class GlobalExceptionHandler {
             status = HttpStatus.BAD_REQUEST.value(),
             error = "Bad Request",
             message = ex.localizedMessage,
+            path = request.requestURI,
+            traceId = traceId(request)
+        )
+        return ResponseEntity(response, HttpStatus.BAD_REQUEST)
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException::class)
+    fun handleValidationExceptions(
+        ex: MethodArgumentNotValidException,
+        request: HttpServletRequest
+    ): ResponseEntity<ErrorResponse> {
+        val errors = ex.bindingResult.fieldErrors.joinToString(", ") { "${it.field}: ${it.defaultMessage}" }
+        val response = ErrorResponse(
+            status = HttpStatus.BAD_REQUEST.value(),
+            error = "Validation Failed",
+            message = errors,
+            path = request.requestURI,
+            traceId = traceId(request)
+        )
+        return ResponseEntity(response, HttpStatus.BAD_REQUEST)
+    }
+
+    @ExceptionHandler(ConstraintViolationException::class)
+    fun handleConstraintViolation(
+        ex: ConstraintViolationException,
+        request: HttpServletRequest
+    ): ResponseEntity<ErrorResponse> {
+        val errors = ex.constraintViolations.joinToString(", ") { "${it.propertyPath}: ${it.message}" }
+        val response = ErrorResponse(
+            status = HttpStatus.BAD_REQUEST.value(),
+            error = "Validation Failed",
+            message = errors,
             path = request.requestURI,
             traceId = traceId(request)
         )

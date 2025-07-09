@@ -1,7 +1,7 @@
 #!/bin/bash
 # Usage: build-and-push-consumers.sh <dockerhub-username> <tag>
 # Example: ./build-and-push-consumers.sh mydockeruser v1.0.0
-
+# use dckr_pat
 set -e
 
 DOCKERHUB_USER=$1

@@ -1,0 +1,42 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-payment-consumer-user
+spec:
+  template:
+    spec:
+      containers:
+        - name: psql
+          image: postgres:15
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: POSTGRES_USER
+            - name: CONSUMER_USER
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: POSTGRES_CONSUMER_USER
+            - name: CONSUMER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: POSTGRES_CONSUMER_PASSWORD
+          command: [ "/bin/sh" ]
+          args:
+            - -c
+            - |
+              echo "CREATE USER \"${CONSUMER_USER}\" WITH PASSWORD '${CONSUMER_PASSWORD}';
+              GRANT CONNECT ON DATABASE payment TO \"${CONSUMER_USER}\";
+              GRANT USAGE ON SCHEMA public TO \"${CONSUMER_USER}\";
+              GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"${CONSUMER_USER}\";
+              ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO \"${CONSUMER_USER}\";" > /tmp/grant-payment-consumer.sql
+              psql -h payment-db -U $POSTGRES_USER -d payment -f /tmp/grant-payment-consumer.sql
+      restartPolicy: OnFailure

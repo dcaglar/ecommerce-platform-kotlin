@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: payment-service
 spec:
-  replicas: 1
+  replicas: 4
   selector:
     matchLabels:
       app: payment-service
@@ -12,10 +12,20 @@ spec:
       labels:
         app: payment-service
     spec:
+      initContainers:
+        - name: wait-for-payment-db
+          image: postgres:15
+          command: [ 'sh', '-c', 'until pg_isready -h payment-db -p 5432 -U payment; do echo waiting for payment-db; sleep 2; done;' ]
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: POSTGRES_PASSWORD
       containers:
         - name: payment-service
-          image: dcaglar1987/payment-service:v1.0.0
-          imagePullPolicy: IfNotPresent
+          image: dcaglar1987/payment-service:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080  # REST API
             - containerPort: 9010  # JMX
@@ -50,14 +60,14 @@ spec:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            initialDelaySeconds: 60
+            periodSeconds: 20
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 10
+            initialDelaySeconds: 60
+            periodSeconds: 20
           resources:
             requests:
               cpu: "100m"

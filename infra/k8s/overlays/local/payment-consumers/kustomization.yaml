@@ -11,9 +11,3 @@ configMapGenerator:
 generatorOptions:
   disableNameSuffixHash: true
 
-
-secretGenerator:
-  - name: payment-consumer-app-db-credentials
-    envs:
-      - secrets/payment-consumer-app-db-credentials.env
-

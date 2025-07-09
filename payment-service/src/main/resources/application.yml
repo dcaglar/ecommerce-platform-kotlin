@@ -3,11 +3,32 @@ server:
 spring:
   jpa.open-in-view: false
   kafka:
+    properties:
+      session:
+        timeout:
+          ms: 45000
+    producer:
+      value-serializer: com.dogancaglar.infrastructure.config.kafka.serialization.EventEnvelopeSerializer
+      properties: #maybe change partition assignment strategy
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+        spring.deserializer.value.delegate.class: com.dogancaglar.infrastructure.config.kafka.deserialization.EventEnvelopeDeserializer
   # Only the bootstrap-servers should be overridden in profiles
   datasource:
+    hikari:
+      maximum-pool-size: 40
+      minimum-idle: 10
+      connection-timeout: 3000
+      idle-timeout: 600000
+      max-lifetime: 1800000
   # Only the url, username, password should be overridden in profiles
   data:
     redis:
+      lettuce:
+        pool:
+          max-active: 64
+          max-idle: 64
+          min-idle: 8
+          max-wait: 2000ms
     # Only the url should be overridden in profiles
   security:
     oauth2:
@@ -33,11 +54,17 @@ management:
     prometheus:
       enabled: true
   metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
     export:
       prometheus:
         enabled: true
     enable:
-      http: false
+      tomcat: true
+      http: true
       jvm: true
       kafka: true
       hikari: true
@@ -45,3 +72,10 @@ management:
   health:
     probes:
       enabled: true
+outbox-dispatcher:
+  thread-count: 10
+  batch-size: 5000
+  pool-size: 10
+
+spring.jackson.time-zone: UTC
+spring.jpa.properties.hibernate.jdbc.time_zone: UTC

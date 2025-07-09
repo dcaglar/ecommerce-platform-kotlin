@@ -8,6 +8,7 @@ resources:
   - ../payment-service
   - ../payment-consumers
   - ../observability
+  - ../monitoring
 
 secretGenerator:
   - name: kafka-credentials
