@@ -3,9 +3,6 @@ server:
 spring:
   kafka:
     properties:
-      session:
-        timeout:
-          ms: 45000
       sasl:
         mechanism: PLAIN
         jaas:
@@ -17,18 +14,11 @@ spring:
     bootstrap-servers: pkc-ewzgj.europe-west4.gcp.confluent.cloud:9092
   datasource:
     url: ${SPRING_DATASOURCE_URL}
-    username: payment
+    username: ${SPRING_DATASOURCE_USERNAME} # This will be injected from a Kubernetes Secret
     password: ${SPRING_DATASOURCE_PASSWORD} # This will be injected from a Kubernetes Secret
   data:
     redis:
       url: redis://redis:6379
-      timeout: 2000ms
-      lettuce:
-        pool:
-          max-active: 8
-          max-idle: 8
-          min-idle: 0
-          max-wait: -1ms
   security:
     oauth2:
       resourceserver:

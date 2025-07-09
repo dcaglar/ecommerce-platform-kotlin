@@ -41,10 +41,12 @@ Spin up all dependencies (Keycloak, Kafka, Redis, Postgres and payment-service ,
    ```
 
 
-2. Port-forward Keycloak so that you can access it locally
+2. Port-forward Keycloak and or other infra you wnat to access so that you can access it locally
    ```bash
    kubectl port-forward svc/keycloak 8080:8080 -n payment
-   kubectl port-forward svc/keycloak 8081:8080 -n payment
+   kubectl port-forward svc/payment-service 8081:8080 -n payment
+   kubectl port-forward svc/kibana 5601:5601 -n payment
+   kubectl port-forward svc/grafana-service 3000:3000 -n payment
    ```
 3. Add the keycloak and payment.local entries to your `/etc/hosts` file via following script
    ```bash
@@ -86,7 +88,7 @@ curl -i -X POST http://localhost:8081/payments \
 From project root, run:
 
 ```bash
-k6 run load-tests/baseline-smoke-test.js
+RPS=10 DURATION=10m k6 run load-tests/baseline-smoke-test.js
 ```
 
 ---

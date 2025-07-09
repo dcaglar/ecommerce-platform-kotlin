@@ -32,8 +32,8 @@ spec:
               memory: "128Mi"
       containers:
         - name: payment-consumers
-          image: dcaglar1987/payment-consumers:v1.0.0
-          imagePullPolicy: IfNotPresent
+          image: dcaglar1987/payment-consumers:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
             - containerPort: 9010
@@ -45,13 +45,13 @@ spec:
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: payment-consumer-app-db-credentials
-                  key: POSTGRES_USER
+                  name: payment-db-credentials
+                  key: POSTGRES_CONSUMER_USER
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: payment-consumer-app-db-credentials
-                  key: POSTGRES_PASSWORD
+                  name: payment-db-credentials
+                  key: POSTGRES_CONSUMER_PASSWORD
             - name: SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG
               valueFrom:
                 secretKeyRef:
@@ -61,21 +61,21 @@ spec:
             - configMapRef:
                 name: payment-consumers-config
             - secretRef:
-                name: payment-consumer-app-db-credentials
+                name: payment-db-credentials
             - secretRef:
                 name: kafka-credentials
           livenessProbe:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            initialDelaySeconds: 60
+            periodSeconds: 20
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 10
+            initialDelaySeconds: 60
+            periodSeconds: 20
           resources:
             requests:
               cpu: "100m"
