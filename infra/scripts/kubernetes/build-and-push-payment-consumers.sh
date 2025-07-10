@@ -22,16 +22,16 @@ echo
 echo "Logging in to Docker Hub..."
 echo "$DOCKER_TOKEN" | docker login --username "$DOCKERHUB_USER" --password-stdin
 
-SERVICE_DIR="$(dirname "$0")/../../../payment-service"
+SERVICE_DIR="$(dirname "$0")/../../../payment-consumers"
 REPO_ROOT="$(dirname "$0")/../../.."
 cd "$SERVICE_DIR"
 
 
 cd "$REPO_ROOT"
 # Build Docker image from root, specifying Dockerfile in payment-consumers
-docker build -f payment-service/Dockerfile -t "$DOCKERHUB_USER/payment-service:$TAG" .
+docker build -f payment-consumers/Dockerfile -t "$DOCKERHUB_USER/payment-consumers:$TAG" .
 
 echo "Pushing to Docker Hub..."
-docker push "$DOCKERHUB_USER/payment-service:$TAG"
+docker push "$DOCKERHUB_USER/payment-consumers:$TAG"
 
-echo "✅ Build and push complete: $DOCKERHUB_USER/payment-service:$TAG"
+echo "✅ Build and push complete: $DOCKERHUB_USER/payment-consumers:$TAG"
