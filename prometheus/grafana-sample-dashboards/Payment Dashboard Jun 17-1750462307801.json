@@ -21,7 +21,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "12.0.1"
+      "version": "12.0.2"
     },
     {
       "type": "datasource",
@@ -104,7 +104,6 @@
             }
           },
           "mappings": [],
-          "max": 500,
           "min": 0,
           "thresholds": {
             "mode": "absolute",
@@ -145,14 +144,16 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(rate(http_server_requests_seconds_count{uri=\"/payments\"}[2m])) by (method)",
+          "editorMode": "code",
+          "expr": "sum(rate(http_server_requests_seconds_count{uri=\"/payments\", method=\"POST\"}[1m]))",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -243,15 +244,17 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
+          "editorMode": "code",
           "expr": "histogram_quantile(0.50, sum(rate(http_server_requests_seconds_bucket{uri=\"/payments\"}[2m])) by (le))",
           "legendFormat": "p50",
+          "range": true,
           "refId": "A"
         },
         {
@@ -361,7 +364,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -456,7 +459,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -588,16 +591,31 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "(hikaricp_connections_active/hikaricp_connections_max)*100",
-          "legendFormat": "DB Pool Utilization",
+          "editorMode": "code",
+          "expr": "(hikaricp_connections_active{job=\"payment-service\"}/hikaricp_connections_max{job=\"payment-service\"})*100",
+          "legendFormat": "payment-service",
+          "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "(hikaricp_connections_active{job=\"payment-consumers\"}/hikaricp_connections_max{job=\"payment-consumers\"})*100",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "payment-consumers",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "DB Connection Pool Utilization (%)",
@@ -688,16 +706,31 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "hikaricp_connections_pending",
-          "legendFormat": "Pending Connections",
+          "editorMode": "code",
+          "expr": "hikaricp_connections_pending{job=\"payment-service\"}",
+          "legendFormat": "Payment Service",
+          "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "hikaricp_connections_pending{job=\"payment-consumers\"}",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "Payment Consuemrs",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "DB Pool Pending Connections",
@@ -789,7 +822,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -797,10 +830,23 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "hikaricp_connections_acquire_seconds_max*1000",
-          "legendFormat": "Acquire Time (max)",
+          "expr": "hikaricp_connections_acquire_seconds_max{job=\"payment-service\"}*1000",
+          "legendFormat": "payment-service",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "hikaricp_connections_acquire_seconds_max{job=\"payment-consumers\"}*1000",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "\"payment-consumers",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "DB Acquire Time (max seconds)",
@@ -886,16 +932,31 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "max(jvm_gc_pause_seconds_max) * 1000",
-          "legendFormat": "GC Pause (ms)",
+          "editorMode": "code",
+          "expr": "max(jvm_gc_pause_seconds_max{job=\"payment-service\"}) * 1000",
+          "legendFormat": "payment-service",
+          "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max(jvm_gc_pause_seconds_max{job=\"payment-consumers\"}) * 1000",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "payment-consumers",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "GC Pause (max ms)",
@@ -954,7 +1015,7 @@
         "showThresholdMarkers": true,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -1050,7 +1111,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -1122,120 +1183,35 @@
         "showThresholdMarkers": true,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "jvm_threads_live_threads",
-          "legendFormat": "Live Threads",
+          "editorMode": "code",
+          "expr": "jvm_threads_live_threads{job=\"payment-service\"}",
+          "legendFormat": "payment-service",
+          "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_live_threads{job=\"payment-consumers\"}",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "payment-consumers",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "JVM Live Threads",
       "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "dashed+area"
-            }
-          },
-          "mappings": [],
-          "max": 100,
-          "min": 0,
-          "thresholds": {
-            "mode": "percentage",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "yellow",
-                "value": 80
-              },
-              {
-                "color": "red",
-                "value": 90
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 7,
-        "x": 13,
-        "y": 18
-      },
-      "id": 14,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.0.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})/sum(jvm_memory_max_bytes{area=\"heap\"})*100",
-          "refId": "A"
-        }
-      ],
-      "title": "JVM Heap Memory Utilization (%)",
-      "type": "timeseries"
     },
     {
       "datasource": {
@@ -1273,7 +1249,7 @@
       "gridPos": {
         "h": 10,
         "w": 4,
-        "x": 20,
+        "x": 19,
         "y": 18
       },
       "id": 15,
@@ -1292,18 +1268,34 @@
         "showThresholdMarkers": true,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
+          "editorMode": "code",
           "expr": "process_cpu_usage{job=\"payment-service\"} * 100",
+          "legendFormat": "payment-service",
+          "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "process_cpu_usage{job=\"payment-consumers\"} * 100",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "payment-consumers",
+          "range": true,
+          "refId": "B"
         }
       ],
-      "title": "CPU Usage (%)",
+      "title": "Payment-Serviice-CPU Usage (%)",
       "type": "gauge"
     },
     {
@@ -1385,7 +1377,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -1450,7 +1442,7 @@
         "showThresholdMarkers": true,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -1507,124 +1499,39 @@
               "mode": "none"
             },
             "thresholdsStyle": {
-              "mode": "off"
+              "mode": "dashed+area"
             }
           },
           "mappings": [],
+          "max": 100,
+          "min": 0,
           "thresholds": {
-            "mode": "absolute",
+            "mode": "percentage",
             "steps": [
               {
                 "color": "green"
               },
               {
-                "color": "red",
+                "color": "yellow",
                 "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 8,
-        "x": 10,
-        "y": 28
-      },
-      "id": 20,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.0.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "scheduler_outbox_queue_size{name=\"outbox-dispatch\"}",
-          "legendFormat": "Active Threads",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Outbox Dispatacher Queue Size",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
+              },
               {
-                "color": "green"
+                "color": "red",
+                "value": 90
               }
             ]
-          }
+          },
+          "unit": "percent"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 10,
-        "w": 6,
-        "x": 18,
+        "w": 7,
+        "x": 13,
         "y": 28
       },
-      "id": 23,
+      "id": 14,
       "options": {
         "legend": {
           "calcs": [],
@@ -1638,21 +1545,18 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "editorMode": "code",
-          "expr": "outbox_dispatched_total",
-          "legendFormat": "Outbox Batch Size",
-          "range": true,
+          "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})/sum(jvm_memory_max_bytes{area=\"heap\"})*100",
           "refId": "A"
         }
       ],
-      "title": "Nr Of Total Outbox Message",
+      "title": "JVM Heap Memory Utilization (%)",
       "type": "timeseries"
     },
     {
@@ -1760,7 +1664,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -1838,10 +1742,223 @@
         "overrides": []
       },
       "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 10,
+        "y": 38
+      },
+      "id": 20,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.0.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "scheduler_outbox_queue_size{name=\"outbox-dispatch\"}",
+          "legendFormat": "Active Threads",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Outbox Dispatacher Queue Size",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 6,
+        "x": 18,
+        "y": 38
+      },
+      "id": 23,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.0.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "outbox_dispatched_total",
+          "legendFormat": "Outbox Batch Size",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Nr Of Total Outbox Message",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "payment_status_check_scheduler_topic"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
         "h": 11,
         "w": 7,
         "x": 4,
-        "y": 38
+        "y": 48
       },
       "id": 3,
       "options": {
@@ -1857,7 +1974,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -1937,7 +2054,7 @@
         "h": 11,
         "w": 6,
         "x": 11,
-        "y": 38
+        "y": 48
       },
       "id": 5,
       "options": {
@@ -1953,7 +2070,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -2031,7 +2148,7 @@
         "h": 11,
         "w": 7,
         "x": 17,
-        "y": 38
+        "y": 48
       },
       "id": 6,
       "options": {
@@ -2047,7 +2164,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -2125,7 +2242,7 @@
         "h": 9,
         "w": 5,
         "x": 0,
-        "y": 49
+        "y": 59
       },
       "id": 4,
       "options": {
@@ -2141,7 +2258,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -2219,7 +2336,7 @@
         "h": 9,
         "w": 6,
         "x": 5,
-        "y": 49
+        "y": 59
       },
       "id": 7,
       "options": {
@@ -2235,7 +2352,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -2332,7 +2449,7 @@
         "h": 9,
         "w": 5,
         "x": 11,
-        "y": 49
+        "y": 59
       },
       "id": 28,
       "options": {
@@ -2348,7 +2465,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -2428,7 +2545,7 @@
         "h": 9,
         "w": 4,
         "x": 16,
-        "y": 49
+        "y": 59
       },
       "hideTimeOverride": true,
       "id": 29,
@@ -2450,7 +2567,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -2537,7 +2654,7 @@
         "h": 9,
         "w": 4,
         "x": 20,
-        "y": 49
+        "y": 59
       },
       "id": 32,
       "options": {
@@ -2553,7 +2670,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -2656,7 +2773,7 @@
         "h": 8,
         "w": 5,
         "x": 0,
-        "y": 58
+        "y": 68
       },
       "id": 30,
       "options": {
@@ -2672,7 +2789,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -2760,7 +2877,7 @@
         "h": 8,
         "w": 5,
         "x": 5,
-        "y": 58
+        "y": 68
       },
       "id": 31,
       "options": {
@@ -2776,7 +2893,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -2929,7 +3046,7 @@
         "h": 8,
         "w": 6,
         "x": 10,
-        "y": 58
+        "y": 68
       },
       "id": 33,
       "options": {
@@ -2945,7 +3062,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -3047,7 +3164,7 @@
         "h": 9,
         "w": 6,
         "x": 16,
-        "y": 58
+        "y": 68
       },
       "id": 26,
       "options": {
@@ -3063,7 +3180,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -3105,7 +3222,7 @@
         "h": 9,
         "w": 2,
         "x": 22,
-        "y": 58
+        "y": 68
       },
       "id": 24,
       "options": {
@@ -3123,7 +3240,7 @@
         "showThresholdMarkers": true,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -3153,6 +3270,6 @@
   "timezone": "browser",
   "title": "Payment Dashboard",
   "uid": "20250615df",
-  "version": 20,
+  "version": 11,
   "weekStart": ""
 }

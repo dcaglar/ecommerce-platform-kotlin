@@ -1,6 +1,24 @@
 #!/bin/bash
 set -e
 
+# --- Help functionality ---
+function print_help() {
+  echo "Usage: $0 [ENV] [COMPONENT] [NAMESPACE]"
+  echo "  ENV        : Target environment (default: local)"
+  echo "  COMPONENT  : Component to deploy (default: all)"
+  echo "  NAMESPACE  : Kubernetes namespace (default: payment)"
+  echo ""
+  echo "Examples:"
+  echo "  $0 local payment-consumers payment"
+  echo "  $0 prod all prod-ns"
+  echo ""
+  exit 0
+}
+
+if [[ $1 == "-h" || $1 == "--help" ]]; then
+  print_help
+fi
+
 # --- Location awareness ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR/../../.."

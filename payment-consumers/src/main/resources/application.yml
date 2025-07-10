@@ -37,22 +37,43 @@ management:
   endpoints:
     web:
       exposure:
-        include: "prometheus,health"
+        include: "prometheus,metrics,health"
   endpoint:
     health:
       show-details: always
     prometheus:
       enabled: true
   metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
     export:
       prometheus:
         enabled: true
     enable:
-      http: false
-      jvm: true
-      kafka: true
-      hikari: true
-      executor: true
+      all: false
+      http.server.requests: true
+      tomcat.threads: true
+      hikaricp.connections: true
+      hikaricp.connections.acquire: true
+      outbox.event.backlog: true
+      outbox.dispatched: true
+      outbox.dispatcher.duration: true
+      kafka.consumer.fetch.manager.records.lag: true
+      kafka.producer.topic.record.send: true
+      process.cpu.usage: true
+      jvm.threads.live: true
+      jvm.memory.used: true
+      jvm.memory.max: true
+      jvm.gc.pause: true
+      scheduler.outbox.active.threads: true
+      scheduler.outbox.pool.size.threads: true
+      scheduler.outbox.queue.size: true
+      kafka.consumer.fetch.manager.records.consumed: true
+      kafka.consumer.fetch.manager.fetch.latency: true
+      kafka.consumer.io.time: true
   health:
     probes:
       enabled: true

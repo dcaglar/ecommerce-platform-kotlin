@@ -1,87 +1,118 @@
-# Kubernetes App Management Scripts
+# Kubernetes Scripts Quick Start
 
-This directory contains simple scripts to help you start, stop, and restart Kubernetes deployments (apps) in a given
-namespace.
+This directory contains scripts to help you manage Kubernetes deployments for the ecommerce platform. The scripts are
+designed for local development and can be adapted for other environments.
 
-## Scripts
+---
 
-### 0.kubectl apply -k infra/k8s/overlays/local
+## 1. Deploy All Services to Local Cluster
 
-Scales a deployment up to a specified number of replicas (default: 1).
-
-**Usage:**
+To deploy all services and infrastructure to your local Kubernetes cluster (namespace: `payment`):
 
 ```
-kubectl apply -k infra/k8s/overlays/local
+./deploy-k8s-overlay.sh local all payment
 ```
 
-### 1. k8s-start-app.sh
+- `local`: Target environment (see overlays in `infra/k8s/overlays/`)
+- `all`: Deploy all components (services + infra)
+- `payment`: Namespace to use (default for local dev)
 
-Scales a deployment up to a specified number of replicas (default: 1).
+This will:
 
-**Usage:**
+- Create the namespace if it doesn't exist
+- Apply all manifests for all services and infrastructure
+- Apply any secrets in the overlay
+
+---
+
+## 2. Port-Forward Infrastructure Services
+
+To access infrastructure UIs (Keycloak, Kibana, Grafana, Prometheus) from your local machine, run:
 
 ```
-./k8s-start-app.sh <deployment-name> <namespace> [replicas]
+./port-forward-infra.sh
 ```
 
-- `<deployment-name>`: Name of the deployment to start
-- `<namespace>`: Kubernetes namespace
-- `[replicas]`: (Optional) Number of replicas to scale to (default: 1)
+- On macOS: Opens a new Terminal tab for each service
+- On Linux: Runs each port-forward in the background
 
-**Example:**
+Default ports:
+
+- Keycloak: http://localhost:8080
+- Payment Service: http://localhost:8081
+- Kibana: http://localhost:5601
+- Grafana: http://localhost:3000
+- Prometheus: http://localhost:9090
+
+You can also port-forward a single service:
 
 ```
-./k8s-start-app.sh payment-service dev 2
+./port-forward-single.sh <service-name> <local-port> <remote-port> <namespace>
+```
+
+Example:
+
+```
+./port-forward-single.sh keycloak 8080 8080 payment
 ```
 
 ---
 
-### 2. k8s-stop-app.sh
+## 3. Manage Deployments
 
-Scales a deployment down to zero replicas (effectively stopping it).
-
-**Usage:**
+### Scale a Deployment
 
 ```
-./k8s-stop-app.sh <deployment-name> <namespace>
+./scale-k8s-deployment.sh <deployment> <namespace> <replicas>
 ```
 
-- `<deployment-name>`: Name of the deployment to stop
-- `<namespace>`: Kubernetes namespace
-
-**Example:**
+Example:
 
 ```
-./k8s-stop-app.sh payment-service dev
+./scale-k8s-deployment.sh payment-consumer payment 0
 ```
 
----
-
-### 3. k8s-restart-app.sh
-
-Performs a rollout restart of a deployment (restarts all pods).
-
-**Usage:**
+### Restart a Deployment
 
 ```
-./k8s-restart-app.sh <deployment-name> <namespace>
+./restart-k8s-deployment.sh <deployment> <namespace>
 ```
 
-- `<deployment-name>`: Name of the deployment to restart
-- `<namespace>`: Kubernetes namespace
-
-**Example:**
+Example:
 
 ```
-./k8s-restart-app.sh payment-service dev
+./restart-k8s-deployment.sh payment-service payment
 ```
 
 ---
 
-## Notes
+## 4. Delete All Resources in an Overlay
 
-- You must have `kubectl` installed and configured to access your cluster.
-- Make sure the scripts are executable. If not, run: `chmod +x k8s-*.sh`
-- These scripts are intended for use with Kubernetes deployments.
+To delete all resources for a given overlay (e.g., clean up your cluster):
 
+```
+./delete-k8s-overlay.sh local all payment
+```
+
+---
+
+## 5. Script Help
+
+Most scripts support `-h` or `--help` for usage instructions:
+
+```
+./deploy-k8s-overlay.sh --help
+```
+
+---
+
+## 6. Notes
+
+- All scripts are designed for macOS and Linux. For Windows, use WSL or adapt as needed.
+- Make scripts executable: `chmod +x <script>.sh`
+- Overlays are in `infra/k8s/overlays/` and control which components are deployed.
+- The `all` overlay includes everything for a full local stack.
+
+---
+
+For more details, see the script headers or source code.
