@@ -60,4 +60,4 @@ infra/k8s/payment/configmap/payment-service-configmap.yaml
 /infra/k8s/overlays/local/keycloak/secrets/
 
 infra/scripts/kubernetes/delete-remote-docker.sh
-infra/scripts/kubernetes/build-and-push-payment-service.sh
+infra/scripts/kubernetes/build-and-push-consumers.sh
