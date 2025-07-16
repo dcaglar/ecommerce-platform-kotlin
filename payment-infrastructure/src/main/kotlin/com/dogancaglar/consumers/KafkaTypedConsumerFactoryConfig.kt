@@ -145,7 +145,7 @@ class KafkaTypedConsumerFactoryConfig(
         .let { cfg ->
             createTypedFactory<PaymentOrderCreated>(
                 clientId = cfg.id,
-                concurrency = 16,
+                concurrency = 1,
                 interceptor = interceptor,
                 consumerFactory = customFactory,
                 errorHandler = errorHandler

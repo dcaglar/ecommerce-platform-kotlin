@@ -32,7 +32,7 @@ spring:
     # Only the url should be overridden in profiles
 
 mybatis:
-  mapper-locations: classpath*:mapper/*.xml
+  mapper-locations: classpath*:com/dogancaglar/infrastructure/persistence/mapper/*.xml
 management:
   endpoints:
     web:

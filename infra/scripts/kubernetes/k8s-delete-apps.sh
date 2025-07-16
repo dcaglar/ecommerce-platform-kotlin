@@ -4,7 +4,9 @@ set -e
 
 # --- Location awareness ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "SCRIPT DIR: $SCRIPT_DIR"
 REPO_ROOT="$SCRIPT_DIR/../../.."
+echo "REPO DIR: $REPO_ROOT"
 cd "$REPO_ROOT"
 
 ENV=${1:-local}
@@ -25,7 +27,7 @@ if [ -d "$OVERLAY/secrets" ]; then
   done
 fi
 
-kubectl delete -k "$OVERLAY" -n "$NS" --ignore-not-found || true
+kubectl delete -k "$OVERLAY" -n "$NS"  || true
 
 echo ""
 echo "🗑️  Deleted: $OVERLAY from namespace $NS"

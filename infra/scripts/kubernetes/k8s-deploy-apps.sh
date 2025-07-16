@@ -1,9 +1,10 @@
 #!/bin/bash
 set -e
 
-# --- Location awareness ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "SCRIPT DIR: $SCRIPT_DIR"
 REPO_ROOT="$SCRIPT_DIR/../../.."
+echo "REPO DIR: $REPO_ROOT"
 cd "$REPO_ROOT"
 
 ENV=${1:-local}

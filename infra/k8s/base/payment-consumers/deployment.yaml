@@ -15,7 +15,7 @@ spec:
       initContainers:
         - name: wait-for-payment-service
           image: curlimages/curl:8.8.0
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           command: [ "/bin/sh", "-c" ]
           args:
             - |
@@ -25,10 +25,10 @@ spec:
               done
           resources:
             requests:
-              cpu: "50m"
+              cpu: 50m
               memory: "64Mi"
             limits:
-              cpu: "100m"
+              cpu: 100m
               memory: "128Mi"
       containers:
         - name: payment-consumers
@@ -52,18 +52,11 @@ spec:
                 secretKeyRef:
                   name: payment-db-credentials
                   key: POSTGRES_CONSUMER_PASSWORD
-            - name: SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG
-              valueFrom:
-                secretKeyRef:
-                  name: kafka-credentials
-                  key: KAFKA_JAAS_CONFIG
           envFrom:
             - configMapRef:
                 name: payment-consumers-config
             - secretRef:
                 name: payment-db-credentials
-            - secretRef:
-                name: kafka-credentials
           livenessProbe:
             httpGet:
               path: /actuator/health
@@ -78,8 +71,8 @@ spec:
             periodSeconds: 20
           resources:
             requests:
-              cpu: "100m"
-              memory: "256Mi"
+              cpu: 100m
+              memory: 256Mi
             limits:
-              cpu: "500m"
-              memory: "512Mi"
+              cpu: 500m
+              memory: 512Mi

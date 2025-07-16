@@ -125,7 +125,7 @@ class PaymentOrderRetryCommandExecutor(
         topics = [TOPICS.PAYMENT_ORDER_RETRY],
         containerFactory = "${TOPICS.PAYMENT_ORDER_RETRY}-factory",
         groupId = "${CONSUMER_GROUPS.PAYMENT_ORDER_RETRY}",
-        concurrency = "4"
+        concurrency = "1"
     )
     fun handleBatchListener(
         records: List<ConsumerRecord<String, EventEnvelope<PaymentOrderRetryRequested>>>,

@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: payment-service
 spec:
-  replicas: 4
+  replicas: 1
   selector:
     matchLabels:
       app: payment-service
@@ -44,18 +44,12 @@ spec:
                 secretKeyRef:
                   name: payment-db-credentials
                   key: POSTGRES_PASSWORD
-            - name: SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG
-              valueFrom:
-                secretKeyRef:
-                  name: kafka-credentials
-                  key: KAFKA_JAAS_CONFIG
           envFrom:
             - configMapRef:
                 name: payment-service-config        # Non-secret config values (ConfigMap)
             - secretRef:
                 name: payment-db-credentials       # DB credentials (Secret)
-            - secretRef:
-                name: kafka-credentials            # Kafka credentials (Secret)
+          # Kafka credentials (Secret)
           livenessProbe:
             httpGet:
               path: /actuator/health
@@ -73,5 +67,5 @@ spec:
               cpu: "100m"
               memory: "256Mi"
             limits:
-              cpu: "500m"
+              cpu: 500m
               memory: "512Mi"

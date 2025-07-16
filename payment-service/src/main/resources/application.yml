@@ -40,9 +40,9 @@ spring:
     change-log: classpath:db/changelog/changelog.master.xml
   health:
     probes:
-      enabled: true
+      enabled: truet
 mybatis:
-  mapper-locations: classpath*:mapper/*.xml
+  mapper-locations: classpath*:com/dogancaglar/infrastructure/persistence/mapper/*.xml
 management:
   endpoints:
     web:

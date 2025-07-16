@@ -10,8 +10,3 @@ resources:
   - ../observability
   - ../monitoring
 
-secretGenerator:
-  - name: kafka-credentials
-    envs:
-      - secrets/kafka-credentials.env
-namespace: payment

@@ -3,15 +3,8 @@ server:
 spring:
   kafka:
     properties:
-      sasl:
-        mechanism: PLAIN
-        jaas:
-          config: ${SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG} # This will be injected from a Kubernetes Secret
-      client:
-        id: ccloud-springboot-client-f556835c-00a8-47cc-86e7-db5386c816d4
-      security:
-        protocol: SASL_SSL
-    bootstrap-servers: pkc-ewzgj.europe-west4.gcp.confluent.cloud:9092
+      client-id: payment-service
+    bootstrap-servers: kafka:9092
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME} # This will be injected from a Kubernetes Secret
@@ -27,26 +20,26 @@ spring:
 kafka:
   topics:
     payment_order_created_topic:
-      partitions: 16
-      replicas: 3
+      partitions: 1
+      replicas: 1
     payment_order_created_topic_dlq:
-      partitions: 16
-      replicas: 3
+      partitions: 1
+      replicas: 1
     payment_order_retry_request_topic:
-      partitions: 16
-      replicas: 3
+      partitions: 1
+      replicas: 1
     payment_order_retry_request_topic_dlq:
-      partitions: 16
-      replicas: 3
+      partitions: 1
+      replicas: 1
     payment_status_check_scheduler_topic:
-      partitions: 16
-      replicas: 3
+      partitions: 1
+      replicas: 1
     payment_status_check_scheduler_topic_dlq:
-      partitions: 16
-      replicas: 3
+      partitions: 1
+      replicas: 1
     payment_order_succeded_topic:
-      partitions: 16
-      replicas: 3
+      partitions: 1
+      replicas: 1
     payment_order_succeded_topic_dlq:
-      partitions: 16
-      replicas: 3
+      partitions: 1
+      replicas: 1

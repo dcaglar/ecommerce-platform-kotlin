@@ -155,7 +155,7 @@ class PaymentOrderExecutor(
         topics = [TOPICS.PAYMENT_ORDER_CREATED],
         containerFactory = "${TOPICS.PAYMENT_ORDER_CREATED}-factory",
         groupId = "${CONSUMER_GROUPS.PAYMENT_ORDER_CREATED}",
-        concurrency = "8"
+        concurrency = "1"
     )
 
     fun handleBatchListener(
