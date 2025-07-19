@@ -1,6 +1,6 @@
 package com.dogancaglar.infrastructure.adapter.persistance
 
-import com.dogancaglar.infrastructure.persistence.mapper.PaymentOrderStatusCheckEntityMapper
+import com.dogancaglar.infrastructure.mapper.PaymentOrderStatusCheckEntityMapper
 import com.dogancaglar.infrastructure.persistence.repository.PaymentOrderStatusCheckMapper
 import com.dogancaglar.payment.application.port.outbound.PaymentOrderStatusCheckRepository
 import com.dogancaglar.payment.domain.model.PaymentOrderStatusCheck

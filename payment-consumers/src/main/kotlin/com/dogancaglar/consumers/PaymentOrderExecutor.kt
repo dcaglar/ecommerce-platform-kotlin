@@ -5,11 +5,10 @@ import com.dogancaglar.common.event.CONSUMER_GROUPS
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.TOPICS
 import com.dogancaglar.consumers.base.BaseBatchKafkaConsumer
-import com.dogancaglar.payment.application.port.inbound.CreatePaymentUseCase
+import com.dogancaglar.payment.application.mapper.PaymentOrderDomainEventMapper
 import com.dogancaglar.payment.application.port.outbound.PaymentGatewayPort
 import com.dogancaglar.payment.application.port.outbound.ProcessPspResultUseCase
 import com.dogancaglar.payment.application.port.outbound.PspResultCachePort
-import com.dogancaglar.payment.domain.factory.PaymentOrderFactory
 import com.dogancaglar.payment.domain.model.PaymentOrder
 import com.dogancaglar.payment.domain.model.PaymentOrderStatus
 import io.micrometer.core.instrument.MeterRegistry
@@ -19,15 +18,15 @@ import org.apache.kafka.common.errors.RetriableException
 import org.apache.kafka.common.errors.SerializationException
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.core.convert.ConversionException
 import org.springframework.dao.*
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.support.Acknowledgment
-import org.springframework.kafka.support.converter.ConversionException
 import org.springframework.kafka.support.serializer.DeserializationException
-import org.springframework.messaging.handler.annotation.support.MethodArgumentNotValidException
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.bind.MethodArgumentNotValidException
 import java.sql.SQLTransientException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
@@ -35,9 +34,7 @@ import java.util.concurrent.TimeoutException
 
 @Component
 class PaymentOrderExecutor(
-    private val createPaymentUseCase: CreatePaymentUseCase,
     private val processPspResultUseCase: ProcessPspResultUseCase,
-    private val paymentOrderFactory: PaymentOrderFactory,
     private val pspClient: PaymentGatewayPort,
     private val meterRegistry: MeterRegistry,
     private val pspResultCache: PspResultCachePort,
@@ -51,20 +48,18 @@ class PaymentOrderExecutor(
         val totalStart = System.currentTimeMillis()
         val envelope = record.value()
         val event = envelope.data
-        val order = paymentOrderFactory.fromEvent(event)
+        val order = PaymentOrderDomainEventMapper.fromEvent(event)
         logger.info("Processing payment order :paymentordercreated")
         if (order.status != PaymentOrderStatus.INITIATED) {
             logger.info("⏩ Skipping already processed order(status=${order.status})")
             return
         }
-
         val cacheStart = System.currentTimeMillis()
         try {
             val key = order.paymentOrderId
             val cachedResult = pspResultCache.get(key)
             val cacheEnd = System.currentTimeMillis()
             logger.info("TIMING: PSP cache lookup took ${cacheEnd - cacheStart} ms for $key")
-
             val pspStart = System.currentTimeMillis()
             val status = if (cachedResult != null) {
                 logger.info("♻️ Cache hit for $key → $cachedResult")
@@ -77,12 +72,10 @@ class PaymentOrderExecutor(
             }
             val pspEnd = System.currentTimeMillis()
             logger.info("TIMING: PSP call (including cache, if miss) took ${pspEnd - pspStart} ms for $key")
-
             val dbStart = System.currentTimeMillis()
             processPspResultUseCase.processPspResult(event = event, pspStatus = status)
             val dbEnd = System.currentTimeMillis()
-            logger.info("TIMING: processPspResult (DB/write) took ${dbEnd - dbStart} ms for $key")
-
+            logger.info("TIMING: processPspResult (DB/write) took  ${dbEnd - dbStart} ms for $key")
             val totalEnd = System.currentTimeMillis()
             logger.info("TIMING: Total handler time: ${totalEnd - totalStart} ms for $key")
         } catch (e: Exception) {
@@ -120,7 +113,6 @@ class PaymentOrderExecutor(
         }
     }
 
-
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
         val pspCallStart = System.currentTimeMillis()
         val future = externalPspExecutorPoolConig.submit<PaymentOrderStatus> { pspClient.charge(order) }
@@ -155,7 +147,7 @@ class PaymentOrderExecutor(
         topics = [TOPICS.PAYMENT_ORDER_CREATED],
         containerFactory = "${TOPICS.PAYMENT_ORDER_CREATED}-factory",
         groupId = "${CONSUMER_GROUPS.PAYMENT_ORDER_CREATED}",
-        concurrency = "8"
+        concurrency = "1"
     )
 
     fun handleBatchListener(
@@ -170,3 +162,21 @@ class PaymentOrderExecutor(
         return true
     }
 }
+/*
+@Component
+class PaymentOrderExecutor(
+    private val createPsp: U
+    private val paymentOrderFactory: PaymentOrderFactory,
+    private val pspClient: PaymentGatewayPort,
+    private val meterRegistry: MeterRegistry,
+    private val pspResultCache: PspResultCachePort,
+    @Qualifier("paymentOrderExecutorPoolConfig") private val pspExecutor: ThreadPoolTaskExecutor,
+    @Qualifier("externalPspExecutorPoolConfig") private val externalPspExecutorPoolConig: ThreadPoolTaskExecutor
+) : BaseBatchKafkaConsumer<PaymentOrderCreated>() {
+    private val logger = LoggerFactory.getLogger(javaClass)
+
+
+
+
+}
+        */

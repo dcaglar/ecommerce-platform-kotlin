@@ -5,11 +5,10 @@ import com.dogancaglar.common.event.CONSUMER_GROUPS
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.TOPICS
 import com.dogancaglar.consumers.base.BaseBatchKafkaConsumer
-import com.dogancaglar.payment.application.port.inbound.CreatePaymentUseCase
+import com.dogancaglar.payment.application.mapper.PaymentOrderDomainEventMapper
 import com.dogancaglar.payment.application.port.outbound.PaymentGatewayPort
 import com.dogancaglar.payment.application.port.outbound.ProcessPspResultUseCase
 import com.dogancaglar.payment.application.port.outbound.PspResultCachePort
-import com.dogancaglar.payment.domain.factory.PaymentOrderFactory
 import com.dogancaglar.payment.domain.model.PaymentOrder
 import com.dogancaglar.payment.domain.model.PaymentOrderStatus
 import io.micrometer.core.instrument.DistributionSummary
@@ -35,12 +34,11 @@ import java.util.concurrent.TimeoutException
 
 @Component
 class PaymentOrderRetryCommandExecutor(
-    private val createPaymentUseCase: CreatePaymentUseCase,
     private val processPspResultUseCase: ProcessPspResultUseCase,
-    private val paymentOrderFactory: PaymentOrderFactory,
+    private val meterRegistry: MeterRegistry,
+    private val pspResultCache: PspResultCachePort,
     private val pspClient: PaymentGatewayPort,
     private val retryMetrics: RetryMetrics,
-    private val pspResultCache: PspResultCachePort,
     @Qualifier("paymentOrderRetryExecutorPoolConfig") private val pspRetryExecutor: ThreadPoolTaskExecutor,
     @Qualifier("externalPspExecutorPoolConfig") private val externalPspExecutorPoolConig: ThreadPoolTaskExecutor
 ) : BaseBatchKafkaConsumer<PaymentOrderRetryRequested>() {
@@ -57,7 +55,7 @@ class PaymentOrderRetryCommandExecutor(
         val totalStart = System.currentTimeMillis()
         val envelope = record.value()
         val event = envelope.data
-        val order = paymentOrderFactory.fromEvent(event)
+        val order = PaymentOrderDomainEventMapper.fromEvent(event)
         val cacheStart = System.currentTimeMillis()
         try {
             val key = order.paymentOrderId
@@ -125,7 +123,7 @@ class PaymentOrderRetryCommandExecutor(
         topics = [TOPICS.PAYMENT_ORDER_RETRY],
         containerFactory = "${TOPICS.PAYMENT_ORDER_RETRY}-factory",
         groupId = "${CONSUMER_GROUPS.PAYMENT_ORDER_RETRY}",
-        concurrency = "4"
+        concurrency = "1"
     )
     fun handleBatchListener(
         records: List<ConsumerRecord<String, EventEnvelope<PaymentOrderRetryRequested>>>,

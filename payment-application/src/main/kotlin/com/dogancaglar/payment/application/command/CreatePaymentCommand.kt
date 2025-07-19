@@ -1,14 +1,14 @@
-package com.dogancaglar.payment.application.service
+package com.dogancaglar.payment.application.command
 
 import com.dogancaglar.com.dogancaglar.payment.application.loggging.PaymentLogFields
 import com.dogancaglar.com.dogancaglar.payment.application.port.out.SerializationPort
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.payment.application.events.EventMetadatas
-import com.dogancaglar.payment.application.events.OutboxEvent
-import com.dogancaglar.payment.application.mapper.PaymentOrderEventMapper
+import com.dogancaglar.payment.application.mapper.PaymentOrderDomainEventMapper
 import com.dogancaglar.payment.application.port.inbound.CreatePaymentUseCase
 import com.dogancaglar.payment.application.port.outbound.OutboxEventPort
+import com.dogancaglar.payment.domain.events.OutboxEvent
 import com.dogancaglar.payment.domain.factory.PaymentFactory
 import com.dogancaglar.payment.domain.model.Payment
 import com.dogancaglar.payment.domain.model.PaymentOrder
@@ -20,12 +20,10 @@ import com.dogancaglar.payment.domain.port.id.IdGeneratorPort
 import com.dogancaglar.payment.domain.port.id.IdNamespaces
 import com.dogancaglar.port.PaymentOrderRepository
 import org.slf4j.LoggerFactory
-import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
-import java.time.LocalDateTime
 import java.util.*
 
-open class CreatePaymentService(
+open class CreatePaymentCommand(
     private val idGeneratorPort: IdGeneratorPort,
     private val paymentRepository: PaymentRepository,
     private val paymentOrderRepository: PaymentOrderRepository,
@@ -36,16 +34,15 @@ open class CreatePaymentService(
 
     val logger = LoggerFactory.getLogger(javaClass)
 
-    @Transactional
-    open override fun create(cmd: CreatePaymentCommand): Payment {
-        val paymentOrderIdList = cmd.paymentLines.map {
+    open override fun create(command: CreatePaymentCommand): Payment {
+        val paymentOrderIdList = command.paymentLines.map {
             PaymentOrderId(idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER))
         }
         val paymentId = getNextPaymentId()
-        val payment = PaymentFactory(clock).createPayment(cmd, paymentId, paymentOrderIdList)
+        val payment = PaymentFactory(clock).createPayment(command, paymentId, paymentOrderIdList)
 
         paymentRepository.save(payment)
-        paymentOrderRepository.saveAll(payment.paymentOrders)
+        paymentOrderRepository.upsertAll(payment.paymentOrders)
 
         val outboxBatch = payment.paymentOrders.map { toOutBoxEvent(it) }
         outboxEventPort.saveAll(outboxBatch)
@@ -65,7 +62,7 @@ open class CreatePaymentService(
 
 
     private fun toOutBoxEvent(paymentOrder: PaymentOrder): OutboxEvent {
-        val paymentOrderCreatedEvent = PaymentOrderEventMapper.toPaymentOrderCreatedEvent(paymentOrder)
+        val paymentOrderCreatedEvent = PaymentOrderDomainEventMapper.toPaymentOrderCreatedEvent(paymentOrder)
         val envelope = DomainEventEnvelopeFactory.envelopeFor(
             traceId = LogContext.getTraceId() ?: UUID.randomUUID().toString(),
             data = paymentOrderCreatedEvent,
@@ -87,10 +84,10 @@ open class CreatePaymentService(
         }
 
         return OutboxEvent.createNew(
+            oeid = paymentOrder.paymentOrderId.value,
             eventType = envelope.eventType,
             aggregateId = envelope.aggregateId,
             payload = serializationPort.toJson(envelope),
-            createdAt = LocalDateTime.now(clock),
         )
     }
 }

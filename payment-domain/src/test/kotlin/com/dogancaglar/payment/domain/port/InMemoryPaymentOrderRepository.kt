@@ -13,7 +13,7 @@ class InMemoryPaymentOrderRepository : PaymentOrderRepository {
         orders.add(paymentOrder)
     }
 
-    override fun saveAll(orders: List<PaymentOrder>) {
+    override fun upsertAll(orders: List<PaymentOrder>) {
         orders.forEach { save(it) }
     }
 

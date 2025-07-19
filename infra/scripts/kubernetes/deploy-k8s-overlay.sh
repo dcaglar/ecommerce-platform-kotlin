@@ -18,7 +18,6 @@ function print_help() {
 if [[ $1 == "-h" || $1 == "--help" ]]; then
   print_help
 fi
-
 # --- Location awareness ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR/../../.."

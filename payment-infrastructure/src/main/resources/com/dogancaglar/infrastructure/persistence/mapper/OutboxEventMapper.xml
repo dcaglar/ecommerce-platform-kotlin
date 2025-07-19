@@ -5,8 +5,7 @@
 <mapper namespace="com.dogancaglar.infrastructure.persistence.repository.OutboxEventMapper">
     <resultMap id="OutboxEventResultMap"
                type="com.dogancaglar.infrastructure.persistence.entity.OutboxEventEntity">
-        <id property="eventId" column="id" javaType="java.util.UUID"
-            typeHandler="com.dogancaglar.infrastructure.persistence.typehandler.UUIDTypeHandler"/>
+        <id property="oeid" column="oeid"/>
         <result property="eventType" column="event_type"/>
         <result property="aggregateId" column="aggregate_id"/>
         <result property="payload" column="payload"/>
@@ -15,7 +14,7 @@
     </resultMap>
 
     <select id="findByStatus" resultMap="OutboxEventResultMap">
-        SELECT id, event_type, aggregate_id, payload, status, created_at FROM outbox_event WHERE status = #{status}
+        SELECT oeid, event_type, aggregate_id, payload, status, created_at FROM outbox_event WHERE status = #{status}
     </select>
 
     <select id="countByStatus" resultType="long">
@@ -26,43 +25,38 @@
         WITH claimed AS (
         UPDATE outbox_event
         SET status = 'PROCESSING'
-        WHERE (id, created_at) IN (
-        SELECT id, created_at
+        WHERE (oeid, created_at) IN (
+        SELECT oeid, created_at
         FROM outbox_event
         WHERE status = 'NEW'
         ORDER BY created_at
         LIMIT #{batchSize}
         FOR UPDATE SKIP LOCKED
         )
-        RETURNING id, event_type, aggregate_id, payload, status, created_at
+        RETURNING oeid, event_type, aggregate_id, payload, status, created_at
         )
-        SELECT id, event_type, aggregate_id, payload, status, created_at FROM claimed
-    </select>
-
-    <select id="findBatchForDispatch" resultMap="OutboxEventResultMap" databaseId="h2">
-        SELECT id, event_type, aggregate_id, payload, status, created_at
-        FROM outbox_event
-        WHERE status = 'NEW'
-        ORDER BY created_at
-        LIMIT #{batchSize}
+        SELECT oeid, event_type, aggregate_id, payload, status, created_at FROM claimed
     </select>
 
     <insert id="insert" parameterType="com.dogancaglar.infrastructure.persistence.entity.OutboxEventEntity">
-        INSERT INTO outbox_event (id, event_type, aggregate_id, payload, status, created_at)
+        INSERT INTO outbox_event (oeid, event_type, aggregate_id, payload, status, created_at)
         VALUES
-        (#{eventId, javaType=java.util.UUID, typeHandler=com.dogancaglar.infrastructure.persistence.typehandler.UUIDTypeHandler},
+        (#{oeid},
         #{eventType}, #{aggregateId}, #{payload}, #{status}, #{createdAt})
     </insert>
 
     <insert id="batchUpsert" parameterType="java.util.List">
-        INSERT INTO outbox_event (id, event_type, aggregate_id, payload, status, created_at)
+        INSERT INTO outbox_event (oeid, event_type, aggregate_id, payload, status, created_at)
         VALUES
         <foreach collection="list" item="event" separator=",">
-            (#{event.eventId, javaType=java.util.UUID, typeHandler=com.dogancaglar.infrastructure.persistence.typehandler.UUIDTypeHandler},
-            #{event.eventType}, #{event.aggregateId}, #{event.payload}, #{event.status},
+            (#{event.oeid},
+            #{event.eventType},
+            #{event.aggregateId},
+            #{event.payload},
+            #{event.status},
             #{event.createdAt})
         </foreach>
-        ON CONFLICT (id, created_at) DO UPDATE SET
+        ON CONFLICT (oeid, created_at) DO UPDATE SET
         event_type = EXCLUDED.event_type,
         aggregate_id = EXCLUDED.aggregate_id,
         payload = EXCLUDED.payload,

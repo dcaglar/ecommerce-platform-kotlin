@@ -45,7 +45,7 @@ It declares that this module is:
         <liquibase.version>4.26.0</liquibase.version>
         <mybatis.version>3.0.3</mybatis.version>
         <logstash.version>7.4</logstash.version>
-        <spring-boot.version>3.5.0</spring-boot.version>
+        <spring-boot.version>3.0.3</spring-boot.version>
         <!-- Build plugins -->
         <kotlin.maven.plugin.version>${kotlin.version}</kotlin.maven.plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -54,6 +54,8 @@ It declares that this module is:
         <maven.surefire.version>3.2.5</maven.surefire.version>
         <assertj.version>3.25.3</assertj.version>
         <mockito.kotlin.version>5.2.1</mockito.kotlin.version>
+        <container.test.version>1.19.3</container.test.version>
+        <mybatis.spring.starter.version>3.0.3</mybatis.spring.starter.version>
     </properties>
 
     <dependencyManagement>
@@ -87,6 +89,12 @@ It declares that this module is:
                 <groupId>org.postgresql</groupId>
                 <artifactId>postgresql</artifactId>
                 <version>${postgresql.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.mybatis.spring.boot</groupId>
+                <artifactId>mybatis-spring-boot-starter</artifactId>
+                <version>${mybatis.spring.starter.version}</version>
             </dependency>
 
             <!-- Liquibase -->
@@ -134,11 +142,6 @@ It declares that this module is:
 
 
             <!-- Spring Boot dependencies-->
-            <dependency>
-                <groupId>org.junit.jupiter</groupId>
-                <artifactId>junit-jupiter</artifactId>
-                <version>5.10.0</version>
-            </dependency>
 
             <dependency>
                 <groupId>org.jetbrains.kotlin</groupId>
@@ -164,15 +167,18 @@ It declares that this module is:
                 <version>${mockito.kotlin.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.mybatis.spring.boot</groupId>
-                <artifactId>mybatis-spring-boot-starter</artifactId>
-                <version>${mybatis.version}</version>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>${container.test.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
             <dependency>
                 <groupId>org.mybatis.spring.boot</groupId>
                 <artifactId>mybatis-spring-boot-starter-test</artifactId>
-                <version>${mybatis.version}</version>
+                <version>${mybatis.spring.starter.version}</version>
             </dependency>
+
         </dependencies>
 
     </dependencyManagement>

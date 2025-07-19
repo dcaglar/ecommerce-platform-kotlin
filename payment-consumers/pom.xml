@@ -12,6 +12,7 @@
     <artifactId>payment-consumers</artifactId>
     <packaging>jar</packaging>
 
+
     <dependencies>
         <dependency>
             <groupId>com.dogancaglar</groupId>

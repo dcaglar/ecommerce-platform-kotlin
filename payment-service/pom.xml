@@ -16,10 +16,6 @@
     <dependencies>
         <dependency>
             <groupId>com.dogancaglar</groupId>
-            <artifactId>payment-application</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.dogancaglar</groupId>
             <artifactId>payment-infrastructure</artifactId>
         </dependency>
         <dependency>
@@ -93,7 +89,18 @@
             <artifactId>mockito-kotlin</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.mybatis.spring.boot</groupId>
+            <artifactId>mybatis-spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
+
 
     <build>
         <sourceDirectory>${project.basedir}/src/main/kotlin</sourceDirectory>

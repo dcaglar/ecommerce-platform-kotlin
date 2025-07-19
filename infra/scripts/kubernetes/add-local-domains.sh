@@ -2,6 +2,7 @@
 
 set -e
 
+HOSTS_LINE1="127.0.0.1 payment.local"
 HOSTS_LINE2="127.0.0.1 keycloak"
 HOSTS_FILE="/etc/hosts"
 

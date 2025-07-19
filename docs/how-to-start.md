@@ -38,6 +38,7 @@ Default ports:
 - Grafana: http://localhost:3000
 - Prometheus: http://localhost:9090
 
+psql -h localhost -p 5432 -U payment
 ---
 
 ## 3️⃣ Add Keycloak to /etc/hosts
@@ -101,7 +102,13 @@ curl -i -X POST http://localhost:8081/payments \
 From project root, run:
 
 ```bash
-RPS=10 DURATION=10m k6 run load-tests/baseline-smoke-test.js
+VUS=10 RPS=10 DURATION=2m k6 run load-tests/baseline-smoke-test.js
+```
+
+connect to db after port-forwarding:
+
+```bash
+RPS=50 DURATION=10m k6 run load-tests/baseline-smoke-test.js
 ```
 
 ---s

@@ -5,20 +5,19 @@
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
 
-    <changeSet id="01-create-outbox-event-partitioned-parent-table" author="dogancaglar">
+    <changeSet id="01-create-outbox-parent" author="dogancaglar">
         <sql>
-            CREATE TABLE IF NOT EXISTS outbox_event (
-            id uuid NOT NULL,
-            event_type varchar(255) NOT NULL,
-            aggregate_id varchar(255) NOT NULL,
-            payload text NOT NULL,
-            status varchar(50) NOT NULL,
-            created_at timestamp NOT NULL,
-            PRIMARY KEY (id, created_at)
+            CREATE TABLE outbox_event (
+            oeid BIGINT NOT NULL,
+            event_type VARCHAR(255) NOT NULL,
+            aggregate_id VARCHAR(255) NOT NULL,
+            payload TEXT NOT NULL,
+            status VARCHAR(50) NOT NULL,
+            created_at TIMESTAMP NOT NULL,
+            PRIMARY KEY (oeid, created_at)
             ) PARTITION BY RANGE (created_at);
         </sql>
     </changeSet>
-
     <changeSet id="02-create-index-outbox-event-createdat" author="dogancaglar">
         <createIndex indexName="idx_outbox_event_createdat" tableName="outbox_event">
             <column name="created_at"/>
@@ -37,5 +36,4 @@
             <column name="created_at"/>
         </createIndex>
     </changeSet>
-
 </databaseChangeLog>

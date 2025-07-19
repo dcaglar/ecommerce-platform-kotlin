@@ -7,11 +7,6 @@ resources:
   - ../payment-db
   - ../payment-service
   - ../payment-consumers
-  - ../observability
+  #  - ../observability
   - ../monitoring
 
-secretGenerator:
-  - name: kafka-credentials
-    envs:
-      - secrets/kafka-credentials.env
-namespace: payment

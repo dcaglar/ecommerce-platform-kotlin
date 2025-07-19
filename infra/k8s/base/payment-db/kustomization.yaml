@@ -3,5 +3,4 @@ kind: Kustomization
 resources:
   - payment-db-statefulset.yaml
   - payment-db-service.yaml
-  - payment-pg-pvc.yaml
   - create-payment-user-job.yaml

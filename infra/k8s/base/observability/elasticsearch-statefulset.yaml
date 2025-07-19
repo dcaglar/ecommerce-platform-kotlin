@@ -54,7 +54,12 @@ spec:
           volumeMounts:
             - name: esdata
               mountPath: /usr/share/elasticsearch/data
-      volumes:
-        - name: esdata
-          persistentVolumeClaim:
-            claimName: elasticsearch-pvc
+  volumeClaimTemplates:
+    - metadata:
+        name: esdata
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 10Gi
+

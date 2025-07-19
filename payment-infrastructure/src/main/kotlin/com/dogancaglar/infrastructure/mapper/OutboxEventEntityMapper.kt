@@ -1,25 +1,25 @@
-package com.dogancaglar.infrastructure.persistence.mapper
+package com.dogancaglar.infrastructure.mapper
 
 import com.dogancaglar.infrastructure.persistence.entity.OutboxEventEntity
-import com.dogancaglar.payment.application.events.OutboxEvent
+import com.dogancaglar.payment.domain.events.OutboxEvent
 
 object OutboxEventEntityMapper {
 
     fun toEntity(event: OutboxEvent): OutboxEventEntity {
         return OutboxEventEntity(
-            eventId = event.eventId,
+            oeid = event.oeid,
             eventType = event.eventType,
             aggregateId = event.aggregateId,
             payload = event.payload,
-            status = event.getStatus(),
+            status = event.status,
             createdAt = event.createdAt
         )
     }
 
 
     fun toDomain(entity: OutboxEventEntity): OutboxEvent {
-        return OutboxEvent.restoreFromPersistence(
-            eventId = entity.eventId ?: error("eventId cannot be null when restoring from DB"),
+        return OutboxEvent.restore(
+            oeid = entity.oeid,
             eventType = entity.eventType,
             aggregateId = entity.aggregateId,
             payload = entity.payload,

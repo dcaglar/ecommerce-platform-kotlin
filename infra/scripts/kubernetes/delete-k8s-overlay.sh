@@ -4,7 +4,9 @@ set -e
 
 # --- Location awareness ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "SCRIPT DIR: $SCRIPT_DIR"
 REPO_ROOT="$SCRIPT_DIR/../../.."
+echo "REPO DIR: $REPO_ROOT"
 cd "$REPO_ROOT"
 
 ENV=${1:-local}
@@ -25,7 +27,24 @@ if [ -d "$OVERLAY/secrets" ]; then
   done
 fi
 
-kubectl delete -k "$OVERLAY" -n "$NS" --ignore-not-found || true
+kubectl delete -k "$OVERLAY" -n "$NS"  || true
 
-echo ""
 echo "🗑️  Deleted: $OVERLAY from namespace $NS"
+
+
+#echo "🧹 Deleting kafka PVCs in namespace"
+kubectl delete pvc -n payment data-kafka-0  || true
+kubectl delete pvc -n payment data-payment-db-0  || true
+kubectl delete pvc -n payment data-zookeeper-0   || true
+
+
+#kubectl delete pvc -n payment  keycloak-pg-pvc || true
+#kubectl delete pvc -n payment redis-data-pvc || true
+#
+#echo "✅  Deleted all kafka pvc"
+
+echo "killing port-forwards..."
+
+pkill -f "kubectl port-forward" || true
+
+echo "✅  Killed all port-forwards."

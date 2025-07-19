@@ -1,4 +1,4 @@
-package com.dogancaglar.infrastructure.persistence.mapper
+package com.dogancaglar.infrastructure.mapper
 
 import com.dogancaglar.infrastructure.persistence.entity.PaymentOrderEntity
 import com.dogancaglar.payment.domain.model.PaymentOrder

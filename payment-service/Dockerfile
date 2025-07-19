@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 
-FROM maven:3.9.6-eclipse-temurin-21-alpine AS builder
+FROM maven:3.9.6-eclipse-temurin-21-jammy AS builder
 WORKDIR /app
 
 # Copy root and all module pom.xml files for dependency resolution
@@ -24,8 +24,13 @@ COPY payment-service/ payment-service/
 # Build the payment-service jar
 RUN mvn -pl payment-service -am clean package -DskipTests
 
-FROM eclipse-temurin:21-jdk-alpine
+FROM eclipse-temurin:21-jdk-jammy
 WORKDIR /app
+
+RUN apt-get update && apt-get install -y curl && \
+    curl -L -o pyroscope.jar https://github.com/grafana/pyroscope-java/releases/download/v0.12.2/pyroscope.jar && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /app/payment-service/target/*.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-javaagent:/app/pyroscope.jar", "-jar", "app.jar"]

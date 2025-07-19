@@ -1,4 +1,4 @@
-package com.dogancaglar.payment.application.service
+package com.dogancaglar.payment.application.command
 
 
 import com.dogancaglar.application.PaymentOrderRetryRequested
@@ -6,7 +6,7 @@ import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.payment.application.events.EventMetadatas
 import com.dogancaglar.payment.application.events.PaymentOrderEvent
 import com.dogancaglar.payment.application.mapper.PSPStatusMapper
-import com.dogancaglar.payment.application.mapper.PaymentOrderEventMapper
+import com.dogancaglar.payment.application.mapper.PaymentOrderDomainEventMapper
 import com.dogancaglar.payment.application.port.outbound.*
 import com.dogancaglar.payment.domain.factory.PaymentOrderFactory
 import com.dogancaglar.payment.domain.model.PaymentOrder
@@ -22,7 +22,7 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.min
 import kotlin.math.pow
 
-open class ProcessPaymentService(
+open class ProcessPaymentCommand(
     private val paymentOrderRepository: PaymentOrderRepository,
     private val eventPublisher: EventPublisherPort,
     private val retryQueuePort: RetryQueuePort<PaymentOrderRetryRequested>,
@@ -82,7 +82,7 @@ open class ProcessPaymentService(
         eventPublisher.publishSync(
             eventMetaData = EventMetadatas.PaymentOrderSuccededMetaData,
             aggregateId = updatedOrder.publicPaymentOrderId,
-            data = PaymentOrderEventMapper.toPaymentOrderSuccededEvent(updatedOrder),
+            data = PaymentOrderDomainEventMapper.toPaymentOrderSuccededEvent(updatedOrder),
             parentEventId = LogContext.getEventId(),
             traceId = LogContext.getTraceId()
         )

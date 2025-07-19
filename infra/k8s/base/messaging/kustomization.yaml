@@ -5,3 +5,7 @@ resources:
   - redis-service.yaml
   - redis-pvc.yaml
   - redis-exporter-deployment.yaml
+  - kafka-statefulset.yaml
+  - kafka-service.yaml
+  - zookeeper-statefulset.yaml
+  - zookeeper-service.yaml

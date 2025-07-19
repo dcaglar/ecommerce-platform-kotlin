@@ -77,7 +77,7 @@ class InMemoryPaymentOrderRepositoryTest {
     @Test
     fun `saveAll and verify all persisted`() {
         val payment = createPaymentWithOrders(PaymentId(10), listOf(PaymentOrderId(1L), PaymentOrderId(2L)))
-        repository.saveAll(payment.paymentOrders)
+        repository.upsertAll(payment.paymentOrders)
         assertEquals(2, repository.countByPaymentId(PaymentId(10)))
     }
 
@@ -88,7 +88,7 @@ class InMemoryPaymentOrderRepositoryTest {
             listOf(PaymentOrderId(1L), PaymentOrderId(2L)),
             listOf(PaymentOrderStatus.PENDING, PaymentOrderStatus.SUCCESSFUL)
         )
-        repository.saveAll(payment.paymentOrders)
+        repository.upsertAll(payment.paymentOrders)
         assertEquals(1, repository.countByPaymentIdAndStatusIn(PaymentId(10), listOf("PENDING")))
         assertEquals(1, repository.countByPaymentIdAndStatusIn(PaymentId(10), listOf("SUCCESSFUL")))
         assertEquals(2, repository.countByPaymentIdAndStatusIn(PaymentId(10), listOf("PENDING", "SUCCESSFUL")))
@@ -101,7 +101,7 @@ class InMemoryPaymentOrderRepositoryTest {
             listOf(PaymentOrderId(1L), PaymentOrderId(2L)),
             listOf(PaymentOrderStatus.PENDING)
         )
-        repository.saveAll(payment.paymentOrders)
+        repository.upsertAll(payment.paymentOrders)
         assertTrue(repository.existsByPaymentIdAndStatus(PaymentId(10), "PENDING"))
         assertFalse(repository.existsByPaymentIdAndStatus(PaymentId(10), "SUCCESSFUL"))
     }
@@ -114,7 +114,7 @@ class InMemoryPaymentOrderRepositoryTest {
             listOf(PaymentOrderId(5L), PaymentOrderId(2L), PaymentOrderId(7L)),
             listOf(PaymentOrderStatus.PENDING, PaymentOrderStatus.SUCCESSFUL, PaymentOrderStatus.FINALIZED_FAILED)
         )
-        repository.saveAll(payment.paymentOrders)
+        repository.upsertAll(payment.paymentOrders)
         assertEquals(PaymentOrderId(7L), repository.getMaxPaymentOrderId())
     }
 }
