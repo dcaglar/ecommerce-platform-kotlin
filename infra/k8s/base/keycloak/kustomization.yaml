@@ -4,6 +4,5 @@ resources:
   - keycloak-db-headless.yaml
   - keycloak-db-service.yaml
   - keycloak-deployment.yaml
-  - keycloak-pg-pvc.yaml
   - keycloak-postgres-statefulset.yaml
   - keycloak-service.yaml

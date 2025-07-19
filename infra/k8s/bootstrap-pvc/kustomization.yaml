@@ -1,0 +1,3 @@
+resources:
+  - grafana-pvc.yaml
+  - prometheus-pvc.yaml

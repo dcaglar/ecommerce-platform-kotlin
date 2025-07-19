@@ -13,3 +13,9 @@ data:
         url: http://prometheus-service:9090
         isDefault: true
         editable: true
+      - name: Pyroscope
+        type: pyroscope
+        access: proxy
+        orgId: 1
+        url: http://pyroscope.payment.svc:4040
+        editable: true

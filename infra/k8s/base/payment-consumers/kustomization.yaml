@@ -3,5 +3,5 @@ kind: Kustomization
 resources:
   - deployment.yaml
   - service.yaml
-  # - consumer-auto-scaler.yaml
+  - consumer-auto-scaler.yaml
 # Ingress is now managed in the overlay, not in the base.

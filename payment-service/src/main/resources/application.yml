@@ -1,7 +1,6 @@
 server:
   port: 8080
 spring:
-  jpa.open-in-view: false
   kafka:
     properties:
       session:
@@ -15,9 +14,9 @@ spring:
   # Only the bootstrap-servers should be overridden in profiles
   datasource:
     hikari:
-      maximum-pool-size: 40
+      maximum-pool-size: 20
       minimum-idle: 10
-      connection-timeout: 3000
+      connection-timeout: 1500
       idle-timeout: 600000
       max-lifetime: 1800000
   # Only the url, username, password should be overridden in profiles
@@ -38,18 +37,16 @@ spring:
   liquibase:
     enabled: true
     change-log: classpath:db/changelog/changelog.master.xml
-  health:
-    probes:
-      enabled: truet
 mybatis:
   mapper-locations: classpath*:com/dogancaglar/infrastructure/persistence/mapper/*.xml
 management:
   endpoints:
     web:
       exposure:
-        include: "prometheus,health"
+        include: "prometheus,metrics,health"
   endpoint:
     health:
+      enabled: true
       show-details: always
     prometheus:
       enabled: true
@@ -63,19 +60,30 @@ management:
       prometheus:
         enabled: true
     enable:
-      tomcat: true
-      http: true
-      jvm: true
-      kafka: true
-      hikari: true
-      executor: true
-  health:
-    probes:
-      enabled: true
+      all: false
+      http.server.requests: true
+      tomcat.threads: true
+      hikaricp.connections: true
+      hikaricp.connections.acquire: true
+      outbox.event.backlog: true
+      outbox.dispatched: true
+      outbox.dispatcher.duration: true
+      kafka.consumer.fetch.manager.records.lag: true
+      kafka.producer.topic.record.send: true
+      process.cpu.usage: true
+      jvm.threads.live: true
+      jvm.memory.used: true
+      jvm.memory.max: true
+      jvm.gc.pause: true
+      scheduler.outbox.active.threads: true
+      scheduler.outbox.pool.size.threads: true
+      scheduler.outbox.queue.size: true
+      kafka.consumer.fetch.manager.records.consumed: true
+      kafka.consumer.fetch.manager.fetch.latency: true
+      kafka.consumer.io.time: true
 outbox-dispatcher:
   thread-count: 10
   batch-size: 5000
   pool-size: 10
 
 spring.jackson.time-zone: UTC
-spring.jpa.properties.hibernate.jdbc.time_zone: UTC

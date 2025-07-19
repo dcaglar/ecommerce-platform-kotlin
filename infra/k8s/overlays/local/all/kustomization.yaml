@@ -7,6 +7,6 @@ resources:
   - ../payment-db
   - ../payment-service
   - ../payment-consumers
-  - ../observability
+  #  - ../observability
   - ../monitoring
 

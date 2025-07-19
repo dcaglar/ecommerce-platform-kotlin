@@ -2,10 +2,9 @@ package com.dogancaglar.infrastructure.persistence.entity
 
 import java.time.LocalDateTime
 import java.time.ZoneOffset.UTC
-import java.util.*
 
 class OutboxEventEntity(
-    val eventId: UUID? = null,
+    val oeid: Long,
     val eventType: String,
     val aggregateId: String,
     val payload: String,
@@ -13,6 +12,24 @@ class OutboxEventEntity(
     val createdAt: LocalDateTime = LocalDateTime.now(UTC)
 ) {
     constructor(
+        oeid: Long,
+        eventType: String,
+        aggregateId: String,
+        payload: String,
+        status: String,
+        createdAt: java.sql.Timestamp
+    ) : this(
+        oeid,
+        eventType,
+        aggregateId,
+        payload,
+        status,
+        createdAt.toInstant().atOffset(UTC).toLocalDateTime()
+    )
+
+
+    /*
+     constructor(
         eventId: UUID?,
         eventType: String,
         aggregateId: String,
@@ -43,10 +60,8 @@ class OutboxEventEntity(
         status,
         createdAt.toInstant().atOffset(UTC).toLocalDateTime()
     )
-
-    /*
-    java.util.UUID, java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.sql.Timestamp
      */
+
     fun markAsSent() {
         this.status = "SENT"
     }

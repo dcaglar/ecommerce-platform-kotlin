@@ -12,34 +12,29 @@ spec:
       labels:
         app: payment-consumers
     spec:
-      initContainers:
-        - name: wait-for-payment-service
-          image: curlimages/curl:8.8.0
-          imagePullPolicy: Always
-          command: [ "/bin/sh", "-c" ]
-          args:
-            - |
-              until curl -sf http://payment-service:8080/actuator/health | grep -q '"status":"UP"'; do
-                echo "Waiting for payment-service to be healthy...";
-                sleep 3;
-              done
-          resources:
-            requests:
-              cpu: 50m
-              memory: "64Mi"
-            limits:
-              cpu: 100m
-              memory: "128Mi"
+      volumes:
+        - name: jfr
+          persistentVolumeClaim:
+            claimName: jfr-data-payment-consumers
       containers:
         - name: payment-consumers
+          volumeMounts:
+            - name: jfr
+              mountPath: /var/log/jfr
           image: dcaglar1987/payment-consumers:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
             - containerPort: 9010
           env:
-            - name: JAVA_OPTS
-              value: "-JAVA_TOOL_OPTIONS=-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Duser.timezone=UTC"
+            - name: PYROSCOPE_APPLICATION_NAME
+              value: payment-consumers
+            - name: PYROSCOPE_SERVER_ADDRESS
+              value: http://pyroscope.payment.svc:4040
+            - name: PYROSCOPE_PROFILER_EVENT
+              value: lock    # or lock or alloc or wall
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:StartFlightRecording=name=payment-consumers,filename=/var/log/jfr/pay.jfr,maxage=30m,maxsize=250M,settings=profile,dumponexit=true -XX:FlightRecorderOptions=repository=/var/log/jfr"
             - name: SPRING_PROFILES_ACTIVE
               value: "local"
             - name: SPRING_DATASOURCE_USERNAME
@@ -57,22 +52,29 @@ spec:
                 name: payment-consumers-config
             - secretRef:
                 name: payment-db-credentials
-          livenessProbe:
-            httpGet:
-              path: /actuator/health
-              port: 8080
-            initialDelaySeconds: 60
-            periodSeconds: 20
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 60
-            periodSeconds: 20
+            initialDelaySeconds: 120
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 90      # (increase for slower startup or when dependent on other services)
+            periodSeconds: 30            # (less frequent is OK, liveness is just for "hung" pod detection)
+            timeoutSeconds: 5            # (gives JVM time under load)
+            failureThreshold: 6          # (allows a few missed heartbeats during spikes)
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: "250m"
+              memory: "512Mi"
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: "1"
+              memory: "2Gi"
+
+
+

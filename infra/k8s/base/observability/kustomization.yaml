@@ -5,7 +5,6 @@ resources:
   - filebeat-daemonset.yaml
   - filebeat-configmap.yaml
   - elasticsearch-statefulset.yaml
-  - elasticsearch-pvc.yaml
   - elasticsearch-service.yaml
   - elasticsearch-headless-service.yaml
   - kibana-deployment.yaml

@@ -4,65 +4,80 @@ This guide walks you through starting up the full stack, getting tokens, and run
 
 ---
 
-## 1️⃣ Clone and Prepare
+## 1️⃣ Start All App & Infra Services
+
+Deploy all services and infrastructure to your local Kubernetes cluster (namespace: `payment`):
 
 ```bash
-git clone https://github.com/your-org/ecommerce-platform-kotlin.git
-cd ecommerce-platform-kotlin
+./infra/scripts/kubernetes/deploy-k8s-overlay.sh local all payment
+```
+
+This will:
+
+- Create the namespace if it doesn't exist
+- Apply all manifests for all services and infrastructure
+- Apply any secrets in the overlay
+
+---
+
+## 2️⃣ Port-forward All Infra Services
+
+To access infrastructure UIs (Keycloak, Kibana, Grafana, Prometheus, etc.) from your local machine, run:
+
+```bash
+./infra/scripts/kubernetes/port-forward-infra.sh
+```
+
+This will open a new Terminal tab for each service (on macOS) or run in the background (on Linux).
+
+Default ports:
+
+- Keycloak: http://localhost:8080
+- Payment Service: http://localhost:8081
+- Kibana: http://localhost:5601
+- Grafana: http://localhost:3000
+- Prometheus: http://localhost:9090
+
+psql -h localhost -p 5432 -U payment
+---
+
+## 3️⃣ Add Keycloak to /etc/hosts
+
+To ensure JWT authentication works (issuer URL comparison), add the Keycloak domain to your `/etc/hosts`:
+
+```bash
+sudo ./infra/scripts/kubernetes/add-local-domains.sh
+```
+
+This will map `keycloak` to `127.0.0.1`.
+
+---
+
+## 4️⃣ Provision Keycloak Credentials
+
+Run the following to create realms, roles, clients, and their configurations in Keycloak:
+
+```bash
+./keycloak/provision-keycloak.sh
 ```
 
 ---
 
-## 2️⃣ Start Local Kubernetes Cluster
+## 5️⃣ Generate Access Token for Payment Service
 
-Spin up all dependencies (Keycloak, Kafka, Redis, Postgres and payment-service , payment-consumer etc.):
-
-```bash
- k8s-deploy-apps.sh local all payment
-```
-
----
-
-## 3️⃣ Start the Application
+Generate an OAuth access token for the payment-service client:
 
 ```bash
-./scripts/app-up.sh
+./keycloak/get-token.sh
 ```
-
----
-
-## 4️⃣ Get a Service Access Token (for local dev & load testing)
-
-**Option 1: Port-forward Keycloak and generate token locally**
-
-1. Start all app and infra services:
-   ```bash
-      `infra/scripts/kubernetes`/k8s-deploy-apps.sh local all payment
-   ```
-
-
-2. Port-forward Keycloak and or other infra you wnat to access so that you can access it locally
-   ```bash
-   kubectl port-forward svc/keycloak 8080:8080 -n payment
-   kubectl port-forward svc/payment-service 8081:8080 -n payment
-   kubectl port-forward svc/kibana 5601:5601 -n payment
-   kubectl port-forward svc/grafana-service 3000:3000 -n payment
-   ```
-3. Add the keycloak and payment.local entries to your `/etc/hosts` file via following script
-   ```bash
-    infra/scripts/kubernetes/add-local-domains.sh 
-   ```
-4. In a new terminal,run 1st commmand for creation of realms, roles, clients, and their configurations,
-   and second one to generate oauth access token for the payment service client
-   so that you can generate a token for the payment service to authenticate your requests:
-   ```bash
-    keycloak/provision-keycloak.sh 
-    keycloak get_token.sh
-   ```
 
 The token will be saved to: `keycloak/access.token`
 
-5. Test the Payment API
+---
+
+## 6️⃣ Test the Payment API
+
+Use the generated access token to call the Payment API:
 
 ```bash
 curl -i -X POST http://localhost:8081/payments \
@@ -78,20 +93,25 @@ curl -i -X POST http://localhost:8081/payments \
       { "sellerId": "SELLER-003", "amount": { "value": 120.00, "currency": "EUR" }}
     ]
   }'
-  
-  ```
+```
 
 ---
 
-## 6️⃣ Run Load Tests
+## 7️⃣ Run Load Tests
 
 From project root, run:
 
 ```bash
-RPS=10 DURATION=10m k6 run load-tests/baseline-smoke-test.js
+VUS=10 RPS=10 DURATION=2m k6 run load-tests/baseline-smoke-test.js
 ```
 
----
+connect to db after port-forwarding:
+
+```bash
+RPS=50 DURATION=10m k6 run load-tests/baseline-smoke-test.js
+```
+
+---s
 
 ## 🔗 Useful URLs
 
@@ -107,6 +127,6 @@ RPS=10 DURATION=10m k6 run load-tests/baseline-smoke-test.js
 
 - **No manual Keycloak setup required** (realm, client, roles provisioned automatically).
 - Tokens/secrets are handled by scripts in `keycloak/`.
-- If you change keycloak configs, re-run `deploy-apps.sh local keyclok payment` to apply changes.
+- If you change Keycloak configs, re-run `deploy-k8s-overlay.sh local keycloak payment` to apply changes.
 - For load testing, always generate tokens using the same Keycloak URL as your payment-service expects (see above for
   port-forwarding).

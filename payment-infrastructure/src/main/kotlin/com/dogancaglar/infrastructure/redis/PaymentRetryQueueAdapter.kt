@@ -5,7 +5,7 @@ import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.payment.application.events.EventMetadatas
-import com.dogancaglar.payment.application.mapper.PaymentOrderEventMapper
+import com.dogancaglar.payment.application.mapper.PaymentOrderDomainEventMapper
 import com.dogancaglar.payment.application.port.outbound.RetryQueuePort
 import com.dogancaglar.payment.domain.model.PaymentOrder
 import com.dogancaglar.payment.domain.model.vo.PaymentOrderId
@@ -50,7 +50,7 @@ class PaymentRetryQueueAdapter(
             val retryAt = System.currentTimeMillis() + backOffMillis
 
             val eventMapStart = System.currentTimeMillis()
-            val paymentRetryRequestEvent = PaymentOrderEventMapper.toPaymentOrderRetryRequestEvent(
+            val paymentRetryRequestEvent = PaymentOrderDomainEventMapper.toPaymentOrderRetryRequestEvent(
                 order = paymentOrder,
                 newRetryCount = retryCount,
                 retryReason = retryReason,

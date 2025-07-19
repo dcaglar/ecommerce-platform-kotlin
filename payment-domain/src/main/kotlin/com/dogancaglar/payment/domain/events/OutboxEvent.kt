@@ -1,68 +1,52 @@
-package  com.dogancaglar.payment.application.events
+package com.dogancaglar.payment.domain.events
 
 import java.time.Clock
 import java.time.LocalDateTime
-import java.util.*
 
-class OutboxEvent private constructor(
-    val eventId: UUID,
+
+class OutboxEvent
+private constructor(
+    val oeid: Long,
     val eventType: String,
     val aggregateId: String,
     val payload: String,
-    private var status: String,
-    val createdAt: LocalDateTime
+    var status: String,
+    val createdAt: LocalDateTime,
 ) {
-
     fun markAsProcessing() {
-        require(status == "NEW") {
-            "OutboxEvent must be NEW to mark as PROCESSING, was $status"
-        }
+        require(status == "NEW") { "Expected status NEW, was $status" }
         status = "PROCESSING"
     }
 
     fun markAsSent() {
-        // ↑ was `require(status == "NEW")`
-        require(status == "PROCESSING" || status == "NEW") {
-            "OutboxEvent must be PROCESSING/NEW to mark as SENT, was $status"
-        }
+        require(status == "PROCESSING" || status == "NEW")
         status = "SENT"
     }
 
-    fun getStatus(): String = status
 
     companion object {
         fun createNew(
+            oeid: Long,
             eventType: String,
             aggregateId: String,
             payload: String,
-            createdAt: LocalDateTime = LocalDateTime.now(Clock.systemUTC())
-        ): OutboxEvent {
-            return OutboxEvent(
-                eventId = UUID.randomUUID(),
-                eventType = eventType,
-                aggregateId = aggregateId,
-                payload = payload,
-                status = "NEW",
-                createdAt = createdAt
-            )
-        }
+            clock: Clock? = Clock.systemUTC()
+        ) = OutboxEvent(
+            oeid = oeid,
+            eventType = eventType,
+            aggregateId = aggregateId,
+            payload = payload,
+            status = "NEW",
+            createdAt = LocalDateTime.now(clock)
+        )
 
-        fun restoreFromPersistence(
-            eventId: UUID,
+        fun restore(
+            oeid: Long,
             eventType: String,
             aggregateId: String,
             payload: String,
             status: String,
             createdAt: LocalDateTime
-        ): OutboxEvent {
-            return OutboxEvent(
-                eventId = eventId,
-                eventType = eventType,
-                aggregateId = aggregateId,
-                payload = payload,
-                status = status,
-                createdAt = createdAt
-            )
-        }
+        ) = OutboxEvent(oeid, eventType, aggregateId, payload, status, createdAt)
     }
 }

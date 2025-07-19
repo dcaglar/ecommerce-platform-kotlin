@@ -4,10 +4,16 @@ import com.dogancaglar.application.PaymentOrderCreated
 import com.dogancaglar.application.PaymentOrderRetryRequested
 import com.dogancaglar.application.PaymentOrderStatusCheckRequested
 import com.dogancaglar.application.PaymentOrderSucceeded
+import com.dogancaglar.payment.application.events.PaymentOrderEvent
+import com.dogancaglar.payment.domain.model.Amount
 import com.dogancaglar.payment.domain.model.PaymentOrder
+import com.dogancaglar.payment.domain.model.PaymentOrderStatus
+import com.dogancaglar.payment.domain.model.vo.PaymentId
+import com.dogancaglar.payment.domain.model.vo.PaymentOrderId
+import com.dogancaglar.payment.domain.model.vo.SellerId
 import java.time.LocalDateTime
 
-object PaymentOrderEventMapper {
+object PaymentOrderDomainEventMapper {
     fun toPaymentOrderRetryRequestEvent(
         order: PaymentOrder,
         newRetryCount: Int,
@@ -47,6 +53,23 @@ object PaymentOrderEventMapper {
     }
 
 
+    fun fromEvent(event: PaymentOrderEvent): PaymentOrder =
+        PaymentOrder.reconstructFromPersistence(
+            paymentOrderId = PaymentOrderId(event.paymentOrderId.toLong()),
+            publicPaymentOrderId = event.publicPaymentOrderId,
+            paymentId = PaymentId(event.paymentId.toLong()),
+            publicPaymentId = event.publicPaymentId,
+            sellerId = SellerId(event.sellerId),
+            amount = Amount(event.amountValue, event.currency),
+            status = PaymentOrderStatus.valueOf(event.status),
+            createdAt = event.createdAt,
+            updatedAt = event.updatedAt,
+            retryCount = event.retryCount,
+            retryReason = event.retryReason,
+            lastErrorMessage = event.lastErrorMessage
+        )
+
+
     fun toPaymentOrderSuccededEvent(order: PaymentOrder): PaymentOrderSucceeded {
         return PaymentOrderSucceeded(
             paymentOrderId = order.paymentOrderId.toString(),
@@ -76,4 +99,13 @@ object PaymentOrderEventMapper {
             currency = order.amount.currency,
         )
     }
+
+    fun copyWithStatus(event: PaymentOrderCreated, newStatus: String): PaymentOrderCreated {
+        return event.copy(
+            status = newStatus,
+            // Optionally update other fields if needed, e.g., updatedAt = LocalDateTime.now()
+        )
+    }
+
+
 }

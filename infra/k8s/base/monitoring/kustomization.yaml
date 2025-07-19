@@ -8,6 +8,5 @@ resources:
   - grafana-deployment.yaml
   - grafana-service.yaml
   - grafana-datasources-configmap.yaml
-  - grafana-config-configmap.yaml
-
+  - pyroscope-statefulset.yaml
 

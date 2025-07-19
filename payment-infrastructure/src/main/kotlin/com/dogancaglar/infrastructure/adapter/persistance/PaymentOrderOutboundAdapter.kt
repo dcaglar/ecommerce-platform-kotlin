@@ -1,6 +1,6 @@
 package com.dogancaglar.infrastructure.adapter.persistance
 
-import com.dogancaglar.infrastructure.persistence.mapper.PaymentOrderEntityMapper
+import com.dogancaglar.infrastructure.mapper.PaymentOrderEntityMapper
 import com.dogancaglar.infrastructure.persistence.repository.PaymentOrderMapper
 import com.dogancaglar.payment.domain.model.PaymentOrder
 import com.dogancaglar.payment.domain.model.vo.PaymentId
@@ -17,7 +17,7 @@ class PaymentOrderOutboundAdapter(
         paymentOrderMapper.upsert(entity)
     }
 
-    override fun saveAll(orders: List<PaymentOrder>) {
+    override fun upsertAll(orders: List<PaymentOrder>) {
         val entities = orders.map { PaymentOrderEntityMapper.toEntity(it) }
         entities.forEach { paymentOrderMapper.upsert(it) }
     }

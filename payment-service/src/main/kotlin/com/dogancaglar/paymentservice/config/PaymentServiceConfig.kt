@@ -10,8 +10,9 @@ import com.dogancaglar.infrastructure.adapter.serialization.JacksonSerialization
 import com.dogancaglar.infrastructure.redis.PaymentRetryQueueAdapter
 import com.dogancaglar.infrastructure.redis.PspResultRedisCacheAdapter
 import com.dogancaglar.infrastructure.redis.id.RedisIdGeneratorPortAdapter
-import com.dogancaglar.payment.application.service.CreatePaymentService
-import com.dogancaglar.payment.application.service.ProcessPaymentService
+import com.dogancaglar.payment.application.command.CreatePaymentCommand
+import com.dogancaglar.payment.application.command.ProcessPaymentCommand
+import com.dogancaglar.payment.application.port.inbound.CreatePaymentUseCase
 import com.dogancaglar.payment.domain.factory.PaymentFactory
 import com.dogancaglar.payment.domain.factory.PaymentOrderFactory
 import org.springframework.context.annotation.Bean
@@ -20,16 +21,17 @@ import java.time.Clock
 
 @Configuration
 class PaymentServiceConfig {
+
     @Bean
-    fun createPaymentService(
+    fun createPaymentCommand(
         idGeneratorPort: RedisIdGeneratorPortAdapter,
         paymentRepository: PaymentOutboundAdapter,
         paymentOrderRepository: PaymentOrderOutboundAdapter,
         outboxEventPort: OutboxBufferAdapter,
         serializationPort: JacksonSerializationAdapter,
         clock: Clock,
-    ): CreatePaymentService {
-        return CreatePaymentService(
+    ): CreatePaymentUseCase {
+        return CreatePaymentCommand(
             idGeneratorPort,
             paymentRepository,
             paymentOrderRepository,
@@ -40,7 +42,7 @@ class PaymentServiceConfig {
     }
 
     @Bean
-    fun processPaymentService(
+    fun processPaymentCommand(
         paymentOrderRepository: PaymentOrderOutboundAdapter,
         paymentEventPublisher: PaymentEventPublisher,
         paymentRetryQueueAdapter: PaymentRetryQueueAdapter,
@@ -48,8 +50,8 @@ class PaymentServiceConfig {
         pspResultRedisCacheAdapter: PspResultRedisCacheAdapter,
         outboxEventPort: OutboxBufferAdapter,
         clock: Clock,
-    ): ProcessPaymentService {
-        return ProcessPaymentService(
+    ): ProcessPaymentCommand {
+        return ProcessPaymentCommand(
             paymentOrderRepository = paymentOrderRepository,
             eventPublisher = paymentEventPublisher,
             retryQueuePort = paymentRetryQueueAdapter,

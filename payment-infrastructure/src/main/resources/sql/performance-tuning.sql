@@ -1,25 +1,22 @@
--- Enable the pg_stat_statements extension (for tracking query stats)
-CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+psql -h localhost -p 5432 -U payment
 
--- Enable the adminpack extension (for some admin features, optional)
-CREATE EXTENSION IF NOT EXISTS adminpack;
-
-
-
-
---to get the top 10 slowest queries
-SELECT
-    query,
-    calls,
-    total_exec_time,
-    mean_exec_time,
-    rows,
-    min_exec_time,
-    max_exec_time
+SELECT query, calls, mean_exec_time, total_exec_time
 FROM pg_stat_statements
-where query ilike '%outbox_event%' or query ilike '%payments%' or query ilike '%payment_orders%'
 ORDER BY mean_exec_time DESC
-LIMIT 10;
+LIMIT 3;
+
+
+--current activities
+SELECT pid, state, query, wait_event_type, wait_event
+FROM pg_stat_activity;
+
+
+--blocking chains
+
+SELECT blocking.pid AS blocking_pid, blocked.pid AS blocked_pid, blocked.query AS blocked_query
+FROM pg_locks blocking
+JOIN pg_locks blocked
+  ON blocking.locktype = blocked.locktype
 
 
 EXPLAIN ANALYZE
@@ -165,3 +162,57 @@ payment=#
 
 
 
+
+
+
+SELECT relname,
+       pg_size_pretty(pg_table_size(relid)) AS table_size,
+       pg_size_pretty(pg_indexes_size(relid)) AS indexes_size
+FROM pg_catalog.pg_statio_user_tables
+ORDER BY relname DESC;
+
+
+SELECT * FROM pg_stat_bgwriter;
+SELECT datname, blks_read, blks_hit
+FROM pg_stat_database
+order by datname;
+
+
+1 — What the numbers are shouting
+	1.	Backend writes exploded
+Previous run: back-end pages ≈ 2 k
+Latest run: back-end pages ≈ 12 k
+→ Most dirty pages are being flushed by the session that issued the insert/update, not by the check-pointer.
+	2.	Allocations shot up almost identically
+buffers_alloc grew ≈ 10 k, matching the jump in buffers_backend.
+→ Every new row is creating/dirtying a fresh page (typical when the B-tree keeps splitting).
+	3.	Checkpoint share shrank
+Even though buffers_checkpoint rose, backend writes rose faster; your workload is now random-IO dominated.
+	4.	Checkpoint duration ballooned
+256 s → 584 s cumulative write time. The check-pointer is desperately trying to flush, but backend traffic races ahead.
+
+2 — Root cause in plain English
+
+Inserts land on random leaf pages because the primary key on outbox_event is a UUID (plus updates hit an indexed status).
+Every page touched becomes dirty once per insert/update, so Postgres can’t group them and has to flush in tiny random 8 kB chunks.
+Result:
+	•	huge buffers_backend
+	•	growing checkpoint latency
+	•	write-amplification exactly like the Spring I/O talk warned.
+
+3 — How you’ll know the fix works
+
+After switching to BIGINT/ULID → sequential clustering and dropping the standalone status index you should see for the same load pattern:
+	•	buffers_backend ≪ buffers_checkpoint (ideally < 10 %).
+	•	buffers_alloc roughly equals inserts but does not explode per update.
+	•	checkpoint_write_time grows linearly, not exponentially, and each timed checkpoint finishes in seconds, not minutes.
+
+Rule of thumb: when backend writes dominate, you’re paying UUID tax.
+
+4 — Suggested next steps
+	1.	Create the new clustered PK (numeric or time-sortable) on outbox_event; keep UUID as public_event_id if you still need it externally.
+	2.	Drop or narrow the simple status index (the composite (status,created_at) already covers the queries you showed).
+	3.	Retest the same load; capture a new snapshot; compare the deltas again.
+	4.	Optional tuning after the schema fix: lower checkpoint_timeout (e.g. 5 min) and raise checkpoint_completion_target (0.9) so remaining checkpoints spill more gently.
+
+Need an exact migration script or Kotlin ULID generator snippet? Just say the word.

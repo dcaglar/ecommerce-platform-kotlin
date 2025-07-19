@@ -88,7 +88,7 @@ open class PaymentRetryRedisCache(
         backOffMillis: Long
     ) {
         // ... envelope creation, scheduling logic unchanged ...
-        val paymentOrderRetryRequested = PaymentOrderEventMapper.toPaymentOrderRetryRequestEvent(order = paymentOrder)
+        val paymentOrderRetryRequested = PaymentOrderDomainEventMapper.toPaymentOrderRetryRequestEvent(order = paymentOrder)
         val envelope = DomainEventEnvelopeFactory.envelopeFor(
             data = paymentOrderRetryRequested,
             eventMetaData = EventMetadatas.PaymentOrderRetryRequestedMetadata,

@@ -1,7 +1,6 @@
 server:
   port: 8080
 spring:
-  jpa.open-in-view: false
   kafka:
     properties:
       session:
@@ -12,14 +11,7 @@ spring:
       properties: #maybe change partition assignment strategy
         partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
         spring.deserializer.value.delegate.class: com.dogancaglar.infrastructure.config.kafka.deserialization.EventEnvelopeDeserializer
-  # Only the bootstrap-servers should be overridden in profiles
-  datasource:
-    hikari:
-      maximum-pool-size: 40
-      minimum-idle: 10
-      connection-timeout: 3000
-      idle-timeout: 600000
-      max-lifetime: 1800000
+
   # Only the url, username, password should be overridden in profiles
   data:
     redis:
@@ -37,24 +29,42 @@ management:
   endpoints:
     web:
       exposure:
-        include: "prometheus,health"
+        include: "prometheus,metrics,health"
   endpoint:
     health:
+      enabled: true
       show-details: always
     prometheus:
       enabled: true
   metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
     export:
       prometheus:
         enabled: true
     enable:
-      http: false
-      jvm: true
-      kafka: true
-      hikari: true
-      executor: true
-  health:
-    probes:
-      enabled: true
+      all: false
+      http.server.requests: true
+      tomcat.threads: true
+      hikaricp.connections: true
+      hikaricp.connections.acquire: true
+      outbox.event.backlog: true
+      outbox.dispatched: true
+      outbox.dispatcher.duration: true
+      kafka.consumer.fetch.manager.records.lag: true
+      kafka.producer.topic.record.send: true
+      process.cpu.usage: true
+      jvm.threads.live: true
+      jvm.memory.used: true
+      jvm.memory.max: true
+      jvm.gc.pause: true
+      scheduler.outbox.active.threads: true
+      scheduler.outbox.pool.size.threads: true
+      scheduler.outbox.queue.size: true
+      kafka.consumer.fetch.manager.records.consumed: true
+      kafka.consumer.fetch.manager.fetch.latency: true
+      kafka.consumer.io.time: true
 spring.jackson.time-zone: UTC
-spring.jpa.properties.hibernate.jdbc.time_zone: UTC

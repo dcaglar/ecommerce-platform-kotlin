@@ -3,9 +3,9 @@ package com.dogancaglar.paymentservice.maintenance
 import com.dogancaglar.application.PaymentOrderCreated
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.payment.application.events.EventMetadatas
-import com.dogancaglar.payment.application.events.OutboxEvent
 import com.dogancaglar.payment.application.port.outbound.EventPublisherPort
 import com.dogancaglar.payment.application.port.outbound.OutboxEventPort
+import com.dogancaglar.payment.domain.events.OutboxEvent
 import com.dogancaglar.paymentservice.config.metrics.MetricNames.OUTBOX_DISPATCHED_TOTAL
 import com.dogancaglar.paymentservice.config.metrics.MetricNames.OUTBOX_DISPATCHER_DURATION
 import com.dogancaglar.paymentservice.config.metrics.MetricNames.OUTBOX_DISPATCH_FAILED_TOTAL
@@ -85,7 +85,7 @@ class OutboxDispatcherJob(
                 succeeded.add(event)
             } catch (ex: Exception) {
                 failed.add(event)
-                logger.error("Failed to publish event on $threadName ${event.eventId}: ${ex.message}", ex)
+                logger.error("Failed to publish event on $threadName ${event.oeid}: ${ex.message}", ex)
                 // Optionally log the error for monitoring
                 // logger.error("Failed to publish event ${event.id}", ex)
             }

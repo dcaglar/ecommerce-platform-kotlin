@@ -1,6 +1,6 @@
 package com.dogancaglar.infrastructure.adapter.persistance
 
-import com.dogancaglar.infrastructure.persistence.mapper.PaymentEntityMapper
+import com.dogancaglar.infrastructure.mapper.PaymentEntityMapper
 import com.dogancaglar.infrastructure.persistence.repository.PaymentMapper
 import com.dogancaglar.payment.domain.model.Payment
 import com.dogancaglar.payment.domain.model.vo.PaymentId

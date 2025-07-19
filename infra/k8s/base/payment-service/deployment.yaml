@@ -12,26 +12,29 @@ spec:
       labels:
         app: payment-service
     spec:
-      initContainers:
-        - name: wait-for-payment-db
-          image: postgres:15
-          command: [ 'sh', '-c', 'until pg_isready -h payment-db -p 5432 -U payment; do echo waiting for payment-db; sleep 2; done;' ]
-          env:
-            - name: PGPASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: payment-db-credentials
-                  key: POSTGRES_PASSWORD
+      volumes:
+        - name: jfr
+          persistentVolumeClaim:
+            claimName: jfr-data-payment-service
       containers:
         - name: payment-service
+          volumeMounts:
+            - name: jfr
+              mountPath: /var/log/jfr
           image: dcaglar1987/payment-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080  # REST API
             - containerPort: 9010  # JMX
           env:
-            - name: JAVA_OPTS
-              value: "-JAVA_TOOL_OPTIONS=-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Duser.timezone=UTC"
+            - name: PYROSCOPE_APPLICATION_NAME
+              value: payment-service
+            - name: PYROSCOPE_SERVER_ADDRESS
+              value: http://pyroscope.payment.svc:4040
+            - name: PYROSCOPE_PROFILER_EVENT
+              value: lock    # or lock or alloc or wall
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:StartFlightRecording=name=payment-service,filename=/var/log/jfr/pay.jfr,maxage=30m,maxsize=250M,settings=profile,dumponexit=true -XX:FlightRecorderOptions=repository=/var/log/jfr"
             - name: SPRING_PROFILES_ACTIVE
               value: "local"
             - name: SPRING_DATASOURCE_USERNAME
@@ -54,18 +57,23 @@ spec:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 60
-            periodSeconds: 20
+            initialDelaySeconds: 120     # Wait 2 minutes before first liveness check
+            periodSeconds: 30            # Check every 30 seconds
+            timeoutSeconds: 5            # Wait up to 5 seconds for response
+            failureThreshold: 6          # Allow up to 6 failures before killing pod
+
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 60
-            periodSeconds: 20
+            initialDelaySeconds: 120     # Wait 2 minutes before first readiness check (match liveness for smoother rollout)
+            periodSeconds: 15            # Check readiness every 15 seconds
+            timeoutSeconds: 5            # Wait up to 5 seconds for response
+            failureThreshold: 6
           resources:
             requests:
-              cpu: "100m"
-              memory: "256Mi"
+              cpu: "500m"
+              memory: "1Gi"
             limits:
-              cpu: 500m
-              memory: "512Mi"
+              cpu: "2"
+              memory: "2Gi"
