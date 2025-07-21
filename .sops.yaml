@@ -1,0 +1,6 @@
+creation_rules:
+  - encrypted_regex: "^(data|stringData)$"
+    age: 
+      - age17mf7r7lxxz6x0h2yfujqchflhldxx7yelxrafngld976fhz8yswq8qluqg
+     # <-- use your actual public key!:wq
+

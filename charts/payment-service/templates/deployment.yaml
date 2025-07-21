@@ -27,12 +27,12 @@ spec:
             - containerPort: 8080  # REST API
             - containerPort: 9010  # JMX
           env:
-            - name: PYROSCOPE_APPLICATION_NAME
-              value: payment-service
-            - name: PYROSCOPE_SERVER_ADDRESS
-              value: http://pyroscope.payment.svc:4040
-            - name: PYROSCOPE_PROFILER_EVENT
-              value: lock    # or lock or alloc or wall
+            #            - name: PYROSCOPE_APPLICATION_NAME
+            #              value: payment-service
+            #            - name: PYROSCOPE_SERVER_ADDRESS
+            #              value: http://pyroscope.payment.svc:4040
+            #            - name: PYROSCOPE_PROFILER_EVENT
+            #              value: lock    # or lock or alloc or wall
             - name: JAVA_TOOL_OPTIONS
               value: "-XX:StartFlightRecording=name=payment-service,filename=/var/log/jfr/pay.jfr,maxage=30m,maxsize=250M,settings=profile,dumponexit=true -XX:FlightRecorderOptions=repository=/var/log/jfr"
             - name: DATA_SOURCE_NAME
