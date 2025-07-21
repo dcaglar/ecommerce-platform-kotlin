@@ -75,6 +75,15 @@ spec:
             limits:
               cpu: "1"
               memory: "2Gi"
-
-
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jfr-data-payment-consumers
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
 

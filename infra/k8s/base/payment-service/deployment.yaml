@@ -35,6 +35,8 @@ spec:
               value: lock    # or lock or alloc or wall
             - name: JAVA_TOOL_OPTIONS
               value: "-XX:StartFlightRecording=name=payment-service,filename=/var/log/jfr/pay.jfr,maxage=30m,maxsize=250M,settings=profile,dumponexit=true -XX:FlightRecorderOptions=repository=/var/log/jfr"
+            - name: DATA_SOURCE_NAME
+              value: "postgresql://payment:payment@payment-db:5432/payment?sslmode=disable"
             - name: SPRING_PROFILES_ACTIVE
               value: "local"
             - name: SPRING_DATASOURCE_USERNAME
@@ -52,7 +54,7 @@ spec:
                 name: payment-service-config        # Non-secret config values (ConfigMap)
             - secretRef:
                 name: payment-db-credentials       # DB credentials (Secret)
-          # Kafka credentials (Secret)
+          # Kdeleafka credentials (Secret)
           livenessProbe:
             httpGet:
               path: /actuator/health
@@ -77,3 +79,16 @@ spec:
             limits:
               cpu: "2"
               memory: "2Gi"
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jfr-data-payment-service
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
