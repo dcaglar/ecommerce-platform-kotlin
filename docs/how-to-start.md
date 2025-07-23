@@ -102,7 +102,8 @@ curl -i -X POST http://localhost:8081/payments \
 From project root, run:
 
 ```bash
-VUS=10 RPS=10 DURATION=2m k6 run load-tests/baseline-smoke-test.js
+       RPS=10 DURATION=1m k6 run load-tests/baseline-smoke-test.js
+VUS=40 RPS=40 DURATION=2m k6 run load-tests/baseline-smoke-test.js
 ```
 
 connect to db after port-forwarding:

@@ -27,10 +27,7 @@ RUN mvn -pl payment-service -am clean package -DskipTests
 FROM eclipse-temurin:21-jdk-jammy
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y curl && \
-    curl -L -o pyroscope.jar https://github.com/grafana/pyroscope-java/releases/download/v0.12.2/pyroscope.jar && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/payment-service/target/*.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["java", "-javaagent:/app/pyroscope.jar", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -1,0 +1,30 @@
+auth:
+  adminUser: admin
+  adminPassword: adminpassword
+
+proxy: edge
+
+service:
+  type: NodePort
+  nodePorts:
+    http: 32080
+
+postgresql:
+  enabled: true
+  auth:
+    username: bn_keycloak
+    password: bitnami
+    database: bitnami_keycloak
+  service:
+    ports:
+      postgresql: 5434
+  containerPorts:
+    postgresql: 5434
+
+resources:
+  requests:
+    memory: 1Gi
+    cpu: 250m
+  limits:
+    memory: 2Gi
+    cpu: 1

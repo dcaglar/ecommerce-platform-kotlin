@@ -1,0 +1,64 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-app-users
+  namespace: payment
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-users
+          image: postgres:16-alpine
+          env:
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-app-config
+                  key: DB_NAME
+            - name: DB_ADMIN_USER
+              value: postgres
+            - name: DB_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: ADMIN_POSTGRES_PASSWORD
+            - name: SERVICE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: PAYMENT_SERVICE_APP_DB_USER
+            - name: SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: PAYMENT_SERVICE_APP_DB_PASSWORD
+            - name: CONSUMER_USER
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: PAYMENT_CONSUMERS_APP_DB_USER
+            - name: CONSUMER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: PAYMENT_CONSUMERS_APP_DB_PASSWORD
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              echo "
+                CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+                CREATE EXTENSION IF NOT EXISTS "btree_gin";
+                CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
+                CREATE EXTENSION IF NOT EXISTS "plpgsql";
+                CREATE USER \"${SERVICE_USER}\" WITH PASSWORD '${SERVICE_PASSWORD}';
+                CREATE USER \"${CONSUMER_USER}\" WITH PASSWORD '${CONSUMER_PASSWORD}';
+                GRANT CONNECT ON DATABASE $DB_NAME TO \"${SERVICE_USER}\";
+                GRANT CONNECT ON DATABASE $DB_NAME TO \"${CONSUMER_USER}\";
+                GRANT ALL ON SCHEMA public TO \"${SERVICE_USER}\";
+                GRANT ALL ON SCHEMA public TO \"${CONSUMER_USER}\";
+                ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO \"${SERVICE_USER}\";
+                ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO \"${CONSUMER_USER}\";"> /tmp/grant-users.sql
+              export PGPASSWORD="${DB_ADMIN_PASSWORD}"
+              psql -h payment-db-postgresql -U postgres -d $DB_NAME -f /tmp/grant-users.sql

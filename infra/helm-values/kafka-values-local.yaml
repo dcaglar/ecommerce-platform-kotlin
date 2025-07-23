@@ -1,0 +1,53 @@
+listeners:
+  client:
+    protocol: PLAINTEXT
+    containerPort: 9092
+    name: CLIENT
+    sslClientAuth: ""
+  controller:
+    protocol: PLAINTEXT
+    containerPort: 9093
+    name: CONTROLLER
+    sslClientAuth: ""
+  interbroker:
+    protocol: PLAINTEXT
+    containerPort: 9094
+    name: INTERNAL
+    sslClientAuth: ""
+  external:
+    protocol: PLAINTEXT
+    containerPort: 9095
+    name: EXTERNAL
+    sslClientAuth: ""
+sasl:
+  enabledMechanisms: ""
+  interBrokerMechanism: ""
+  controllerMechanism: ""
+  interbroker:
+    user: ""
+    password: ""
+  controller:
+    user: ""
+    password: ""
+  client:
+    users: []
+    passwords: ""
+  existingSecret: ""
+
+replicaCount: 1
+
+
+metrics:
+  kafka:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 10s
+
+resources:
+  requests:
+    memory: 1Gi
+    cpu: 500m
+  limits:
+    memory: 2Gi
+    cpu: 2

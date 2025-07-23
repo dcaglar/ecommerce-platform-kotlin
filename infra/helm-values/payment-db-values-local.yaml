@@ -1,0 +1,13 @@
+auth:
+  existingSecret: payment-db-credentials
+  database: payment_db           # Your DB name (as before)
+  secretKeys:
+    adminPasswordKey: ADMIN_POSTGRES_PASSWORD
+
+primary:
+  extendedConfiguration: |
+    max_connections = 200
+    log_statement = 'all'
+    log_min_duration_statement = 0
+    log_connections = on
+    log_disconnections = on

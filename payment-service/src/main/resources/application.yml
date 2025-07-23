@@ -1,4 +1,7 @@
 server:
+  tomcat:
+    mbeanregistry:
+      enabled: true
   port: 8080
 spring:
   kafka:
@@ -51,16 +54,11 @@ management:
     prometheus:
       enabled: true
   metrics:
-    distribution:
-      percentiles-histogram:
-        http.server.requests: true
-      percentiles:
-        http.server.requests: 0.5,0.95,0.99
-    export:
-      prometheus:
-        enabled: true
     enable:
       all: false
+      tomcat.threads.current: true      # current thread count
+      tomcat.threads.busy: true         # threads handling requests
+      tomcat.threads.config.max: true
       http.server.requests: true
       tomcat.threads: true
       hikaricp.connections: true
@@ -81,9 +79,22 @@ management:
       kafka.consumer.fetch.manager.records.consumed: true
       kafka.consumer.fetch.manager.fetch.latency: true
       kafka.consumer.io.time: true
-outbox-dispatcher:
-  thread-count: 10
-  batch-size: 5000
-  pool-size: 10
+    binders:
+      tomcat:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+    export:
+      prometheus:
+        enabled: true
+
+
+  outbox-dispatcher:
+    thread-count: 10
+    batch-size: 5000
+    pool-size: 10
 
 spring.jackson.time-zone: UTC
