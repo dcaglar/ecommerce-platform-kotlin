@@ -33,7 +33,7 @@ spring:
     bootstrap-servers: kafka:9092
   data:
     redis:
-      url: redis://redis:6379
+      url: redis://redis-master:6379
       timeout: 2000ms
       lettuce:
         pool:

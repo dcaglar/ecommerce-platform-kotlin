@@ -11,7 +11,7 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD} # This will be injected from a Kubernetes Secret
   data:
     redis:
-      url: redis://redis:6379
+      url: redis://redis-master:6379
   security:
     oauth2:
       resourceserver:

@@ -39,21 +39,27 @@ spec:
               value: "postgresql://payment:payment@payment-db:5432/payment?sslmode=disable"
             - name: SPRING_PROFILES_ACTIVE
               value: "local"
+            - name: SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-app-config
+                  key: KEYCLOAK_ISSUER_URL
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-app-config
+                  key: PAYMENT_DB_URL
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: payment-db-credentials
-                  key: POSTGRES_USER
+                  key: PAYMENT_SERVICE_APP_DB_USER
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: payment-db-credentials
-                  key: POSTGRES_PASSWORD
+                  key: PAYMENT_SERVICE_APP_DB_PASSWORD
           envFrom:
-            - configMapRef:
-                name: payment-service-config        # Non-secret config values (ConfigMap)
-            - secretRef:
-                name: payment-db-credentials       # DB credentials (Secret)
           # Kdeleafka credentials (Secret)
           livenessProbe:
             httpGet:

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-app-config
+  namespace: {{.Release.Namespace}}
+data:
+  KEYCLOAK_ISSUER_URL: {{.Values.KEYCLOAK_ISSUER_URL | quote}}
+  PAYMENT_DB_URL: {{.Values.PAYMENT_DB_URL | quote}}
+  DB_NAME: {{.Values.DB_NAME | quote}}
+  # ...more keys as needed

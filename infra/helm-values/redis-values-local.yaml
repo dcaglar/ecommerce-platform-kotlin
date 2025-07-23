@@ -1,0 +1,12 @@
+architecture: standalone
+
+auth:
+  enabled: false
+
+master:
+  persistence:
+    enabled: true
+    size: 5Gi
+
+  # Reference your existing ConfigMap (must exist in the same namespace)
+  existingConfigmap: redis-config
