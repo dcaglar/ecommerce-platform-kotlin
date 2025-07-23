@@ -29,8 +29,11 @@ server:
 spring:
   kafka:
     properties:
-      client-id: payment-service
-    bootstrap-servers: kafka:9092
+      security.protocol: SASL_PLAINTEXT
+      sasl.mechanism: SCRAM-SHA-256
+      sasl.jaas.config: ${SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG}
+      client-id: ${CLIENT_ID:payment-consumers}
+    bootstrap-servers: kafka.payment.svc.cluster.local:9092
   data:
     redis:
       url: redis://redis-master:6379

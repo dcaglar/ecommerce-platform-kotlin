@@ -3,8 +3,8 @@ server:
 spring:
   kafka:
     properties:
-      client-id: payment-service
-    bootstrap-servers: kafka:9092
+      security.protocol: PLAINTEXT
+      bootstrap-servers: kafka.payment.svc.cluster.local:9092
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME} # This will be injected from a Kubernetes Secret

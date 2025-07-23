@@ -59,7 +59,12 @@ spec:
                 secretKeyRef:
                   name: payment-db-credentials
                   key: PAYMENT_SERVICE_APP_DB_PASSWORD
-          envFrom:
+            - name: KAFKA_CLIENT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: KAFKA_CLIENT_PASSWORD
+
           # Kdeleafka credentials (Secret)
           livenessProbe:
             httpGet:
