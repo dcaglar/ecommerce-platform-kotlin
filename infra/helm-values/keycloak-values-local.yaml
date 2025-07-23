@@ -6,6 +6,8 @@ proxy: edge
 
 service:
   type: NodePort
+  ports:
+    http: 8080
   nodePorts:
     http: 32080
 
@@ -20,6 +22,26 @@ postgresql:
       postgresql: 5434
   containerPorts:
     postgresql: 5434
+## Enable/Override Health Probes
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+  path: /health/live
+  scheme: HTTP
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+  path: /health/ready
+  scheme: HTTP
 
 resources:
   requests:

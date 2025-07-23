@@ -3,26 +3,25 @@
 set -euo pipefail
 
 # --- Configurable Vars ---
-KEYCLOAK_URL="http://keycloak:8080"
+KEYCLOAK_URL="http://localhost:8080"
 REALM="ecommerce-platform"
 ADMIN_USER="admin"
-ADMIN_PASS="admin"
+ADMIN_PASS="adminpassword"
 OUTPUT_DIR="$(dirname "$0")/output"
-
 mkdir -p "$OUTPUT_DIR"
 
 log() { echo "[$(date +'%H:%M:%S')] $*" >&2; }
-
-# --- Wait for Keycloak to be Ready ---
-log "⏳ Waiting for Keycloak to be ready at $KEYCLOAK_URL..."
-for i in $(seq 1 30); do
-  if curl -s "$KEYCLOAK_URL/health/ready" | grep -q UP; then
-    log "✅ Keycloak is ready!"
-    break
-  fi
-  log "Keycloak not ready yet, waiting ($i/30)..."
-  sleep 2
-done
+#
+## --- Wait for Keycloak to be Ready ---
+#log "⏳ Waiting for Keycloak to be ready at $KEYCLOAK_URL..."
+#for i in $(seq 1 30); do
+#  if curl -s "$KEYCLOAK_URL/health/ready" | grep -q UP; then
+#    log "✅ Keycloak is ready!"
+#    break
+#  fi
+#  log "Keycloak not ready yet, waiting ($i/30)..."
+#  sleep 2
+#done
 
 # --- Authenticate as Admin ---
 log "🔐 Authenticating as admin..."
