@@ -27,32 +27,45 @@ spec:
             - containerPort: 8080  # REST API
             - containerPort: 9010  # JMX
           env:
-            - name: PYROSCOPE_APPLICATION_NAME
-              value: payment-service
-            - name: PYROSCOPE_SERVER_ADDRESS
-              value: http://pyroscope.payment.svc:4040
-            - name: PYROSCOPE_PROFILER_EVENT
-              value: lock    # or lock or alloc or wall
+            #            - name: PYROSCOPE_APPLICATION_NAME
+            #              value: payment-service
+            #            - name: PYROSCOPE_SERVER_ADDRESS
+            #              value: http://pyroscope.payment.svc:4040
+            #            - name: PYROSCOPE_PROFILER_EVENT
+            #              value: lock    # or lock or alloc or wall
             - name: JAVA_TOOL_OPTIONS
               value: "-XX:StartFlightRecording=name=payment-service,filename=/var/log/jfr/pay.jfr,maxage=30m,maxsize=250M,settings=profile,dumponexit=true -XX:FlightRecorderOptions=repository=/var/log/jfr"
+            - name: DATA_SOURCE_NAME
+              value: "postgresql://payment:payment@payment-db:5432/payment?sslmode=disable"
             - name: SPRING_PROFILES_ACTIVE
               value: "local"
+            - name: SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-app-config
+                  key: KEYCLOAK_ISSUER_URL
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-app-config
+                  key: PAYMENT_DB_URL
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: payment-db-credentials
-                  key: POSTGRES_USER
+                  key: PAYMENT_SERVICE_APP_DB_USER
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: payment-db-credentials
-                  key: POSTGRES_PASSWORD
-          envFrom:
-            - configMapRef:
-                name: payment-service-config        # Non-secret config values (ConfigMap)
-            - secretRef:
-                name: payment-db-credentials       # DB credentials (Secret)
-          # Kafka credentials (Secret)
+                  key: PAYMENT_SERVICE_APP_DB_PASSWORD
+            - name: KAFKA_CLIENT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: KAFKA_CLIENT_PASSWORD
+
+          # Kdeleafka credentials (Secret)
           livenessProbe:
             httpGet:
               path: /actuator/health
@@ -77,3 +90,16 @@ spec:
             limits:
               cpu: "2"
               memory: "2Gi"
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jfr-data-payment-service
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi

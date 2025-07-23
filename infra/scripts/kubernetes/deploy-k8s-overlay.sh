@@ -47,12 +47,10 @@ fi
 
 echo "🚀 Deploying overlay: $OVERLAY (namespace: $NS)..."
 
-# Namespace
-if kubectl get ns "$NS" >/dev/null 2>&1; then
-  echo "ℹ️  Namespace '$NS' already exists."
+if [[ "$COMPONENT" == "monitoring" || "$COMPONENT" == "all" ]]; then
+  kubectl apply -k "$OVERLAY"              # ← let each YAML set its own ns
 else
-  echo "🆕 Creating namespace '$NS'..."
-  kubectl create ns "$NS"
+  kubectl apply -k "$OVERLAY" -n "$NS"
 fi
 
 # Optional: Apply any overlay secrets yaml files
@@ -62,7 +60,6 @@ if [ -d "$OVERLAY/secrets" ]; then
   done
 fi
 
-kubectl apply -k "$OVERLAY" -n "$NS"
 
 echo ""
 echo "✅ Deployed: $OVERLAY to namespace $NS"

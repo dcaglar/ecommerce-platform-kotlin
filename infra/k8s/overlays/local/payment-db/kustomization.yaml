@@ -7,3 +7,6 @@ secretGenerator:
   - name: payment-db-credentials
     envs:
       - secrets/payment-db-credentials.env
+
+generatorOptions:
+  disableNameSuffixHash: true

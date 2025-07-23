@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: payment
+data:
+  redis.conf: |
+    save 900 1
+    save 300 10
+    save 60 10000
+
+    appendonly yes
+    appendfsync everysec

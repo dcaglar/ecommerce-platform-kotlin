@@ -1,12 +1,8 @@
 #!/bin/bash
-
 set -e
 
-# --- Location awareness ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-echo "SCRIPT DIR: $SCRIPT_DIR"
 REPO_ROOT="$SCRIPT_DIR/../../.."
-echo "REPO DIR: $REPO_ROOT"
 cd "$REPO_ROOT"
 
 ENV=${1:-local}
@@ -15,36 +11,32 @@ NS=${3:-payment}
 
 OVERLAY="$REPO_ROOT/infra/k8s/overlays/$ENV/$COMPONENT"
 
-if [ ! -d "$OVERLAY" ]; then
-  echo "❌ Overlay path does not exist: $OVERLAY"
-  exit 2
+if [[ ! -d "$OVERLAY" ]]; then
+  echo "❌ Overlay path does not exist: $OVERLAY"; exit 2
 fi
 
-# Optional: Delete any overlay secrets yaml files
-if [ -d "$OVERLAY/secrets" ]; then
+# --- delete overlay-specific Secrets first ---
+if [[ -d "$OVERLAY/secrets" ]]; then
   for s in "$OVERLAY"/secrets/*.yaml; do
-    [ -f "$s" ] && echo "🗑️  Deleting secret: $s" && kubectl delete -f "$s" -n "$NS" --ignore-not-found || true
+    [[ -f "$s" ]] && kubectl delete -f "$s" -n "$NS" --ignore-not-found || true
   done
 fi
 
-kubectl delete -k "$OVERLAY" -n "$NS"  || true
-
-echo "🗑️  Deleted: $OVERLAY from namespace $NS"
+echo "🗑️  Deleting component '$COMPONENT' ..."
 
 
-#echo "🧹 Deleting kafka PVCs in namespace"
-kubectl delete pvc -n payment data-kafka-0  || true
-kubectl delete pvc -n payment data-payment-db-0  || true
-kubectl delete pvc -n payment data-zookeeper-0   || true
 
+if [[ "$COMPONENT" == "monitoring" || "$COMPONENT" == "all" ]]; then
+  kubectl delete -k "$OVERLAY"              # ← let each YAML set its own ns
+else
+  kubectl delete -k "$OVERLAY" -n "$NS"
+fi
 
-#kubectl delete pvc -n payment  keycloak-pg-pvc || true
-#kubectl delete pvc -n payment redis-data-pvc || true
-#
-#echo "✅  Deleted all kafka pvc"
+echo "✅  Deleted $COMPONENT from overlay $ENV"
 
-echo "killing port-forwards..."
+# --- PVC cleanup (namespace-scoped) ---
+kubectl delete pvc -n "$NS" data-kafka-0 data-payment-db-0 data-zookeeper-0 --ignore-not-found || true
 
+# kill any stray port-forwards
 pkill -f "kubectl port-forward" || true
-
 echo "✅  Killed all port-forwards."
