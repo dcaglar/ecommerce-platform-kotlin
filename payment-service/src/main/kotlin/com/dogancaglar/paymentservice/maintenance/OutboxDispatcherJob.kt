@@ -1,11 +1,11 @@
 package com.dogancaglar.paymentservice.maintenance
 
-import com.dogancaglar.application.PaymentOrderCreated
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.payment.application.events.EventMetadatas
 import com.dogancaglar.payment.application.port.outbound.EventPublisherPort
 import com.dogancaglar.payment.application.port.outbound.OutboxEventPort
+import com.dogancaglar.payment.domain.PaymentOrderCreated
 import com.dogancaglar.payment.domain.events.OutboxEvent
+import com.dogancaglar.payment.domain.model.EventMetadatas
 import com.dogancaglar.paymentservice.config.metrics.MetricNames.OUTBOX_DISPATCHED_TOTAL
 import com.dogancaglar.paymentservice.config.metrics.MetricNames.OUTBOX_DISPATCHER_DURATION
 import com.dogancaglar.paymentservice.config.metrics.MetricNames.OUTBOX_DISPATCH_FAILED_TOTAL

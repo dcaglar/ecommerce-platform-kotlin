@@ -1,4 +1,4 @@
-package com.dogancaglar.payment.domain.port.id
+package paymentservice.port.port.id
 
 object IdNamespaces {
     const val PAYMENT = "id-generator:payment"

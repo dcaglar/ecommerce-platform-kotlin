@@ -1,6 +1,6 @@
 package com.dogancaglar.payment.application.events
 
-import com.dogancaglar.common.event.EVENT_TYPE
+import com.dogancaglar.common.event.CONSUMER_GROUPS.PAYMENT_ORDER_CREATED
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
 import com.dogancaglar.common.event.TOPICS
@@ -14,7 +14,7 @@ class DummyClass
 
 object DummyClassEventMetadata : EventMetadata<DummyClass> {
     override val topic = TOPICS.PAYMENT_ORDER_CREATED
-    override val eventType = EVENT_TYPE.PAYMENT_ORDER_CREATED
+    override val eventType = PAYMENT_ORDER_CREATED
     override val clazz = DummyClass::class.java
     override val typeRef = object : TypeReference<EventEnvelope<DummyClass>>() {}
 }
@@ -24,7 +24,7 @@ class DummyClassEventMetadataTest {
     fun `DummyClassEventMetadata has correct topic and eventType`() {
         val meta = DummyClassEventMetadata
         assertEquals(TOPICS.PAYMENT_ORDER_CREATED, meta.topic)
-        assertEquals(EVENT_TYPE.PAYMENT_ORDER_CREATED, meta.eventType)
+        assertEquals(PAYMENT_ORDER_CREATED, meta.eventType)
     }
 
     @Test

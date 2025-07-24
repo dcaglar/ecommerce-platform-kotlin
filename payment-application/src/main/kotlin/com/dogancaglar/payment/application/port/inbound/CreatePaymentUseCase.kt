@@ -1,7 +1,7 @@
 package com.dogancaglar.payment.application.port.inbound
 
+import com.dogancaglar.payment.domain.model.CreatePaymentCommand
 import com.dogancaglar.payment.domain.model.Payment
-import com.dogancaglar.payment.domain.model.command.CreatePaymentCommand
 
 /**
  * Starts the “Create Payment” use-case.

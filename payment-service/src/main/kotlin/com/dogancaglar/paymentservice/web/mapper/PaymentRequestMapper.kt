@@ -2,9 +2,9 @@ package com.dogancaglar.paymentservice.web.mapper
 
 
 import com.dogancaglar.payment.domain.model.Amount
+import com.dogancaglar.payment.domain.model.CreatePaymentCommand
 import com.dogancaglar.payment.domain.model.Payment
 import com.dogancaglar.payment.domain.model.PaymentOrder
-import com.dogancaglar.payment.domain.model.command.CreatePaymentCommand
 import com.dogancaglar.payment.domain.model.vo.BuyerId
 import com.dogancaglar.payment.domain.model.vo.OrderId
 import com.dogancaglar.payment.domain.model.vo.PaymentLine

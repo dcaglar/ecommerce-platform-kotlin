@@ -1,6 +1,5 @@
-package com.dogancaglar.application
+package com.dogancaglar.payment.domain
 
-import com.dogancaglar.payment.application.events.PaymentOrderEvent
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -8,7 +7,7 @@ import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class PaymentOrderCreated @JsonCreator constructor(
+data class PaymentOrderRetryRequested @JsonCreator constructor(
     @JsonProperty("paymentOrderId") override val paymentOrderId: String,
     @JsonProperty("publicPaymentOrderId") override val publicPaymentOrderId: String,
     @JsonProperty("paymentId") override val paymentId: String,

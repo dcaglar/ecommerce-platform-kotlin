@@ -1,4 +1,4 @@
-package com.dogancaglar.payment.domain.port
+package com.dogancaglar.payment.application.port.outbound
 
 import com.dogancaglar.payment.domain.model.Payment
 import com.dogancaglar.payment.domain.model.vo.PaymentId

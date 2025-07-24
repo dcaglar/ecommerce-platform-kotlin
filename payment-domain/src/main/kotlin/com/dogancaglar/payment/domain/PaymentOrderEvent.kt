@@ -1,4 +1,4 @@
-package com.dogancaglar.payment.application.events
+package com.dogancaglar.payment.domain
 
 import java.math.BigDecimal
 import java.time.LocalDateTime

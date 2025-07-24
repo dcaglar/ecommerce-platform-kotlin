@@ -1,18 +1,18 @@
 package com.dogancaglar.payment.application.command
 
 
-import com.dogancaglar.application.PaymentOrderRetryRequested
 import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.payment.application.events.EventMetadatas
-import com.dogancaglar.payment.application.events.PaymentOrderEvent
 import com.dogancaglar.payment.application.mapper.PSPStatusMapper
 import com.dogancaglar.payment.application.mapper.PaymentOrderDomainEventMapper
+import com.dogancaglar.payment.application.port.inbound.ProcessPspResultUseCase
 import com.dogancaglar.payment.application.port.outbound.*
+import com.dogancaglar.payment.domain.PaymentOrderEvent
+import com.dogancaglar.payment.domain.PaymentOrderRetryRequested
 import com.dogancaglar.payment.domain.factory.PaymentOrderFactory
+import com.dogancaglar.payment.domain.model.EventMetadatas
 import com.dogancaglar.payment.domain.model.PaymentOrder
 import com.dogancaglar.payment.domain.model.PaymentOrderStatus
 import com.dogancaglar.payment.domain.model.PaymentOrderStatusCheck
-import com.dogancaglar.port.PaymentOrderRepository
 import org.slf4j.LoggerFactory
 import java.time.Clock
 import java.time.Instant
@@ -80,7 +80,7 @@ open class ProcessPaymentCommand(
         paymentOrderRepository.save(updatedOrder)
         // Publish the success event synchronously to ensure it is processed immediately
         eventPublisher.publishSync(
-            eventMetaData = EventMetadatas.PaymentOrderSuccededMetaData,
+            eventMetaData = EventMetadatas.PaymentOrderSucceededMetadata,
             aggregateId = updatedOrder.publicPaymentOrderId,
             data = PaymentOrderDomainEventMapper.toPaymentOrderSuccededEvent(updatedOrder),
             parentEventId = LogContext.getEventId(),

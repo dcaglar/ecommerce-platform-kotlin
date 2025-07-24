@@ -1,8 +1,8 @@
 package com.dogancaglar.paymentservice.application.service
 
-import com.dogancaglar.payment.application.events.PaymentOrderEvent
 import com.dogancaglar.payment.application.port.inbound.CreatePaymentUseCase
-import com.dogancaglar.payment.application.port.outbound.ProcessPspResultUseCase
+import com.dogancaglar.payment.application.port.inbound.ProcessPspResultUseCase
+import com.dogancaglar.payment.domain.PaymentOrderEvent
 import com.dogancaglar.payment.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.web.dto.PaymentRequestDTO
 import com.dogancaglar.paymentservice.web.dto.PaymentResponseDTO

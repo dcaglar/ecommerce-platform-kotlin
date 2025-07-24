@@ -1,8 +1,8 @@
 package com.dogancaglar.paymentservice.service
 
 import com.dogancaglar.payment.application.port.inbound.CreatePaymentUseCase
+import com.dogancaglar.payment.domain.model.CreatePaymentCommand
 import com.dogancaglar.payment.domain.model.Payment
-import com.dogancaglar.payment.domain.model.command.CreatePaymentCommand
 import com.dogancaglar.paymentservice.web.dto.PaymentRequestDTO
 import com.dogancaglar.paymentservice.web.dto.PaymentResponseDTO
 import com.dogancaglar.paymentservice.web.mapper.PaymentRequestMapper

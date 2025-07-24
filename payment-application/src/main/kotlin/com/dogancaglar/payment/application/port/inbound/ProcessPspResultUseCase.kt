@@ -1,6 +1,6 @@
-package com.dogancaglar.payment.application.port.outbound
+package com.dogancaglar.payment.application.port.inbound
 
-import com.dogancaglar.payment.application.events.PaymentOrderEvent
+import com.dogancaglar.payment.domain.PaymentOrderEvent
 import com.dogancaglar.payment.domain.model.PaymentOrderStatus
 
 

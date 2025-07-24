@@ -1,6 +1,5 @@
-package com.dogancaglar.payment.domain.model.command
+package com.dogancaglar.payment.domain.model
 
-import com.dogancaglar.payment.domain.model.Amount
 import com.dogancaglar.payment.domain.model.vo.BuyerId
 import com.dogancaglar.payment.domain.model.vo.OrderId
 import com.dogancaglar.payment.domain.model.vo.PaymentLine

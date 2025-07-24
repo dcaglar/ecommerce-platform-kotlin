@@ -1,7 +1,7 @@
 package com.dogancaglar.payment.domain.factory
 
 import com.dogancaglar.payment.domain.model.Amount
-import com.dogancaglar.payment.domain.model.command.CreatePaymentCommand
+import com.dogancaglar.payment.domain.model.CreatePaymentCommand
 import com.dogancaglar.payment.domain.model.vo.*
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -23,6 +23,7 @@ class PaymentFactoryTest {
             PaymentLine(sellerId = SellerId("seller-1"), amount = Amount(BigDecimal.valueOf(1000), "USD")),
             PaymentLine(sellerId = SellerId("seller-2"), amount = Amount(BigDecimal.valueOf(1000), "USD"))
         )
+
         val cmd = CreatePaymentCommand(
             orderId = orderId,
             buyerId = buyerId,

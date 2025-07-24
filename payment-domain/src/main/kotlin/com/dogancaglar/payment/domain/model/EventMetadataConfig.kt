@@ -1,4 +1,4 @@
-package com.dogancaglar.payment.application.events
+package com.dogancaglar.payment.domain.model
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.fasterxml.jackson.core.type.TypeReference

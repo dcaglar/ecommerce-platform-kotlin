@@ -1,6 +1,5 @@
-package com.dogancaglar.application
+package com.dogancaglar.payment.domain
 
-import com.dogancaglar.payment.application.events.PaymentOrderEvent
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.math.BigDecimal

@@ -1,8 +1,8 @@
 package com.dogancaglar.payment.domain.factory
 
+import com.dogancaglar.payment.domain.model.CreatePaymentCommand
 import com.dogancaglar.payment.domain.model.Payment
 import com.dogancaglar.payment.domain.model.PaymentOrder
-import com.dogancaglar.payment.domain.model.command.CreatePaymentCommand
 import com.dogancaglar.payment.domain.model.vo.PaymentId
 import com.dogancaglar.payment.domain.model.vo.PaymentOrderId
 import java.time.Clock

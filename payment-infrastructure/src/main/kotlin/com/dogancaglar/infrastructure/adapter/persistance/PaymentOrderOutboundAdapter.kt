@@ -2,10 +2,10 @@ package com.dogancaglar.infrastructure.adapter.persistance
 
 import com.dogancaglar.infrastructure.mapper.PaymentOrderEntityMapper
 import com.dogancaglar.infrastructure.persistence.repository.PaymentOrderMapper
+import com.dogancaglar.payment.application.port.outbound.PaymentOrderRepository
 import com.dogancaglar.payment.domain.model.PaymentOrder
 import com.dogancaglar.payment.domain.model.vo.PaymentId
 import com.dogancaglar.payment.domain.model.vo.PaymentOrderId
-import com.dogancaglar.port.PaymentOrderRepository
 import org.springframework.stereotype.Repository
 
 @Repository

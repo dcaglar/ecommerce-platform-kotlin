@@ -1,13 +1,13 @@
 package com.dogancaglar.consumers
 
-import com.dogancaglar.application.PaymentOrderStatusCheckRequested
 import com.dogancaglar.common.event.CONSUMER_GROUPS
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.TOPICS
 import com.dogancaglar.consumers.base.BaseBatchKafkaConsumer
 import com.dogancaglar.payment.application.port.inbound.CreatePaymentUseCase
+import com.dogancaglar.payment.application.port.inbound.ProcessPspResultUseCase
 import com.dogancaglar.payment.application.port.outbound.PaymentGatewayPort
-import com.dogancaglar.payment.application.port.outbound.ProcessPspResultUseCase
+import com.dogancaglar.payment.domain.PaymentOrderStatusCheckRequested
 import com.dogancaglar.payment.domain.factory.PaymentOrderFactory
 import com.dogancaglar.payment.domain.model.PaymentOrder
 import com.dogancaglar.payment.domain.model.PaymentOrderStatus

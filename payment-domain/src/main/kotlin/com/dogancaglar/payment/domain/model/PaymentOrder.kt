@@ -5,7 +5,7 @@ import com.dogancaglar.payment.domain.model.vo.PaymentOrderId
 import com.dogancaglar.payment.domain.model.vo.SellerId
 import java.time.LocalDateTime
 
-class PaymentOrder private constructor(
+class PaymentOrder constructor(
     val paymentOrderId: PaymentOrderId,
     val publicPaymentOrderId: String, // Keep as String for display purposes
     val paymentId: PaymentId,

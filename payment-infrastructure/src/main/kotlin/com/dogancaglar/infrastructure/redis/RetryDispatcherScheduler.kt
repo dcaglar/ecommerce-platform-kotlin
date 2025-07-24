@@ -1,7 +1,7 @@
 package com.dogancaglar.infrastructure.redis
 
 import com.dogancaglar.infrastructure.adapter.producers.PaymentEventPublisher
-import com.dogancaglar.payment.application.events.EventMetadatas
+import com.dogancaglar.payment.domain.model.EventMetadatas
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory

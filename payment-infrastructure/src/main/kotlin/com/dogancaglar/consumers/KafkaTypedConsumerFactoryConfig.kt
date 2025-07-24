@@ -1,14 +1,14 @@
 // KafkaTypedConsumerFactoryConfig.kt
 package com.dogancaglar.consumers
 
-import com.dogancaglar.application.PaymentOrderCreated
-import com.dogancaglar.application.PaymentOrderRetryRequested
-import com.dogancaglar.application.PaymentOrderStatusCheckRequested
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.TOPICS
 import com.dogancaglar.common.logging.GenericLogFields
 import com.dogancaglar.infrastructure.config.kafka.deserialization.EventEnvelopeDeserializer
-import com.dogancaglar.payment.application.events.EventMetadatas
+import com.dogancaglar.payment.domain.PaymentOrderCreated
+import com.dogancaglar.payment.domain.PaymentOrderRetryRequested
+import com.dogancaglar.payment.domain.PaymentOrderStatusCheckRequested
+import com.dogancaglar.payment.domain.model.EventMetadatas
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.KafkaException
@@ -177,7 +177,7 @@ class KafkaTypedConsumerFactoryConfig(
         customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler
     ) = dynamicProps.dynamicConsumers
-        .first { it.topic == EventMetadatas.PaymentOrderStatusCheckScheduledMetadata.topic }
+        .first { it.topic == EventMetadatas.PaymentOrderSucceededMetadata.topic }
         .let { cfg ->
             createTypedFactory<PaymentOrderStatusCheckRequested>(
                 clientId = cfg.id,
