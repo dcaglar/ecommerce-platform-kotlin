@@ -4,8 +4,8 @@ package com.dogancaglar.paymentservice.config.application
 import com.dogancaglar.infrastructure.redis.PaymentRetryQueueAdapter
 import com.dogancaglar.infrastructure.redis.PspResultRedisCacheAdapter
 import com.dogancaglar.infrastructure.redis.id.RedisIdGeneratorPortAdapter
-import com.dogancaglar.paymentservice.adapter.outbound.redis.kafka.PaymentEventPublisher
-import com.dogancaglar.paymentservice.adapter.outbound.redis.persistance.PaymentOutboundAdapter
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.PaymentEventPublisher
+import com.dogancaglar.paymentservice.adapter.outbound.persistance.PaymentOutboundAdapter
 import com.dogancaglar.paymentservice.domain.config.CreatePaymentService
 import com.dogancaglar.paymentservice.domain.config.ProcessPaymentService
 import com.dogancaglar.paymentservice.port.inbound.CreatePaymentUseCase

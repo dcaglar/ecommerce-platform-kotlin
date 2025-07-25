@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.adapter.outbound.redis.persistance
+package com.dogancaglar.paymentservice.adapter.outbound.persistance
 
 import com.dogancaglar.infrastructure.mapper.PaymentEntityMapper
 import com.dogancaglar.infrastructure.persistence.repository.PaymentMapper

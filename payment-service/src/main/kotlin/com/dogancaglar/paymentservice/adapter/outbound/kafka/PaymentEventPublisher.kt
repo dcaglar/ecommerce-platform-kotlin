@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.adapter.outbound.redis.kafka
+package com.dogancaglar.paymentservice.adapter.outbound.kafka
 
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
