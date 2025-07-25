@@ -15,7 +15,7 @@ global:
   ##
   imagePullSecrets: []
   ## @param global.defaultStorageClass Global default StorageClass for Persistent Volume(s)
-  ## @param global.storageClass DEPRECATED: use global.defaultStorageClass instead
+## @param global.storageClass DEPRECATED: use global.defaultStorageClass instead
   ##
   defaultStorageClass: ""
   storageClass: ""
@@ -192,7 +192,7 @@ replication:
   ##
   synchronousCommit: "off"
   numSynchronousReplicas: 0
-  ## @param replication.applicationName Cluster domain name. Useful for advanced replication settings
+  ## @param replication.applicationName Cluster application name. Useful for advanced replication settings
   ##
   applicationName: my_application
 ## @param containerPorts.postgresql PostgreSQL container port

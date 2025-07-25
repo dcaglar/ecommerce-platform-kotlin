@@ -1,6 +1,6 @@
 apiVersion: v2
 name: payment-service
 description: Spring-Boot Payment micro-service
-type: domain
+type: application
 version: 0.1.0          # chart version
 appVersion: "1.0.0"     # image tag default
