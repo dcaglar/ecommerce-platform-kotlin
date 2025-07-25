@@ -144,7 +144,7 @@ kubectl get pods -n kube-system
 
 ```sh
 kubectl create configmap payment-service-config \
-  --from-file=application-kubernetes.yml=payment-service/src/main/resources/application-kubernetes.yml \
+  --from-file=domain-kubernetes.yml=payment-service/src/main/resources/domain-kubernetes.yml \
   -n payment
 ```
 
@@ -155,7 +155,7 @@ when you want to quickly update the config in your cluster from your local file.
 
 ```sh
 kubectl create configmap payment-service-config \
-  --from-file=application-kubernetes.yml=payment-service/src/main/resources/application-kubernetes.yml \
+  --from-file=domain-kubernetes.yml=payment-service/src/main/resources/domain-kubernetes.yml \
   -n payment \
   --dry-run=client -o yaml > infra/k8s/payment/configmap/payment-service-configmap.yaml
 ```

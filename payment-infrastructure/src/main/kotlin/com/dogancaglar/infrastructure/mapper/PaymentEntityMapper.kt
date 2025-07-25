@@ -1,7 +1,7 @@
 package com.dogancaglar.infrastructure.mapper
 
 import com.dogancaglar.infrastructure.persistence.entity.PaymentEntity
-import com.dogancaglar.payment.domain.model.Payment
+import com.dogancaglar.paymentservice.domain.model.Payment
 
 
 object PaymentEntityMapper {

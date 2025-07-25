@@ -1,7 +1,7 @@
 package com.dogancaglar.infrastructure.mapper
 
 import com.dogancaglar.infrastructure.persistence.entity.OutboxEventEntity
-import com.dogancaglar.payment.domain.events.OutboxEvent
+import com.dogancaglar.paymentservice.domain.events.OutboxEvent
 
 object OutboxEventEntityMapper {
 

@@ -5,10 +5,10 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.TOPICS
 import com.dogancaglar.common.logging.GenericLogFields
 import com.dogancaglar.infrastructure.config.kafka.deserialization.EventEnvelopeDeserializer
-import com.dogancaglar.payment.domain.PaymentOrderCreated
-import com.dogancaglar.payment.domain.PaymentOrderRetryRequested
-import com.dogancaglar.payment.domain.PaymentOrderStatusCheckRequested
-import com.dogancaglar.payment.domain.model.EventMetadatas
+import com.dogancaglar.paymentservice.domain.PaymentOrderCreated
+import com.dogancaglar.paymentservice.domain.PaymentOrderRetryRequested
+import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
+import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.KafkaException

@@ -1,6 +1,6 @@
 package com.dogancaglar.infrastructure.persistence.typehandler
 
-import com.dogancaglar.payment.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import org.apache.ibatis.type.BaseTypeHandler
 import org.apache.ibatis.type.JdbcType
 import java.sql.CallableStatement

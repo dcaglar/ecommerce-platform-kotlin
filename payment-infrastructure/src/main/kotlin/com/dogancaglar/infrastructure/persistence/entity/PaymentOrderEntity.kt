@@ -1,6 +1,6 @@
 package com.dogancaglar.infrastructure.persistence.entity
 
-import com.dogancaglar.payment.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import java.math.BigDecimal
 import java.time.LocalDateTime
 

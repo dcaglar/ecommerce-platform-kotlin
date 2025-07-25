@@ -1,9 +1,9 @@
 package com.dogancaglar.infrastructure.psp
 
-import com.dogancaglar.payment.application.mapper.PSPStatusMapper
-import com.dogancaglar.payment.application.port.outbound.PaymentGatewayPort
-import com.dogancaglar.payment.domain.model.PaymentOrder
-import com.dogancaglar.payment.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.util.PSPStatusMapper
+import com.dogancaglar.paymentservice.port.outbound.PaymentGatewayPort
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import kotlin.random.Random

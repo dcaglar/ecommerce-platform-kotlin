@@ -1,10 +1,7 @@
 // DynamicKafkaConsumersProperties.kt
 package com.dogancaglar.consumers
 
-import org.springframework.boot.context.properties.ConfigurationProperties
-
-@ConfigurationProperties(prefix = "app.kafka")
-class DynamicKafkaConsumersProperties {
+final class DynamicKafkaConsumersProperties {
     var dynamicConsumers: List<DynamicConsumer> = mutableListOf()
 
     class DynamicConsumer {

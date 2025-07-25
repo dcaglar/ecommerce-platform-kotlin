@@ -1,0 +1,24 @@
+package com.dogancaglar.paymentservice.adapter.outbound.redis.persistance
+
+import com.dogancaglar.infrastructure.mapper.PaymentEntityMapper
+import com.dogancaglar.infrastructure.persistence.repository.PaymentMapper
+import com.dogancaglar.paymentservice.domain.model.Payment
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.port.outbound.PaymentRepository
+import org.springframework.stereotype.Repository
+
+@Repository
+class PaymentOutboundAdapter(
+    private val paymentMapper: PaymentMapper
+) : PaymentRepository {
+    override fun save(payment: Payment) {
+        val entity = PaymentEntityMapper.toEntity(payment)
+        paymentMapper.insert(entity)
+    }
+
+    override fun getMaxPaymentId(): PaymentId {
+        val paymentIdLong = paymentMapper.getMaxPaymentId() ?: 0
+        return PaymentId(paymentIdLong)
+    }
+
+}

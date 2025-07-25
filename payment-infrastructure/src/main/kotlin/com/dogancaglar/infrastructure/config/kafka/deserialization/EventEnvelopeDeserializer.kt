@@ -1,7 +1,7 @@
 package com.dogancaglar.infrastructure.config.kafka.deserialization
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.payment.domain.model.EventMetadatas
+import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature

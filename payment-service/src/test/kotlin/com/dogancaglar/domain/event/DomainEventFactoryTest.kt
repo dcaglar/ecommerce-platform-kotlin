@@ -3,8 +3,8 @@ package com.dogancaglar.domain.event
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.GenericLogFields
-import com.dogancaglar.payment.domain.PaymentOrderCreated
-import com.dogancaglar.payment.domain.model.EventMetadatas
+import com.dogancaglar.paymentservice.domain.PaymentOrderCreated
+import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows

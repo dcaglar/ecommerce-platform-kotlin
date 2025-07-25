@@ -1,7 +1,7 @@
 package com.dogancaglar.adapter
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.payment.domain.PaymentOrderCreated
+import com.dogancaglar.paymentservice.domain.PaymentOrderCreated
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule

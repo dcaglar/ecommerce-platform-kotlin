@@ -14,7 +14,7 @@ services:
     ports:
       - "5433:5432"  # Exposed for IntelliJ/pgAdmin or Spring Boot if needed
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U keycloak" ]
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -140,7 +140,7 @@ services:
       environment: local
     ports:
       - "6379:6379"  # Exposed for Spring Boot to connect
-    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
     restart: unless-stopped
     networks:
       - messaging-net  # Same as Kafka/Zookeeper for simplicity
@@ -195,7 +195,7 @@ services:
       - ES_JAVA_OPTS=-Xms3g -Xmx3g
     mem_limit: 4g  # optional Docker hard limit if neede
     healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://elasticsearch:9200 || exit 1" ]
+      test: ["CMD-SHELL", "curl -f http://elasticsearch:9200 || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 15
@@ -215,7 +215,7 @@ services:
     depends_on:
       - elasticsearch
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://kibana:5601/api/status" ]
+      test: ["CMD", "curl", "-f", "http://kibana:5601/api/status"]
       interval: 10s
       timeout: 10s
       retries: 15
@@ -247,7 +247,7 @@ services:
         condition: service_healthy
       kibana:
         condition: service_healthy
-    command: [ "-c", "/usr/share/filebeat/filebeat.yml" , "--strict.perms=false" ]
+    command: ["-c", "/usr/share/filebeat/filebeat.yml" , "--strict.perms=false"]
 
   prometheus:
     image: prom/prometheus:latest
