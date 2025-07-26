@@ -1,10 +1,10 @@
 package com.dogancaglar.paymentservice.adapter.outbound.persistance
 
-import com.dogancaglar.infrastructure.mapper.PaymentEntityMapper
-import com.dogancaglar.infrastructure.persistence.repository.PaymentMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.PaymentEntityMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.PaymentMapper
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.port.outbound.PaymentRepository
+import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
 import org.springframework.stereotype.Repository
 
 @Repository

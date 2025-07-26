@@ -4,7 +4,7 @@ import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
 import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.paymentservice.port.outbound.EventPublisherPort
+import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader

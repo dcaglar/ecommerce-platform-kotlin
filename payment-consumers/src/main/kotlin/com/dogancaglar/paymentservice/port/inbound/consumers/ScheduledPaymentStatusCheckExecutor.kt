@@ -7,10 +7,10 @@ import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderFactory
-import com.dogancaglar.paymentservice.port.inbound.CreatePaymentUseCase
-import com.dogancaglar.paymentservice.port.inbound.ProcessPspResultUseCase
 import com.dogancaglar.paymentservice.port.inbound.consumers.base.BaseBatchKafkaConsumer
-import com.dogancaglar.paymentservice.port.outbound.PaymentGatewayPort
+import com.dogancaglar.paymentservice.ports.inbound.CreatePaymentUseCase
+import com.dogancaglar.paymentservice.ports.inbound.ProcessPspResultUseCase
+import com.dogancaglar.paymentservice.ports.outbound.PaymentGatewayPort
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.errors.RetriableException
@@ -32,7 +32,7 @@ import java.sql.SQLTransientException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
-//todo  appply sama logic as in retry command executor
+//todo  appply sama logic as in retry commands executor
 
 @Configuration
 class ScheduledExecutorConfig {

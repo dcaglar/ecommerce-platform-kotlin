@@ -1,7 +1,7 @@
 package com.dogancaglar.infrastructure.redis
 
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
-import com.dogancaglar.paymentservice.port.outbound.PspResultCachePort
+import com.dogancaglar.paymentservice.ports.outbound.PspResultCachePort
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component

@@ -1,8 +1,0 @@
-spring.test.database.replace: none
-mybatis:
-  mapper-locations: classpath:com/dogancaglar/infrastructure/persistence/mapper/*.xml
-  type-aliases-package: com.dogancaglar.infrastructure.persistence.entity
-  type-handlers-package: com.dogancaglar.infrastructure.persistence.typehandler
-spring:
-  liquibase:
-    enabled: false

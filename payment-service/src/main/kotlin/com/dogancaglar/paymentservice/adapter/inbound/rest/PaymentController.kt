@@ -1,6 +1,5 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
-import com.dogancaglar.port.out.application.service.PaymentService
 import com.dogancaglar.port.out.web.dto.PaymentRequestDTO
 import com.dogancaglar.port.out.web.dto.PaymentResponseDTO
 import jakarta.validation.Valid

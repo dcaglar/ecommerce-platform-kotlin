@@ -41,7 +41,7 @@ spring:
     enabled: true
     change-log: classpath:db/changelog/changelog.master.xml
 mybatis:
-  mapper-locations: classpath*:com/dogancaglar/infrastructure/persistence/mapper/*.xml
+  mapper-locations: classpath:mapper/*.xml
 management:
   endpoints:
     web:

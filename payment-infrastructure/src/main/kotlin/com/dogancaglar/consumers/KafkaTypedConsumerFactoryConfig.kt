@@ -4,7 +4,7 @@ package com.dogancaglar.consumers
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.TOPICS
 import com.dogancaglar.common.logging.GenericLogFields
-import com.dogancaglar.infrastructure.config.kafka.deserialization.EventEnvelopeDeserializer
+import com.dogancaglar.paymentservice.deserialization.EventEnvelopeKafkaDeserializer
 import com.dogancaglar.paymentservice.domain.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
@@ -50,7 +50,7 @@ class KafkaTypedConsumerFactoryConfig(
         configs[ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG] =
             ErrorHandlingDeserializer::class.java
         configs[ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS] =
-            EventEnvelopeDeserializer::class.java.name
+            EventEnvelopeKafkaDeserializer::class.java.name
 
         return DefaultKafkaConsumerFactory<String, EventEnvelope<*>>(configs).apply {
             addListener(MicrometerConsumerListener(meterRegistry))

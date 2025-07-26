@@ -7,10 +7,10 @@ import com.dogancaglar.paymentservice.domain.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
-import com.dogancaglar.paymentservice.port.inbound.ProcessPspResultUseCase
 import com.dogancaglar.paymentservice.port.inbound.consumers.base.BaseBatchKafkaConsumer
-import com.dogancaglar.paymentservice.port.outbound.PaymentGatewayPort
-import com.dogancaglar.paymentservice.port.outbound.PspResultCachePort
+import com.dogancaglar.paymentservice.ports.inbound.ProcessPspResultUseCase
+import com.dogancaglar.paymentservice.ports.outbound.PaymentGatewayPort
+import com.dogancaglar.paymentservice.ports.outbound.PspResultCachePort
 import io.micrometer.core.instrument.DistributionSummary
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.ConsumerRecord

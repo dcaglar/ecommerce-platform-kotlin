@@ -1,9 +1,9 @@
-package com.dogancaglar.port.out.adapter.persistance
+package com.dogancaglar.paymentservice.adapter.outbound.persistance
 
-import com.dogancaglar.infrastructure.mapper.PaymentOrderStatusCheckEntityMapper
-import com.dogancaglar.infrastructure.persistence.repository.PaymentOrderStatusCheckMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.PaymentOrderStatusCheckEntityMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.PaymentOrderStatusCheckMapper
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatusCheck
-import com.dogancaglar.paymentservice.port.outbound.PaymentOrderStatusCheckRepository
+import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderStatusCheckRepository
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
