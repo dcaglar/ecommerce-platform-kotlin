@@ -66,8 +66,8 @@ extraDeploy: []
 ##
 usePasswordFiles: true
 ## Diagnostic mode
-## @param diagnosticMode.enabled Enable diagnostic mode (all probes will be disabled and the commands will be overridden)
-## @param diagnosticMode.commands Command to override all containers in the chart release
+## @param diagnosticMode.enabled Enable diagnostic mode (all probes will be disabled and the command will be overridden)
+## @param diagnosticMode.command Command to override all containers in the chart release
 ## @param diagnosticMode.args Args to override all containers in the chart release
 ##
 diagnosticMode:
@@ -286,7 +286,7 @@ sasl:
       - user1
     passwords: ""
   ## @param sasl.existingSecret Name of the existing secret containing credentials for client.users, interbroker.user and controller.user
-  ## Create this secret running the commands below where SECRET_NAME is the name of the secret you want to create:
+  ## Create this secret running the command below where SECRET_NAME is the name of the secret you want to create:
   ##       kubectl create secret generic SECRET_NAME --from-literal=client-passwords=CLIENT_PASSWORD1,CLIENT_PASSWORD2 --from-literal=inter-broker-password=INTER_BROKER_PASSWORD --from-literal=inter-broker-client-secret=INTER_BROKER_CLIENT_SECRET --from-literal=controller-password=CONTROLLER_PASSWORD --from-literal=controller-client-secret=CONTROLLER_CLIENT_SECRET
   ## The client secrets are only required when using OAuthBearer as SASL mechanism.
   ## Client, inter-broker and controller passwords are only required if the SASL mechanism includes something other than OAuthBearer.
@@ -330,7 +330,7 @@ tls:
   ## 1) Generate your truststore and keystore files. Helpful script: https://raw.githubusercontent.com/confluentinc/confluent-platform-security-tools/master/kafka-generate-ssl.sh
   ## 2) Rename your truststore to `kafka.truststore.jks`.
   ## 3) Rename your keystores to `kafka-<role>-X.keystore.jks` where X is the replica number of the .
-  ## 4) Run the commands below one time per broker to create its associated secret (SECRET_NAME_X is the name of the secret you want to create):
+  ## 4) Run the command below one time per broker to create its associated secret (SECRET_NAME_X is the name of the secret you want to create):
   ##      kubectl create secret generic SECRET_NAME_0 --from-file=kafka.truststore.jks=./kafka.truststore.jks \
   ##        --from-file=kafka-controller-0.keystore.jks=./kafka-controller-0.keystore.jks --from-file=kafka-broker-0.keystore.jks=./kafka-broker-0.keystore.jks ...
   ##
@@ -342,7 +342,7 @@ tls:
   ## 2) Rename your CA file to `ca.crt`.
   ## 3) Rename your certificates to `kafka-X.tls.crt` where X is the ID of each Kafka broker.
   ## 3) Rename your keys to `kafka-X.tls.key` where X is the ID of each Kafka broker.
-  ## 4) Run the commands below one time per broker to create its associated secret (SECRET_NAME_X is the name of the secret you want to create):
+  ## 4) Run the command below one time per broker to create its associated secret (SECRET_NAME_X is the name of the secret you want to create):
   ##      kubectl create secret generic SECRET_NAME_0 --from-file=ca.crt=./ca.crt --from-file=kafka-controller-0.crt=./kafka-controller-0.crt --from-file=kafka-controller-0.key=./kafka-controller-0.key \
   ##        --from-file=kafka-broker-0.crt=./kafka-broker-0.crt --from-file=kafka-broker-0.key=./kafka-broker-0.key ...
   ##
@@ -710,7 +710,7 @@ controller:
   ## @param controller.heapOpts Kafka Java Heap configuration for controller-eligible nodes
   ##
   heapOpts: -XX:InitialRAMPercentage=75 -XX:MaxRAMPercentage=75
-  ## @param controller.commands Override Kafka container commands
+  ## @param controller.command Override Kafka container command
   ##
   command: []
   ## @param controller.args Override Kafka container arguments
@@ -1171,7 +1171,7 @@ broker:
   ## @param broker.heapOpts Kafka Java Heap configuration for broker-only nodes
   ##
   heapOpts: -XX:InitialRAMPercentage=75 -XX:MaxRAMPercentage=75
-  ## @param broker.commands Override Kafka container commands
+  ## @param broker.command Override Kafka container command
   ##
   command: []
   ## @param broker.args Override Kafka container arguments
@@ -2260,13 +2260,13 @@ provisioning:
   ## - >-
   ##   /opt/bitnami/kafka/bin/kafka-acls.sh
   ##   --bootstrap-server $KAFKA_SERVICE
-  ##   --commands-config /shared/client.properties
+  ##   --command-config /shared/client.properties
   ##   --add
   ##   --allow-principal User:user
   ##   --consumer --topic *
   ## - "/opt/bitnami/kafka/bin/kafka-acls.sh
   ##      --bootstrap-server $KAFKA_SERVICE
-  ##      --commands-config /shared/client.properties
+  ##      --command-config /shared/client.properties
   ##      --list"
   ##
   extraProvisioningCommands: []
@@ -2337,7 +2337,7 @@ provisioning:
       ## @param provisioning.auth.tls.truststorePassword Password to access the JKS truststore. Ignored if 'passwordsSecret' is provided.
       ##
       truststorePassword: ""
-  ## @param provisioning.commands Override provisioning container commands
+  ## @param provisioning.command Override provisioning container command
   ##
   command: []
   ## @param provisioning.args Override provisioning container arguments

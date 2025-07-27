@@ -10,7 +10,7 @@ function port_forward_mac_resilient_payment_service() {
   SERVICE=payment-service
   LOCAL_PORT=8081
   REMOTE_PORT=8080
-  osascript -e 'tell domain "Terminal" to activate' \
+  osascript -e 'tell application "Terminal" to activate' \
             -e "tell application \"Terminal\" to do script \"/bin/bash '$SCRIPT_DIR/port-forward-pod-resilient.sh' $SERVICE $LOCAL_PORT $REMOTE_PORT $NAMESPACE\""
   sleep 1
 }
@@ -19,7 +19,7 @@ function port_forward_mac() {
   SERVICE=$1
   LOCAL_PORT=$2
   REMOTE_PORT=$3
-  osascript -e 'tell domain "Terminal" to activate' \
+  osascript -e 'tell application "Terminal" to activate' \
             -e "tell application \"Terminal\" to do script \"/bin/bash '$SCRIPT_DIR/port-forward-single.sh' $SERVICE $LOCAL_PORT $REMOTE_PORT $NAMESPACE\""
   sleep 1
 }

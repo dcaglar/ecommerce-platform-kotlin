@@ -1,14 +1,14 @@
 // KafkaTypedConsumerFactoryConfig.kt
 package com.dogancaglar.consumers
 
+import com.dogancaglar.application.PaymentOrderCreated
+import com.dogancaglar.application.PaymentOrderRetryRequested
+import com.dogancaglar.application.PaymentOrderStatusCheckRequested
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.TOPICS
 import com.dogancaglar.common.logging.GenericLogFields
-import com.dogancaglar.paymentservice.deserialization.EventEnvelopeKafkaDeserializer
-import com.dogancaglar.paymentservice.domain.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.PaymentOrderRetryRequested
-import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
+import com.dogancaglar.infrastructure.config.kafka.deserialization.EventEnvelopeDeserializer
+import com.dogancaglar.payment.application.events.EventMetadatas
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.KafkaException
@@ -50,7 +50,7 @@ class KafkaTypedConsumerFactoryConfig(
         configs[ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG] =
             ErrorHandlingDeserializer::class.java
         configs[ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS] =
-            EventEnvelopeKafkaDeserializer::class.java.name
+            EventEnvelopeDeserializer::class.java.name
 
         return DefaultKafkaConsumerFactory<String, EventEnvelope<*>>(configs).apply {
             addListener(MicrometerConsumerListener(meterRegistry))
@@ -177,7 +177,7 @@ class KafkaTypedConsumerFactoryConfig(
         customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler
     ) = dynamicProps.dynamicConsumers
-        .first { it.topic == EventMetadatas.PaymentOrderSucceededMetadata.topic }
+        .first { it.topic == EventMetadatas.PaymentOrderStatusCheckScheduledMetadata.topic }
         .let { cfg ->
             createTypedFactory<PaymentOrderStatusCheckRequested>(
                 clientId = cfg.id,

@@ -1,5 +1,6 @@
 package com.dogancaglar
 
+import org.mybatis.spring.annotation.MapperScan
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.context.annotation.ComponentScan
@@ -8,10 +9,10 @@ import org.springframework.context.annotation.ComponentScan
 @ComponentScan(
     basePackages = [
         "com.dogancaglar.infrastructure",
-        "com.dogancaglar.consumers",
-        "com.dogancaglar.paymentservice"
+        "com.dogancaglar.consumers"
     ]
 )
+@MapperScan("com.dogancaglar.infrastructure.persistence.repository")
 class PaymentConsumersApplication
 
 fun main(args: Array<String>) {
