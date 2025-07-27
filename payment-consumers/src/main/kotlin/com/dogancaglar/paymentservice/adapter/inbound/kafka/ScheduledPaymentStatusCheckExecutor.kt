@@ -1,4 +1,4 @@
-package    com.dogancaglar.paymentservice.port.inbound.consumers
+package com.dogancaglar.paymentservice.adapter.inbound.kafka
 
 import com.dogancaglar.common.event.CONSUMER_GROUPS
 import com.dogancaglar.common.event.EventEnvelope
