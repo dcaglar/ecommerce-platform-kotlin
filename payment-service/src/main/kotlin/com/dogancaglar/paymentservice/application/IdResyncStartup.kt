@@ -1,12 +1,12 @@
 package com.dogancaglar.paymentservice.application
 
 import com.dogancaglar.paymentservice.application.constants.IdNamespaces
+import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
-import paymentservice.port.outbound.IdGeneratorPort
 
 @Component
 class IdResyncStartup(

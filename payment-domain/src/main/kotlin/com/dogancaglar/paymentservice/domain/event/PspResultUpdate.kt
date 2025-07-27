@@ -8,7 +8,7 @@ import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class PaymentOrderCreated @JsonCreator constructor(
+data class PspResultUpdate @JsonCreator constructor(
     @JsonProperty("paymentOrderId") override val paymentOrderId: String,
     @JsonProperty("publicPaymentOrderId") override val publicPaymentOrderId: String,
     @JsonProperty("paymentId") override val paymentId: String,

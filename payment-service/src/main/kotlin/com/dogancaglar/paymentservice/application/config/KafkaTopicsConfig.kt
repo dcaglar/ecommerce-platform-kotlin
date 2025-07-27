@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
 @Configuration
-@EnableConfigurationProperties(KafkaTopicsProperties::class)
+@EnableConfigurationProperties(KafkaTopicsPropertiesSpring::class)
 class KafkaTopicsConfig(
     private val kafkaTopicsProperties: KafkaTopicsProperties
 ) {
@@ -83,7 +83,5 @@ class KafkaTopicsConfig(
 
 }
 
-@Bean
 @ConfigurationProperties(prefix = "kafka.topics")
-fun kafkaTopicsProperties(): KafkaTopicsProperties = KafkaTopicsProperties()
-
+class KafkaTopicsPropertiesSpring : KafkaTopicsProperties()
