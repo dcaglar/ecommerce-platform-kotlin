@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers.config
 
 
-import com.dogancaglar.paymentservice.domain.config.ProcessPaymentService
+import com.dogancaglar.paymentservice.application.usecases.ProcessPaymentService
 import com.dogancaglar.paymentservice.domain.util.PaymentFactory
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderFactory
 import org.springframework.context.annotation.Bean

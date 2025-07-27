@@ -3,7 +3,6 @@ package com.dogancaglar.paymentservice.adapter.outbound.redis
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.infrastructure.redis.PaymentRetryRedisCache
 import com.dogancaglar.paymentservice.domain.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder

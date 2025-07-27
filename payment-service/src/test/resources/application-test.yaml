@@ -1,0 +1,35 @@
+# src/test/resources/application-test.yaml
+
+# Use in-memory or embedded DB if needed (often not required for true unit tests)
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  data:
+    redis:
+      url: redis://localhost:0  # dummy/unreachable port, disables Redis for units
+  kafka:
+    bootstrap-servers: dummy:9092  # dummy, disables Kafka for units
+  liquibase:
+    enabled: false
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.dogancaglar.paymentservice.adapter.outbound.persistance.entity
+  type-handlers-package: com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.typehandler
+
+# Optionally disable security for unit tests
+security:
+  enabled: false
+
+# Optionally disable background jobs
+myapp:
+  background-jobs:
+    enabled: false
+
+# Any other dummy config your units might "see"
+psp:
+  api-key: dummy
+  url: http://dummy

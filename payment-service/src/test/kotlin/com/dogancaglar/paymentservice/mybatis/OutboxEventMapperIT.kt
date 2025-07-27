@@ -3,15 +3,19 @@ package com.dogancaglar.paymentservice.mybatis
 
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.OutboxEventEntity
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.OutboxEventMapper
+import com.dogancaglar.paymentservice.application.usecases.ProcessPaymentService
+import com.dogancaglar.paymentservice.ports.inbound.CreatePaymentUseCase
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.context.ApplicationContext
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.TestPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
@@ -21,17 +25,18 @@ import java.time.LocalDateTime
 @Testcontainers
 @TestPropertySource(
     properties = [
-        "spring.liquibase.enabled=false",
+        "spring.liquibase.enabled=false"
+        // Add any others if needed
     ]
 )
-class OutboxEventMapperIntegrationTest {
+class OutboxEventMapperIT {
 
     companion object {
         @BeforeAll
         @JvmStatic
         fun initSchema() {
             val ddl =
-                OutboxEventMapperIntegrationTest::class.java.classLoader.getResource("schema-test.sql")!!.readText()
+                OutboxEventMapperIT::class.java.classLoader.getResource("schema-test.sql")!!.readText()
             postgres.createConnection("").use { c -> c.createStatement().execute(ddl) }
         }
 
@@ -59,6 +64,22 @@ class OutboxEventMapperIntegrationTest {
 
     @Autowired
     lateinit var outboxEventMapper: OutboxEventMapper
+
+    @MockitoBean
+    lateinit var createPaymentService: CreatePaymentUseCase
+
+    @MockitoBean
+    lateinit var processPaymentService: ProcessPaymentService
+
+
+    @Autowired
+    lateinit var ctx: ApplicationContext
+
+    @Test
+    fun debugBeans() {
+        println("Beans loaded in test context:")
+        ctx.beanDefinitionNames.sorted().forEach { println(it) }
+    }
 
     private fun newEvent(
         oeid: Long = System.currentTimeMillis(),

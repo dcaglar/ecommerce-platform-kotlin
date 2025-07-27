@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: payment-service
+  namespace: payment
+  labels:
+    release: prometheus-stack   # <-- This label must match your Prometheus Operator's selector!
+spec:
+  selector:
+    matchLabels:
+      app: payment-service
+  namespaceSelector:
+    matchNames:
+      - payment
+  endpoints:
+    - port: http                # Name must match your Service port!
+      path: /actuator/prometheus
+      interval: 15s

@@ -11,3 +11,8 @@ primary:
     log_min_duration_statement = 0
     log_connections = on
     log_disconnections = on
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: payment

@@ -1,4 +1,4 @@
-package com.dogancaglar.infrastructure.redis
+package com.dogancaglar.paymentservice.adapter.outbound.redis
 
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.ports.outbound.PspResultCachePort

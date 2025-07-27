@@ -1,18 +1,37 @@
 server:
   port: 8080
+app:
+  kafka: # Kafka configuration for dynamic consumers
+    dynamic-consumers:
+      - id: payment-order-executor
+        topic: payment_order_created_topic
+        group-id: payment-order-created-consumer-group
+        class-name: com.dogancaglar.paymentservice.adapter.inbound.kafka.PaymentOrderExecutor
+        concurrency: 1
+
+      - id: payment-retry-executor
+        topic: payment_order_retry_request_topic
+        group-id: payment-order-retry-consumer-group
+        class-name: com.dogancaglar.paymentservice.adapter.inbound.kafka.PaymentOrderRetryCommandExecutor
+        concurrency: 1
+
+      - id: payment-status-check-executor-scheduler
+        topic: payment_status_check_scheduler_topic
+        group-id: payment-status-check-scheduler-consumer-group
+        class-name: com.dogancaglar.paymentservice.adapter.inbound.kafka.ScheduledPaymentStatusCheckExecutor
+        concurrency: 1
 spring:
   kafka:
     properties:
-      session:
-        timeout:
-          ms: 45000
-    producer:
-      value-serializer: com.dogancaglar.infrastructure.config.kafka.serialization.EventEnvelopeSerializer
-      properties: #maybe change partition assignment strategy
+      session.timeout.ms: 45000
+      # any other common Kafka configs needed for ALL clients
+    consumer:
+      group-id: payment-consumer-group      # (set appropriately for your domain)
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: com.dogancaglar.paymentservice.deserialization.EventEnvelopeKafkaDeserializer
+      properties:
         partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
-        spring.deserializer.value.delegate.class: com.dogancaglar.infrastructure.config.kafka.deserialization.EventEnvelopeDeserializer
 
-  # Only the url, username, password should be overridden in profiles
   data:
     redis:
       lettuce:
@@ -21,10 +40,12 @@ spring:
           max-idle: 64
           min-idle: 8
           max-wait: 2000ms
-    # Only the url should be overridden in profiles
+    # Only the url should be
+
+
 
 mybatis:
-  mapper-locations: classpath*:com/dogancaglar/infrastructure/persistence/mapper/*.xml
+  mapper-locations: classpath*:mapper/*.xml
 management:
   endpoints:
     web:

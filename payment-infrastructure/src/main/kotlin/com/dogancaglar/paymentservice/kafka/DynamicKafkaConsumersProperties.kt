@@ -1,7 +1,6 @@
-// DynamicKafkaConsumersProperties.kt
-package com.dogancaglar.consumers
+package com.dogancaglar.paymentservice.kafka
 
-class DynamicKafkaConsumersProperties {
+open class DynamicKafkaConsumersProperties {
     var dynamicConsumers: List<DynamicConsumer> = mutableListOf()
 
     class DynamicConsumer {

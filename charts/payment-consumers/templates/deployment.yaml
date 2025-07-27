@@ -1,78 +1,97 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "payment-consumers.fullname" . }}
+  name: {{include "payment-consumers.fullname" .}}
   labels:
-    {{- include "payment-consumers.labels" . | nindent 4 }}
+    {{include "payment-consumers.labels" . | nindent 4}}
 spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
-  {{- end }}
+  replicas: {{.Values.replicaCount}}
   selector:
     matchLabels:
-      {{- include "payment-consumers.selectorLabels" . | nindent 6 }}
+      app: {{include "payment-consumers.fullname" .}}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       labels:
-        {{- include "payment-consumers.labels" . | nindent 8 }}
-        {{- with .Values.podLabels }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
+        app: {{include "payment-consumers.fullname" .}}
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "payment-consumers.serviceAccountName" . }}
-      {{- with .Values.podSecurityContext }}
-      securityContext:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      containers:
-        - name: {{ .Chart.Name }}
-          {{- with .Values.securityContext }}
-          securityContext:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - name: http
-              containerPort: {{ .Values.service.port }}
-              protocol: TCP
-          {{- with .Values.livenessProbe }}
-          livenessProbe:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- with .Values.readinessProbe }}
-          readinessProbe:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- with .Values.resources }}
-          resources:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- with .Values.volumeMounts }}
-          volumeMounts:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-      {{- with .Values.volumes }}
       volumes:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        - name: jfr
+          persistentVolumeClaim:
+            claimName: jfr-data-{{ include "payment-consumers.fullname" . }}
+      containers:
+        - name: payment-consumers
+          volumeMounts:
+            - name: jfr
+              mountPath: /var/log/jfr
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{.Values.image.pullPolicy}}
+          ports:
+            - containerPort: 8080  # REST API
+            - containerPort: 9010  # JMX
+          env:
+            #            - name: PYROSCOPE_APPLICATION_NAME
+            #              value: payment-service
+            #            - name: PYROSCOPE_SERVER_ADDRESS
+            #              value: http://pyroscope.payment.svc:4040
+            #            - name: PYROSCOPE_PROFILER_EVENT
+            #              value: lock    # or lock or alloc or wall
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:StartFlightRecording=name=payment-consumers,filename=/var/log/jfr/pay.jfr,maxage=30m,maxsize=250M,settings=profile,dumponexit=true -XX:FlightRecorderOptions=repository=/var/log/jfr"
+            - name: DATA_SOURCE_NAME
+              value: "postgresql://payment:payment@payment-db:5432/payment?sslmode=disable"
+            - name: SPRING_DATA_REDIS_URL
+              value: redis://redis-master:6379
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:9092
+            - name: SPRING_PROFILES_ACTIVE
+              value: "local"
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-app-config
+                  key: PAYMENT_DB_URL
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: PAYMENT_CONSUMERS_APP_DB_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: PAYMENT_CONSUMERS_APP_DB_PASSWORD
+
+          # Kdeleafka credentials (Secret)
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 120     # Wait 2 minutes before first liveness check
+            periodSeconds: 30            # Check every 30 seconds
+            timeoutSeconds: 5            # Wait up to 5 seconds for response
+            failureThreshold: 6          # Allow up to 6 failures before killing pod
+
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 120     # Wait 2 minutes before first readiness check (match liveness for smoother rollout)
+            periodSeconds: 15            # Check readiness every 15 seconds
+            timeoutSeconds: 5            # Wait up to 5 seconds for response
+            failureThreshold: 6
+          resources:
+            resources:
+              {{- toYaml .Values.resources | nindent 12}}
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jfr-data-payment-consumers
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi

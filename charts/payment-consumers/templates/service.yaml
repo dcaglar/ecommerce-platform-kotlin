@@ -1,15 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "payment-consumers.fullname" . }}
-  labels:
-    {{- include "payment-consumers.labels" . | nindent 4 }}
+  name: payment-consumers
 spec:
-  type: {{ .Values.service.type }}
+  type: NodePort
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: http
-      protocol: TCP
-      name: http
+    - port: 8080
+      targetPort: 8080
+      nodePort: 32082   # Always use this port locally!
   selector:
-    {{- include "payment-consumers.selectorLabels" . | nindent 4 }}
+    app: payment-service

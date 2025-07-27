@@ -3,40 +3,11 @@ app:
     ttl-seconds: 3600  # 1 hour redis  TTL for PSP result cache
   payment-service:
     api-key: secretpaymentapikey12345
-
-  kafka: # Kafka configuration for dynamic consumers
-    dynamic-consumers:
-      - id: payment-order-executor
-        topic: payment_order_created_topic
-        group-id: payment-order-created-consumer-group
-        class-name: com.dogancaglar.consumers.PaymentOrderExecutor
-        concurrency: 1
-
-      - id: payment-retry-executor
-        topic: payment_order_retry_request_topic
-        group-id: payment-order-retry-consumer-group
-        class-name: com.dogancaglar.consumers.PaymentOrderRetryCommandExecutor
-        concurrency: 1
-
-      - id: payment-status-check-executor-scheduler
-        topic: payment_status_check_scheduler_topic
-        group-id: payment-status-check-scheduler-consumer-group
-        class-name: com.dogancaglar.consumers.ScheduledPaymentStatusCheckExecutor
-        concurrency: 1
-
 server:
   port: 8080
 spring:
-  kafka:
-    properties:
-      security.protocol: SASL_PLAINTEXT
-      sasl.mechanism: SCRAM-SHA-256
-      sasl.jaas.config: ${SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG}
-      client-id: ${CLIENT_ID:payment-consumers}
-    bootstrap-servers: kafka.payment.svc.cluster.local:9092
   data:
     redis:
-      url: redis://redis-master:6379
       timeout: 2000ms
       lettuce:
         pool:

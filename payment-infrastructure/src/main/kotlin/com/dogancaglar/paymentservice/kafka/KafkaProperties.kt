@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.kafka
 
-class KafkaTopicsProperties {
+open class KafkaTopicsProperties {
     var payment_order_created_topic: TopicConfig = TopicConfig()
     var payment_order_created_topic_dlq: TopicConfig = TopicConfig()
     var payment_order_retry_request_topic: TopicConfig = TopicConfig()

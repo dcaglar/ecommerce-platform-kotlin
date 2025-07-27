@@ -1,22 +1,113 @@
+app:
+  cache:
+    ttl-seconds: 3600  # 1 hour redis  TTL for PSP result cache
+  payment-service:
+    api-key: secretpaymentapikey12345
 server:
+  tomcat:
+    mbeanregistry:
+      enabled: true
   port: 8080
 spring:
-  kafka:
-    properties:
-      security.protocol: PLAINTEXT
-      bootstrap-servers: kafka.payment.svc.cluster.local:9092
-  datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME} # This will be injected from a Kubernetes Secret
-    password: ${SPRING_DATASOURCE_PASSWORD} # This will be injected from a Kubernetes Secret
-  data:
-    redis:
-      url: redis://redis-master:6379
   security:
     oauth2:
       resourceserver:
         jwt:
           issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}
+  kafka:
+    properties:
+      security.protocol: PLAINTEXT
+      session.timeout.ms: 45000
+    producer:
+      value-serializer: com.dogancaglar.paymentservice.serialization.EventEnvelopeKafkaSerializer
+      properties: #maybe change partition assignment strategy
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+        spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.deserialization.EventEnvelopeKafkaDeserializer
+  # Only the bootstrap-servers should be overridden in profiles
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME} # This will be injected from a Kubernetes Secret
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 10
+      connection-timeout: 1500
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  # Only the url, username, password should be overridden in profiles
+  data:
+    redis:
+      url: ${SPRING_DATA_REDIS_URL}
+      lettuce:
+        pool:
+          max-active: 64
+          max-idle: 64
+          min-idle: 8
+          max-wait: 2000ms
+    # Only the url should be overridden in profiles
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/changelog.master.xml
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus,metrics,health"
+  endpoint:
+    health:
+      enabled: true
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    enable:
+      all: false
+      tomcat.threads.current: true      # current thread count
+      tomcat.threads.busy: true         # threads handling requests
+      tomcat.threads.config.max: true
+      http.server.requests: true
+      tomcat.threads: true
+      hikaricp.connections: true
+      hikaricp.connections.acquire: true
+      outbox.event.backlog: true
+      outbox.dispatched: true
+      outbox.dispatcher.duration: true
+      kafka.consumer.fetch.manager.records.lag: true
+      kafka.producer.topic.record.send: true
+      process.cpu.usage: true
+      jvm.threads.live: true
+      jvm.memory.used: true
+      jvm.memory.max: true
+      jvm.gc.pause: true
+      scheduler.outbox.active.threads: true
+      scheduler.outbox.pool.size.threads: true
+      scheduler.outbox.queue.size: true
+      kafka.consumer.fetch.manager.records.consumed: true
+      kafka.consumer.fetch.manager.fetch.latency: true
+      kafka.consumer.io.time: true
+    binders:
+      tomcat:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+    export:
+      prometheus:
+        enabled: true
+
+
+  outbox-dispatcher:
+    thread-count: 10
+    batch-size: 5000
+    pool-size: 10
+
+spring.jackson.time-zone: UTC
+
+
 kafka:
   topics:
     payment_order_created_topic:

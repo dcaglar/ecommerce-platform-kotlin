@@ -1,14 +1,15 @@
 // KafkaTypedConsumerFactoryConfig.kt
-package com.dogancaglar.consumers
+package com.dogancaglar.paymentservice.port.inbound.consumers.config
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.TOPICS
 import com.dogancaglar.common.logging.GenericLogFields
 import com.dogancaglar.paymentservice.deserialization.EventEnvelopeKafkaDeserializer
-import com.dogancaglar.paymentservice.domain.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
+import com.dogancaglar.paymentservice.kafka.DynamicKafkaConsumersProperties
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.KafkaException
@@ -18,6 +19,7 @@ import org.apache.kafka.common.errors.SerializationException
 import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties
+import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -37,7 +39,7 @@ import org.springframework.messaging.handler.annotation.support.MethodArgumentNo
 import java.sql.SQLTransientException
 
 @Configuration
-@EnableConfigurationProperties(DynamicKafkaConsumersProperties::class)
+@EnableConfigurationProperties(DynamicKafkaConsumersPropertiesSpring::class)
 class KafkaTypedConsumerFactoryConfig(
     private val dynamicProps: DynamicKafkaConsumersProperties,
     private val bootKafkaProps: KafkaProperties,
@@ -206,3 +208,30 @@ class KafkaTypedConsumerFactoryConfig(
     @Bean
     fun messageHandlerMethodFactory(): DefaultMessageHandlerMethodFactory = DefaultMessageHandlerMethodFactory()
 }
+
+
+@ConfigurationProperties(prefix = "app.kafka")
+class DynamicKafkaConsumersPropertiesSpring : DynamicKafkaConsumersProperties()
+
+
+/*
+// DynamicKafkaConsumersProperties.kt
+package com.dogancaglar.consumers
+
+import org.springframework.boot.context.properties.ConfigurationProperties
+
+@ConfigurationProperties(prefix = "app.kafka")
+class DynamicKafkaConsumersProperties {
+    var dynamicConsumers: List<DynamicConsumer> = mutableListOf()
+
+    class DynamicConsumer {
+        lateinit var id: String
+        lateinit var topic: String
+        lateinit var groupId: String
+        lateinit var className: String
+
+        /** number of threads = number of partitions */
+        var concurrency: Int = 1
+    }
+}
+ */

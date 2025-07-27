@@ -1,4 +1,4 @@
-package com.dogancaglar.infrastructure.redis
+package com.dogancaglar.paymentservice.adapter.outbound.redis
 
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.StringRedisTemplate

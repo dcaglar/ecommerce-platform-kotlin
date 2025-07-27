@@ -10,3 +10,8 @@ master:
 
   # Reference your existing ConfigMap (must exist in the same namespace)
   existingConfigmap: redis-config
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: payment
