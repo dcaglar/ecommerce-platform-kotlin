@@ -17,6 +17,7 @@ This will:
 - Create the namespace if it doesn't exist
 - Apply all manifests for all services and infrastructure
 - Apply any secrets in the overlay
+  dckr_pat_DpyIlTAg0JHxgtEjXFrO5JDXHDA
 
 ---
 
@@ -38,7 +39,8 @@ Default ports:
 - Grafana: http://localhost:3000
 - Prometheus: http://localhost:9090
 
-psql -h localhost -p 5432 -U payment
+psql -h localhost -d payment_db -p 5432 -U payment
+
 ---
 
 ## 3️⃣ Add Keycloak to /etc/hosts
@@ -101,9 +103,9 @@ curl -i -X POST http://localhost:8081/payments \
 
 From project root, run:
 
-```bash
-       RPS=10 DURATION=1m k6 run load-tests/baseline-smoke-test.js
-VUS=40 RPS=40 DURATION=2m k6 run load-tests/baseline-smoke-test.js
+```bash 
+VUS=5  RPS=5 DURATION=50m k6 run load-tests/baseline-smoke-test.js
+VUS=40 RPS=40 DURATION=20m k6 run load-tests/baseline-smoke-test.js
 ```
 
 connect to db after port-forwarding:
