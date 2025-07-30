@@ -4,6 +4,7 @@ import com.dogancaglar.common.event.EVENT_TYPE
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
 import com.dogancaglar.common.event.TOPICS
+import com.dogancaglar.paymentservice.domain.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.PaymentOrderSucceeded
 import com.fasterxml.jackson.core.type.TypeReference

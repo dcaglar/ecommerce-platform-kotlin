@@ -1,15 +1,20 @@
-package com.dogancaglar.paymentservice.adapter.outbound.kafka
+package com.dogancaglar.paymentservice.application.config
 
 import com.dogancaglar.common.event.TOPICS
 import com.dogancaglar.paymentservice.kafka.KafkaTopicsProperties
 import org.apache.kafka.clients.admin.NewTopic
 import org.springframework.boot.context.properties.ConfigurationProperties
-import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
 @Configuration
-@EnableConfigurationProperties(KafkaTopicsPropertiesSpring::class)
+class KafkaTopicsPropertiesConfig {
+    @Bean
+    @ConfigurationProperties(prefix = "kafka.topics")
+    fun kafkaTopicsProperties(): KafkaTopicsProperties = KafkaTopicsProperties()
+}
+
+@Configuration
 class KafkaTopicsConfig(
     private val kafkaTopicsProperties: KafkaTopicsProperties
 ) {
@@ -82,6 +87,3 @@ class KafkaTopicsConfig(
         )
 
 }
-
-@ConfigurationProperties(prefix = "kafka.topics")
-class KafkaTopicsPropertiesSpring : KafkaTopicsProperties()

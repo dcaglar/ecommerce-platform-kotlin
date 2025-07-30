@@ -38,11 +38,14 @@ replicaCount: 1
 
 
 metrics:
+  jmx:
+    enabled: true                 # <- turn ON the JMX exporter container
   kafka:
-    enabled: true
     serviceMonitor:
       enabled: true
-      interval: 10s
+      namespace: payment
+      labels:
+        release: prometheus-stack
 
 resources:
   requests:

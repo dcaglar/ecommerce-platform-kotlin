@@ -2,11 +2,15 @@ apiVersion: v1
 kind: Service
 metadata:
   name: payment-service
+  labels:
+    app: payment-service    # <-- This label is CRUCIAL for ServiceMonitor selector!
+    release: prometheus-stack
 spec:
   type: NodePort
   ports:
-    - port: 8080
+    - name: http           # <-- Name must match ServiceMonitor's 'port'
+      port: 8080
       targetPort: 8080
-      nodePort: 32081   # Always use this port locally!
+      nodePort: 32081
   selector:
     app: payment-service

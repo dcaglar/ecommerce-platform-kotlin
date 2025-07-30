@@ -56,7 +56,7 @@ port_forward keycloak 8080 8080
 port_forward grafana-service 3000 3000
 port_forward prometheus-service 9090 9090
 port_forward payment-db 5432 5432
-port_forward pyroscope 4040 4040
+
 
 # Only this one gets auto-reconnect on pod restart:
 port_forward_mac_resilient_payment_service

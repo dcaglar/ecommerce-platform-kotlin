@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.ports.outbound
+package paymentservice.port.outbound
 
 interface IdGeneratorPort {
 

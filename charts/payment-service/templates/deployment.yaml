@@ -1,40 +1,44 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{include "payment-service.fullname" .}}
-  labels:
-    {{include "payment-service.labels" . | nindent 4}}
+  name: payment-service
 spec:
-  replicas: {{.Values.replicaCount}}
+  replicas: 1
   selector:
     matchLabels:
-      app: {{include "payment-service.fullname" .}}
+      app: payment-service
   template:
     metadata:
       labels:
-        app: {{include "payment-service.fullname" .}}
+        app: payment-service
     spec:
       volumes:
         - name: jfr
           persistentVolumeClaim:
-            claimName: jfr-data-{{ include "payment-service.fullname" . }}
+            claimName: jfr-data-payment-service
       containers:
         - name: payment-service
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{.Values.image.pullPolicy}}
           volumeMounts:
             - name: jfr
               mountPath: /var/log/jfr
+          image: dcaglar1987/payment-service:latest
+          imagePullPolicy: Always
           ports:
-            - containerPort: 8080
-            - containerPort: 9010
+            - containerPort: 8080  # REST API
+            - containerPort: 9010  # JMX
           env:
+            #            - name: PYROSCOPE_APPLICATION_NAME
+            #              value: payment-service
+            #            - name: PYROSCOPE_SERVER_ADDRESS
+            #              value: http://pyroscope.payment.svc:4040
+            #            - name: PYROSCOPE_PROFILER_EVENT
+            #              value: lock    # or lock or alloc or wall
             - name: JAVA_TOOL_OPTIONS
-              value: "{{ .Values.jvmOpts }}"
+              value: "-XX:StartFlightRecording=name=payment-service,filename=/var/log/jfr/pay.jfr,maxage=30m,maxsize=250M,settings=profile,dumponexit=true -XX:FlightRecorderOptions=repository=/var/log/jfr"
             - name: DATA_SOURCE_NAME
               value: "postgresql://payment:payment@payment-db:5432/payment?sslmode=disable"
             - name: SPRING_PROFILES_ACTIVE
-              value: "{{ .Values.spring.profile }}"
+              value: "local"
             - name: SPRING_DATA_REDIS_URL
               value: redis://redis-master:6379
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
@@ -59,24 +63,37 @@ spec:
                 secretKeyRef:
                   name: payment-db-credentials
                   key: PAYMENT_SERVICE_APP_DB_PASSWORD
+            - name: KAFKA_CLIENT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: KAFKA_CLIENT_PASSWORD
+
+          # Kdeleafka credentials (Secret)
           livenessProbe:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 60
-            periodSeconds: 15
-            timeoutSeconds: 5
-            failureThreshold: 10
+            initialDelaySeconds: 120     # Wait 2 minutes before first liveness check
+            periodSeconds: 30            # Check every 30 seconds
+            timeoutSeconds: 5            # Wait up to 5 seconds for response
+            failureThreshold: 6          # Allow up to 6 failures before killing pod
+
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 60
-            periodSeconds: 15
-            timeoutSeconds: 5
-            failureThreshold: 10
+            initialDelaySeconds: 120     # Wait 2 minutes before first readiness check (match liveness for smoother rollout)
+            periodSeconds: 15            # Check readiness every 15 seconds
+            timeoutSeconds: 5            # Wait up to 5 seconds for response
+            failureThreshold: 6
           resources:
-            {{- toYaml .Values.resources | nindent 12}}
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
 
 ---
 

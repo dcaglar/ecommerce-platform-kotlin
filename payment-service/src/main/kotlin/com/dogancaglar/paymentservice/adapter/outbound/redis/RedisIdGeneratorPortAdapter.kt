@@ -1,8 +1,8 @@
 package com.dogancaglar.paymentservice.adapter.outbound.redis
 
-import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
+import paymentservice.port.outbound.IdGeneratorPort
 
 @Component
 class RedisIdGeneratorPortAdapter(

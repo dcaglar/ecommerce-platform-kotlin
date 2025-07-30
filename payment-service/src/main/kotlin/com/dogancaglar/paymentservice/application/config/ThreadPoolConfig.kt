@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.config.threadpool
+package com.dogancaglar.paymentservice.application.config
 
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Tag

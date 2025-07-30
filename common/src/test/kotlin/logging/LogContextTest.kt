@@ -1,6 +1,8 @@
-package com.dogancaglar.common.logging
+package logging
 
 import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.common.logging.GenericLogFields
+import com.dogancaglar.common.logging.LogContext
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test

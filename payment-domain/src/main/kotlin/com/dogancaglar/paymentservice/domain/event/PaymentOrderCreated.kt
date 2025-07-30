@@ -1,6 +1,5 @@
-package com.dogancaglar.paymentservice.domain.event
+package com.dogancaglar.paymentservice.domain
 
-import com.dogancaglar.paymentservice.domain.PaymentOrderEvent
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
