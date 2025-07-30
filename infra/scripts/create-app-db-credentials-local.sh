@@ -6,7 +6,7 @@ REPO_ROOT="$SCRIPT_DIR/../.."
 
 cd "$REPO_ROOT"
 
-JOBFILE="$REPO_ROOT/infra/jobs/create-app-db-users.yaml"
+JOBFILE="$REPO_ROOT/infra/jobs/create-app-db-credentials.yaml"
 
 
 kubectl apply -f "$JOBFILE"  -n payment

@@ -1,7 +1,6 @@
-package com.dogancaglar.infrastructure.redis
+package com.dogancaglar.paymentservice.adapter.outbound.redis
 
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.PaymentEventPublisher
-import com.dogancaglar.paymentservice.adapter.outbound.redis.PaymentRetryQueueAdapter
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry

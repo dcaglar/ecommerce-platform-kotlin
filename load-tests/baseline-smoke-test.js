@@ -48,7 +48,7 @@ function randomAmount(min, max) {
 // --- k6 main function: makes payment requests ---
 export default function (data) {
     const AUTH_TOKEN = data.authToken;
-    const paymentOrderCount = Math.floor(Math.random() * 3) + 1; // 1-3 payment orders
+    const paymentOrderCount = 2; // 1-3 payment orders
     const paymentOrders = [];
     for (let i = 0; i < paymentOrderCount; i++) {
         paymentOrders.push({

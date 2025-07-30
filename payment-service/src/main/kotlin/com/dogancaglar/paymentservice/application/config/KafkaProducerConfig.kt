@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.adapter.outbound.kafka
+package com.dogancaglar.paymentservice.application.config
 
 import com.dogancaglar.common.event.EventEnvelope
 import io.micrometer.core.instrument.MeterRegistry

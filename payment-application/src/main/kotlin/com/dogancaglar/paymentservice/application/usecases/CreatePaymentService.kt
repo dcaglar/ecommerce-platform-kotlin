@@ -1,6 +1,5 @@
 package com.dogancaglar.paymentservice.application.usecases
 
-import com.dogancaglar.com.dogancaglar.payment.application.port.out.SerializationPort
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.paymentservice.application.constants.IdNamespaces
@@ -18,6 +17,7 @@ import com.dogancaglar.paymentservice.ports.inbound.CreatePaymentUseCase
 import com.dogancaglar.paymentservice.ports.outbound.OutboxEventPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
+import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import org.slf4j.LoggerFactory
 import paymentservice.port.outbound.IdGeneratorPort
 import java.time.Clock

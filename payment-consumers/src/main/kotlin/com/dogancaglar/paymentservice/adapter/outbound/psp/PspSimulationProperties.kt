@@ -1,4 +1,4 @@
-package com.dogancaglar.infrastructure.psp
+package com.dogancaglar.paymentservice.adapter.outbound.psp
 
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Configuration

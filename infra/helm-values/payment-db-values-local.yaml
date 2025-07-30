@@ -1,13 +1,43 @@
+image:
+  tag: 16.3.0-debian-12-r12
+
+postgresqlSharedPreloadLibraries: "pgaudit,pg_stat_statements"
+
 auth:
   existingSecret: payment-db-credentials
-  database: payment_db           # Your DB name (as before)
+  database: payment_db
   secretKeys:
     adminPasswordKey: ADMIN_POSTGRES_PASSWORD
 
 primary:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "1"
+      memory: 2Gi
   extendedConfiguration: |
-    max_connections = 200
-    log_statement = 'all'
-    log_min_duration_statement = 0
-    log_connections = on
-    log_disconnections = on
+    max_connections          = 40
+    pg_stat_statements.max = 1000
+    pg_stat_statements.track = 'all'
+    shared_preload_libraries = 'pgaudit,pg_stat_statements'
+
+
+
+metrics:
+  enabled: true
+  collectors:
+    stat_statements: true
+    long_running_transactions: true
+  extraEnvVars:
+    - name: PG_EXPORTER_FLAGS
+      value: >
+        --collector.stat_statements
+        --collector.stat_statements.include_query
+        --collector.stat_statements.limit=100
+  serviceMonitor:
+    enabled: true
+    namespace: payment
+    labels:
+      release: prometheus-stack

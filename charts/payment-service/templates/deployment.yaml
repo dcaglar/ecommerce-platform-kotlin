@@ -39,6 +39,10 @@ spec:
               value: "postgresql://payment:payment@payment-db:5432/payment?sslmode=disable"
             - name: SPRING_PROFILES_ACTIVE
               value: "local"
+            - name: SPRING_DATA_REDIS_URL
+              value: redis://redis-master:6379
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:9092
             - name: SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
               valueFrom:
                 configMapKeyRef:

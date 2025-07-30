@@ -1,5 +1,6 @@
 package com.dogancaglar.infrastructure.psp
 
+import com.dogancaglar.paymentservice.adapter.outbound.psp.PspSimulationProperties
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.util.PSPStatusMapper

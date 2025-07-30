@@ -10,3 +10,11 @@ master:
 
   # Reference your existing ConfigMap (must exist in the same namespace)
   existingConfigmap: redis-config
+
+  metrics:
+    enabled: true                  # redis-exporter side-car
+    serviceMonitor:
+      enabled: true
+      namespace: payment
+      labels:
+        release: prometheus-stack
