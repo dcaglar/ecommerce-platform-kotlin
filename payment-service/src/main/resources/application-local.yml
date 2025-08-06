@@ -7,6 +7,8 @@ server:
   tomcat:
     mbeanregistry:
       enabled: true
+    threads:
+      max: 4
   port: 8080
 spring:
   security:
@@ -30,7 +32,7 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
       maximum-pool-size: 20
-      minimum-idle: 10
+      minimum-idle: 8
       connection-timeout: 1500
       idle-timeout: 600000
       max-lifetime: 1800000
@@ -101,9 +103,9 @@ management:
 
 
   outbox-dispatcher:
-    thread-count: 10
-    batch-size: 5000
-    pool-size: 10
+    thread-count: 2
+    batch-size: 100
+    pool-size: 2
 
 spring.jackson.time-zone: UTC
 

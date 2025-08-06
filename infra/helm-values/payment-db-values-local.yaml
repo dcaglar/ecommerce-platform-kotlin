@@ -10,6 +10,9 @@ auth:
     adminPasswordKey: ADMIN_POSTGRES_PASSWORD
 
 primary:
+  persistence:
+    enabled: true
+    size: 50Gi
   resources:
     requests:
       cpu: 500m
@@ -18,11 +21,19 @@ primary:
       cpu: "1"
       memory: 2Gi
   extendedConfiguration: |
-    max_connections          = 40
+    checkpoint_timeout = '10min'
+    max_wal_size = '4GB'
+    min_wal_size = '512MB'
+    checkpoint_completion_target = 0.9
+    shared_buffers = '512MB'
+    max_connections = 40
     pg_stat_statements.max = 1000
     pg_stat_statements.track = 'all'
     shared_preload_libraries = 'pgaudit,pg_stat_statements'
-
+    log_min_duration_statement = 1000         # Log queries slower than 1s (in ms)
+    log_statement = 'none'                    # (Optional, only logs queries by time not all)
+    bgwriter_lru_maxpages = 400      # Try 200 or 400
+    bgwriter_lru_multiplier = 2
 
 
 metrics:

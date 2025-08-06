@@ -27,6 +27,7 @@ sasl:
     user: ""
     password: ""
   controller:
+    replicaCount: 1
     user: ""
     password: ""
   client:
@@ -35,6 +36,7 @@ sasl:
   existingSecret: ""
 
 replicaCount: 1
+
 
 
 metrics:
@@ -49,8 +51,8 @@ metrics:
 
 resources:
   requests:
-    memory: 1Gi
+    memory: 356Mi
     cpu: 500m
   limits:
-    memory: 2Gi
-    cpu: 2
+    memory: 612Mi
+    cpu: 1

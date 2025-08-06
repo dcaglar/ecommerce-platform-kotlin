@@ -4,60 +4,18 @@ This guide walks you through starting up the full stack, getting tokens, and run
 
 ---
 
-## 1️⃣ Start All App & Infra Services
+## 1️⃣ create jfr record manually
 
-Deploy all services and infrastructure to your local Kubernetes cluster (namespace: `payment`):
+kubectl exec -n payment -- jcmd 1 JFR.dump name=payment-service filename=/var/log/jfr/pay.jfr
+payment-service-5c4c5b74-podname
 
-```bash
-./infra/scripts/kubernetes/deploy-k8s-overlay.sh local all payment
-```
+grep 'POST /payments'
 
-This will:
-
-- Create the namespace if it doesn't exist
-- Apply all manifests for all services and infrastructure
-- Apply any secrets in the overlay
-  dckr_pat_DpyIlTAg0JHxgtEjXFrO5JDXHDA
-
----
-
-## 2️⃣ Port-forward All Infra Services
-
-To access infrastructure UIs (Keycloak, Kibana, Grafana, Prometheus, etc.) from your local machine, run:
+## 1️⃣ connect to be
 
 ```bash
-./infra/scripts/kubernetes/port-forward-infra.sh
-```
-
-This will open a new Terminal tab for each service (on macOS) or run in the background (on Linux).
-
-Default ports:
-
-- Keycloak: http://localhost:8080
-- Payment Service: http://localhost:8081
-- Kibana: http://localhost:5601
-- Grafana: http://localhost:3000
-- Prometheus: http://localhost:9090
-
 psql -h localhost -d payment_db -p 5432 -U payment
-
----
-
-## 3️⃣ Add Keycloak to /etc/hosts
-
-To ensure JWT authentication works (issuer URL comparison), add the Keycloak domain to your `/etc/hosts`:
-
-```bash
-sudo ./infra/scripts/kubernetes/add-local-domains.sh
 ```
-
-This will map `keycloak` to `127.0.0.1`.
-
----
-
-## 4️⃣ Provision Keycloak Credentials
-
-Run the following to create realms, roles, clients, and their configurations in Keycloak:
 
 ```bash
 ./keycloak/provision-keycloak.sh
@@ -72,10 +30,6 @@ Generate an OAuth access token for the payment-service client:
 ```bash
 ./keycloak/get-token.sh
 ```
-
-The token will be saved to: `keycloak/access.token`
-
----
 
 ## 6️⃣ Test the Payment API
 
@@ -97,14 +51,37 @@ curl -i -X POST http://localhost:8081/payments \
   }'
 ```
 
----
+kubectl top pods -A
+
+kubectl top node
+
+kubectl top pods -n payment
+
+kubectl top pods -n monitoring --sort-by=memory
+
+kubectl top pods -n logging
+
+kubectl logs -n payment payment-service | grep 'POST /payments'
+
+kubectl exec -n payment payment-service- -- ls -lh /var/log/jfr
+kubectl exec -n payment payment-service- -- jcmd 1 JFR.dump name=payment-service
+
+find / -name 'access_log*.log' 2>/dev/null
+
+kubectl cp payment/payment-service-:/var/log/jfr/pay.jfr ./pay.jfr
+
+stern -n payment 'payment-service'| grep 'POST'
+
+---d\
 
 ## 7️⃣ Run Load Tests
 
 From project root, run:
 
 ```bash 
-VUS=5  RPS=5 DURATION=50m k6 run load-tests/baseline-smoke-test.js
+VUS=10  RPS=10 DURATION=1m k6 run load-tests/baseline-smoke-test.js
+VUS=10  RPS=5 DURATION=50m k6 run load-tests/baseline-smoke-test.js
+VUS=20  RPS=20 DURATION=50m k6 run load-tests/baseline-smoke-test.js
 VUS=40 RPS=40 DURATION=20m k6 run load-tests/baseline-smoke-test.js
 ```
 

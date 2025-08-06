@@ -38,15 +38,14 @@
         SELECT oeid, event_type, aggregate_id, payload, status, created_at FROM claimed
     </select>
 
-    <insert id="insert"
+    <insert id="insertOutboxEvent"
             parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.OutboxEventEntity">
         INSERT INTO outbox_event (oeid, event_type, aggregate_id, payload, status, created_at)
         VALUES
-        (#{oeid},
-        #{eventType}, #{aggregateId}, #{payload}, #{status}, #{createdAt})
+        (#{oeid}, #{eventType}, #{aggregateId}, #{payload}, #{status}, #{createdAt})
     </insert>
 
-    <insert id="batchUpsert" parameterType="java.util.List">
+    <insert id="insertAllOutboxEvents" parameterType="java.util.List">
         INSERT INTO outbox_event (oeid, event_type, aggregate_id, payload, status, created_at)
         VALUES
         <foreach collection="list" item="event" separator=",">
@@ -57,10 +56,21 @@
             #{event.status},
             #{event.createdAt})
         </foreach>
-        ON CONFLICT (oeid, created_at) DO UPDATE SET
-        event_type = EXCLUDED.event_type,
-        aggregate_id = EXCLUDED.aggregate_id,
-        payload = EXCLUDED.payload,
-        status = EXCLUDED.status;
     </insert>
+
+    <update id="updateOutboxEventStatus">
+        UPDATE outbox_event
+        SET status = #{status}
+        WHERE oeid = #{oeid}
+    </update>
+
+
+    <update id="batchUpdate" parameterType="java.util.List">
+        <foreach collection="list" item="event" separator=";">
+            UPDATE outbox_event
+            SET status = #{event.status}
+            WHERE oeid = #{event.oeid}
+            AND created_at = #{event.createdAt}
+        </foreach>
+    </update>
 </mapper>

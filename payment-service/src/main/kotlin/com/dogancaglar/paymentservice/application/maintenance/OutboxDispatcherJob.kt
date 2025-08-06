@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.application.maintenance
 
 import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.paymentservice.domain.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.events.OutboxEvent
@@ -54,65 +55,73 @@ class OutboxDispatcherJob(
     fun dispatchBatchWorker(workedId: Int) {
         val start = System.currentTimeMillis()
         val threadName = Thread.currentThread().name
-        logger.debug("Started dispatchBatchWorker method for $workedId on $threadName ")
-        val events = outboxEventPort.findBatchForDispatch(batchSize)
-        logger.debug("Found \\${events.size} events to dispatch in worker $workedId on $threadName")
-        if (events.isEmpty()) {
-            logger.debug("No events to dispatch in worker $workedId, exiting. on $threadName")
-            return
-        }
+        val workerContext = mapOf("workerId" to workedId.toString(), "threadName" to threadName)
+        LogContext.with(workerContext) {
+            val events = outboxEventPort.findBatchForDispatch(batchSize)
+            logger.info("Found \\${events.size} events to dispatch in worker $workedId on $threadName")
+            if (events.isEmpty()) {
+                logger.debug("No events to dispatch in worker $workedId, exiting. on $threadName")
+                return@with
+            }
 
-        val succeeded = mutableListOf<OutboxEvent>()
-        val failed = mutableListOf<OutboxEvent>()
+            val succeeded = mutableListOf<OutboxEvent>()
+            val failed = mutableListOf<OutboxEvent>()
 
-        for (event in events) {
+            for (event in events) {
+                try {
+                    //todo do we have to set LogContext here?
+                    val envelopeType = objectMapper.typeFactory
+                        .constructParametricType(EventEnvelope::class.java, PaymentOrderCreated::class.java)
+                    val envelope: EventEnvelope<PaymentOrderCreated> =
+                        objectMapper.readValue(event.payload, envelopeType)
+                    LogContext.with(envelope) {
+                        paymentEventPublisher.publish(
+                            preSetEventIdFromCaller = envelope.eventId,
+                            aggregateId = envelope.aggregateId,
+                            eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
+                            data = envelope.data,
+                            traceId = envelope.traceId,
+                            parentEventId = envelope.eventId
+                        )
+                        logger.info("Dispatcher job Published event ${event.oeid} in worker $workedId")
+                    }
+                    event.markAsSent()
+                    succeeded.add(event)
+                } catch (ex: Exception) {
+                    failed.add(event)
+                    logger.error("Failed to publish event on $threadName ${event.oeid}: ${ex.message}", ex)
+                    // Optionally log the error for monitoring
+                    // logger.error("Failed to publish event ${event.id}", ex)
+                }
+            }
             try {
-                //todo do we have to set LogContext here?
-                val envelopeType = objectMapper.typeFactory
-                    .constructParametricType(EventEnvelope::class.java, PaymentOrderCreated::class.java)
-                val envelope: EventEnvelope<PaymentOrderCreated> =
-                    objectMapper.readValue(event.payload, envelopeType)
+                // Only persist the succeeded events
+                if (succeeded.isNotEmpty()) {
+                    outboxEventPort.updateAll(succeeded)
+                    meterRegistry.counter(OUTBOX_DISPATCHED_TOTAL).increment(succeeded.size.toDouble())
+                    logger.debug("Successfully dispatched ${succeeded.size} events in worker $workedId on $threadName")
+                } else {
+                    logger.warn("No events were successfully dispatched in worker $workedId on $threadName")
+                }
 
-                paymentEventPublisher.publish(
-                    preSetEventIdFromCaller = envelope.eventId,
-                    aggregateId = envelope.aggregateId,
-                    eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
-                    data = envelope.data,
-                    traceId = envelope.traceId,
-                    parentEventId = envelope.eventId
-                )
-                event.markAsSent()
-                succeeded.add(event)
+                if (failed.isNotEmpty()) {
+                    logger.warn("Failed to dispatch ${failed.size} events in worker $workedId")
+                    meterRegistry.counter(OUTBOX_DISPATCH_FAILED_TOTAL).increment(failed.size.toDouble())
+                }
+                // Update backlog gauge
+                meterRegistry.gauge(OUTBOX_EVENT_BACKLOG, outboxEventPort) { _ ->
+                    outboxEventPort.countByStatus("NEW").toDouble()
+                }
+                val end = System.currentTimeMillis()
+                val durationMs = end - start
+                logger.info("DispatchBatchWorker #$workedId completed in ${durationMs}ms on $threadName")
+                // Optionally, record as a metric:
+                meterRegistry.timer(OUTBOX_DISPATCHER_DURATION, "thread", threadName)
+                    .record(durationMs, TimeUnit.MILLISECONDS)
             } catch (ex: Exception) {
-                failed.add(event)
-                logger.error("Failed to publish event on $threadName ${event.oeid}: ${ex.message}", ex)
-                // Optionally log the error for monitoring
-                // logger.error("Failed to publish event ${event.id}", ex)
+                logger.error("Exception in OutboxDispatcherJob worker $workedId on $threadName", ex)
+                throw ex
             }
         }
-        // Only persist the succeeded events
-        if (succeeded.isNotEmpty()) {
-            outboxEventPort.saveAll(succeeded)
-            meterRegistry.counter(OUTBOX_DISPATCHED_TOTAL).increment(succeeded.size.toDouble())
-            logger.debug("Successfully dispatched ${succeeded.size} events in worker $workedId on $threadName")
-        } else {
-            logger.warn("No events were successfully dispatched in worker $workedId on $threadName")
-        }
-
-
-        if (failed.isNotEmpty()) {
-            logger.warn("Failed to dispatch ${failed.size} events in worker $workedId")
-            meterRegistry.counter(OUTBOX_DISPATCH_FAILED_TOTAL).increment(failed.size.toDouble())
-        }
-        // Update backlog gauge
-        meterRegistry.gauge(OUTBOX_EVENT_BACKLOG, outboxEventPort) { _ ->
-            outboxEventPort.countByStatus("NEW").toDouble()
-        }
-        val end = System.currentTimeMillis()
-        val durationMs = end - start
-        logger.info("DispatchBatchWorker #$workedId completed in ${durationMs}ms on $threadName")
-        // Optionally, record as a metric:
-        meterRegistry.timer(OUTBOX_DISPATCHER_DURATION, "thread", threadName)
-            .record(durationMs, TimeUnit.MILLISECONDS)
     }
 }

@@ -18,15 +18,22 @@ class OutboxBufferAdapter(
     override fun saveAll(events: List<OutboxEvent>): List<OutboxEvent> {
         val entities: List<OutboxEventEntity> = events.map { event -> OutboxEventEntityMapper.toEntity(event) }
         if (entities.isNotEmpty()) {
-            outboxEventMapper.batchUpsert(entities)
+            outboxEventMapper.insertAllOutboxEvents(entities)
         }
         return entities.map { entity -> OutboxEventEntityMapper.toDomain(entity) }
     }
 
     override fun save(event: OutboxEvent): OutboxEvent {
         val entity = OutboxEventEntityMapper.toEntity(event)
-        outboxEventMapper.batchUpsert(listOf(entity))
+        outboxEventMapper.insertOutboxEvent(entity)
         return OutboxEventEntityMapper.toDomain(entity)
+    }
+
+    override fun updateAll(events: List<OutboxEvent>) {
+        val entities = events.map { OutboxEventEntityMapper.toEntity(it) }
+        if (entities.isNotEmpty()) {
+            outboxEventMapper.batchUpdate(entities)
+        }
     }
 
     override fun countByStatus(status: String): Long =

@@ -1,0 +1,12 @@
+replicas: 1
+
+# Service name created by the ES chart ➜ https://… !
+elasticsearchHosts: "https://elasticsearch-master:9200"
+
+# Tell Kibana where to find creds & CA bundle
+elasticsearchCredentialSecret: elasticsearch-master-credentials
+elasticsearchCertificateSecret: elasticsearch-master-certs
+
+resources:
+  requests: {cpu: 100m, memory: 512Mi}
+  limits: {cpu: 300m, memory: 1Gi}
