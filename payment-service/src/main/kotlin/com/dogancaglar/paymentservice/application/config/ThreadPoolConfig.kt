@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component
 class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val decorator: MdcTaskDecorator) {
     @Bean("outboxTaskScheduler")
     fun outboxTaskScheduler(
-        @Value("\${outbox-dispatcher.pool-size:8}") poolSize: Int
+        @Value("\${outbox-dispatcher.pool-size:8}") poolSize: Int,
     ): ThreadPoolTaskScheduler {
         val scheduler = ThreadPoolTaskScheduler()
         scheduler.poolSize = poolSize

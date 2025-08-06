@@ -1,0 +1,58 @@
+daemonSet:
+  enabled: true          # run a Beat on every node
+
+# --- Filebeat configuration (verbatim copy of what you pasted) ----
+filebeatConfig:
+  filebeat.yml: |
+    filebeat.inputs:
+      - type: filestream
+        id: payment-logs
+        ignore_older: 24h
+        paths:
+          - /var/log/containers/*payment-service*.log
+          - /var/log/containers/*payment-db*.log
+        prospector.scanner.symlinks: true
+        parsers:
+          - container: ~
+        processors:
+          - add_kubernetes_metadata:
+              default_indexers: []
+              default_matchers: []
+              matchers:
+                - logs_path:
+                    logs_path: "/var/log/containers/"
+          - decode_json_fields:
+              fields: ["log","message"]
+              target: ""
+              overwrite_keys: true
+              max_depth: 1
+              process_array: false
+    
+    
+    queue.mem:
+      events: 4096
+      flush.min_events: 512
+
+    setup.ilm.enabled: false
+    setup.template.enabled: true
+    setup.template.name: "ecommerce-logs"
+    setup.template.pattern: "ecommerce-logs-*"
+
+    output.elasticsearch:
+      hosts: ["https://elasticsearch-master:9200"]
+      ssl.verification_mode: none 
+      username: elastic
+      password: gs96EMuK5IWOIGFv
+      index: "ecommerce-logs-%{+yyyy.MM.dd}"
+      bulk_max_size: 2048
+
+# --- RBAC (chart will create ClusterRole/Binding automatically) ---- rm rf   /var/lib/filebeat-filebeat-logging-data
+
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi

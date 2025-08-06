@@ -25,8 +25,8 @@ postgresql:
 
 resources:
   requests:
-    memory: 1Gi
+    memory: 700Mi
     cpu: 250m
   limits:
-    memory: 2Gi
-    cpu: 1
+    memory: 1Gi
+    cpu: 500m

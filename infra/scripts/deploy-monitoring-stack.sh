@@ -11,7 +11,7 @@ VALUES_FILE="$REPO_ROOT/infra/helm-values/monitoring-stack-values-local.yaml"
  helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
  helm repo update
  helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
-   --namespace payment --create-namespace -f "$VALUES_FILE"
+   --namespace monitoring --create-namespace -f "$VALUES_FILE"
 
 
 echo "✅ prom sstaack deployed with values from: $VALUES_FILE"

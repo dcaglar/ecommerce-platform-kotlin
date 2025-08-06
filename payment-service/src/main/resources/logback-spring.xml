@@ -7,16 +7,6 @@
     <timestamp key="date" datePattern="yyyy-MM-dd"/>
     <!-- DEFAULT ROOT (used when *no* active Spring profile matches below) -->
 
-    <!-- Default root logger and appender for all profiles (fallback) -->
-    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
-    </appender>
-    <root level="INFO">
-        <appender-ref ref="STDOUT"/>
-    </root>
-
     <!-- ──────────────────────────────── -->
     <!--  ►  Container / Kubernetes JSON  -->
     <!-- ──────────────────────────────── -->
@@ -44,7 +34,7 @@
         </appender>
 
         <!-- Root logger at INFO for containers -->
-        <root level="WARN">
+        <root level="INFO">
             <appender-ref ref="JSON"/>
         </root>
     </springProfile>

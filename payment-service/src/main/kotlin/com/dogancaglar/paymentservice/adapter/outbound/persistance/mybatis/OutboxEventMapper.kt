@@ -14,6 +14,14 @@ interface OutboxEventMapper {
         @Param("batchSize") batchSize: Int
     ): List<OutboxEventEntity>
 
-    fun batchUpsert(events: List<OutboxEventEntity>): Int
-    fun insert(event: OutboxEventEntity): Int
+    fun insertOutboxEvent(event: OutboxEventEntity): Int
+    fun insertAllOutboxEvents(events: List<OutboxEventEntity>): Int
+    fun updateOutboxEventStatus(
+        @Param("oeid") oeid: Long,
+        @Param("status") status: String
+    ): Int
+
+    fun batchUpdate(events: List<OutboxEventEntity>): Int
+
+
 }

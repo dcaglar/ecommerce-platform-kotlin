@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: jfr-debug
+  namespace: payment
+spec:
+  containers:
+    - name: debug
+      image: busybox
+      command: ["sleep", "3600"]
+      volumeMounts:
+        - name: jfr
+          mountPath: /mnt
+  volumes:
+    - name: jfr
+      persistentVolumeClaim:
+        claimName: jfr-data-payment-service

@@ -1,5 +1,51 @@
 prometheus:
   prometheusSpec:
+    containers:
+      - name: config-reloader
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
     serviceMonitorSelector:
       matchLabels:
         release: prometheus-stack
+
+alertmanager:
+  alertmanagerSpec:
+    containers:
+      - name: config-reloader
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi
+
+grafana:
+  sidecar:
+    datasources:
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 50m
+          memory: 64Mi
+    dashboards:
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 50m
+          memory: 64Mi

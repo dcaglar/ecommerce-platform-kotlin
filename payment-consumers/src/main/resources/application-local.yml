@@ -26,6 +26,14 @@ app:
 
 server:
   port: 8080
+  tomcat:
+    accesslog:
+      enabled: true
+      directory: /var/log/tomcat
+      prefix: access_log
+      suffix: .log
+      pattern: '%h %l %u %t "%r" %s %b %D'
+      buffered: true
 spring:
   kafka:
     properties:

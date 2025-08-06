@@ -1,12 +1,17 @@
 package com.dogancaglar.paymentservice.application.maintenance
 
+import com.dogancaglar.common.logging.LogContext
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
 import org.slf4j.LoggerFactory
+import org.slf4j.MDC
 import org.springframework.boot.context.event.ApplicationReadyEvent
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
 import org.springframework.context.event.EventListener
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.scheduling.annotation.Scheduled
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -29,14 +34,25 @@ class OutboxPartitionCreator(
     @EventListener(ApplicationReadyEvent::class)
     @Transactional
     fun ensureCurrentPartitionOnStartup() {
-        ensurePartitionForNow()
+        try {
+            ensurePartitionForNow()
+        } catch (ex: Exception) {
+            logger.error("Exception in ensureCurrentPartitionOnStartup", ex)
+            throw ex
+        }
     }
 
     // Ensure next partition exists (run every 11 min, slightly offset from prune)
     @Scheduled(fixedDelay = 11 * 60 * 1000)
     @Transactional
     fun ensureNextPartitionScheduled() {
-        ensurePartitionForNext()
+        try {
+            ensurePartitionForNow()
+            ensurePartitionForNext()
+        } catch (ex: Exception) {
+            logger.error("Exception in ensureNextPartitionScheduled", ex)
+            throw ex
+        }
     }
 
     // Partition creation logic for current window
@@ -58,15 +74,18 @@ class OutboxPartitionCreator(
 
 
     private fun floorToPartitionStart(t: LocalDateTime): LocalDateTime =
-        t.withMinute(((t.minute / PARTITION_SIZE_MIN).toInt()) * PARTITION_SIZE_MIN.toInt())
-            .withSecond(0).withNano(0)
+        t.withMinute(((t.minute / PARTITION_SIZE_MIN).toInt()) * PARTITION_SIZE_MIN.toInt()).withSecond(0).withNano(0)
 
     // --- Partition creation (safe DDL) ---
     private fun ensurePartitionExists(from: LocalDateTime, to: LocalDateTime) {
         val partitionName = "outbox_event_${from.format(partitionFormatter)}"
         val fromStr = from.format(sqlFormatter)
         val toStr = to.format(sqlFormatter)
-        val sql = """
+        val mdcContext = mapOf(
+            "partitionName" to partitionName, "from" to fromStr, "to" to toStr
+        )
+        LogContext.with(mdcContext) {
+            val sql = """
             DO $$
             BEGIN
                 IF NOT EXISTS (
@@ -79,25 +98,27 @@ class OutboxPartitionCreator(
             $$;
         """.trimIndent()
 
-        val timer = Timer.start()
-        var success = false
-        val zoneId = clock.zone
-        try {
-            jdbcTemplate.execute(sql)
-            logger.info("Ensured partition exists: $partitionName for [$fromStr, $toStr)")
-            meterRegistry.counter("outbox_partition_creator.success").increment()
-            success = true
-        } catch (e: Exception) {
-            logger.error("Error creating partition $partitionName: ${e.message}", e)
-            meterRegistry.counter("outbox_partition_creator.failure").increment()
-        } finally {
-            timer.stop(meterRegistry.timer("outbox_partition_creator.duration"))
-            meterRegistry.gauge(
-                "outbox_partition_creator.last_from_epoch",
-                from.atZone(zoneId).toEpochSecond().toDouble()
-            )
-            meterRegistry.gauge("outbox_partition_creator.last_to_epoch", to.atZone(zoneId).toEpochSecond().toDouble())
-            meterRegistry.gauge("outbox_partition_creator.last_success", if (success) 1.0 else 0.0)
+            val timer = Timer.start()
+            var success = false
+            val zoneId = clock.zone
+            try {
+                jdbcTemplate.execute(sql)
+                logger.info("Ensured partition exists: $partitionName for [$fromStr, $toStr)")
+                meterRegistry.counter("outbox_partition_creator.success").increment()
+                success = true
+            } catch (e: Exception) {
+                logger.error("Error creating partition $partitionName: ${e.message}", e)
+                meterRegistry.counter("outbox_partition_creator.failure").increment()
+            } finally {
+                timer.stop(meterRegistry.timer("outbox_partition_creator.duration"))
+                meterRegistry.gauge(
+                    "outbox_partition_creator.last_from_epoch", from.atZone(zoneId).toEpochSecond().toDouble()
+                )
+                meterRegistry.gauge(
+                    "outbox_partition_creator.last_to_epoch", to.atZone(zoneId).toEpochSecond().toDouble()
+                )
+                meterRegistry.gauge("outbox_partition_creator.last_success", if (success) 1.0 else 0.0)
+            }
         }
     }
 
@@ -111,8 +132,12 @@ class OutboxPartitionCreator(
     fun prunePartitionsSafe() {
         val now = LocalDateTime.now(clock)
         val currWindowStart = now.withMinute((now.minute / 30) * 30).withSecond(0).withNano(0)
-
-        val sql = """
+        MDC.put("currWindowStart", currWindowStart.toString())
+        val mdcContext = mapOf(
+            "currWindowStart" to currWindowStart.toString(),
+        )
+        LogContext.with(mdcContext) {
+            val sql = """
             DO $$
             DECLARE
                 part record;
@@ -144,13 +169,73 @@ class OutboxPartitionCreator(
             END $$;
         """.trimIndent()
 
-        try {
-            jdbcTemplate.execute(sql)
-            logger.info("Pruned old partitions up to $currWindowStart")
-            meterRegistry.counter("outbox_partition_prune.success").increment()
-        } catch (e: Exception) {
-            logger.error("Partition prune failed: ${e.message}", e)
-            meterRegistry.counter("outbox_partition_prune.failure").increment()
+            try {
+                jdbcTemplate.execute(sql)
+                logger.info("Pruned old partitions up to $currWindowStart")
+                meterRegistry.counter("outbox_partition_prune.success").increment()
+            } catch (e: Exception) {
+                logger.error("Partition prune failed: ${e.message}", e)
+                meterRegistry.counter("outbox_partition_prune.failure").increment()
+            }
         }
+
+    }
+
+    @Scheduled(fixedDelay = 30 * 60 * 1000, initialDelay = 15 * 60 * 1000)
+    fun vacuumOldPartitionsWithNewRows() {
+        val now = LocalDateTime.now(clock)
+        val partitionFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmm")
+        val currWindowStart = now.withMinute((now.minute / 30) * 30).withSecond(0).withNano(0)
+        val nextWindowStart = currWindowStart.plusMinutes(PARTITION_SIZE_MIN)
+
+        val currPartitionName = "outbox_event_${currWindowStart.format(partitionFormatter)}"
+        val nextPartitionName = "outbox_event_${nextWindowStart.format(partitionFormatter)}"
+
+        logger.info("Vacuum check for partitions (skipping: $currPartitionName and $nextPartitionName)")
+
+        val partitionNames: List<String> = jdbcTemplate.queryForList(
+            """
+        SELECT inhrelid::regclass::text AS partition_name
+        FROM pg_inherits
+        WHERE inhparent = 'outbox_event'::regclass
+        """, String::class.java
+        )
+
+        for (partitionName in partitionNames) {
+            if (partitionName == currPartitionName || partitionName == nextPartitionName) continue
+
+            val newCount: Int? = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM $partitionName WHERE status = 'NEW'", Int::class.java
+            )
+            if ((newCount ?: 0) > 0) {
+                logger.info("VACUUM: $partitionName ($newCount NEW rows remaining)")
+                try {
+                    jdbcTemplate.execute("VACUUM $partitionName")
+                    meterRegistry.counter("outbox_partition_vacuum.success").increment()
+                } catch (ex: Exception) {
+                    logger.warn("VACUUM failed for $partitionName: ${ex.message}", ex)
+                    meterRegistry.counter("outbox_partition_vacuum.failure").increment()
+                }
+            }
+        }
+    }
+}
+
+@Configuration
+class AsyncConfig {
+    @Bean("partitionCreationExecutor")
+    fun partitionCreationExecutor(): ThreadPoolTaskExecutor = ThreadPoolTaskExecutor().apply {
+        corePoolSize = 2
+        maxPoolSize = 2
+        setThreadNamePrefix("partition-creation-")
+        initialize()
+    }
+
+    @Bean("partitionRemovalExecutor")
+    fun partitionRemovalExecutor(): ThreadPoolTaskExecutor = ThreadPoolTaskExecutor().apply {
+        corePoolSize = 2
+        maxPoolSize = 2
+        setThreadNamePrefix("partition-removal-")
+        initialize()
     }
 }

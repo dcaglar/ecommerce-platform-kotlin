@@ -14,7 +14,7 @@
             payload TEXT NOT NULL,
             status VARCHAR(50) NOT NULL,
             created_at TIMESTAMP NOT NULL,
-            PRIMARY KEY (oeid, created_at)
+            PRIMARY KEY (oeid,created_at)
             ) PARTITION BY RANGE (created_at);
         </sql>
     </changeSet>
