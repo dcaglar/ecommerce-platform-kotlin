@@ -14,17 +14,11 @@ spec:
       labels:
         app: {{include "payment-service.fullname" .}}
     spec:
-      volumes:
-        - name: jfr
-          persistentVolumeClaim:
-            claimName: jfr-data-{{ include "payment-service.fullname" . }}
       containers:
         - name: payment-service
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{.Values.image.pullPolicy}}
-          volumeMounts:
-            - name: jfr
-              mountPath: /var/log/jfr
+
           ports:
             - containerPort: 8080  # REST API
             - containerPort: 9010  # JMX
@@ -79,10 +73,10 @@ spec:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 120     # Wait 2 minutes before first readiness check (match liveness for smoother rollout)
+            initialDelaySeconds: 60     # Wait 2 minutes before first readiness check (match liveness for smoother rollout)
             periodSeconds: 15            # Check readiness every 15 seconds
             timeoutSeconds: 5            # Wait up to 5 seconds for response
-            failureThreshold: 6
+            failureThreshold: 12
           resources:
             {{- toYaml .Values.resources | nindent 12}}
 

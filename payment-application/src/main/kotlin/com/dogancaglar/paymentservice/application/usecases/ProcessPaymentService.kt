@@ -52,15 +52,21 @@ open class ProcessPaymentService(
                     val dbStart = System.currentTimeMillis()
                     handleSuccessfulPayment(order = order)
                     val dbEnd = System.currentTimeMillis()
-                    logger.info("TIMING: processPspResult (DB/write) took ${dbEnd - dbStart} ms for ${order.paymentOrderId}")
+                    logger.info("TIMING:  processPspResult ${pspStatus.name}  (DB/write+publish+succeed) took ${dbEnd - dbStart} ms for ${order.paymentOrderId}")
                 }
 
                 PSPStatusMapper.requiresRetryPayment(pspStatus) -> {
+                    val dbStart = System.currentTimeMillis()
                     handleRetryEvent(order = order, reason = pspStatus.name)
+                    val dbEnd = System.currentTimeMillis()
+                    logger.info("TIMING:  processPspResult ${pspStatus.name}  (DB/write+schdule-retry-redis) took ${dbEnd - dbStart} ms for ${order.paymentOrderId}")
                 }
 
                 PSPStatusMapper.requiresStatusCheck(pspStatus) -> {
+                    val dbStart = System.currentTimeMillis()
                     handlePaymentStatusCheckEvent(order)
+                    val dbEnd = System.currentTimeMillis()
+                    logger.info("TIMING:  processPspResult ${pspStatus.name}  (DB/write+STATUSDB/write) took ${dbEnd - dbStart} ms for ${order.paymentOrderId}")
                 }
 
                 else -> {

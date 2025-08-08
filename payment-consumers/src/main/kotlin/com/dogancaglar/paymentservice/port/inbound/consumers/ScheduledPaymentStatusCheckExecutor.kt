@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.adapter.inbound.kafka
+package com.dogancaglar.paymentservice.port.inbound.consumers
 
 import com.dogancaglar.common.event.CONSUMER_GROUPS
 import com.dogancaglar.common.event.EventEnvelope
@@ -8,7 +8,6 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderFactory
 import com.dogancaglar.paymentservice.port.inbound.consumers.base.BaseBatchKafkaConsumer
-import com.dogancaglar.paymentservice.ports.inbound.CreatePaymentUseCase
 import com.dogancaglar.paymentservice.ports.inbound.ProcessPspResultUseCase
 import com.dogancaglar.paymentservice.ports.outbound.PaymentGatewayPort
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -52,7 +51,6 @@ class ScheduledExecutorConfig {
 @Component
 class ScheduledPaymentStatusCheckExecutor(
     val paymentGatewayPort: PaymentGatewayPort,
-    private val createPaymentUseCase: CreatePaymentUseCase,
     private val processPspResultUseCase: ProcessPspResultUseCase,
     val paymetOrderFactory: PaymentOrderFactory,
     @Qualifier("scheduledStatusCheckTaskExecutor") private val scheduledStatusCheckExecutor: ThreadPoolTaskExecutor,
@@ -138,8 +136,9 @@ class ScheduledPaymentStatusCheckExecutor(
         super.handleBatch(records, acknowledgment)
     }
 
+
     override fun consume(record: ConsumerRecord<String, EventEnvelope<PaymentOrderStatusCheckRequested>>) {
-        TODO("Not yet implemented")
+        handle(record)
     }
 
     override fun getExecutor(): ThreadPoolTaskExecutor? {

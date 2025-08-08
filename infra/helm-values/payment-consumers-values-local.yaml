@@ -1,3 +1,8 @@
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70
 # image
 image:
   repository: dcaglar1987/payment-consumers
@@ -9,21 +14,23 @@ replicaCount: 1
 
 # JVM / JFR
 jvmOpts: >-
-  -XX:StartFlightRecording=name=payment-consumers,filename=/var/log/jfr/pay.jfr,maxage=30m,maxsize=250M,settings=profile,dumponexit=true
-  -XX:FlightRecorderOptions=repository=/var/log/jfr
+  -XX:+UseZGC -Xms600m -Xmx600m
 
 # Spring profile & datasource
 spring:
   profile: local
+  kafka:
+    properties:
+      security.protocol: PLAINTEXT
+      session.timeout.ms: 45000
 
-# resources
 resources:
   requests:
     cpu: 500m
-    memory: 1Gi
+    memory: 512Mi       # Safe lower bound for small pods
   limits:
     cpu: "2"
-    memory: 2Gi
+    memory: 1Gi
 
 # PVC
 persistence:

@@ -1,6 +1,5 @@
-package com.dogancaglar.infrastructure.psp
+package com.dogancaglar.paymentservice.adapter.outbound.psp
 
-import com.dogancaglar.paymentservice.adapter.outbound.psp.PspSimulationProperties
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import kotlin.random.Random

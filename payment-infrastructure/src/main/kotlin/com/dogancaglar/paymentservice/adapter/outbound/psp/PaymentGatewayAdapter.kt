@@ -1,6 +1,5 @@
-package com.dogancaglar.infrastructure.psp
+package com.dogancaglar.paymentservice.adapter.outbound.psp
 
-import com.dogancaglar.paymentservice.adapter.outbound.psp.PspSimulationProperties
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.util.PSPStatusMapper
@@ -52,10 +51,10 @@ class PaymentGatewayAdapter(
     private fun getRetryPaymentResult(): PSPResponse {
         val roll = Random.nextInt(100)
         val result = when {
-            roll < 50 -> PaymentOrderStatus.SUCCESSFUL  //final
-            roll < 90 -> PaymentOrderStatus.FAILED     //retry payment
-            roll < 95 -> PaymentOrderStatus.DECLINED    //final stage
-            else -> PaymentOrderStatus.PSP_UNAVAILABLE //retryable
+            roll < active.response.successful -> PaymentOrderStatus.SUCCESSFUL  //final
+            roll < active.response.successful + active.response.retryable -> PaymentOrderStatus.FAILED     //retry payment
+            roll < active.response.successful + active.response.retryable + active.response.nonRetryable -> PaymentOrderStatus.DECLINED    //final stage
+            else -> PaymentOrderStatus.PENDING
         }
         return PSPResponse(result.toString());
     }

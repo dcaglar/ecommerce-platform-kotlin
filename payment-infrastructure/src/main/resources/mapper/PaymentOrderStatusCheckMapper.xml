@@ -14,19 +14,19 @@
     </resultMap>
 
     <select id="findDue" resultMap="PaymentOrderStatusCheckResultMap">
-        SELECT * FROM payment_order_status_check
+        SELECT * FROM payment_order_status_checks
         WHERE scheduled_at &lt;= #{now} AND status = 'SCHEDULED'
     </select>
 
     <update id="markAsProcessed">
-        UPDATE payment_order_status_check
+        UPDATE payment_order_status_checks
         SET status = 'PROCESSED', updated_at = #{updatedAt}
         WHERE id = #{id}
     </update>
 
     <insert id="insert"
             parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentOrderStatusCheckEntity">
-        INSERT INTO payment_order_status_check (
+        INSERT INTO payment_order_status_checks (
         id, payment_order_id, scheduled_at, attempt, status, created_at, updated_at
         ) VALUES (
         #{id}, #{paymentOrderId}, #{scheduledAt}, #{attempt}, #{status}, #{createdAt}, #{updatedAt}

@@ -7,10 +7,7 @@ image:
 # replica count
 replicaCount: 1
 
-# JVM / JFR
-jvmOpts: >-
-  -XX:StartFlightRecording=name=payment-service,filename=/var/log/jfr/pay.jfr,maxage=30m,maxsize=250M,settings=profile,dumponexit=true
-  -XX:FlightRecorderOptions=repository=/var/log/jfr
+
 
 # Spring profile & datasource
 spring:
@@ -21,3 +18,5 @@ persistence:
   enabled: true
   size: 2Gi
   accessMode: ReadWriteOnce
+
+runPrivilegeGrantJob: true

@@ -15,6 +15,7 @@ import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.RetriableException
 import org.apache.kafka.common.errors.SerializationException
+import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties
@@ -36,15 +37,15 @@ import org.springframework.messaging.handler.annotation.support.MethodArgumentNo
 import java.sql.SQLTransientException
 
 @Configuration
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
-    prefix = "payment.consumers",
-    name = ["dynamic-consumers"]
-)
 class KafkaTypedConsumerFactoryConfig(
     private val dynamicProps: DynamicKafkaConsumersProperties,
     private val bootKafkaProps: KafkaProperties,
     private val meterRegistry: MeterRegistry
 ) {
+    init {
+        val logger = LoggerFactory.getLogger(KafkaTypedConsumerFactoryConfig::class.java)
+        logger.info("Loaded dynamicConsumers: {}", dynamicProps.dynamicConsumers.map { it.topic })
+    }
 
     @Bean("custom-kafka-consumer-factory-for-micrometer")
     fun defaultKafkaConsumerFactory(): DefaultKafkaConsumerFactory<String, EventEnvelope<*>> {
@@ -57,6 +58,14 @@ class KafkaTypedConsumerFactoryConfig(
         return DefaultKafkaConsumerFactory<String, EventEnvelope<*>>(configs).apply {
             addListener(MicrometerConsumerListener(meterRegistry))
         }
+    }
+
+
+    @Bean
+    fun paymentOrderEventKafkaTemplate(
+        paymentOrderEventProducerFactory: DefaultKafkaProducerFactory<String, EventEnvelope<*>>
+    ): KafkaTemplate<String, EventEnvelope<*>> {
+        return KafkaTemplate(paymentOrderEventProducerFactory)
     }
 
 
@@ -179,7 +188,7 @@ class KafkaTypedConsumerFactoryConfig(
         customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler
     ) = dynamicProps.dynamicConsumers
-        .first { it.topic == EventMetadatas.PaymentOrderSucceededMetadata.topic }
+        .first { it.topic == EventMetadatas.PaymentOrderStatusCheckScheduledMetadata.topic }
         .let { cfg ->
             createTypedFactory<PaymentOrderStatusCheckRequested>(
                 clientId = cfg.id,
@@ -207,4 +216,13 @@ class KafkaTypedConsumerFactoryConfig(
 
     @Bean
     fun messageHandlerMethodFactory(): DefaultMessageHandlerMethodFactory = DefaultMessageHandlerMethodFactory()
+
+    @Bean
+    fun paymentOrderEventProducerFactory(): DefaultKafkaProducerFactory<String, EventEnvelope<*>> {
+        val configs = bootKafkaProps.buildProducerProperties()
+        return DefaultKafkaProducerFactory<String, EventEnvelope<*>>(configs).apply {
+            addListener(MicrometerProducerListener(meterRegistry))
+        }
+    }
+
 }

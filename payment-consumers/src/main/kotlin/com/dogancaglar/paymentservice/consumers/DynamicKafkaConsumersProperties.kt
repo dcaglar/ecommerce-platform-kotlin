@@ -3,7 +3,7 @@ package com.dogancaglar.paymentservice.consumers
 
 import org.springframework.boot.context.properties.ConfigurationProperties
 
-@ConfigurationProperties(prefix = "payment.consumers")
+@ConfigurationProperties(prefix = "app.kafka")
 class DynamicKafkaConsumersProperties {
     var dynamicConsumers: List<DynamicConsumer> = mutableListOf()
 
