@@ -18,7 +18,6 @@ import org.apache.kafka.common.errors.SerializationException
 import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties
-import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.convert.ConversionException
@@ -37,7 +36,10 @@ import org.springframework.messaging.handler.annotation.support.MethodArgumentNo
 import java.sql.SQLTransientException
 
 @Configuration
-@EnableConfigurationProperties(DynamicKafkaConsumersProperties::class)
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+    prefix = "payment.consumers",
+    name = ["dynamic-consumers"]
+)
 class KafkaTypedConsumerFactoryConfig(
     private val dynamicProps: DynamicKafkaConsumersProperties,
     private val bootKafkaProps: KafkaProperties,

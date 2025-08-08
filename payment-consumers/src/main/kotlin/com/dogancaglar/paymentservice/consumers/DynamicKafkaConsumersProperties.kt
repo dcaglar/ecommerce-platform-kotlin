@@ -1,6 +1,9 @@
 // DynamicKafkaConsumersProperties.kt
 package com.dogancaglar.paymentservice.consumers
 
+import org.springframework.boot.context.properties.ConfigurationProperties
+
+@ConfigurationProperties(prefix = "payment.consumers")
 class DynamicKafkaConsumersProperties {
     var dynamicConsumers: List<DynamicConsumer> = mutableListOf()
 
