@@ -27,9 +27,9 @@
     <insert id="insert"
             parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentOrderStatusCheckEntity">
         INSERT INTO payment_order_status_checks (
-        id, payment_order_id, scheduled_at, attempt, status, created_at, updated_at
+        payment_order_id, scheduled_at, attempt, status, created_at, updated_at
         ) VALUES (
-        #{id}, #{paymentOrderId}, #{scheduledAt}, #{attempt}, #{status}, #{createdAt}, #{updatedAt}
+        #{paymentOrderId}, #{scheduledAt}, #{attempt}, #{status}, #{createdAt}, #{updatedAt}
         )
     </insert>
 </mapper>

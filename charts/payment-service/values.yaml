@@ -13,10 +13,4 @@ replicaCount: 1
 spring:
   profile: local
 
-# PVC
-persistence:
-  enabled: true
-  size: 2Gi
-  accessMode: ReadWriteOnce
-
 runPrivilegeGrantJob: true

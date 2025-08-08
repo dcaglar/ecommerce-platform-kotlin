@@ -1,32 +1,19 @@
-{{- if .Values.autoscaling.enabled }}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ include "payment-consumers.fullname" . }}
-  labels:
-    {{- include "payment-consumers.labels" . | nindent 4 }}
+  name: {{include "payment-consumers.fullname" .}}
+  namespace: {{.Release.Namespace}}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "payment-consumers.fullname" . }}
-  minReplicas: {{ .Values.autoscaling.minReplicas }}
-  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+    name: {{include "payment-consumers.fullname" .}}
+  minReplicas: {{.Values.autoscaling.minReplicas}}
+  maxReplicas: {{.Values.autoscaling.maxReplicas}}
   metrics:
-    {{- if .Values.autoscaling.targetCPUUtilizationPercentage }}
     - type: Resource
       resource:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
-    {{- end }}
-    {{- if .Values.autoscaling.targetMemoryUtilizationPercentage }}
-    - type: Resource
-      resource:
-        name: memory
-        target:
-          type: Utilization
-          averageUtilization: {{ .Values.autoscaling.targetMemoryUtilizationPercentage }}
-    {{- end }}
-{{- end }}
+          averageUtilization: {{.Values.autoscaling.targetCPUUtilizationPercentage}}
