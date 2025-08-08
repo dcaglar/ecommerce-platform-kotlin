@@ -1,5 +1,5 @@
 // KafkaTypedConsumerFactoryConfig.kt
-package com.dogancaglar.consumers
+package com.dogancaglar.paymentservice.consumers
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.TOPICS
