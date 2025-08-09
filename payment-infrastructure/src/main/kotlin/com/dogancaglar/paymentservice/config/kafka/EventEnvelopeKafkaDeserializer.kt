@@ -1,4 +1,5 @@
-package com.dogancaglar.paymentservice.deserialization
+package com.dogancaglar.paymentservice.config.kafka
+
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas

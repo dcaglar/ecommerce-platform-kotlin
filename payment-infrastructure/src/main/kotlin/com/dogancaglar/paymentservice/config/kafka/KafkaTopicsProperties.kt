@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.kafka
+package com.dogancaglar.paymentservice.config.kafka
 
 class KafkaTopicsProperties {
     var payment_order_created_topic: TopicConfig = TopicConfig()
@@ -7,8 +7,8 @@ class KafkaTopicsProperties {
     var payment_order_retry_request_topic_dlq: TopicConfig = TopicConfig()
     var payment_status_check_scheduler_topic: TopicConfig = TopicConfig()
     var payment_status_check_scheduler_topic_dlq: TopicConfig = TopicConfig()
-    var payment_order_succeded_topic: TopicConfig = TopicConfig()
-    var payment_order_succeded_topic_dlq: TopicConfig = TopicConfig()
+    var payment_order_succeeded_topic: TopicConfig = TopicConfig()
+    var payment_order_succeeded_topic_dlq: TopicConfig = TopicConfig()
     // add more as needed
 
     class TopicConfig {

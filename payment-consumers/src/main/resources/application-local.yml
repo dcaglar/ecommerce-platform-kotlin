@@ -39,21 +39,21 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME} # This will be injected from a Kubernetes Secret
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 8
+      maximum-pool-size: 10
+      minimum-idle: 2
       connection-timeout: 1500
       idle-timeout: 600000
       max-lifetime: 1800000
   kafka:
     producer:
-      value-serializer: com.dogancaglar.paymentservice.serialization.EventEnvelopeKafkaSerializer
+      value-serializer: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaSerializer
       properties: #maybe change partition assignment strategy
         partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
-        spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.deserialization.EventEnvelopeKafkaDeserializer
+        spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
     consumer:
       group-id: payment-consumer-group      # (set appropriately for your domain)
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: com.dogancaglar.paymentservice.deserialization.EventEnvelopeKafkaDeserializer
+      value-deserializer: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
       properties:
         partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
     properties:
@@ -122,8 +122,8 @@ psp:
         response:
           successful: 70
           retryable: 20
-          statusCheck: 5
-          nonRetryable: 5
+          statusCheck: 0
+          nonRetryable: 10
       PEAK:
         timeouts:
           enabled: true
@@ -190,3 +190,4 @@ psp:
           retryable: 0
           statusCheck: 0
           nonRetryable: 0
+

@@ -7,16 +7,6 @@
     <timestamp key="date" datePattern="yyyy-MM-dd"/>
     <!-- DEFAULT ROOT (used when *no* active Spring profile matches below) -->
 
-    <!-- Default root logger and appender for all profiles (fallback) -->
-    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
-    </appender>
-    <root level="INFO">
-        <appender-ref ref="STDOUT"/>
-    </root>
-
     <!-- ──────────────────────────────── -->
     <!--  ►  Container / Kubernetes JSON  -->
     <!-- ──────────────────────────────── -->
@@ -38,7 +28,7 @@
                     <mdc includes="traceId,eventId,parentEventId,aggregateId,eventType,
                retryCount,retryBackoffMillis,retryReason,retryErrorMessage"/>
                     <stackTrace/>
-                    <globalCustomFields>{"app":"payment-consumers"}</globalCustomFields>
+                    <globalCustomFields>{"app":"payment-service"}</globalCustomFields>
                 </providers>
             </encoder>
         </appender>

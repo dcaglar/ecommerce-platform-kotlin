@@ -4,7 +4,7 @@ package com.dogancaglar.paymentservice.consumers
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.TOPICS
 import com.dogancaglar.common.logging.GenericLogFields
-import com.dogancaglar.paymentservice.deserialization.EventEnvelopeKafkaDeserializer
+import com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
 import com.dogancaglar.paymentservice.domain.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
@@ -25,10 +25,7 @@ import org.springframework.core.convert.ConversionException
 import org.springframework.dao.*
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.kafka.core.*
-import org.springframework.kafka.listener.ContainerProperties
-import org.springframework.kafka.listener.DeadLetterPublishingRecoverer
-import org.springframework.kafka.listener.DefaultErrorHandler
-import org.springframework.kafka.listener.RecordInterceptor
+import org.springframework.kafka.listener.*
 import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries
 import org.springframework.kafka.support.serializer.DeserializationException
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
@@ -42,8 +39,11 @@ class KafkaTypedConsumerFactoryConfig(
     private val bootKafkaProps: KafkaProperties,
     private val meterRegistry: MeterRegistry
 ) {
+    companion object {
+        private val logger = LoggerFactory.getLogger(KafkaTypedConsumerFactoryConfig::class.java)
+    }
+
     init {
-        val logger = LoggerFactory.getLogger(KafkaTypedConsumerFactoryConfig::class.java)
         logger.info("Loaded dynamicConsumers: {}", dynamicProps.dynamicConsumers.map { it.topic })
     }
 
@@ -53,7 +53,7 @@ class KafkaTypedConsumerFactoryConfig(
         configs[ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG] =
             ErrorHandlingDeserializer::class.java
         configs[ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS] =
-            EventEnvelopeKafkaDeserializer::class.java.name
+            EventEnvelopeKafkaDeserializer::class.java
 
         return DefaultKafkaConsumerFactory<String, EventEnvelope<*>>(configs).apply {
             addListener(MicrometerConsumerListener(meterRegistry))
@@ -61,15 +61,7 @@ class KafkaTypedConsumerFactoryConfig(
     }
 
 
-    @Bean
-    fun paymentOrderEventKafkaTemplate(
-        paymentOrderEventProducerFactory: DefaultKafkaProducerFactory<String, EventEnvelope<*>>
-    ): KafkaTemplate<String, EventEnvelope<*>> {
-        return KafkaTemplate(paymentOrderEventProducerFactory)
-    }
-
-
-    @Bean
+    @Bean("dlqProducerFactory")
     fun producerFactory(): ProducerFactory<String, Any> {
         val configs = bootKafkaProps.buildProducerProperties()
         return DefaultKafkaProducerFactory<String, Any>(configs).apply {
@@ -78,8 +70,8 @@ class KafkaTypedConsumerFactoryConfig(
     }
 
 
-    @Bean
-    fun kafkaTemplate(producerFactory: ProducerFactory<String, Any>): KafkaTemplate<String, Any> =
+    @Bean("dlqKafkaTemplate")
+    fun dlqKafkaTemplate(@Qualifier("dlqProducerFactory") producerFactory: ProducerFactory<String, Any>): KafkaTemplate<String, Any> =
         KafkaTemplate(producerFactory)
 
     @Bean
@@ -92,21 +84,46 @@ class KafkaTypedConsumerFactoryConfig(
 
     @Bean
     fun errorHandler(
-        kafkaTemplate: KafkaTemplate<String, Any>,
+        @Qualifier("dlqKafkaTemplate") kafkaTemplate: KafkaTemplate<String, Any>,
         kafkaExponentialBackOff: ExponentialBackOffWithMaxRetries
     ): DefaultErrorHandler {
+
         val recoverer = DeadLetterPublishingRecoverer(kafkaTemplate) { rec, _ ->
-            TopicPartition("${rec.topic()}.DLQ", rec.partition())
+            when (rec.topic()) {
+                TOPICS.PAYMENT_ORDER_CREATED ->
+                    TopicPartition(TOPICS.PAYMENT_ORDER_CREATED_DLQ, rec.partition())
+
+                TOPICS.PAYMENT_ORDER_RETRY ->
+                    TopicPartition(TOPICS.PAYMENT_ORDER_RETRY_DLQ, rec.partition())
+
+                TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER ->
+                    TopicPartition(TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER_DLQ, rec.partition())
+
+                else ->
+                    TopicPartition(rec.topic() + ".DLQ", rec.partition())
+            }
         }
+
         return DefaultErrorHandler(recoverer, kafkaExponentialBackOff).apply {
-            // Retryable exceptions
+            setCommitRecovered(true)        // commit offset after successful DLQ publish
+            setAckAfterHandle(false)
+            setRetryListeners(
+                RetryListener { rec, ex, deliveryAttempt ->
+                    logger.warn(
+                        "Retry #{} for {}-{}@{}: {} - {}",
+                        deliveryAttempt, rec.topic(), rec.partition(), rec.offset(),
+                        ex::class.java.simpleName, ex.message
+                    )
+                }
+            )
+            // your retryable / not-retryable adds stay the same
+
             addRetryableExceptions(
                 RetriableException::class.java,
                 TransientDataAccessException::class.java,
                 CannotAcquireLockException::class.java,
                 SQLTransientException::class.java,
             )
-            // Non-retryable exceptions
             addNotRetryableExceptions(
                 IllegalArgumentException::class.java,
                 NullPointerException::class.java,
@@ -115,11 +132,9 @@ class KafkaTypedConsumerFactoryConfig(
                 DeserializationException::class.java,
                 SerializationException::class.java,
                 MethodArgumentNotValidException::class.java,
-                // Data duplicates & constraint violations
                 DuplicateKeyException::class.java,
                 DataIntegrityViolationException::class.java,
                 NonTransientDataAccessException::class.java,
-                IllegalArgumentException::class.java,
                 KafkaException::class.java,
                 org.springframework.kafka.KafkaException::class.java
             )
@@ -140,9 +155,9 @@ class KafkaTypedConsumerFactoryConfig(
             @Suppress("UNCHECKED_CAST")
             setRecordInterceptor(interceptor as RecordInterceptor<String, EventEnvelope<T>>)
             setCommonErrorHandler(errorHandler)
-            containerProperties.ackMode = ContainerProperties.AckMode.MANUAL_IMMEDIATE
+            containerProperties.ackMode = ContainerProperties.AckMode.RECORD
             setConcurrency(concurrency)
-            isBatchListener = true
+            isBatchListener = false
         }
 
     @Bean("${TOPICS.PAYMENT_ORDER_CREATED}-factory")
@@ -151,17 +166,16 @@ class KafkaTypedConsumerFactoryConfig(
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
         customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler
-    ) = dynamicProps.dynamicConsumers
-        .first { it.topic == EventMetadatas.PaymentOrderCreatedMetadata.topic }
-        .let { cfg ->
-            createTypedFactory<PaymentOrderCreated>(
-                clientId = cfg.id,
-                concurrency = 1,
-                interceptor = interceptor,
-                consumerFactory = customFactory,
-                errorHandler = errorHandler
-            )
-        }
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderCreated>> {
+        val cfg = cfgFor(EventMetadatas.PaymentOrderCreatedMetadata.topic, "${TOPICS.PAYMENT_ORDER_CREATED}-factory")
+        return createTypedFactory(
+            clientId = cfg.id,
+            concurrency = cfg.concurrency,
+            interceptor = interceptor,
+            consumerFactory = customFactory,
+            errorHandler = errorHandler
+        )
+    }
 
     @Bean("${TOPICS.PAYMENT_ORDER_RETRY}-factory")
     fun paymentRetryRequestedFactory(
@@ -169,17 +183,17 @@ class KafkaTypedConsumerFactoryConfig(
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
         customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler
-    ) = dynamicProps.dynamicConsumers
-        .first { it.topic == EventMetadatas.PaymentOrderRetryRequestedMetadata.topic }
-        .let { cfg ->
-            createTypedFactory<PaymentOrderRetryRequested>(
-                clientId = cfg.id,
-                concurrency = cfg.concurrency,
-                interceptor = interceptor,
-                consumerFactory = customFactory,
-                errorHandler = errorHandler
-            )
-        }
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderRetryRequested>> {
+        val cfg =
+            cfgFor(EventMetadatas.PaymentOrderRetryRequestedMetadata.topic, "${TOPICS.PAYMENT_ORDER_RETRY}-factory")
+        return createTypedFactory(
+            clientId = cfg.id,
+            concurrency = cfg.concurrency,
+            interceptor = interceptor,
+            consumerFactory = customFactory,
+            errorHandler = errorHandler
+        )
+    }
 
     @Bean("${TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER}-factory")
     fun paymentStatusCheckExecutorFactory(
@@ -187,17 +201,19 @@ class KafkaTypedConsumerFactoryConfig(
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
         customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler
-    ) = dynamicProps.dynamicConsumers
-        .first { it.topic == EventMetadatas.PaymentOrderStatusCheckScheduledMetadata.topic }
-        .let { cfg ->
-            createTypedFactory<PaymentOrderStatusCheckRequested>(
-                clientId = cfg.id,
-                concurrency = cfg.concurrency,
-                interceptor = interceptor,
-                consumerFactory = customFactory,
-                errorHandler = errorHandler
-            )
-        }
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderStatusCheckRequested>> {
+        val cfg = cfgFor(
+            EventMetadatas.PaymentOrderStatusCheckScheduledMetadata.topic,
+            "${TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER}-factory"
+        )
+        return createTypedFactory(
+            clientId = cfg.id,
+            concurrency = cfg.concurrency,
+            interceptor = interceptor,
+            consumerFactory = customFactory,
+            errorHandler = errorHandler
+        )
+    }
 
     @Bean
     fun mdcRecordInterceptor(): RecordInterceptor<String, EventEnvelope<*>> = RecordInterceptor { record, _ ->
@@ -217,12 +233,9 @@ class KafkaTypedConsumerFactoryConfig(
     @Bean
     fun messageHandlerMethodFactory(): DefaultMessageHandlerMethodFactory = DefaultMessageHandlerMethodFactory()
 
-    @Bean
-    fun paymentOrderEventProducerFactory(): DefaultKafkaProducerFactory<String, EventEnvelope<*>> {
-        val configs = bootKafkaProps.buildProducerProperties()
-        return DefaultKafkaProducerFactory<String, EventEnvelope<*>>(configs).apply {
-            addListener(MicrometerProducerListener(meterRegistry))
-        }
-    }
+
+    private fun cfgFor(topic: String, beanName: String): DynamicKafkaConsumersProperties.DynamicConsumer =
+        dynamicProps.dynamicConsumers.firstOrNull { it.topic == topic }
+            ?: error("Missing app.kafka.dynamic-consumers entry for topic '$topic' (required by bean '$beanName').")
 
 }

@@ -28,7 +28,7 @@ resources:
     cpu: 500m
     memory: 512Mi       # Safe lower bound for small pods
   limits:
-    cpu: "2"
+    cpu: "1"
     memory: 1Gi
 
 # PVC

@@ -2,18 +2,25 @@
 package com.dogancaglar.paymentservice.consumers
 
 import org.springframework.boot.context.properties.ConfigurationProperties
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
 
-@ConfigurationProperties(prefix = "app.kafka")
+
+@Configuration
+class ConsumersPropertiesConfig {
+    @Bean
+    @ConfigurationProperties("app.kafka")
+    fun dynamicKafkaConsumersProperties() = DynamicKafkaConsumersProperties()
+}
+
 class DynamicKafkaConsumersProperties {
-    var dynamicConsumers: List<DynamicConsumer> = mutableListOf()
+    var dynamicConsumers: List<DynamicConsumer> = emptyList()
 
     class DynamicConsumer {
-        lateinit var id: String
-        lateinit var topic: String
-        lateinit var groupId: String
-        lateinit var className: String
-
-        /** number of threads = number of partitions */
+        var id: String = ""
+        var topic: String = ""
+        var groupId: String = ""
+        var className: String = ""
         var concurrency: Int = 1
     }
 }

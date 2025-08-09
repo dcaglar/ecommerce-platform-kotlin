@@ -73,7 +73,7 @@ spec:
             - name: SPRING_DATA_REDIS_URL
               value: redis://redis-master:6379
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-              value: kafka:9092
+              value: kafka.payment.svc.cluster.local:9092
             - name: SPRING_DATASOURCE_URL
               valueFrom:
                 configMapKeyRef:

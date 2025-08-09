@@ -1,58 +1,56 @@
 listeners:
-  client:
-    protocol: PLAINTEXT
-    containerPort: 9092
-    name: CLIENT
-    sslClientAuth: ""
-  controller:
-    protocol: PLAINTEXT
-    containerPort: 9093
-    name: CONTROLLER
-    sslClientAuth: ""
-  interbroker:
-    protocol: PLAINTEXT
-    containerPort: 9094
-    name: INTERNAL
-    sslClientAuth: ""
-  external:
-    protocol: PLAINTEXT
-    containerPort: 9095
-    name: EXTERNAL
-    sslClientAuth: ""
-sasl:
-  enabledMechanisms: ""
-  interBrokerMechanism: ""
-  controllerMechanism: ""
-  interbroker:
-    user: ""
-    password: ""
-  controller:
-    replicaCount: 1
-    user: ""
-    password: ""
-  client:
-    users: []
-    passwords: ""
-  existingSecret: ""
+  client: {protocol: PLAINTEXT, containerPort: 9092, name: CLIENT,     sslClientAuth: ""}
+  controller: {protocol: PLAINTEXT, containerPort: 9093, name: CONTROLLER, sslClientAuth: ""}
+  interbroker: {protocol: PLAINTEXT, containerPort: 9094, name: INTERNAL,   sslClientAuth: ""}
+  external: {protocol: PLAINTEXT, containerPort: 9095, name: EXTERNAL,   sslClientAuth: ""}
 
-replicaCount: 1
+controller:
+  replicaCount: 3
+  resources:
+    requests: {cpu: 50m, memory: 256Mi}
+    limits: {cpu: 200m,  memory: 512Mi}
+  extraEnvVars:
+    - name: KAFKA_HEAP_OPTS
+      value: "-Xms256m -Xmx256m"
 
+broker:
+  replicaCount: 3
+  resources:
+    requests: {cpu: 50m, memory: 400Mi}
+    limits: {cpu: 200m,  memory: 712Mi}
+  extraEnvVars:
+    - {name: KAFKA_HEAP_OPTS, value: "-Xms256m -Xmx256m"}
+    - {name: KAFKA_CFG_DEFAULT_REPLICATION_FACTOR,            value: "1"}
+    - {name: KAFKA_CFG_MIN_INSYNC_REPLICAS,                    value: "1"}
+    - {name: KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR,       value: "1"}
+    - {name: KAFKA_CFG_OFFSETS_TOPIC_NUM_PARTITIONS,           value: "1"}   # only takes effect if the topic doesn't exist yet
+    - {name: KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR,value: "1"}
+    - {name: KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR,          value: "1"}
+    - {name: KAFKA_CFG_TRANSACTION_STATE_LOG_NUM_PARTITIONS,   value: "1"}
 
 
 metrics:
   jmx:
-    enabled: true                 # <- turn ON the JMX exporter container
+    enabled: true
+    resources:
+      requests: {cpu: 50m, memory: 128Mi}
+      limits: {cpu: 200m, memory: 256Mi}
+  serviceMonitor:
+    enabled: true
+    namespace: payment
+    labels: {release: prometheus-stack}
   kafka:
+    enabled: true
+    resources:
+      requests: {cpu: 50m, memory: 128Mi}
+      limits: {cpu: 200m, memory: 256Mi}
     serviceMonitor:
       enabled: true
       namespace: payment
-      labels:
-        release: prometheus-stack
+      labels: {release: prometheus-stack}
 
-resources:
-  requests:
-    memory: 356Mi
-    cpu: 500m
-  limits:
-    memory: 612Mi
-    cpu: 1
+defaultInitContainers:
+  prepareConfig:
+    resources:
+      requests: {cpu: 50m, memory: 64Mi}
+      limits: {cpu: 200m, memory: 128Mi}

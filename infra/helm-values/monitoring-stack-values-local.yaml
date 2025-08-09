@@ -1,51 +1,46 @@
 prometheus:
   prometheusSpec:
-    containers:
-      - name: config-reloader
-        resources:
-          requests:
-            cpu: 10m
-            memory: 32Mi
-          limits:
-            cpu: 50m
-            memory: 64Mi
+    # scrape speed + retention for minikube
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    retention: 12h
     resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 500m
+      requests: {cpu: 150m, memory: 512Mi}
+      limits: {cpu: 500m, memory: 1Gi}
+
+    # ONLY pick ServiceMonitors with this label…
     serviceMonitorSelector:
       matchLabels:
         release: prometheus-stack
+    # …and ONLY from these namespaces
+    serviceMonitorNamespaceSelector:
+      matchNames:
+        - payment
+
+    containers:
+      - name: config-reloader
+        resources:
+          requests: {cpu: 10m, memory: 32Mi}
+          limits: {cpu: 50m, memory: 64Mi}
 
 alertmanager:
   alertmanagerSpec:
     containers:
       - name: config-reloader
         resources:
-          requests:
-            cpu: 10m
-            memory: 32Mi
-          limits:
-            cpu: 50m
-            memory: 64Mi
+          requests: {cpu: 10m, memory: 32Mi}
+          limits: {cpu: 50m, memory: 64Mi}
 
 grafana:
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {cpu: 200m, memory: 256Mi}
   sidecar:
     datasources:
       resources:
-        requests:
-          cpu: 10m
-          memory: 32Mi
-        limits:
-          cpu: 50m
-          memory: 64Mi
+        requests: {cpu: 10m, memory: 32Mi}
+        limits: {cpu: 50m, memory: 64Mi}
     dashboards:
       resources:
-        requests:
-          cpu: 10m
-          memory: 32Mi
-        limits:
-          cpu: 50m
-          memory: 64Mi
+        requests: {cpu: 10m, memory: 32Mi}
+        limits: {cpu: 50m, memory: 64Mi}

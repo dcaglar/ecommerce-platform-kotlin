@@ -6,8 +6,7 @@ import com.dogancaglar.common.event.TOPICS
 import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderFactory
-import com.dogancaglar.paymentservice.port.inbound.consumers.base.BaseBatchKafkaConsumer
+import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.inbound.ProcessPspResultUseCase
 import com.dogancaglar.paymentservice.ports.outbound.PaymentGatewayPort
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -16,55 +15,41 @@ import org.apache.kafka.common.errors.RetriableException
 import org.apache.kafka.common.errors.SerializationException
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Configuration
 import org.springframework.dao.*
 import org.springframework.kafka.annotation.KafkaListener
-import org.springframework.kafka.support.Acknowledgment
 import org.springframework.kafka.support.converter.ConversionException
 import org.springframework.kafka.support.serializer.DeserializationException
 import org.springframework.messaging.handler.annotation.support.MethodArgumentNotValidException
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.stereotype.Component
-import org.springframework.transaction.annotation.Transactional
 import java.sql.SQLTransientException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
-//todo  appply sama logic as in retry commands executor
-
-@Configuration
-class ScheduledExecutorConfig {
-    @Bean
-    fun scheduledStatusCheckTaskExecutor(): ThreadPoolTaskExecutor {
-        val executor = ThreadPoolTaskExecutor()
-        executor.corePoolSize = 1
-        executor.maxPoolSize = 1
-        executor.setQueueCapacity(100)
-        executor.setThreadNamePrefix("scheduled-status-check-")
-        executor.setWaitForTasksToCompleteOnShutdown(true)
-        executor.initialize()
-        return executor
-    }
-}
 
 @Component
 class ScheduledPaymentStatusCheckExecutor(
     val paymentGatewayPort: PaymentGatewayPort,
     private val processPspResultUseCase: ProcessPspResultUseCase,
-    val paymetOrderFactory: PaymentOrderFactory,
-    @Qualifier("scheduledStatusCheckTaskExecutor") private val scheduledStatusCheckExecutor: ThreadPoolTaskExecutor,
     @Qualifier("externalPspExecutorPoolConfig") private val externalPspExecutorPoolConig: ThreadPoolTaskExecutor
-) : BaseBatchKafkaConsumer<PaymentOrderStatusCheckRequested>() {
+) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    // For higher concurrency, inject a shared executor as a constructor parameter or as a class val.
-    // For demo purposes, creating a new executor each time is OK.
-    @Transactional
+    @KafkaListener(
+        topics = [TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER],
+        containerFactory = "${TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER}-factory",
+        groupId = CONSUMER_GROUPS.PAYMENT_STATUS_CHECK_SCHEDULER,
+        concurrency = "1"
+    )
+    fun onMessage(record: ConsumerRecord<String, EventEnvelope<PaymentOrderStatusCheckRequested>>) {
+        handle(record) // throw to trigger retries/DLQ; return = commit success
+    }
+
+
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderStatusCheckRequested>>) {
         val envelope = record.value()
         val paymentOrderStatusCheckRequested = envelope.data
-        val order = paymetOrderFactory.fromEvent(paymentOrderStatusCheckRequested)
+        val order = PaymentOrderDomainEventMapper.fromEvent(paymentOrderStatusCheckRequested)
         logger.info("▶️ [Handle Start] Processing PaymentOrderStatusCheckRequested")
         try {
             val response = safePspCall(order)
@@ -113,36 +98,21 @@ class ScheduledPaymentStatusCheckExecutor(
     }
 
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
-        return externalPspExecutorPoolConig.submit<PaymentOrderStatus> {
-            paymentGatewayPort.checkPaymentStatus(order.paymentOrderId.toString())
-        }.get(3, TimeUnit.SECONDS)
-    }
-
-
-    override fun filter(envelope: EventEnvelope<PaymentOrderStatusCheckRequested>): Boolean {
-        return true
-    }
-
-
-    @KafkaListener(
-        topics = [TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER],
-        containerFactory = "${TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER}-factory",
-        groupId = "${CONSUMER_GROUPS.PAYMENT_STATUS_CHECK_SCHEDULER}",
-    )
-    fun handleBatchListener(
-        records: List<ConsumerRecord<String, EventEnvelope<PaymentOrderStatusCheckRequested>>>,
-        acknowledgment: Acknowledgment
-    ) {
-        super.handleBatch(records, acknowledgment)
-    }
-
-
-    override fun consume(record: ConsumerRecord<String, EventEnvelope<PaymentOrderStatusCheckRequested>>) {
-        handle(record)
-    }
-
-    override fun getExecutor(): ThreadPoolTaskExecutor? {
-        return scheduledStatusCheckExecutor
+        val start = System.currentTimeMillis()
+        val future = externalPspExecutorPoolConig.submit<PaymentOrderStatus> { paymentGatewayPort.charge(order) }
+        return try {
+            future.get(1, TimeUnit.SECONDS)
+        } catch (e: TimeoutException) {
+            logger.warn("PSP call timed out for {}", order.paymentOrderId)
+            future.cancel(true)
+            PaymentOrderStatus.TIMEOUT
+        } finally {
+            logger.info(
+                "TIMING: PSP call took {} ms for {}",
+                (System.currentTimeMillis() - start),
+                order.paymentOrderId
+            )
+        }
     }
 
 

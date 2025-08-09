@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.serialization
+package com.dogancaglar.paymentservice.config.kafka
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.fasterxml.jackson.databind.ObjectMapper

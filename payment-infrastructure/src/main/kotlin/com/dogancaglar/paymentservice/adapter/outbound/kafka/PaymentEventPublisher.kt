@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
 
 @Component
 class PaymentEventPublisher(
-    @Qualifier("paymentOrderEventKafkaTemplate")
+    @Qualifier("businessEventKafkaTemplate")
     private val kafkaTemplate: KafkaTemplate<String, EventEnvelope<*>>,
     private val meterRegistry: MeterRegistry
 ) : EventPublisherPort {
@@ -158,3 +158,6 @@ class PaymentEventPublisher(
             }
         }
 }
+
+
+

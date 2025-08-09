@@ -26,14 +26,8 @@ spring:
 
 resources:
   requests:
-    cpu: 500m
+    cpu: 400m
     memory: 512Mi       # Safe lower bound for small pods
   limits:
-    cpu: "2"
+    cpu: "1"
     memory: 1Gi
-
-# PVC
-persistence:
-  enabled: true
-  size: 2Gi
-  accessMode: ReadWriteOnce

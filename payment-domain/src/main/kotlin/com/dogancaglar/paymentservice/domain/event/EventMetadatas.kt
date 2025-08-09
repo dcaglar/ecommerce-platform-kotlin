@@ -27,8 +27,8 @@ object EventMetadatas {
     }
 
     object PaymentOrderSucceededMetadata : EventMetadata<PaymentOrderSucceeded> {
-        override val topic = TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER
-        override val eventType = EVENT_TYPE.PAYMENT_ORDER_STATUS_CHECK_REQUESTED
+        override val topic = TOPICS.PAYMENT_ORDER_SUCCEEDED
+        override val eventType = EVENT_TYPE.PAYMENT_ORDER_SUCCEDED
         override val clazz = PaymentOrderSucceeded::class.java
         override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderSucceeded>>() {}
     }
