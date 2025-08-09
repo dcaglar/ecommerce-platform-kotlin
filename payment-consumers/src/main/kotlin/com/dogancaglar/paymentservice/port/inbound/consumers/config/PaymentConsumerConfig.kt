@@ -1,6 +1,11 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers.config
 
 
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.PaymentEventPublisher
+import com.dogancaglar.paymentservice.adapter.outbound.persistance.PaymentOrderOutboundAdapter
+import com.dogancaglar.paymentservice.adapter.outbound.persistance.PaymentOrderStatusCheckAdapter
+import com.dogancaglar.paymentservice.adapter.outbound.redis.PaymentRetryQueueAdapter
+import com.dogancaglar.paymentservice.adapter.outbound.redis.PspResultRedisCacheAdapter
 import com.dogancaglar.paymentservice.application.usecases.ProcessPaymentService
 import com.dogancaglar.paymentservice.domain.util.PaymentFactory
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderFactory
@@ -13,10 +18,22 @@ class PaymentProcessorServiceConfig {
 
 
     @Bean
-    fun processPaymentCommand(
-    ): ProcessPaymentService? {
-        return null;
-
+    fun processPaymentService(
+        paymentOrderRepository: PaymentOrderOutboundAdapter,
+        paymentEventPublisher: PaymentEventPublisher,
+        paymentRetryQueueAdapter: PaymentRetryQueueAdapter,
+        paymentOrderStatusCheckAdapter: PaymentOrderStatusCheckAdapter,
+        pspResultRedisCacheAdapter: PspResultRedisCacheAdapter,
+        clock: Clock,
+    ): ProcessPaymentService {
+        return ProcessPaymentService(
+            paymentOrderRepository = paymentOrderRepository,
+            eventPublisher = paymentEventPublisher,
+            retryQueuePort = paymentRetryQueueAdapter,
+            statusCheckRepo = paymentOrderStatusCheckAdapter,
+            pspResultCache = pspResultRedisCacheAdapter,
+            clock = clock
+        )
     }
 
 
@@ -27,11 +44,4 @@ class PaymentProcessorServiceConfig {
     @Bean
     fun createPaymentOrderFactory(clock: Clock) =
         PaymentOrderFactory()
-}
-
-
-@Configuration
-class ClockConfig {
-    @Bean
-    fun clock(): Clock = Clock.systemUTC()
 }

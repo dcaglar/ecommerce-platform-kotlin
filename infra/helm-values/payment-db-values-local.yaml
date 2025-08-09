@@ -8,47 +8,43 @@ auth:
   database: payment_db
   secretKeys:
     adminPasswordKey: ADMIN_POSTGRES_PASSWORD
-
 primary:
-  persistence:
-    enabled: true
-    size: 50Gi
   resources:
     requests:
-      cpu: 500m
-      memory: 1Gi
+      cpu: 200m
+      memory: 512Mi
     limits:
-      cpu: "1"
-      memory: 2Gi
+      cpu: 800m
+      memory: 1Gi
   extendedConfiguration: |
+    # memory / caches
+    shared_buffers = '256MB'               # ≈ 25% of 1Gi limit
+    effective_cache_size = '512MB'         # OS page cache estimate
+    work_mem = '4MB'                       # per sort/hash (per parallel op)
+    maintenance_work_mem = '64MB'          # VACUUM/CREATE INDEX
+
+    # connections (lower = less RAM)
+    max_connections = 30
+
+    # WAL / checkpoints (lighter on disk/CPU)
     checkpoint_timeout = '10min'
-    max_wal_size = '4GB'
-    min_wal_size = '512MB'
+    max_wal_size = '1GB'
+    min_wal_size = '256MB'
     checkpoint_completion_target = 0.9
-    shared_buffers = '512MB'
-    max_connections = 40
+    wal_compression = on
+
+    # pg_stat_statements
     pg_stat_statements.max = 1000
-    pg_stat_statements.track = 'all'
-    shared_preload_libraries = 'pgaudit,pg_stat_statements'
-    log_min_duration_statement = 1000         # Log queries slower than 1s (in ms)
-    log_statement = 'none'                    # (Optional, only logs queries by time not all)
-    bgwriter_lru_maxpages = 400      # Try 200 or 400
+    pg_stat_statements.track = top
+    pg_stat_statements.track_utility = off
+    pg_stat_statements.save = on
+
+    # misc
+    jit = off
+    log_min_duration_statement = 1000
+    log_statement = 'none'
+    bgwriter_lru_maxpages = 400
     bgwriter_lru_multiplier = 2
 
-
 metrics:
-  enabled: true
-  collectors:
-    stat_statements: true
-    long_running_transactions: true
-  extraEnvVars:
-    - name: PG_EXPORTER_FLAGS
-      value: >
-        --collector.stat_statements
-        --collector.stat_statements.include_query
-        --collector.stat_statements.limit=100
-  serviceMonitor:
-    enabled: true
-    namespace: payment
-    labels:
-      release: prometheus-stack
+  enabled: false

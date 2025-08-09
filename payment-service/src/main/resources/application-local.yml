@@ -21,18 +21,18 @@ spring:
       security.protocol: PLAINTEXT
       session.timeout.ms: 45000
     producer:
-      value-serializer: com.dogancaglar.paymentservice.serialization.EventEnvelopeKafkaSerializer
+      value-serializer: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaSerializer
       properties: #maybe change partition assignment strategy
         partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
-        spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.deserialization.EventEnvelopeKafkaDeserializer
+        spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
   # Only the bootstrap-servers should be overridden in profiles
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME} # This will be injected from a Kubernetes Secret
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 8
+      maximum-pool-size: 10
+      minimum-idle: 2
       connection-timeout: 1500
       idle-timeout: 600000
       max-lifetime: 1800000
@@ -109,30 +109,15 @@ management:
 
 spring.jackson.time-zone: UTC
 
-
 kafka:
   topics:
-    payment_order_created_topic:
-      partitions: 1
-      replicas: 1
-    payment_order_created_topic_dlq:
-      partitions: 1
-      replicas: 1
-    payment_order_retry_request_topic:
-      partitions: 1
-      replicas: 1
-    payment_order_retry_request_topic_dlq:
-      partitions: 1
-      replicas: 1
-    payment_status_check_scheduler_topic:
-      partitions: 1
-      replicas: 1
-    payment_status_check_scheduler_topic_dlq:
-      partitions: 1
-      replicas: 1
-    payment_order_succeded_topic:
-      partitions: 1
-      replicas: 1
-    payment_order_succeded_topic_dlq:
-      partitions: 1
-      replicas: 1
+    payment_order_created_topic: {partitions: 3, replicas: 3}
+    payment_order_created_topic_dlq: {partitions: 3, replicas: 3}
+    payment_order_retry_request_topic: {partitions: 3, replicas: 3}
+    payment_order_retry_request_topic_dlq: {partitions: 3, replicas: 3}
+    payment_status_check_scheduler_topic: {partitions: 3, replicas: 3}
+    payment_status_check_scheduler_topic_dlq: {partitions: 3, replicas: 3}
+    payment_order_succeeded_topic: {partitions: 3, replicas: 3}
+    payment_order_succeeded_topic_dlq: {partitions: 3, replicas: 3}
+
+

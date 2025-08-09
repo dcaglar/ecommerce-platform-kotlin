@@ -1,5 +1,6 @@
-package com.dogancaglar.paymentservice.domain
+package com.dogancaglar.paymentservice.domain.event
 
+import com.dogancaglar.paymentservice.domain.PaymentOrderEvent
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -13,7 +14,7 @@ data class PaymentOrderSucceeded(
     @JsonProperty("amountValue") override val amountValue: BigDecimal,
     @JsonProperty("currency") override val currency: String,
     // Below are default values for the interface, not used by this event
-    override val status: String = "SUCCESS",
+    override val status: String = "SUCCESSFUL",
     override val createdAt: LocalDateTime = LocalDateTime.now(),
     override val updatedAt: LocalDateTime = LocalDateTime.now(),
     override val retryCount: Int = 0,

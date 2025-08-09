@@ -40,6 +40,7 @@ trap cleanup SIGINT SIGTERM
 port_forward keycloak 8080 8080 $PAYMENT_NS & PIDS+=($!)
 port_forward payment-db-postgresql 5432 5432 $PAYMENT_NS & PIDS+=($!)
 port_forward payment-service 8081 8080 $PAYMENT_NS & PIDS+=($!)
+port_forward payment-consumers 8082 8080 $PAYMENT_NS & PIDS+=($!)
 port_forward prometheus-stack-kube-prom-prometheus 9090 9090 $MONITORING_NS & PIDS+=($!)
 port_forward prometheus-stack-grafana 3000 80 $MONITORING_NS & PIDS+=($!)
 port_forward kibana-kibana 5601 5601 $LOGGING_NS & PIDS+=($!)

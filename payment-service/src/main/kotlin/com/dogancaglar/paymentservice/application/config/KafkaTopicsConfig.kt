@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.application.config
 
 import com.dogancaglar.common.event.TOPICS
-import com.dogancaglar.paymentservice.kafka.KafkaTopicsProperties
+import com.dogancaglar.paymentservice.config.kafka.KafkaTopicsProperties
 import org.apache.kafka.clients.admin.NewTopic
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -73,17 +73,17 @@ class KafkaTopicsConfig(
     fun paymentOrderSuccededTopic(): NewTopic =
         NewTopic(
             TOPICS.PAYMENT_ORDER_SUCCEEDED,
-            kafkaTopicsProperties.payment_order_succeded_topic.partitions,
-            kafkaTopicsProperties.payment_order_succeded_topic.replicas
+            kafkaTopicsProperties.payment_order_succeeded_topic.partitions,
+            kafkaTopicsProperties.payment_order_succeeded_topic.replicas
         )
 
 
     @Bean
-    fun paymentOrderSuccededTopicDLQ(): NewTopic =
+    fun paymentOrderSucceededTopicDLQ(): NewTopic =
         NewTopic(
             TOPICS.PAYMENT_ORDER_SUCCEEDED_DLQ,
-            kafkaTopicsProperties.payment_order_succeded_topic_dlq.partitions,
-            kafkaTopicsProperties.payment_order_succeded_topic_dlq.replicas
+            kafkaTopicsProperties.payment_order_succeeded_topic_dlq.partitions,
+            kafkaTopicsProperties.payment_order_succeeded_topic_dlq.replicas
         )
 
 }

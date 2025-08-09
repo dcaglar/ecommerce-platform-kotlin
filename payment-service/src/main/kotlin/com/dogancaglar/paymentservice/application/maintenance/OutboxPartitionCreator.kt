@@ -30,28 +30,60 @@ class OutboxPartitionCreator(
     private val sqlFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
     private val PARTITION_SIZE_MIN = 30L
 
-    // Ensure current partition exists on startup
+
     @EventListener(ApplicationReadyEvent::class)
+    @Scheduled(
+        initialDelayString = "\${outbox.partition.initial-delay:PT10M}",
+        fixedDelayString = "\${outbox.partition.fixed-delay:PT10M}"
+    )
     @Transactional
-    fun ensureCurrentPartitionOnStartup() {
-        try {
-            ensurePartitionForNow()
-        } catch (ex: Exception) {
-            logger.error("Exception in ensureCurrentPartitionOnStartup", ex)
-            throw ex
-        }
+    fun ensureCurrentAndNext() {
+        val now = LocalDateTime.now(clock)
+        val start = now.withMinute((now.minute / 30) * 30).withSecond(0).withNano(0)
+
+        // current window
+        ensurePartitionExists(start, start.plusMinutes(PARTITION_SIZE_MIN))
+        // next window
+        ensurePartitionExists(start.plusMinutes(PARTITION_SIZE_MIN), start.plusMinutes(PARTITION_SIZE_MIN * 2))
     }
 
-    // Ensure next partition exists (run every 11 min, slightly offset from prune)
-    @Scheduled(fixedDelay = 11 * 60 * 1000)
-    @Transactional
-    fun ensureNextPartitionScheduled() {
-        try {
-            ensurePartitionForNow()
-            ensurePartitionForNext()
-        } catch (ex: Exception) {
-            logger.error("Exception in ensureNextPartitionScheduled", ex)
-            throw ex
+    // --- Partition creation (idempotent with IF NOT EXISTS) ---
+    private fun ensurePartitionExists(from: LocalDateTime, to: LocalDateTime) {
+        val partitionName = "outbox_event_${from.format(partitionFormatter)}"
+        val fromStr = from.format(sqlFormatter)
+        val toStr = to.format(sqlFormatter)
+
+        val mdcContext = mapOf("partitionName" to partitionName, "from" to fromStr, "to" to toStr)
+        LogContext.with(mdcContext) {
+            val sql = """
+                CREATE TABLE IF NOT EXISTS $partitionName
+                PARTITION OF outbox_event
+                FOR VALUES FROM ('$fromStr') TO ('$toStr');
+            """.trimIndent()
+
+            val timer = Timer.start()
+            var success = false
+            val zoneId = clock.zone
+            try {
+                jdbcTemplate.execute(sql)
+                logger.info("Ensured partition exists: $partitionName for [$fromStr, $toStr)")
+                meterRegistry.counter("outbox_partition_creator.success").increment()
+                success = true
+            } catch (e: Exception) {
+                logger.error("Error creating partition $partitionName: ${e.message}", e)
+                meterRegistry.counter("outbox_partition_creator.failure").increment()
+            } finally {
+                timer.stop(meterRegistry.timer("outbox_partition_creator.duration"))
+                meterRegistry.gauge(
+                    "outbox_partition_creator.last_from_epoch",
+                    from.atZone(zoneId).toEpochSecond().toDouble()
+                )
+                meterRegistry.gauge(
+                    "outbox_partition_creator.last_to_epoch",
+                    to.atZone(zoneId).toEpochSecond().toDouble()
+                )
+                meterRegistry.gauge("outbox_partition_creator.last_success", if (success) 1.0 else 0.0)
+            }
         }
     }
 
@@ -76,51 +108,6 @@ class OutboxPartitionCreator(
     private fun floorToPartitionStart(t: LocalDateTime): LocalDateTime =
         t.withMinute(((t.minute / PARTITION_SIZE_MIN).toInt()) * PARTITION_SIZE_MIN.toInt()).withSecond(0).withNano(0)
 
-    // --- Partition creation (safe DDL) ---
-    private fun ensurePartitionExists(from: LocalDateTime, to: LocalDateTime) {
-        val partitionName = "outbox_event_${from.format(partitionFormatter)}"
-        val fromStr = from.format(sqlFormatter)
-        val toStr = to.format(sqlFormatter)
-        val mdcContext = mapOf(
-            "partitionName" to partitionName, "from" to fromStr, "to" to toStr
-        )
-        LogContext.with(mdcContext) {
-            val sql = """
-            DO $$
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM pg_class WHERE relname = '$partitionName'
-                ) THEN
-                    EXECUTE format('CREATE TABLE %I PARTITION OF outbox_event FOR VALUES FROM (%L) TO (%L);',
-                        '$partitionName', '$fromStr', '$toStr');
-                END IF;
-            END
-            $$;
-        """.trimIndent()
-
-            val timer = Timer.start()
-            var success = false
-            val zoneId = clock.zone
-            try {
-                jdbcTemplate.execute(sql)
-                logger.info("Ensured partition exists: $partitionName for [$fromStr, $toStr)")
-                meterRegistry.counter("outbox_partition_creator.success").increment()
-                success = true
-            } catch (e: Exception) {
-                logger.error("Error creating partition $partitionName: ${e.message}", e)
-                meterRegistry.counter("outbox_partition_creator.failure").increment()
-            } finally {
-                timer.stop(meterRegistry.timer("outbox_partition_creator.duration"))
-                meterRegistry.gauge(
-                    "outbox_partition_creator.last_from_epoch", from.atZone(zoneId).toEpochSecond().toDouble()
-                )
-                meterRegistry.gauge(
-                    "outbox_partition_creator.last_to_epoch", to.atZone(zoneId).toEpochSecond().toDouble()
-                )
-                meterRegistry.gauge("outbox_partition_creator.last_success", if (success) 1.0 else 0.0)
-            }
-        }
-    }
 
     // --- Prune old partitions (every 31 min, slightly offset from create) ---
     @Scheduled(fixedDelay = 21 * 60 * 1000)

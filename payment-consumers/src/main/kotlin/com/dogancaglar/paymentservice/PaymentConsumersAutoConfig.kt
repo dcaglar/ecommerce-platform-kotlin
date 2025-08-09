@@ -1,0 +1,6 @@
+package com.dogancaglar.paymentservice
+
+import org.springframework.boot.autoconfigure.AutoConfiguration
+
+@AutoConfiguration
+class PaymentConsumersAutoConfig

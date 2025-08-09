@@ -13,8 +13,6 @@ import com.dogancaglar.paymentservice.adapter.outbound.serialization.JacksonSeri
 import com.dogancaglar.paymentservice.application.usecases.CreatePaymentService
 import com.dogancaglar.paymentservice.application.usecases.ProcessPaymentService
 import com.dogancaglar.paymentservice.ports.inbound.CreatePaymentUseCase
-import com.dogancaglar.paymentservice.serialization.JacksonUtil
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.time.Clock
@@ -59,17 +57,4 @@ class PaymentServiceConfig {
             clock = clock
         )
     }
-}
-
-@Configuration
-class JacksonConfig {
-    @Bean("myObjectMapper")
-    fun objectMapper(): ObjectMapper = JacksonUtil.createObjectMapper()
-}
-
-
-@Configuration
-class ClockConfig {
-    @Bean
-    fun clock(): Clock = Clock.systemUTC()
 }

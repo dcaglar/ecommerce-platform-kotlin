@@ -9,21 +9,20 @@ app:
       - id: payment-order-executor
         topic: payment_order_created_topic
         group-id: payment-order-created-consumer-group
-        class-name: com.dogancaglar.consumers.PaymentOrderExecutor
+        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderExecutor
         concurrency: 1
 
       - id: payment-retry-executor
         topic: payment_order_retry_request_topic
         group-id: payment-order-retry-consumer-group
-        class-name: com.dogancaglar.consumers.PaymentOrderRetryCommandExecutor
+        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderRetryCommandExecutor
         concurrency: 1
 
       - id: payment-status-check-executor-scheduler
         topic: payment_status_check_scheduler_topic
         group-id: payment-status-check-scheduler-consumer-group
-        class-name: com.dogancaglar.consumers.ScheduledPaymentStatusCheckExecutor
+        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.ScheduledPaymentStatusCheckExecutor
         concurrency: 1
-
 server:
   port: 8080
   tomcat:
@@ -35,13 +34,31 @@ server:
       pattern: '%h %l %u %t "%r" %s %b %D'
       buffered: true
 spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME} # This will be injected from a Kubernetes Secret
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 1500
+      idle-timeout: 600000
+      max-lifetime: 1800000
   kafka:
+    producer:
+      value-serializer: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaSerializer
+      properties: #maybe change partition assignment strategy
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+        spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
+    consumer:
+      group-id: payment-consumer-group      # (set appropriately for your domain)
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
+      properties:
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
     properties:
-      security.protocol: SASL_PLAINTEXT
-      sasl.mechanism: SCRAM-SHA-256
-      sasl.jaas.config: ${SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG}
-      client-id: ${CLIENT_ID:payment-consumers}
-    bootstrap-servers: kafka.payment.svc.cluster.local:9092
+      security.protocol: PLAINTEXT
+      session.timeout.ms: 45000
   data:
     redis:
       url: redis://redis-master:6379
@@ -52,32 +69,61 @@ spring:
           max-idle: 8
           min-idle: 0
           max-wait: -1ms
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus,metrics,health"
+  endpoint:
+    health:
+      enabled: true
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    enable:
+      all: false
+      hikaricp.connections: true
+      hikaricp.connections.acquire: true
+      kafka.consumer.fetch.manager.records.lag: true
+      kafka.producer.topic.record.send: true
+      process.cpu.usage: true
+      jvm.threads.live: true
+      jvm.memory.used: true
+      jvm.memory.max: true
+      jvm.gc.pause: true
+      kafka.consumer.fetch.manager.records.consumed: true
+      kafka.consumer.fetch.manager.fetch.latency: true
+      kafka.consumer.io.time: true
+    export:
+      prometheus:
+        enabled: true
 psp:
   simulation:
     currentScenario: NORMAL
     scenarios:
       NORMAL:
         timeouts:
-          enabled: true
-          probability: 1       # 1% of requests time out
+          enabled: false
+          probability: 0       # 1% of requests time out
         latency:
           fast:
-            probability: 70    # 70% are fast (50–150ms)
+            probability: 100    # 70% are fast (50–150ms)
             minMs: 50
             maxMs: 150
           moderate:
-            probability: 25    # 25% are moderate (150–300ms)
+            probability: 0    # 25% are moderate (150–300ms)
             minMs: 150
             maxMs: 300
           slow:
-            probability: 5     # 5% are slow (300–600ms)
+            probability: 0     # 5% are slow (300–600ms)
             minMs: 300
             maxMs: 600
         response:
-          successful: 80
-          retryable: 15
+          successful: 70
+          retryable: 20
           statusCheck: 0
-          nonRetryable: 5
+          nonRetryable: 10
       PEAK:
         timeouts:
           enabled: true
@@ -144,3 +190,4 @@ psp:
           retryable: 0
           statusCheck: 0
           nonRetryable: 0
+

@@ -5,74 +5,89 @@ metadata:
   labels:
     {{- include "payment-consumers.labels" . | nindent 4}}
 spec:
-  {{- if not .Values.autoscaling.enabled}}
   replicas: {{.Values.replicaCount}}
-  {{- end}}
   selector:
     matchLabels:
-      {{- include "payment-consumers.selectorLabels" . | nindent 6}}
+      app: {{include "payment-consumers.fullname" .}}
   template:
     metadata:
-      {{- with .Values.podAnnotations}}
-      annotations:
-        {{- toYaml . | nindent 8}}
-      {{- end}}
       labels:
-        {{- include "payment-consumers.labels" . | nindent 8}}
-          {{- with .Values.podLabels}}
-          {{- toYaml . | nindent 8}}
-          {{- end}}
+        app: {{include "payment-consumers.fullname" .}}
     spec:
-      {{- with .Values.imagePullSecrets}}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8}}
-      {{- end}}
-      serviceAccountName: {{include "payment-consumers.serviceAccountName" .}}
-      {{- with .Values.podSecurityContext}}
-      securityContext:
-        {{- toYaml . | nindent 8}}
-      {{- end}}
+      initContainers:
+        - name: create-consumer-user
+          image: postgres:16-alpine
+          env:
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-app-config
+                  key: DB_NAME
+            - name: DB_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: ADMIN_POSTGRES_PASSWORD
+            - name: CONSUMER_USER
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: PAYMENT_CONSUMERS_APP_DB_USER
+            - name: CONSUMER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: PAYMENT_CONSUMERS_APP_DB_PASSWORD
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              export PGPASSWORD="$DB_ADMIN_PASSWORD"
+              until pg_isready -h payment-db-postgresql -U postgres -d "$DB_NAME"; do
+                echo "Waiting for Postgres to be ready…"
+                sleep 2
+              done
+              psql -h payment-db-postgresql -U postgres -d $DB_NAME <<EOF
+              DO \$\$
+              BEGIN
+                IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$CONSUMER_USER') THEN
+                  EXECUTE 'CREATE USER "' || '$CONSUMER_USER' || '" WITH PASSWORD ''' || '$CONSUMER_PASSWORD' || '''';
+                END IF;
+              END
+              \$\$;
+              GRANT ALL PRIVILEGES ON SCHEMA public TO "$CONSUMER_USER";
+              GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "$CONSUMER_USER";
+              GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "$CONSUMER_USER";
+              EOF
       containers:
-        - name: {{.Chart.Name}}
-          {{- with .Values.securityContext}}
-          securityContext:
-            {{- toYaml . | nindent 12}}
-          {{- end}}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        - name: payment-consumers
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{.Values.image.pullPolicy}}
           ports:
-            - name: http
-              containerPort: {{.Values.service.port}}
-              protocol: TCP
-          {{- with .Values.livenessProbe}}
-          livenessProbe:
-            {{- toYaml . | nindent 12}}
-          {{- end}}
-          {{- with .Values.readinessProbe}}
-          readinessProbe:
-            {{- toYaml . | nindent 12}}
-          {{- end}}
-          {{- with .Values.resources}}
-          resources:
-            {{- toYaml . | nindent 12}}
-          {{- end}}
-          {{- with .Values.volumeMounts}}
-          volumeMounts:
-            {{- toYaml . | nindent 12}}
-          {{- end}}
-      {{- with .Values.volumes}}
-      volumes:
-        {{- toYaml . | nindent 8}}
-      {{- end}}
-      {{- with .Values.nodeSelector}}
-      nodeSelector:
-        {{- toYaml . | nindent 8}}
-      {{- end}}
-      {{- with .Values.affinity}}
-      affinity:
-        {{- toYaml . | nindent 8}}
-      {{- end}}
-      {{- with .Values.tolerations}}
-      tolerations:
-        {{- toYaml . | nindent 8}}
-      {{- end}}
+            - containerPort: 8080
+            - containerPort: 9010
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "{{ .Values.jvmOpts }}"
+            - name: SPRING_PROFILES_ACTIVE
+              value: "{{ .Values.spring.profile }}"
+            - name: SPRING_DATA_REDIS_URL
+              value: redis://redis-master:6379
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: kafka.payment.svc.cluster.local:9092
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-app-config
+                  key: PAYMENT_DB_URL
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: PAYMENT_CONSUMERS_APP_DB_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: PAYMENT_CONSUMERS_APP_DB_PASSWORD
+            # Add other env vars as needed
+      # Add other spec fields as needed

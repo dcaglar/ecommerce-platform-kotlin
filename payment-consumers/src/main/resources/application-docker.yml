@@ -4,7 +4,7 @@ server:
 #  servers: kafka:9092
 spring:
   kafka: #url for kafka in container-since this is used in docker-compose we use the service name
-    bootstrap-servers: kafka:9092
+    bootstrap-servers: kafka.payment.svc.cluster.local:9092
   datasource:
     url: jdbc:postgresql://payment-db:5432/payment?options=-c%20timezone=UTC
     username: payment

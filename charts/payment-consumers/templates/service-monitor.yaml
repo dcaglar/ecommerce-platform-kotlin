@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: payment-consumers
+  labels:
+    release: prometheus-stack   # <-- Sometimes needed; matches Prometheus deployment (optional)
+spec:
+  selector:
+    matchLabels:
+      app: payment-consumers      # <-- Must match Service.metadata.labels.app
+  endpoints:
+    - port: http               # <-- Must match Service.ports.name
+      path: /actuator/prometheus
+      interval: 15s
+      scheme: http             # Optional, defaults to http
+

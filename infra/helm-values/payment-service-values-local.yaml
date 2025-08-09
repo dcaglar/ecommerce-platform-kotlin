@@ -12,12 +12,11 @@ image:
 # replica count
 replicaCount: 1
 
+runPrivilegeGrantJob: true
+
 # JVM / JFR
 jvmOpts: >-
   -XX:+UseZGC -Xms600m -Xmx600m
-  -XX:StartFlightRecording=name=payment-service,filename=/var/log/jfr/pay.jfr,maxage=30m,maxsize=250M,settings=profile,dumponexit=true
-  -XX:FlightRecorderOptions=repository=/var/log/jfr
-  -Xlog:gc*:file=/var/log/jfr/gc.log:time,uptime,level,tags
 
 # Spring profile & datasource
 spring:
@@ -29,7 +28,7 @@ resources:
     cpu: 500m
     memory: 512Mi       # Safe lower bound for small pods
   limits:
-    cpu: "2"
+    cpu: "1"
     memory: 1Gi
 
 # PVC

@@ -1,13 +1,16 @@
 package com.dogancaglar.paymentservice.domain.util
 
-import com.dogancaglar.paymentservice.domain.*
+import com.dogancaglar.paymentservice.domain.PaymentOrderCreated
+import com.dogancaglar.paymentservice.domain.PaymentOrderEvent
+import com.dogancaglar.paymentservice.domain.PaymentOrderRetryRequested
+import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
-
 import java.time.LocalDateTime
 
 object PaymentOrderDomainEventMapper {
@@ -69,9 +72,9 @@ object PaymentOrderDomainEventMapper {
 
     fun toPaymentOrderSuccededEvent(order: PaymentOrder): PaymentOrderSucceeded {
         return PaymentOrderSucceeded(
-            paymentOrderId = order.paymentOrderId.toString(),
+            paymentOrderId = order.paymentOrderId.value.toString(),
             publicPaymentOrderId = order.publicPaymentOrderId,
-            paymentId = order.paymentId.toString(),
+            paymentId = order.paymentId.value.toString(),
             publicPaymentId = order.publicPaymentId,
             sellerId = order.sellerId.value,
             amountValue = order.amount.value,
@@ -82,9 +85,9 @@ object PaymentOrderDomainEventMapper {
 
     fun toPaymentOrderStatusCheckRequested(order: PaymentOrder): PaymentOrderStatusCheckRequested {
         return PaymentOrderStatusCheckRequested(
-            paymentOrderId = order.paymentOrderId.toString(),
+            paymentOrderId = order.paymentOrderId.value.toString(),
             publicPaymentOrderId = order.publicPaymentOrderId,
-            paymentId = order.paymentId.toString(),
+            paymentId = order.paymentId.value.toString(),
             publicPaymentId = order.publicPaymentId,
             sellerId = order.sellerId.value,
             retryCount = order.retryCount,
