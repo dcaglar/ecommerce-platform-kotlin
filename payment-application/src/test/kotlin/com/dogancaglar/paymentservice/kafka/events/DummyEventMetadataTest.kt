@@ -3,7 +3,7 @@ package com.dogancaglar.paymentservice.kafka.events
 import com.dogancaglar.common.event.CONSUMER_GROUPS.PAYMENT_ORDER_CREATED
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
-import com.dogancaglar.common.event.TOPICS
+import com.dogancaglar.common.event.Topics
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test
 class DummyClass
 
 object DummyClassEventMetadata : EventMetadata<DummyClass> {
-    override val topic = TOPICS.PAYMENT_ORDER_CREATED
+    override val topic = Topics.PAYMENT_ORDER_CREATED
     override val eventType = PAYMENT_ORDER_CREATED
     override val clazz = DummyClass::class.java
     override val typeRef = object : com.fasterxml.jackson.core.type.TypeReference<EventEnvelope<DummyClass>>() {}
@@ -22,7 +22,7 @@ class DummyClassEventMetadataTest {
     @Test
     fun `DummyClassEventMetadata has correct topic and eventType`() {
         val meta = DummyClassEventMetadata
-        assertEquals(TOPICS.PAYMENT_ORDER_CREATED, meta.topic)
+        assertEquals(Topics.PAYMENT_ORDER_CREATED, meta.topic)
         assertEquals(PAYMENT_ORDER_CREATED, meta.eventType)
     }
 

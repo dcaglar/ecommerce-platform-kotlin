@@ -51,7 +51,6 @@ spring:
         partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
         spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
     consumer:
-      group-id: payment-consumer-group      # (set appropriately for your domain)
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
       properties:
@@ -191,3 +190,8 @@ psp:
           statusCheck: 0
           nonRetryable: 0
 
+
+logging:
+  level:
+    org.springframework.kafka.core: DEBUG
+    org.springframework.kafka.listener.DefaultErrorHandler: DEBUG

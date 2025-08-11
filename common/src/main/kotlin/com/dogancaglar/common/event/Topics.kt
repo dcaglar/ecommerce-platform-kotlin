@@ -8,19 +8,20 @@ object EVENT_TYPE {
 }
 
 
-object TOPICS {
+object Topics {
     const val PAYMENT_ORDER_CREATED = "payment_order_created_topic"
     const val PAYMENT_ORDER_RETRY = "payment_order_retry_request_topic"
-    const val PAYMENT_STATUS_CHECK_SCHEDULER = "payment_status_check_scheduler_topic"
+    const val PAYMENT_STATUS_CHECK = "payment_status_check_scheduler_topic"
     const val PAYMENT_ORDER_SUCCEEDED = "payment_order_succeeded_topic"
 
+    fun dlqOf(topic: String) = "$topic.DLQ"
 
-    const val PAYMENT_ORDER_CREATED_DLQ = "payment_order_created_topic.DLQ"
-    const val PAYMENT_ORDER_RETRY_DLQ = "payment_order_retry_request_topic.DLQ"
-    const val PAYMENT_STATUS_CHECK_SCHEDULER_DLQ = "payment_status_check_scheduler_topic.DLQ"
-    const val PAYMENT_ORDER_SUCCEEDED_DLQ = "payment_order_succeeded_topic.DLQ"
-
-
+    val ALL = listOf(
+        PAYMENT_ORDER_CREATED,
+        PAYMENT_ORDER_RETRY,
+        PAYMENT_STATUS_CHECK,
+        PAYMENT_ORDER_SUCCEEDED
+    )
 }
 
 object CONSUMER_GROUPS {

@@ -2,7 +2,7 @@
 package com.dogancaglar.paymentservice.consumers
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.event.TOPICS
+import com.dogancaglar.common.event.Topics
 import com.dogancaglar.common.logging.GenericLogFields
 import com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
 import com.dogancaglar.paymentservice.domain.PaymentOrderCreated
@@ -89,19 +89,10 @@ class KafkaTypedConsumerFactoryConfig(
     ): DefaultErrorHandler {
 
         val recoverer = DeadLetterPublishingRecoverer(kafkaTemplate) { rec, _ ->
-            when (rec.topic()) {
-                TOPICS.PAYMENT_ORDER_CREATED ->
-                    TopicPartition(TOPICS.PAYMENT_ORDER_CREATED_DLQ, rec.partition())
-
-                TOPICS.PAYMENT_ORDER_RETRY ->
-                    TopicPartition(TOPICS.PAYMENT_ORDER_RETRY_DLQ, rec.partition())
-
-                TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER ->
-                    TopicPartition(TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER_DLQ, rec.partition())
-
-                else ->
-                    TopicPartition(rec.topic() + ".DLQ", rec.partition())
-            }
+            val src = rec.topic()
+            // If it's already a DLQ message, keep it in the same DLQ (or send to a "parking lot" if you want).
+            val target = if (src.endsWith(".DLQ")) src else Topics.dlqOf(src)
+            TopicPartition(target, rec.partition())
         }
 
         return DefaultErrorHandler(recoverer, kafkaExponentialBackOff).apply {
@@ -160,14 +151,14 @@ class KafkaTypedConsumerFactoryConfig(
             isBatchListener = false
         }
 
-    @Bean("${TOPICS.PAYMENT_ORDER_CREATED}-factory")
+    @Bean("${Topics.PAYMENT_ORDER_CREATED}-factory")
     fun paymentOrderCreatedFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
         customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler
     ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderCreated>> {
-        val cfg = cfgFor(EventMetadatas.PaymentOrderCreatedMetadata.topic, "${TOPICS.PAYMENT_ORDER_CREATED}-factory")
+        val cfg = cfgFor(EventMetadatas.PaymentOrderCreatedMetadata.topic, "${Topics.PAYMENT_ORDER_CREATED}-factory")
         return createTypedFactory(
             clientId = cfg.id,
             concurrency = cfg.concurrency,
@@ -177,7 +168,7 @@ class KafkaTypedConsumerFactoryConfig(
         )
     }
 
-    @Bean("${TOPICS.PAYMENT_ORDER_RETRY}-factory")
+    @Bean("${Topics.PAYMENT_ORDER_RETRY}-factory")
     fun paymentRetryRequestedFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
@@ -185,7 +176,7 @@ class KafkaTypedConsumerFactoryConfig(
         errorHandler: DefaultErrorHandler
     ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderRetryRequested>> {
         val cfg =
-            cfgFor(EventMetadatas.PaymentOrderRetryRequestedMetadata.topic, "${TOPICS.PAYMENT_ORDER_RETRY}-factory")
+            cfgFor(EventMetadatas.PaymentOrderRetryRequestedMetadata.topic, "${Topics.PAYMENT_ORDER_RETRY}-factory")
         return createTypedFactory(
             clientId = cfg.id,
             concurrency = cfg.concurrency,
@@ -195,7 +186,7 @@ class KafkaTypedConsumerFactoryConfig(
         )
     }
 
-    @Bean("${TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER}-factory")
+    @Bean("${Topics.PAYMENT_ORDER_SUCCEEDED}-factory")
     fun paymentStatusCheckExecutorFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
@@ -204,7 +195,7 @@ class KafkaTypedConsumerFactoryConfig(
     ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderStatusCheckRequested>> {
         val cfg = cfgFor(
             EventMetadatas.PaymentOrderStatusCheckScheduledMetadata.topic,
-            "${TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER}-factory"
+            "${Topics.PAYMENT_STATUS_CHECK}-factory"
         )
         return createTypedFactory(
             clientId = cfg.id,

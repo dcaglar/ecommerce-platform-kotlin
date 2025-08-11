@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.port.inbound.consumers
 
 import com.dogancaglar.common.event.CONSUMER_GROUPS
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.event.TOPICS
+import com.dogancaglar.common.event.Topics
 import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
@@ -36,8 +36,8 @@ class ScheduledPaymentStatusCheckExecutor(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @KafkaListener(
-        topics = [TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER],
-        containerFactory = "${TOPICS.PAYMENT_STATUS_CHECK_SCHEDULER}-factory",
+        topics = [Topics.PAYMENT_STATUS_CHECK],
+        containerFactory = "${Topics.PAYMENT_STATUS_CHECK}-factory",
         groupId = CONSUMER_GROUPS.PAYMENT_STATUS_CHECK_SCHEDULER,
         concurrency = "1"
     )
