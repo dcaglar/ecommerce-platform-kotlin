@@ -17,6 +17,23 @@ spring:
         jwt:
           issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}
   kafka:
+    specs:
+      payment_order_created_topic:
+        partitions: 1
+        replicas: 1
+        createDlq: true
+      payment_order_retry_request_topic:
+        partitions: 1
+        replicas: 1
+        createDlq: true
+      payment_status_check_scheduler_topic:
+        partitions: 1
+        replicas: 1
+        createDlq: true
+      payment_order_succeeded_topic:
+        partitions: 1
+        replicas: 1
+        createDlq: true
     properties:
       security.protocol: PLAINTEXT
       session.timeout.ms: 45000
@@ -109,15 +126,8 @@ management:
 
 spring.jackson.time-zone: UTC
 
-kafka:
-  topics:
-    payment_order_created_topic: {partitions: 3, replicas: 3}
-    payment_order_created_topic_dlq: {partitions: 3, replicas: 3}
-    payment_order_retry_request_topic: {partitions: 3, replicas: 3}
-    payment_order_retry_request_topic_dlq: {partitions: 3, replicas: 3}
-    payment_status_check_scheduler_topic: {partitions: 3, replicas: 3}
-    payment_status_check_scheduler_topic_dlq: {partitions: 3, replicas: 3}
-    payment_order_succeeded_topic: {partitions: 3, replicas: 3}
-    payment_order_succeeded_topic_dlq: {partitions: 3, replicas: 3}
-
+logging:
+  level:
+    org.springframework.kafka.core: DEBUG
+    org.springframework.kafka.listener.DefaultErrorHandler: DEBUG
 

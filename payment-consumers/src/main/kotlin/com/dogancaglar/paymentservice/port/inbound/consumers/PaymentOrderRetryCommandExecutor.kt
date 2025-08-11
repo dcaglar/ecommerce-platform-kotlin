@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.port.inbound.consumers
 
 import com.dogancaglar.common.event.CONSUMER_GROUPS
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.event.TOPICS
+import com.dogancaglar.common.event.Topics
 import com.dogancaglar.paymentservice.domain.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
@@ -41,8 +41,8 @@ class PaymentOrderRetryCommandExecutor(
 
     // Single-record listener, no manual ack, no batching, concurrency=1
     @KafkaListener(
-        topics = [TOPICS.PAYMENT_ORDER_RETRY],
-        containerFactory = "${TOPICS.PAYMENT_ORDER_RETRY}-factory",
+        topics = [Topics.PAYMENT_ORDER_RETRY],
+        containerFactory = "${Topics.PAYMENT_ORDER_RETRY}-factory",
         groupId = CONSUMER_GROUPS.PAYMENT_ORDER_RETRY,
         concurrency = "1"
     )

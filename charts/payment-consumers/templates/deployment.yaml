@@ -28,6 +28,8 @@ spec:
                 secretKeyRef:
                   name: payment-db-credentials
                   key: ADMIN_POSTGRES_PASSWORD
+            - name: SPRING_KAFKA_ADMIN_AUTO_CREATE
+              value: "false"
             - name: CONSUMER_USER
               valueFrom:
                 secretKeyRef:

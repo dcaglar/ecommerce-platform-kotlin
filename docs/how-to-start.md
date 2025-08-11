@@ -79,7 +79,7 @@ stern -n payment 'payment-service'| grep 'POST'
 From project root, run:
 
 ```bash 
-VUS=10  RPS=10 DURATION=1m k6 run load-tests/baseline-smoke-test.js
+VUS=10  RPS=10 DURATION=2m k6 run load-tests/baseline-smoke-test.js
 VUS=10  RPS=5 DURATION=50m k6 run load-tests/baseline-smoke-test.js
 VUS=20  RPS=20 DURATION=50m k6 run load-tests/baseline-smoke-test.js
 VUS=40 RPS=40 DURATION=20m k6 run load-tests/baseline-smoke-test.js
@@ -110,48 +110,64 @@ RPS=50 DURATION=10m k6 run load-tests/baseline-smoke-test.js
 - If you change Keycloak configs, re-run `deploy-k8s-overlay.sh local keycloak payment` to apply changes.
 - For load testing, always generate tokens using the same Keycloak URL as your payment-service expects (see above for
   port-forwarding).
+  export BS="kafka.payment.svc.cluster.local:9092"
+  BS_BROKER=kafka-controller-0.kafka-controller-headless.payment.svc.cluster.local:9092
+  BS_CONSUMER=kafka.payment.svc.cluster.local
 
-I have no name!@kafka-client:/$ /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "$BS" --list
---exclude-internal false
-payment_order_created_topic
-payment_order_created_topic.DLQ
-payment_order_retry_request_topic
-payment_order_retry_request_topic.DLQ
-payment_order_succeeded_topic
-payment_order_succeeded_topic.DLQ
-payment_status_check_scheduler_topic
-payment_status_check_scheduler_topic.DLQ
-test
-I have no name!@kafka-client:/$ /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "$BS" --describe --topic __
-consumer_offsets
+# __consumer_offsets (matches OFFSETS_TOPIC_NUM_PARTITIONS=1 and RF=1)
+
+export BS="kafka.payment.svc.cluster.local:9092"
+kafka-topics.sh --bootstrap-server "$BS" --create \
+--topic __consumer_offsets \
+--partitions 1 \
+--replication-factor 1 \
+--config cleanup.policy=compact \
+--config compression.type=producer \
+--config segment.bytes=104857600
+
+# __transaction_state (matches TRANSACTION_STATE_LOG_* = 1)
+
+v
+
+kafka-topics.sh
+--bootstrap-server "$BS" --describe --topic __consumer_offsets | egrep 'Topic:|PartitionCount|ReplicationFactor'
+kafka-topics.sh --bootstrap-server "$BS" --describe --topic __transaction_state | egrep 'Topic: \
+|PartitionCount|ReplicationFactor'
+
+/opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "$BS" --list --exclude-internal false
+/opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "$BS" --describe --topic __consumer_offsets
+/opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "$BS" --describe --topic __transaction_state
+
 Topic: __consumer_offsets TopicId: dxyj3OlSTFCD5dRVZ4NOLw PartitionCount: 3 ReplicationFactor: 1 Configs:
 cleanup.policy=compact
 Topic: __consumer_offsets Partition: 0 Leader: 0 Replicas: 0 Isr: 0 Elr:    LastKnownElr:
 Topic: __consumer_offsets Partition: 1 Leader: 100 Replicas: 100 Isr: 100 Elr:    LastKnownElr:
 Topic: __consumer_offsets Partition: 2 Leader: 100 Replicas: 100 Isr: 100 Elr:    LastKnownElr:
-I have no name!@kafka-client:/$ /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "$BS" --describe --topic __
-consumer_offsets
 
-dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % kubectl -n payment exec -it kafka-controller-0 -- \
-sh -lc 'env | egrep "OFFSETS|TRANSACTION_STATE|DEFAULT_REPLICATION|MIN_INSYNC|AUTO_CREATE"'
-Defaulted container "kafka" out of: kafka, jmx-exporter, prepare-config (init)
-KAFKA_CFG_OFFSETS_TOPIC_NUM_PARTITIONS=3
-KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
-KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
-KAFKA_CFG_DEFAULT_REPLICATION_FACTOR=1
-KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=1
-KAFKA_CFG_MIN_INSYNC_REPLICAS=1
-dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin %
+opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "$BS" --describe --topic __consumer_offsets
 
---connect kafka client to be able run kafka bin shell commands
 kubectl -n payment exec -it kafka-client -- bash
 
 --remove kafka ,payment-consumer,paymeny-service
 
-dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % delete-kafka-local.sh
-release "kafka" uninstalled
-persistentvolumeclaim "data-kafka-controller-0" deleted
-persistentvolumeclaim "data-kafka-broker-0" deleted
+# __consumer_offsets (matches OFFSETS_TOPIC_NUM_PARTITIONS=1 and RF=1)
+
+kafka-topics.sh --bootstrap-server "$BS" --create \
+--topic __consumer_offsets \
+--partitions 1 \
+--replication-factor 1 \
+--config cleanup.policy=compact \
+--config compression.type=producer \
+--config segment.bytes=104857600
+
+# __transaction_state (matches TRANSACTION_STATE_LOG_* = 1)
+
+kafka-topics.sh --bootstrap-server "$BS" --create \
+--topic __transaction_state \
+--partitions 1 \
+--replication-factor 1 \
+--config cleanup.policy=compact
+
 ✅ Uninstalled kafka, and deleted pvc from namespace: payment
 dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % helm uninstall -n payment payment-service
 release "payment-service" uninstalled
@@ -175,7 +191,6 @@ export BS="kafka-broker-0.kafka-broker-headless.payment.svc.cluster.local:9092"
 kubectl -n payment run kafka-client --restart=Never \
 --image docker.io/bitnami/kafka:4.0.0-debian-12-r10 --command -- sleep infinity
 
-kubectl -n payment wait --for=condition=Ready pod/kafka-client --timeout=90s
 
 
 

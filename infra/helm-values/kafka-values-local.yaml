@@ -1,37 +1,61 @@
+# Single-node, controller+broker in one pod; plaintext listeners; single-node-friendly internals.
+
 listeners:
-  client: {protocol: PLAINTEXT, containerPort: 9092, name: CLIENT,     sslClientAuth: ""}
-  controller: {protocol: PLAINTEXT, containerPort: 9093, name: CONTROLLER, sslClientAuth: ""}
-  interbroker: {protocol: PLAINTEXT, containerPort: 9094, name: INTERNAL,   sslClientAuth: ""}
-  external: {protocol: PLAINTEXT, containerPort: 9095, name: EXTERNAL,   sslClientAuth: ""}
+  client: {protocol: PLAINTEXT, containerPort: 9092, name: CLIENT}
+  controller: {protocol: PLAINTEXT, containerPort: 9093, name: CONTROLLER}
+  interbroker: {protocol: PLAINTEXT, containerPort: 9094, name: INTERNAL}
 
 controller:
-  replicaCount: 3
-  resources:
-    requests: {cpu: 50m, memory: 256Mi}
-    limits: {cpu: 200m,  memory: 512Mi}
-  extraEnvVars:
-    - name: KAFKA_HEAP_OPTS
-      value: "-Xms256m -Xmx256m"
+  replicaCount: 1
+  controllerOnly: false
+  overrideConfiguration:
+    # Roles & listeners
+    process.roles: controller,broker
+    controller.listener.names: CONTROLLER
+    inter.broker.listener.name: INTERNAL
+    listeners: CLIENT://:9092,INTERNAL://:9094,CONTROLLER://:9093
+    listener.security.protocol.map: CLIENT:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+    advertised.listeners: >
+      CLIENT://kafka.payment.svc.cluster.local:9092,
+      INTERNAL://kafka-controller-0.kafka-controller-headless.payment.svc.cluster.local:9094
+
+    # Single-node defaults (safe in dev)
+    num.partitions: 1
+    min.insync.replicas: 1
+
+    # Make internal topics 1/1 so Kafka won't expect a 3-node quorum
+    offsets.topic.replication.factor: 1
+    offsets.topic.num.partitions: 1
+    transaction.state.log.replication.factor: 1
+    transaction.state.log.min.isr: 1
+    transaction.state.log.num.partitions: 1
+    # Kafka 4.x also logs this one; keep it small in single node
+    share.coordinator.state.topic.num.partitions: 1
 
 broker:
-  replicaCount: 3
-  resources:
-    requests: {cpu: 50m, memory: 400Mi}
-    limits: {cpu: 200m,  memory: 712Mi}
-  extraEnvVars:
-    - {name: KAFKA_HEAP_OPTS, value: "-Xms256m -Xmx256m"}
-    - {name: KAFKA_CFG_DEFAULT_REPLICATION_FACTOR,            value: "1"}
-    - {name: KAFKA_CFG_MIN_INSYNC_REPLICAS,                    value: "1"}
-    - {name: KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR,       value: "1"}
-    - {name: KAFKA_CFG_OFFSETS_TOPIC_NUM_PARTITIONS,           value: "1"}   # only takes effect if the topic doesn't exist yet
-    - {name: KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR,value: "1"}
-    - {name: KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR,          value: "1"}
-    - {name: KAFKA_CFG_TRANSACTION_STATE_LOG_NUM_PARTITIONS,   value: "1"}
+  # No separate broker-only set for single-node
+  replicaCount: 0
 
+# Avoid surprises with policies in local clusters
+networkPolicy:
+  enabled: false
 
 metrics:
   jmx:
-    enabled: true
+    enabled: false
+    config: |
+      lowercaseOutputName: true
+      rules:
+        - pattern: "kafka.server<type=(.+), name=(.+)PerSec\\, topic=(.+)><>Count"
+          name: "kafka_server_$1_$2_total"
+          labels:
+            topic: "$3"
+          type: COUNTER
+      serviceMonitor:
+      enabled: true         # set to false if you don’t use Prometheus Operator
+      namespace: monitoring # adjust to your Prometheus Operator ns
+      interval: 30s
+      scrapeTimeout: 10s
     resources:
       requests: {cpu: 50m, memory: 128Mi}
       limits: {cpu: 200m, memory: 256Mi}

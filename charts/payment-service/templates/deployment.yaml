@@ -33,6 +33,10 @@ spec:
               value: redis://redis-master:6379
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: kafka.payment.svc.cluster.local:9092
+            - name: SPRING_KAFKA_ADMIN_AUTO_CREATE
+              value: "true"
+            - name: SPRING_KAFKA_ADMIN_FAIL_FAST
+              value: "true"
             - name: SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
               valueFrom:
                 configMapKeyRef:

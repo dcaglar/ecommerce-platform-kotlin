@@ -21,16 +21,6 @@ echo "🚀 Deploying kafka..."
 "$SCRIPT_DIR/deploy-kafka-local.sh"
 
 
-
-echo "🚀 Creating app DB credentials..."
-"$SCRIPT_DIR/create-app-db-credentials-local.sh"
-
-echo "🚀 Deploying payment-service..."
-"$SCRIPT_DIR/deploy-payment-service-local.sh"
-
-echo "🚀 Deploying payment-consumer..."
-"$SCRIPT_DIR/deploy-payment-consumers-local.sh"
-
 echo "✅ All components deployed!"
 
 
