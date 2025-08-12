@@ -18,11 +18,14 @@ spec:
         - name: payment-service
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{.Values.image.pullPolicy}}
-
           ports:
             - containerPort: 8080  # REST API
             - containerPort: 9010  # JMX
           env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: JAVA_TOOL_OPTIONS
               value: "{{ .Values.jvmOpts }}"
             - name: DATA_SOURCE_NAME

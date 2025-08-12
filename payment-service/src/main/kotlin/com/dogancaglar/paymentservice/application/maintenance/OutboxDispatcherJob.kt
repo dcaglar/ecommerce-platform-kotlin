@@ -2,6 +2,7 @@ package com.dogancaglar.paymentservice.application.maintenance
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.domain.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.events.OutboxEvent
@@ -28,6 +29,7 @@ import java.util.concurrent.TimeUnit
 class OutboxDispatcherJob(
     private val outboxEventPort: OutboxEventPort, // <-- use the shared outbox event port bean
     private val paymentEventPublisher: EventPublisherPort,
+    private val kafkaTx: KafkaTxExecutor,         // ← inject this
     private val meterRegistry: MeterRegistry,
     private val objectMapper: ObjectMapper,
     @Qualifier("outboxTaskScheduler") // <-- use the shared scheduler bean
@@ -75,14 +77,16 @@ class OutboxDispatcherJob(
                     val envelope: EventEnvelope<PaymentOrderCreated> =
                         objectMapper.readValue(event.payload, envelopeType)
                     LogContext.with(envelope) {
-                        paymentEventPublisher.publish(
-                            preSetEventIdFromCaller = envelope.eventId,
-                            aggregateId = envelope.aggregateId,
-                            eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
-                            data = envelope.data,
-                            traceId = envelope.traceId,
-                            parentEventId = envelope.eventId
-                        )
+                        kafkaTx.run {
+                            paymentEventPublisher.publishSync(
+                                preSetEventIdFromCaller = envelope.eventId,
+                                aggregateId = envelope.aggregateId,
+                                eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
+                                data = envelope.data,
+                                traceId = envelope.traceId,
+                                parentEventId = envelope.parentEventId
+                            )
+                        }
                         logger.info("Dispatcher job Published event ${event.oeid} in worker $workedId")
                     }
                     event.markAsSent()

@@ -18,6 +18,10 @@ spec:
         - name: create-consumer-user
           image: postgres:16-alpine
           env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: DB_NAME
               valueFrom:
                 configMapKeyRef:

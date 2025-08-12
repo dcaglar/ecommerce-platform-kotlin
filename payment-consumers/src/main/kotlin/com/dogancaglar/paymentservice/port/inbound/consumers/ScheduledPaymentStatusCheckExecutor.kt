@@ -38,8 +38,7 @@ class ScheduledPaymentStatusCheckExecutor(
     @KafkaListener(
         topics = [Topics.PAYMENT_STATUS_CHECK],
         containerFactory = "${Topics.PAYMENT_STATUS_CHECK}-factory",
-        groupId = CONSUMER_GROUPS.PAYMENT_STATUS_CHECK_SCHEDULER,
-        concurrency = "1"
+        groupId = CONSUMER_GROUPS.PAYMENT_STATUS_CHECK_SCHEDULER
     )
     fun onMessage(record: ConsumerRecord<String, EventEnvelope<PaymentOrderStatusCheckRequested>>) {
         handle(record) // throw to trigger retries/DLQ; return = commit success

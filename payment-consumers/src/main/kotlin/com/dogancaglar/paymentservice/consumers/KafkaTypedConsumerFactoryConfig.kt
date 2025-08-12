@@ -4,14 +4,11 @@ package com.dogancaglar.paymentservice.consumers
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.Topics
 import com.dogancaglar.common.logging.GenericLogFields
-import com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
 import com.dogancaglar.paymentservice.domain.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import io.micrometer.core.instrument.MeterRegistry
-import org.apache.kafka.clients.consumer.ConsumerConfig
-import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.RetriableException
 import org.apache.kafka.common.errors.SerializationException
@@ -28,7 +25,6 @@ import org.springframework.kafka.core.*
 import org.springframework.kafka.listener.*
 import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries
 import org.springframework.kafka.support.serializer.DeserializationException
-import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
 import org.springframework.messaging.handler.annotation.support.DefaultMessageHandlerMethodFactory
 import org.springframework.messaging.handler.annotation.support.MethodArgumentNotValidException
 import java.sql.SQLTransientException
@@ -50,11 +46,6 @@ class KafkaTypedConsumerFactoryConfig(
     @Bean("custom-kafka-consumer-factory-for-micrometer")
     fun defaultKafkaConsumerFactory(): DefaultKafkaConsumerFactory<String, EventEnvelope<*>> {
         val configs = bootKafkaProps.buildConsumerProperties().toMutableMap()
-        configs[ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG] =
-            ErrorHandlingDeserializer::class.java
-        configs[ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS] =
-            EventEnvelopeKafkaDeserializer::class.java
-
         return DefaultKafkaConsumerFactory<String, EventEnvelope<*>>(configs).apply {
             addListener(MicrometerConsumerListener(meterRegistry))
         }
@@ -126,8 +117,6 @@ class KafkaTypedConsumerFactoryConfig(
                 DuplicateKeyException::class.java,
                 DataIntegrityViolationException::class.java,
                 NonTransientDataAccessException::class.java,
-                KafkaException::class.java,
-                org.springframework.kafka.KafkaException::class.java
             )
         }
     }
@@ -137,7 +126,8 @@ class KafkaTypedConsumerFactoryConfig(
         concurrency: Int,
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         consumerFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
-        errorHandler: DefaultErrorHandler
+        errorHandler: DefaultErrorHandler,
+        ackMode: ContainerProperties.AckMode = ContainerProperties.AckMode.RECORD
     ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>> =
         ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>>().apply {
             this.consumerFactory = consumerFactory
@@ -146,7 +136,7 @@ class KafkaTypedConsumerFactoryConfig(
             @Suppress("UNCHECKED_CAST")
             setRecordInterceptor(interceptor as RecordInterceptor<String, EventEnvelope<T>>)
             setCommonErrorHandler(errorHandler)
-            containerProperties.ackMode = ContainerProperties.AckMode.RECORD
+            containerProperties.ackMode = ackMode  // ← change from RECORD
             setConcurrency(concurrency)
             isBatchListener = false
         }
@@ -164,7 +154,8 @@ class KafkaTypedConsumerFactoryConfig(
             concurrency = cfg.concurrency,
             interceptor = interceptor,
             consumerFactory = customFactory,
-            errorHandler = errorHandler
+            errorHandler = errorHandler,
+            ackMode = ContainerProperties.AckMode.MANUAL
         )
     }
 
@@ -182,11 +173,12 @@ class KafkaTypedConsumerFactoryConfig(
             concurrency = cfg.concurrency,
             interceptor = interceptor,
             consumerFactory = customFactory,
-            errorHandler = errorHandler
+            errorHandler = errorHandler,
+            ackMode = ContainerProperties.AckMode.MANUAL
         )
     }
 
-    @Bean("${Topics.PAYMENT_ORDER_SUCCEEDED}-factory")
+    @Bean("${Topics.PAYMENT_STATUS_CHECK}-factory")
     fun paymentStatusCheckExecutorFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
@@ -202,7 +194,8 @@ class KafkaTypedConsumerFactoryConfig(
             concurrency = cfg.concurrency,
             interceptor = interceptor,
             consumerFactory = customFactory,
-            errorHandler = errorHandler
+            errorHandler = errorHandler,
+            ackMode = ContainerProperties.AckMode.MANUAL
         )
     }
 

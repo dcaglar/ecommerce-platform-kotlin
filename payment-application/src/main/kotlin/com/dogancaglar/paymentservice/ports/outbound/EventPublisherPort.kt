@@ -26,5 +26,6 @@ interface EventPublisherPort {
         parentEventId: UUID? = null,
         timeoutSeconds: Long = 5
     ): EventEnvelope<T>
+
 }
 

@@ -1,4 +1,5 @@
 app:
+  instance-id: ${POD_NAME:${HOSTNAME:${random.value}}}
   cache:
     ttl-seconds: 3600  # 1 hour redis  TTL for PSP result cache
   payment-service:
@@ -10,13 +11,13 @@ app:
         topic: payment_order_created_topic
         group-id: payment-order-created-consumer-group
         class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderExecutor
-        concurrency: 1
+        concurrency: 4
 
       - id: payment-retry-executor
         topic: payment_order_retry_request_topic
         group-id: payment-order-retry-consumer-group
         class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderRetryCommandExecutor
-        concurrency: 1
+        concurrency: 4
 
       - id: payment-status-check-executor-scheduler
         topic: payment_status_check_scheduler_topic
@@ -46,15 +47,19 @@ spring:
       max-lifetime: 1800000
   kafka:
     producer:
+      acks: all
       value-serializer: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaSerializer
       properties: #maybe change partition assignment strategy
-        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
-        spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        delivery.timeout.ms: 120000
     consumer:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
-        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+        spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
+        isolation.level: read_committed
+      enable-auto-commit: false
     properties:
       security.protocol: PLAINTEXT
       session.timeout.ms: 45000
@@ -104,18 +109,18 @@ psp:
       NORMAL:
         timeouts:
           enabled: false
-          probability: 0       # 1% of requests time out
+          probability: 0       # 0% of requests time out
         latency:
           fast:
-            probability: 100    # 70% are fast (50–150ms)
+            probability: 100    # 100% are fast (50–150ms)
             minMs: 50
             maxMs: 150
           moderate:
-            probability: 0    # 25% are moderate (150–300ms)
+            probability: 0    # 0% are moderate (150–300ms)
             minMs: 150
             maxMs: 300
           slow:
-            probability: 0     # 5% are slow (300–600ms)
+            probability: 0     # 0% are slow (300–600ms)
             minMs: 300
             maxMs: 600
         response:
