@@ -4,19 +4,6 @@ app:
     ttl-seconds: 3600  # 1 hour redis  TTL for PSP result cache
   payment-service:
     api-key: secretpaymentapikey12345
-server:
-  tomcat:
-    mbeanregistry:
-      enabled: true
-    threads:
-      max: 4
-  port: 8080
-spring:
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}
   kafka:
     specs:
       payment_order_created_topic:
@@ -35,13 +22,27 @@ spring:
         partitions: 8
         replicas: 1
         createDlq: true
+server:
+  tomcat:
+    mbeanregistry:
+      enabled: true
+    threads:
+      max: 4
+  port: 8080
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}
     properties:
       security.protocol: PLAINTEXT
       session.timeout.ms: 45000
     producer:
       value-serializer: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaSerializer
-      properties: #maybe change partition assignment strategy
-        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+      properties:
+        linger.ms: 5
+        compression.type: lz4
         spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
   # Only the bootstrap-servers should be overridden in profiles
   datasource:

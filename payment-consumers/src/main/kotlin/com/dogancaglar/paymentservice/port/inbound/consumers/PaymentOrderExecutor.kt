@@ -30,7 +30,7 @@ class PaymentOrderExecutor(
     private val meterRegistry: MeterRegistry,
     private val pspResultCache: PspResultCachePort,
     private val kafkaTx: KafkaTxExecutor, // ← inject helper, not KafkaTemplate
-    @Qualifier("paymentOrderExecutorPoolConfig") private val pspExecutor: ThreadPoolTaskExecutor
+    @Qualifier("paymentOrderPspPool") private val pspExecutor: ThreadPoolTaskExecutor
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 

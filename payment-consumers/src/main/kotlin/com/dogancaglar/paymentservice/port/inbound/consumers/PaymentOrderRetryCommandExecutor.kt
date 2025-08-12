@@ -30,7 +30,7 @@ class PaymentOrderRetryCommandExecutor(
     private val meterRegistry: MeterRegistry,
     private val pspResultCache: PspResultCachePort,
     private val kafkaTx: KafkaTxExecutor,
-    @Qualifier("paymentOrderExecutorPoolConfig") private val pspExecutor: ThreadPoolTaskExecutor
+    @Qualifier("paymentRetryPspPool") private val pspExecutor: ThreadPoolTaskExecutor
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 

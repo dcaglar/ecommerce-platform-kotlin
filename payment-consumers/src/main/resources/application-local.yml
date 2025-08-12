@@ -53,10 +53,15 @@ spring:
         enable.idempotence: true
         max.in.flight.requests.per.connection: 5
         delivery.timeout.ms: 120000
+        linger.ms: 5
+        compression.type: lz4
     consumer:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      max-poll-records: 25
       properties:
+        fetch.max.wait.ms: 50
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
         spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
         isolation.level: read_committed
       enable-auto-commit: false

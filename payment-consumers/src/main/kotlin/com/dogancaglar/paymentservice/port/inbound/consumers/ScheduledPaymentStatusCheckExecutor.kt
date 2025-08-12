@@ -31,7 +31,7 @@ import java.util.concurrent.TimeoutException
 class ScheduledPaymentStatusCheckExecutor(
     val paymentGatewayPort: PaymentGatewayPort,
     private val processPspResultUseCase: ProcessPspResultUseCase,
-    @Qualifier("externalPspExecutorPoolConfig") private val externalPspExecutorPoolConig: ThreadPoolTaskExecutor
+    @Qualifier("paymentStatusPspPool") private val externalPspExecutorPoolConig: ThreadPoolTaskExecutor
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 

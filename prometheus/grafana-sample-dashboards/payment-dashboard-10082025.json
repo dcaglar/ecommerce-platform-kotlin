@@ -1296,32 +1296,7 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "payment-order-created-consumer-group"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 9,
@@ -1448,7 +1423,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (topic) (\n  kafka_topic_partition_current_offset{topic=~\"^payment.*\", topic!~\".*\\\\.DLQ$\"}\n)\nand on (topic)\nsum by (topic) (\n  kafka_topic_partition_current_offset{topic=~\"^payment.*\", topic!~\".*\\\\.DLQ$\"}\n) > bool 0",
+          "expr": "sum by (topic) (\n  max by (topic, partition) (\n    kafka_topic_partition_current_offset{\n      topic=~\"^payment.*\",\n      topic!~\".*\\\\.DLQ$\"\n    }\n  )\n)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1545,47 +1520,10 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "kafka_consumergroup_current_offset{\n  topic=~\"payment_order_created_topic|payment_order_retry_request_topic|payment_order_succeeded_topic\",\n  consumergroup=~\"payment-order-(created|retry)-consumer-group\"\n}",
+          "expr": "sum by (consumergroup, topic) (\n  max by (consumergroup, topic, partition) (kafka_consumergroup_current_offset)\n)",
           "legendFormat": "{{topic}}",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "sum by (topic) (\n  rate(kafka_producer_topic_record_send_total{topic=\"payment_order_succeeded_topic\"}[5m])\n)",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "sum by (topic) (\n  rate(kafka_producer_topic_record_send_total{topic=\"payment_status_check_scheduler_topic\"}[5m])\n)\n",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "C"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "",
-          "hide": false,
-          "instant": false,
-          "range": true,
-          "refId": "D"
         }
       ],
       "title": "Consumer Group Current Offset",
@@ -1679,7 +1617,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (topic) (\n  kafka_topic_partition_current_offset{topic=~\"^payment.*\", topic=~\".*\\\\.DLQ$\"}\n)\nand on (topic)\nsum by (topic) (\n  kafka_topic_partition_current_offset{topic=~\"^payment.*\", topic=~\".*\\\\.DLQ$\"}\n) > bool 0",
+          "expr": "sum by (topic) (\n  max by (topic, partition) (\n    kafka_topic_partition_current_offset{\n      topic=~\"^payment.*\\\\.DLQ$\"\n    }\n  )\n)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1800,6 +1738,6 @@
   "timezone": "browser",
   "title": "Payment Dashboard",
   "uid": "20250615df",
-  "version": 2,
+  "version": 5,
   "weekStart": ""
 }
