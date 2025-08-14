@@ -1,38 +1,28 @@
-autoscaling:
-  enabled: true
-  minReplicas: 1
-  maxReplicas: 4
-  targetCPUUtilizationPercentage: 70
-# image
-image:
-  repository: dcaglar1987/payment-service
-  tag: latest
-  pullPolicy: Always
 
-# replica count
-replicaCount: 1
+image:
+  tag: "latest"
+  pullPolicy: Always
+  repository: dcaglar1987/payment-service
+
+
+
 
 runPrivilegeGrantJob: true
 
-# JVM / JFR
-jvmOpts: >-
-  -XX:+UseZGC -Xms600m -Xmx600m
 
-# Spring profile & datasource
+
+service:
+  type: ClusterIP
+  port: 8080
+  portName: http
+
+serviceMonitor:
+  enabled: true
+  labels:
+    release: prometheus-stack
+
+
+
+
 spring:
   profile: local
-
-# resources
-resources:
-  requests:
-    cpu: 500m
-    memory: 512Mi       # Safe lower bound for small pods
-  limits:
-    cpu: "1"
-    memory: 1Gi
-
-# PVC
-persistence:
-  enabled: true
-  size: 2Gi
-  accessMode: ReadWriteOnce

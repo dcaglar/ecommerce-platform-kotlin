@@ -22,7 +22,10 @@ class EventEnvelopeKafkaDeserializer : Deserializer<EventEnvelope<*>> {
         EventMetadatas.all.associate { it.topic to it.typeRef }
 
 
-    override fun deserialize(topic: String?, data: ByteArray?): EventEnvelope<*>? {
+    override fun deserialize(
+        topic: String?, data:
+        ByteArray?
+    ): EventEnvelope<*>? {
         return deserialize(topic, null, data)
     }
 

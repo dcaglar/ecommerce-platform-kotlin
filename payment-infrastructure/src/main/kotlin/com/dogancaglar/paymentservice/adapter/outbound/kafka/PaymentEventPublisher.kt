@@ -43,6 +43,7 @@ class PaymentEventPublisher(
         )
         LogContext.with(envelope) {
             logger.info(
+                "Publishing event type={} id={} parentId={} traceId={} agg={}",
                 envelope.eventType,
                 envelope.eventId,
                 envelope.parentEventId,
@@ -80,28 +81,23 @@ class PaymentEventPublisher(
         parentEventId: UUID?,
         timeoutSeconds: Long
     ): EventEnvelope<T> {
-        val envelope = buildEnvelope(
-            preSetEventIdFromCaller, aggregateId, eventMetaData, data, traceId, parentEventId
-        )
+        val envelope = buildEnvelope(preSetEventIdFromCaller, aggregateId, eventMetaData, data, traceId, parentEventId)
         val record = buildRecord(eventMetaData, envelope)
-        try {
-            val future = kafkaTemplate.send(record)
-            // This will throw if Kafka send fails or times out
-            future.get(timeoutSeconds, TimeUnit.SECONDS)
-            logger.info(
-                "📨 PUBLISH SYNC SUCCEDED"
-            )
-        } catch (ex: Exception) {
-            logger.error(
-                "❌ [SYNC] Failed to publish eventId={} to topic={}: {}",
-                envelope.eventId,
-                eventMetaData.topic,
-                ex.message,
-                ex
-            )
-            throw ex // bubble up to handler, causing a retry
+        LogContext.with(envelope) {
+            try {
+                kafkaTemplate.send(record).get(timeoutSeconds, TimeUnit.SECONDS)
+                logger.info("📨 PUBLISH SYNC SUCCEEDED (topic={})", eventMetaData.topic)
+            } catch (ex: Exception) {
+                logger.error(
+                    "❌ [SYNC] Failed to publish eventId={} to topic={}: {}",
+                    envelope.eventId,
+                    eventMetaData.topic,
+                    ex.message,
+                    ex
+                )
+                throw ex
+            }
         }
-
         return envelope
     }
 
@@ -148,6 +144,12 @@ class PaymentEventPublisher(
                     envelope.eventId.toString().toByteArray(StandardCharsets.UTF_8)
                 )
             )
+            headers().add(
+                RecordHeader(
+                    "eventType", envelope.eventType.toByteArray(StandardCharsets.UTF_8)
+                )
+            )
+
             envelope.parentEventId?.let {
                 headers().add(
                     RecordHeader(

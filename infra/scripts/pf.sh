@@ -41,10 +41,18 @@ port_forward keycloak 8080 8080 $PAYMENT_NS & PIDS+=($!)
 port_forward payment-db-postgresql 5432 5432 $PAYMENT_NS & PIDS+=($!)
 port_forward payment-service 8081 8080 $PAYMENT_NS & PIDS+=($!)
 port_forward payment-consumers 8082 8080 $PAYMENT_NS & PIDS+=($!)
-port_forward prometheus-stack-kube-prom-prometheus 9090 9090 $MONITORING_NS & PIDS+=($!)
+
+# Prefer the operator's service for Prometheus
+if kubectl -n $MONITORING_NS get svc prometheus-operated >/dev/null 2>&1; then
+  port_forward prometheus-operated 9090 9090 $MONITORING_NS & PIDS+=($!)
+else
+  port_forward prometheus-stack-kube-prom-prometheus 9090 9090 $MONITORING_NS & PIDS+=($!)
+fi
 port_forward prometheus-stack-grafana 3000 80 $MONITORING_NS & PIDS+=($!)
+port_forward kafka 9092 9092 $PAYMENT_NS & PIDS+=($!)
 #port_forward kibana-kibana 5601 5601 $LOGGING_NS & PIDS+=($!)
 
 echo "All port-forwards running. Press Ctrl+C in this terminal to stop ALL."
 
 wait
+

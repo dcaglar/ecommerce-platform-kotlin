@@ -1,32 +1,33 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{include "payment-service.fullname" .}}
+  name: {{ include "payment-service.fullname" . }}
   labels:
-    {{include "payment-service.labels" . | nindent 4}}
+    {{- include "payment-service.labels" . | nindent 4 }}
 spec:
-  replicas: {{.Values.replicaCount}}
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: {{include "payment-service.fullname" .}}
+      app: {{ include "payment-service.fullname" . }}
   template:
     metadata:
       labels:
-        app: {{include "payment-service.fullname" .}}
+        app: {{ include "payment-service.fullname" . }}
     spec:
       containers:
         - name: payment-service
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{.Values.image.pullPolicy}}
-
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - containerPort: 8080  # REST API
-            - containerPort: 9010  # JMX
+            - name: http
+              containerPort: 8080   # REST API
           env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: JAVA_TOOL_OPTIONS
               value: "{{ .Values.jvmOpts }}"
-            - name: DATA_SOURCE_NAME
-              value: "postgresql://payment:payment@payment-db:5432/payment?sslmode=disable"
             - name: SPRING_PROFILES_ACTIVE
               value: "{{ .Values.spring.profile }}"
             - name: SPRING_DATA_REDIS_URL
@@ -57,42 +58,23 @@ spec:
                 secretKeyRef:
                   name: payment-db-credentials
                   key: PAYMENT_SERVICE_APP_DB_PASSWORD
-            - name: KAFKA_CLIENT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: payment-db-credentials
-                  key: KAFKA_CLIENT_PASSWORD
-
-          # Kdeleafka credentials (Secret)
           livenessProbe:
             httpGet:
               path: /actuator/health
-              port: 8080
-            initialDelaySeconds: 120     # Wait 2 minutes before first liveness check
-            periodSeconds: 30            # Check every 30 seconds
-            timeoutSeconds: 5            # Wait up to 5 seconds for response
-            failureThreshold: 6          # Allow up to 6 failures before killing pod
-
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 12
           readinessProbe:
             httpGet:
               path: /actuator/health
-              port: 8080
-            initialDelaySeconds: 60     # Wait 2 minutes before first readiness check (match liveness for smoother rollout)
-            periodSeconds: 15            # Check readiness every 15 seconds
-            timeoutSeconds: 5            # Wait up to 5 seconds for response
+              port: http
+            initialDelaySeconds: 60   # 1 minute (comment fixed)
+            periodSeconds: 30
+            timeoutSeconds: 10
             failureThreshold: 12
           resources:
-            {{- toYaml .Values.resources | nindent 12}}
+            {{- toYaml .Values.resources | nindent 12 }}
 
----
 
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: jfr-data-payment-service
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 2Gi

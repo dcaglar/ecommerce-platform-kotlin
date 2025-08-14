@@ -6,13 +6,14 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 
 interface RetryQueuePort<T> {
     fun scheduleRetry(
-        paymentOrder: PaymentOrder, backOffMillis: Long, retryReason: String? = "PSP_TIMEOUT",
-        lastErrorMessage: String? = "PSP call timed out, retrying"
+        paymentOrder: PaymentOrder,
+        backOffMillis: Long,
+        retryReason: String? = null,
+        lastErrorMessage: String? = null
     )
 
-    fun pollDueRetries(maxBatchSize: Long): List<EventEnvelope<T>>
+    fun pollDueRetries(maxBatchSize: Long = 1000): List<EventEnvelope<T>>
+
     fun getRetryCount(paymentOrderId: PaymentOrderId): Int
     fun resetRetryCounter(paymentOrderId: PaymentOrderId)
-
-
 }

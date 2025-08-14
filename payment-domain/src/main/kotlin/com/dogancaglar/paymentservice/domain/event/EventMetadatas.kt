@@ -4,8 +4,6 @@ import com.dogancaglar.common.event.EVENT_TYPE
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
 import com.dogancaglar.common.event.Topics
-import com.dogancaglar.paymentservice.domain.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
 import com.fasterxml.jackson.core.type.TypeReference
 
@@ -19,11 +17,11 @@ object EventMetadatas {
         override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderCreated>>() {}
     }
 
-    object PaymentOrderRetryRequestedMetadata : EventMetadata<PaymentOrderRetryRequested> {
-        override val topic = Topics.PAYMENT_ORDER_RETRY
-        override val eventType = EVENT_TYPE.PAYMENT_ORDER_RETRY_REQUESTED
-        override val clazz = PaymentOrderRetryRequested::class.java
-        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderRetryRequested>>() {}
+    object PaymentOrderPspCallRequestedMetadata : EventMetadata<PaymentOrderPspCallRequested> {
+        override val topic = Topics.PAYMENT_ORDER_PSP_CALL_REQUESTED
+        override val eventType = EVENT_TYPE.PAYMENT_ORDER_PSP_CALL_REQUESTED
+        override val clazz = PaymentOrderPspCallRequested::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderPspCallRequested>>() {}
     }
 
     object PaymentOrderSucceededMetadata : EventMetadata<PaymentOrderSucceeded> {
@@ -43,7 +41,7 @@ object EventMetadatas {
 
     val all: List<EventMetadata<*>> = listOf(
         PaymentOrderCreatedMetadata,
-        PaymentOrderRetryRequestedMetadata,
+        PaymentOrderPspCallRequestedMetadata,
         PaymentOrderSucceededMetadata,
         PaymentOrderStatusCheckScheduledMetadata
     )

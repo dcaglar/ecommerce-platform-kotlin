@@ -9,7 +9,8 @@ import java.util.*
 object LogContext {
     private val logger = LoggerFactory.getLogger(LogContext::class.java)
     fun getTraceId(): String? = MDC.get(GenericLogFields.TRACE_ID)
-    fun getEventId(): UUID? = UUID.fromString(MDC.get(GenericLogFields.EVENT_ID))
+    fun getEventId(): UUID? =
+        MDC.get(GenericLogFields.EVENT_ID)?.let { runCatching { UUID.fromString(it) }.getOrNull() }
 
     fun <T> with(
         envelope: EventEnvelope<T>,

@@ -28,7 +28,7 @@
                     <mdc includes="traceId,eventId,parentEventId,aggregateId,eventType,
                retryCount,retryBackoffMillis,retryReason,retryErrorMessage"/>
                     <stackTrace/>
-                    <globalCustomFields>{"app":"payment-service"}</globalCustomFields>
+                    <globalCustomFields>{"app":"payment-consumers"}</globalCustomFields>
                 </providers>
             </encoder>
         </appender>

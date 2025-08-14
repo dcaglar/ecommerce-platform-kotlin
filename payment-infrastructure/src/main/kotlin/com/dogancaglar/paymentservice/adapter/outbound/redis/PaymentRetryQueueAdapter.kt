@@ -3,8 +3,8 @@ package com.dogancaglar.paymentservice.adapter.outbound.redis
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.paymentservice.domain.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
@@ -20,15 +20,13 @@ import java.util.*
 
 @Component("paymentRetryQueueAdapter")
 class PaymentRetryQueueAdapter(
-    val paymentRetryRedisCache: PaymentRetryRedisCache,
+    private val paymentRetryRedisCache: PaymentRetryRedisCache,
     meterRegistry: MeterRegistry,
     @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper
-) : RetryQueuePort<PaymentOrderRetryRequested> {
+) : RetryQueuePort<PaymentOrderPspCallRequested> {
 
     init {
-        Gauge.builder("redis_retry_zset_size") {
-            paymentRetryRedisCache.zsetSize()
-        }
+        Gauge.builder("redis_retry_zset_size") { paymentRetryRedisCache.zsetSize() }
             .description("Number of entries pending in the Redis retry ZSet")
             .register(meterRegistry)
     }
@@ -43,27 +41,20 @@ class PaymentRetryQueueAdapter(
     ) {
         val totalStart = System.currentTimeMillis()
         try {
-            val retryCountStart = System.currentTimeMillis()
-            val retryCount = paymentRetryRedisCache.incrementAndGetRetryCount(paymentOrder.paymentOrderId.value)
-            val retryCountEnd = System.currentTimeMillis()
-
             val retryAt = System.currentTimeMillis() + backOffMillis
 
-            val eventMapStart = System.currentTimeMillis()
-            val paymentRetryRequestEvent = PaymentOrderDomainEventMapper.toPaymentOrderRetryRequestEvent(
+            // Build PSP_CALL_REQUESTED with DB-owned attempt
+            val pspCallRequested = PaymentOrderDomainEventMapper.toPaymentOrderPspCallRequested(
                 order = paymentOrder,
-                newRetryCount = retryCount,
-                retryReason = retryReason,
-                lastErrorMessage = lastErrorMessage
+                attempt = paymentOrder.retryCount
             )
             val envelope = DomainEventEnvelopeFactory.envelopeFor(
-                data = paymentRetryRequestEvent,
-                eventMetaData = EventMetadatas.PaymentOrderRetryRequestedMetadata,
-                aggregateId = paymentRetryRequestEvent.publicPaymentOrderId,
+                data = pspCallRequested,
+                eventMetaData = EventMetadatas.PaymentOrderPspCallRequestedMetadata,
+                aggregateId = pspCallRequested.paymentOrderId,
                 traceId = LogContext.getTraceId() ?: UUID.randomUUID().toString(),
                 parentEventId = LogContext.getEventId()
             )
-            val eventMapEnd = System.currentTimeMillis()
 
             val serializationStart = System.currentTimeMillis()
             val json = objectMapper.writeValueAsString(envelope)
@@ -75,47 +66,35 @@ class PaymentRetryQueueAdapter(
 
             val totalEnd = System.currentTimeMillis()
             logger.info(
-                "TIMING: scheduleRetry " +
-                        "| retryCount: ${retryCountEnd - retryCountStart} ms " +
-                        "| eventMap: ${eventMapEnd - eventMapStart} ms " +
-                        "| serialization: ${serializationEnd - serializationStart} ms " +
-                        "| redis: ${redisEnd - redisStart} ms " +
-                        "| total: ${totalEnd - totalStart} ms " +
-                        "| paymentOrderId=${paymentOrder.paymentOrderId} retryAt=$retryAt"
+                "TIMING: scheduleRetry | serialize: {} ms | redis: {} ms | total: {} ms | agg={} attempt={} retryAt={}",
+                (serializationEnd - serializationStart),
+                (redisEnd - redisStart),
+                (totalEnd - totalStart),
+                envelope.aggregateId,
+                pspCallRequested.retryCount,
+                retryAt
             )
         } catch (e: Exception) {
-            logger.error("❌ Exception during scheduleRetry for paymentOrderId=${paymentOrder.paymentOrderId}", e)
+            logger.error("❌ Exception during scheduleRetry for agg={}", paymentOrder.publicPaymentOrderId, e)
             throw e
         }
     }
 
-    override fun pollDueRetries(maxBatchSize: Long): List<EventEnvelope<PaymentOrderRetryRequested>> {
-        val totalStart = System.currentTimeMillis()
+    override fun pollDueRetries(maxBatchSize: Long): List<EventEnvelope<PaymentOrderPspCallRequested>> {
         val dueItems = paymentRetryRedisCache.pollDueRetriesAtomic(maxBatchSize)
-        val pollEnd = System.currentTimeMillis()
-        val dueEnvelopes = dueItems.mapNotNull { json ->
+        return dueItems.mapNotNull { json ->
             try {
-                val deserializeStart = System.currentTimeMillis()
-                val envelope: EventEnvelope<PaymentOrderRetryRequested> =
-                    objectMapper.readValue(json, object : TypeReference<EventEnvelope<PaymentOrderRetryRequested>>() {})
-                val deserializeEnd = System.currentTimeMillis()
-                logger.debug("TIMING: pollDueRetries | deserialization: ${deserializeEnd - deserializeStart} ms for paymentOrderId=${envelope.data.publicPaymentOrderId}")
-                envelope
+                objectMapper.readValue(json, object : TypeReference<EventEnvelope<PaymentOrderPspCallRequested>>() {})
             } catch (e: Exception) {
-                logger.error("❌ Failed to deserialize retry event from Redis", e)
+                logger.error("❌ Failed to deserialize retry envelope", e)
                 null
             }
         }
-        val totalEnd = System.currentTimeMillis()
-        logger.debug(
-            "TIMING: pollDueRetries | redis poll: ${pollEnd - totalStart} ms | total: ${totalEnd - totalStart} ms | polled count: ${dueItems.size}"
-        )
-        return dueEnvelopes
     }
 
-    override fun getRetryCount(paymentOrderId: PaymentOrderId): Int {
-        return paymentRetryRedisCache.getRetryCount(paymentOrderId.value)
-    }
+    // Optional ops helpers
+    override fun getRetryCount(paymentOrderId: PaymentOrderId): Int =
+        paymentRetryRedisCache.getRetryCount(paymentOrderId.value)
 
     override fun resetRetryCounter(paymentOrderId: PaymentOrderId) {
         paymentRetryRedisCache.resetRetryCounter(paymentOrderId.value)

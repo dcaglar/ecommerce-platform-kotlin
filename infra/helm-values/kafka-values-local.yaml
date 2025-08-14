@@ -8,8 +8,30 @@ listeners:
 controller:
   replicaCount: 1
   controllerOnly: false
+  # ✅ Resources for the Kafka container (fix OOMKills)
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+      # Optional; if you see eviction due to local disk, set this:
+      # ephemeral-storage: 1Gi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+      # Optional; raise or remove if you don't want a hard cap on local disk:
+      # ephemeral-storage: 4Gi
+
+  # ✅ Pin JVM heap so it fits inside the container limit
+  # (Use the key your chart supports; many charts use extraEnv, some use env)
+  extraEnv:
+    - name: KAFKA_HEAP_OPTS
+      value: "-Xms512m -Xmx512m"
+    # Reasonable JVM perf defaults for Kafka on small nodes
+    - name: KAFKA_JVM_PERFORMANCE_OPTS
+      value: "-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExplicitGCInvokesConcurrent"
   overrideConfiguration:
     # Roles & listeners
+    auto.create.topics.enable: false
     process.roles: controller,broker
     controller.listener.names: CONTROLLER
     inter.broker.listener.name: INTERNAL
@@ -41,38 +63,8 @@ networkPolicy:
   enabled: false
 
 metrics:
-  jmx:
-    enabled: false
-    config: |
-      lowercaseOutputName: true
-      rules:
-        - pattern: "kafka.server<type=(.+), name=(.+)PerSec\\, topic=(.+)><>Count"
-          name: "kafka_server_$1_$2_total"
-          labels:
-            topic: "$3"
-          type: COUNTER
-      serviceMonitor:
-      enabled: true         # set to false if you don’t use Prometheus Operator
-      namespace: monitoring # adjust to your Prometheus Operator ns
-      interval: 30s
-      scrapeTimeout: 10s
-    resources:
-      requests: {cpu: 50m, memory: 128Mi}
-      limits: {cpu: 200m, memory: 256Mi}
-  serviceMonitor:
-    enabled: true
-    namespace: payment
-    labels: {release: prometheus-stack}
   kafka:
-    enabled: true
-    resources:
-      requests: {cpu: 50m, memory: 128Mi}
-      limits: {cpu: 200m, memory: 256Mi}
-    serviceMonitor:
-      enabled: true
-      namespace: payment
-      labels: {release: prometheus-stack}
-
+    enabled: false
 defaultInitContainers:
   prepareConfig:
     resources:

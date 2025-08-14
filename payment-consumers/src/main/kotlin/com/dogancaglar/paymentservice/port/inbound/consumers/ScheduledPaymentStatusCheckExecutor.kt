@@ -31,15 +31,14 @@ import java.util.concurrent.TimeoutException
 class ScheduledPaymentStatusCheckExecutor(
     val paymentGatewayPort: PaymentGatewayPort,
     private val processPspResultUseCase: ProcessPspResultUseCase,
-    @Qualifier("externalPspExecutorPoolConfig") private val externalPspExecutorPoolConig: ThreadPoolTaskExecutor
+    @Qualifier("paymentStatusPspPool") private val externalPspExecutorPoolConig: ThreadPoolTaskExecutor
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @KafkaListener(
         topics = [Topics.PAYMENT_STATUS_CHECK],
         containerFactory = "${Topics.PAYMENT_STATUS_CHECK}-factory",
-        groupId = CONSUMER_GROUPS.PAYMENT_STATUS_CHECK_SCHEDULER,
-        concurrency = "1"
+        groupId = CONSUMER_GROUPS.PAYMENT_STATUS_CHECK_SCHEDULER
     )
     fun onMessage(record: ConsumerRecord<String, EventEnvelope<PaymentOrderStatusCheckRequested>>) {
         handle(record) // throw to trigger retries/DLQ; return = commit success

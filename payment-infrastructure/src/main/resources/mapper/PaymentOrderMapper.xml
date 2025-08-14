@@ -81,4 +81,19 @@
         retry_reason = EXCLUDED.retry_reason,
         last_error_message = EXCLUDED.last_error_message;
     </insert>
+
+    <update id="casLockAttempt">
+        UPDATE payment_orders
+        SET updated_at = now()
+        WHERE payment_order_id = #{id}
+        AND retry_count = #{expectedAttempt}
+    </update>
+
+    <update id="bumpAttemptFrom">
+        UPDATE payment_orders
+        SET retry_count = #{fromAttempt} + 1,
+        updated_at = now()
+        WHERE payment_order_id = #{id}
+        AND retry_count = #{fromAttempt}
+    </update>
 </mapper>

@@ -4,8 +4,8 @@ A **modular**, **event-driven**, and **resilient** eCommerce backend prototype b
 **, demonstrating how to design a high-throughput system (like Amazon or bol.com) using **Domain-Driven Design (DDD)**
 and **Hexagonal Architecture**.
 
-> 🚧 Currently focused on the `payment-service` module. Other modules (like order, wallet, and shipment) are planned for
-> future development.
+> 🚧 Currently focused on the `payment-service` and its async counterpart `payment-consumers`. Other contexts (order,
+> wallet, shipment) are planned.
 
 ---
 
@@ -14,10 +14,10 @@ and **Hexagonal Architecture**.
 This project simulates a real-world multi-seller eCommerce platform where:
 
 - A single order may contain products from multiple sellers.
-- Each seller must be paid independently.
-- Payment flow must handle failures, retries, and PSP timeouts robustly.
-- All communication is decoupled using Kafka events.
-- Observability and fault tolerance are built-in from day one.
+- Each seller must be paid independently (one `PaymentOrder` per seller).
+- Payment flow handles failures, retries, PSP timeouts, and eventual consistency.
+- All communication is **decoupled via Kafka**.
+- **Observability** and **fault tolerance** are built-in from day one.
 
 ---
 
@@ -31,215 +31,209 @@ This project simulates a real-world multi-seller eCommerce platform where:
 
 ```mermaid
 %%{init: { 
-  "themeVariables": { "fontSize": "32px", "nodeTextSize": "32px" }, 
-  "flowchart": { "nodeSpacing": 80, "rankSpacing": 90 },
+  "themeVariables": { "fontSize": "28px", "nodeTextSize": "28px" }, 
+  "flowchart": { "nodeSpacing": 70, "rankSpacing": 70 },
   "theme": "default"
 }}%%
 flowchart LR
-%% SRE-Style Custom Palette
-    classDef controller fill: #e3f0fd, stroke: #4285F4, stroke-width: 3px;
-    classDef service fill: #e6f5ea, stroke: #34A853, stroke-width: 3px;
-    classDef domain fill: #fef7e0, stroke: #FBBC05, stroke-width: 3px;
-    classDef adapter fill: #f3e8fd, stroke: #A142F4, stroke-width: 3px;
-    classDef infra fill: #fde8e6, stroke: #EA4335, stroke-width: 3px;
-    classDef legend fill: #fff, stroke: #aaa, stroke-width: 1px;
-    subgraph Legend [Legend: Layer Color Coding]
-        L1[Controller: Blue]:::controller
-        L2[Service: Green]:::service
-        L3[Domain: Yellow]:::domain
-        L4[Adapter: Purple]:::adapter
-        L5[Infra: Red]:::infra
+    classDef controller fill: #e3f0fd, stroke: #4285F4, stroke-width: 2px;
+    classDef service fill: #e6f5ea, stroke: #34A853, stroke-width: 2px;
+    classDef domain fill: #fef7e0, stroke: #FBBC05, stroke-width: 2px;
+    classDef adapter fill: #f3e8fd, stroke: #A142F4, stroke-width: 2px;
+    classDef infra fill: #fde8e6, stroke: #EA4335, stroke-width: 2px;
+    subgraph Client ["Client Layer"]
+        A["REST Controller<br/>PaymentController"]:::controller
     end
 
-    subgraph Client_Layer ["Client Layer"]
-        A["REST Controller<br/>(PaymentController)"]:::controller
+    subgraph App ["Application Layer"]
+        B["PaymentService (Orchestrator)"]:::service
+        D["OutboxDispatcherJob"]:::service
+        M["RetryDispatcherScheduler (Redis → Kafka)"]:::service
     end
 
-    subgraph Application_Layer ["Application Layer"]
-        B["PaymentService<br/>(Orchestrator)"]:::service
-        C[DomainEventEnvelopeFactory]:::service
-        D[PaymentOrderOutboxDispatcherScheduler]:::service
-        E[PaymentOrderEventPublisher]:::service
+    subgraph Domain ["Domain Layer"]
+        F["Aggregates & VOs<br/>Payment / PaymentOrder"]:::domain
+        G["Ports (Interfaces)<br/>OutboxEventPort, EventPublisherPort, PaymentOrderStatePort, IdGeneratorPort"]:::domain
+        H["Backoff & Retry Policy"]:::domain
     end
 
-    subgraph Domain_Layer ["Domain Layer"]
-        F["Domain Models<br/>• Payment • PaymentOrder"]:::domain
-        G["Ports / Interfaces<br/>• PaymentOutboundPort<br/>• PaymentOrderOutboundPort<br/>• OutboxEventPort<br/>• IdGeneratorPort"]:::domain
-        H["Retry Logic & Backoff<br/>(in PaymentOrder)"]:::domain
+    subgraph Adapter ["Adapter Layer"]
+        I["Persistence (JPA)"]:::adapter
+        J["Redis Adapters<br/>ID Gen • Retry ZSet"]:::adapter
+        K1["Kafka Consumer<br/>PaymentOrderEnqueuer"]:::adapter
+        K2["Kafka Consumer<br/>PaymentOrderPspCallExecutor"]:::adapter
+        N["PSP Client (Mock)"]:::adapter
     end
 
-    subgraph Adapter_Layer ["Adapter Layer"]
-        I["Persistence Adapters<br/>• JPA Repositories"]:::adapter
-        J["Redis Adapters<br/>• ID Generator • Retry ZSet"]:::adapter
-        K["Kafka Consumer<br/>(PaymentOrderExecutor)"]:::adapter
-        M["Retry Scheduler Job<br/>(Redis → PaymentOrderRetryRequested)"]:::adapter
-        N["PSP Client<br/>(Mock PSP)"]:::adapter
-    end
-
-subgraph Infrastructure_Layer ["Infrastructure"]
-DB[(🗄️ PostgreSQL)]:::infra
+subgraph Infra ["Infrastructure"]
+DB[(🗄️ PostgreSQL<br/>partitioned outbox)]:::infra
 REDIS[(📦 Redis)]:::infra
-KAFKA[(🟪 Kafka)]:::infra
-PSP_API[(💳 Mock PSP Endpoint)]:::infra
+KAFKA[(🟪 Kafka<br/>partition by paymentOrderId)]:::infra
+PROM[(📈 Prometheus/Grafana/Micrometer)]:::infra
+ELK[(🔎 Elasticsearch + Filebeat)]:::infra
+KEYC[(🔐 Keycloak)]:::infra
 end
 
-%% Relationships
 A --> B
-B --> F
-B --> J
 B --> I
-B --> G
-B --> C
+B --> J
 B --> D
-D --> E
-E --> KAFKA
-M --> E
-KAFKA --> K
-K --> N
-K --> H
-H --> J
+D --> KAFKA
+B --> F
+B --> G
+M --> KAFKA
+
+KAFKA --> K1
+K1 --> K2
+K2 --> N
+K2 --> H
+H --> M
+
 I --> DB
 J --> REDIS
-N --> PSP_API
+N -->|charge|K2
 
-Legend --- Client_Layer
+B -. metrics/logs .-> PROM
+K1 -. metrics/logs .-> PROM
+K2 -. metrics/logs .-> PROM
+D -. metrics/logs .-> PROM
+B -. logs .-> ELK
+K1 -. logs .-> ELK
+K2 -. logs .-> ELK
 ```
 
-## Project Structure
+---
 
-This project follows a modular multi-module Maven layout designed for scalability and maintainability.
+## 📁 Project Structure
 
-For detailed folder and package structure, see [docs/folder-structure.md](./docs/folder-structure.md).  
-For architectural principles and deployment plans, and detailed diagrams
-see [docs/architecture.md](./docs/architecture.md).
-For quick start instructions, see [docs/how-to-start.md](./docs/how-to-start.md).
+This repo uses a **multi-module** layout to keep concerns clear and evolvable.
 
-## ✅ Current Focus: `payment-service`
+- `payment-domain` – pure domain model, events, mappers, ports.
+- `payment-application` – app services (orchestration), schedulers, use cases.
+- `payment-infrastructure` – auto-config, adapters (JPA, Redis, Kafka, PSP), Micrometer, logging.
+- **Deployables**
+    - `payment-service` – synchronous API + Outbox dispatcher.
+    - `payment-consumers` – async executors: `PaymentOrderEnqueuer`, `PaymentOrderPspCallExecutor`, retry scheduler.
 
-Handles the full lifecycle of payment processing for multi-seller orders:
+> Infra & packaging: Helm charts for both deployables and shared platform config. See `charts/` and `infra/` for values,
+> scripts, and secrets templates.
 
-### 🌐 Responsibilities
+For deeper details, see **[docs/architecture.md](./docs/architecture.md)** and *
+*[docs/folder-structure.md](./docs/folder-structure.md)**.  
+Quick start: **[docs/how-to-start.md](./docs/how-to-start.md)**.
 
-- Generate and persist `Payment` and multiple `PaymentOrder`s (one per seller).
-- Use Redis for ID generation (payment and paymentOrder).
-- Create outbox events for Kafka: `payment_order_created`.
-- Consume `payment_order_created` events and process via a mock PSP.
-- Retry failed payments with backoff (via Redis).
-- Schedule delayed status checks.
-- Emit follow-up events like `payment_order_succeeded`, `retry_requested`, `status_check_scheduled`.
-- Gracefully recover Redis ID state on startup.
-- All domain changes live in the payment-service.
+---
+
+## ✅ Current Focus: `payment-service` + `payment-consumers`
+
+**Responsibilities**
+
+- Create `Payment` and per-seller `PaymentOrder`s; generate IDs via Redis.
+- Persist **outbox** rows atomically with DB writes.
+- **OutboxDispatcherJob** reliably publishes `payment_order_created` to Kafka.
+- `payment-consumers`:
+    - **PaymentOrderEnqueuer**: consumes `payment_order_created`, prepares/validates work.
+    - **PaymentOrderPspCallExecutor**: performs bounded-latency PSP calls and emits follow-up events.
+    - **RetryDispatcherScheduler**: uses Redis ZSet for backoff & re-enqueue.
+- Status checks for long-tail confirmations.
+- End-to-end traceability via **EventEnvelope** (`eventId`, `traceId`, `parentEventId`, `paymentOrderId`).
 
 ---
 
 ## 🧱 Architecture Principles
 
-### ✅ Domain-Driven Design (DDD)
+### Domain-Driven Design (DDD)
 
-- Clear separation of `domain`, `application`, `adapter`, and `config` layers.
-- Domain logic isolated and testable; all IO abstracted via ports.
+- Layers: **domain**, **application**, **adapter**, **config**; IO only through **ports**.
 
-### ✅ Hexagonal Architecture
+### Hexagonal Architecture
 
-- Adapters implement ports and isolate external dependencies.
-- Prevents domain leakage and encourages modular evolution.
+- Ports abstract persistence, messaging, cache, and PSP; adapters implement them.
 
-### ✅ Event-Driven Communication
+### Event-Driven
 
-- Kafka events drive all workflows.
-- Events wrapped in custom `EventEnvelope` with traceability (`traceId`, `parentEventId`).
+- Kafka topics **partitioned by `paymentOrderId`** to preserve per-order ordering and scale horizontally.
 
-### ✅ Observability
+### Outbox Pattern
 
-- Structured JSON logs with `logstash-logback-encoder`.
-- MDC context propagation.
-- Metrics planned with Prometheus/Micrometer.
-- Full event traceability via logging and Elasticsearch.
+- PostgreSQL outbox **partitioned by time** (e.g., half-hour buckets) to keep writes fast and cleanup cheap.
 
-### ✅ Resilience Patterns
+### Observability
 
-- Redis ZSet for short-term retry queue.
-- PostgreSQL + scheduled jobs for long-term status checks.
-- Retry, backoff, dead letter queues (DLQ) supported.
-- Redis-backed ID generation with crash recovery.
-- Mock PSP simulates network delays, failures, and pending states.
+- **Micrometer → Prometheus → Grafana**, curated dashboards (PSP latency, outbox throughput/backlog, consumer lag).
+- **Structured JSON logs** (trace-friendly) shipped via Filebeat → Elasticsearch; search by `eventId`, `traceId`,
+  `parentEventId`, `paymentOrderId`.
+
+### Resilience
+
+- PSP calls guarded by **timeouts** and **executor isolation**.
+- **Equal-jitter backoff** retries in Redis ZSet + scheduled dispatcher.
+- DLQs supported; transactional Kafka writes where appropriate.
 
 ---
 
 ## 🔩 Tech Stack
 
-| Component     | Technology                    |
-|---------------|-------------------------------|
-| Language      | Kotlin (JDK 21)               |
-| Framework     | Spring Boot 3.x               |
-| Messaging     | Kafka                         |
-| DB            | PostgreSQL + JPA              |
-| Caching       | Redis                         |
-| Auth          | Keycloak (OAuth2)             |
-| Logging       | Logback + JSON + MDC          |
-| Observability | Prometheus + Micrometer       |
-| Testing       | Testcontainers (Redis, Kafka) |
+| Component     | Technology                                    |
+|---------------|-----------------------------------------------|
+| Language      | Kotlin (JDK 21)                               |
+| Framework     | Spring Boot 3.x                               |
+| Messaging     | Kafka (partitions by `paymentOrderId`)        |
+| DB            | PostgreSQL (partitioned outbox) + JPA         |
+| Cache/Queue   | Redis (ID Gen, retry ZSet)                    |
+| Auth          | Keycloak (OAuth2 Resource Server)             |
+| Logging       | Logback JSON + MDC + Filebeat → Elasticsearch |
+| Observability | Micrometer + Prometheus + Grafana             |
+| Deploy        | Docker, Helm charts, Kubernetes               |
 
 ---
 
-## 📦 Modules (Maven Multi-Module)
+## 📦 Modules
 
-| Module             | Status     | Description                         |
-|--------------------|------------|-------------------------------------|
-| `payment-service`  | ✅ Active   | Multi-seller payment orchestration  |
-| `common`           | ✅ Active   | Shared contracts, envelope, logging |
-| `order-service`    | 🕒 Planned | Will emit order-created events      |
-| `wallet-service`   | 🕒 Planned | Track balances per seller           |
-| `shipment-service` | 🕒 Planned | Delivery coordination               |
+| Module                   | Status     | Description                                     |
+|--------------------------|------------|-------------------------------------------------|
+| `payment-domain`         | ✅ Active   | Pure domain model, events, ports                |
+| `payment-application`    | ✅ Active   | Use-cases, schedulers, orchestration            |
+| `payment-infrastructure` | ✅ Active   | Auto-config + adapters (JPA, Redis, Kafka, PSP) |
+| `payment-service`        | ✅ Active   | API + Outbox dispatcher                         |
+| `payment-consumers`      | ✅ Active   | Async executors (Enqueuer, PSP Call, Retry)     |
+| `common`                 | ✅ Active   | Shared contracts, envelope, logging             |
+| `order-service`          | 🕒 Planned | Emits order-created                             |
+| `wallet-service`         | 🕒 Planned | Updates balances                                |
+| `shipment-service`       | 🕒 Planned | Coordinates delivery                            |
 
 ---
 
-## 🚧 Roadmap
+## ⚙️ Deployment Highlights
 
-Roadmap
+- **Helm** charts in `charts/` for `payment-service`, `payment-consumers`, and shared `payment-platform-config`.
+- Values in `infra/helm-values/*.yaml`; scripts in `infra/scripts/*.sh` (deploy all, port-forward, etc.).
+- **HPA for `payment-consumers` uses consumer lag** (not CPU) to scale workers precisely when topics back up.
+- `ServiceMonitor` resources wired for Prometheus scraping out of the box.
 
-Updated Roadmap (Containerization moved up, dual outbox event support, Kafka partitioning milestone added):
-• 🟦 1. Enforce Controlled Construction for Domain & Event Classes✅
-• 🟩 2. Align Entity Instantiation with Domain Factories✅
-• 🟨 3. Complete Structured Logging and ELK Stack Setup ✅
-• 🟧 4. Implement and Refactor Retry Payment Logic in PaymentOrder✅
-• 🟧 5. Use Redis ZSet and a scheduled job for retry scheduling.✅
-• 🟦 6. Containerize Spring Boot Apps.✅
-• 🟥 7. Build Monitoring Dashboards and Basic Metrics (Prometheus/Grafana)
-Metrics and Monitoring
-• Prometheus Redis Exporter:
-For real SRE-style monitoring, run Redis Exporter with Prometheus.
-• It gives you:
-• 🟩 7.5. Kafka Partitioning by Aggregate ID (paymentOrderId)
-• Repartitioned all payment-order event topics by aggregateId (paymentOrderId) to guarantee per-order event ordering.
-• Enables safe horizontal scaling (one consumer per partition) and preserves state machine transitions for each payment
-order.
-• Simplified consumer logic and minimized risk of subtle, order-dependent bugs in orchestration flows.
-• Key lesson: Scalability, parallelism, and correctness require infrastructure-level event ordering—this milestone marks
-robust event choreography in a high-throughput, distributed system.
-• 🟩 8. Implement Dual Outbox Event Tables/Flows
-• 🟨 9. Enable Basic Kubernetes Deployment (Docker Desktop/Minikube)
-• 🟧 10. Build Dummy Wallet and Shipment Services
-• 🟫 11. Add Elasticsearch Read Model for Payment Queries
-• 🟫 12. Add OAuth2 Security to All APIs
-• 🟥 13. Harden Retry and DLQ Handling
-• 🟦 14. Implement Node Affinity & Resource Management for K8s
-• 🟩 15. Add Alerting and Advanced Monitoring
-• 🟨 16. Scale Kafka Consumers (Horizontal Concurrency Tuning)
-• 🟨 17. Implement Circuit Breaker Patterns
-• 18- Move Micrometer-related logic out of business classes. Use AOP/decorator.
+---
 
 ## 🧪 Testing Strategy
 
-- Unit tests for domain and mappers
-- Integration tests with Redis and Kafka using Testcontainers
-- Outbox dispatch and retry scheduler tests with event assertions
+- Unit tests for domain logic and mappers.
+- Integration tests with Testcontainers (Kafka, Redis, Postgres).
+- Outbox & retry scheduler tests assert produced events and timing bounds.
 
 ---
 
+## 🗺️ Roadmap (condensed)
 
+- ✅ Repartition Kafka topics by **`paymentOrderId`** for strict per-order ordering.
+- ✅ Split consumer into **Enqueuer** and **PSP Call Executor** to isolate PSP latency.
+- ✅ Partition **outbox** tables in Postgres for O(1) purging and faster scans.
+- ✅ Add **Prometheus/Grafana** dashboards and key **Micrometer** meters.
+- ✅ Structured JSON logging + Elasticsearch searchability (event/trace correlation).
+- ✅ Helmized deployables + lag-based **HPA** for `payment-consumers`.
+- 🔜 Harden DLQ/poison pill handling and circuit breakers.
+- 🔜 OpenTelemetry tracing end-to-end (gateway → service → consumers → PSP).
+- 🔜 Read models for payment queries; secure all APIs under OAuth2.
+- 🔜 Move cross-cutting metrics to decorators/AOP to simplify services.
 
+---
 
-
-
-
+If you have ideas, issues, or want to contribute, open a PR or start a discussion. 🚀

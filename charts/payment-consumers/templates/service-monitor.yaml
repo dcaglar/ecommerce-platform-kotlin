@@ -1,16 +1,26 @@
+# templates/servicemonitor.yaml
+  {{- if .Values.serviceMonitor.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: payment-consumers
+  name: {{ include "payment-consumers.fullname" . }}
   labels:
-    release: prometheus-stack   # <-- Sometimes needed; matches Prometheus deployment (optional)
+    {{- include "payment-consumers.labels" . | nindent 4 }}
+      {{- with .Values.serviceMonitor.labels }}
+      {{- toYaml . | nindent 4 }}
+      {{- end }}
 spec:
   selector:
     matchLabels:
-      app: payment-consumers      # <-- Must match Service.metadata.labels.app
+      app: {{ include "payment-consumers.fullname" . }}   # must match Service.metadata.labels
   endpoints:
-    - port: http               # <-- Must match Service.ports.name
-      path: /actuator/prometheus
-      interval: 15s
-      scheme: http             # Optional, defaults to http
-
+    - port: {{ .Values.service.portName | default "http" }}
+      path: {{ .Values.serviceMonitor.path | default "/actuator/prometheus" }}
+      interval: {{ .Values.serviceMonitor.interval | default "30s" }}
+      scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout | default "10s" }}
+      scheme: {{ .Values.serviceMonitor.scheme | default "http" }}
+  # optional: only needed if the Service is in another namespace than this SM
+  # namespaceSelector:
+  #   matchNames:
+  #     - {{ .Release.Namespace }}
+       {{- end }}

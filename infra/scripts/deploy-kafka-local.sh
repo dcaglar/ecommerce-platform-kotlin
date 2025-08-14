@@ -8,13 +8,7 @@ VALUES_FILE="infra/helm-values/kafka-values-local.yaml"
 helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null 2>&1 || true
 helm repo update
 
-# Optional wipe: pass --wipe to delete PVCs and the kraft secret if you previously created bad internals
-if [[ "${1-}" == "--wipe" ]]; then
-  echo "Wiping previous state (StatefulSet, PVCs, kraft secret)…"
-  kubectl -n "$NS" delete statefulset kafka-controller --ignore-not-found
-  kubectl -n "$NS" delete pvc -l app.kubernetes.io/instance=kafka --ignore-not-found
-  kubectl -n "$NS" delete secret kafka-kraft --ignore-not-found
-fi
+
 
 # Install/upgrade the chart (specific, stable version)
 helm upgrade --install kafka bitnami/kafka \

@@ -6,7 +6,7 @@ object MetricNames {
     const val OUTBOX_DISPATCHED_TOTAL = "outbox_dispatched_total"
     const val OUTBOX_DISPATCH_FAILED_TOTAL = "outbox_dispatch_failed_total"
     const val OUTBOX_EVENT_BACKLOG = "outbox_event_backlog"
-    const val OUTBOX_DISPATCHER_DURATION = "outbox_dispatcher_duration_seconds"
+    const val OUTBOX_DISPATCHER_DURATION = "outbox_dispatcher_duration" // <- ✅ no “_seconds”
     /*
     const val OUTBOX_CLEANUP_DELETED_TOTAL = "outbox_cleanup_total_deleted"
     const val OUTBOX_CLEANUP_LAST_BATCH_DELETED_SIZE = "outbox_cleanup_last_batch_deleted_size"

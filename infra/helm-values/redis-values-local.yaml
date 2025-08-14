@@ -16,5 +16,3 @@ master:
     serviceMonitor:
       enabled: true
       namespace: payment
-      labels:
-        release: prometheus-stack

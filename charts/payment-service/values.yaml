@@ -1,16 +1,38 @@
-# image
 image:
   repository: dcaglar1987/payment-service
-  tag: latest
+  tag: "latest"
   pullPolicy: Always
 
-# replica count
-replicaCount: 1
 
 
-
-# Spring profile & datasource
+jvmOpts: >-
+  -XX:+UseG1GC
+  -Xms372m -Xmx372m
+  -XX:MaxGCPauseMillis=200
+  -XX:InitiatingHeapOccupancyPercent=30
+  -XX:+UseStringDeduplication
+  -Xlog:gc*:stdout:time,uptime,level,tags
 spring:
-  profile: local
+  profile: "local"
+
+replicaCount: 1
+resources:
+  requests: { cpu: "500m", memory: "412Mi" }
+  limits:   { cpu: "750m", memory: "750Mi" }
+
 
 runPrivilegeGrantJob: true
+
+
+service:
+  type: ClusterIP
+  port: 8080
+  portName: http
+
+serviceMonitor:
+  enabled: false
+  path: /actuator/prometheus
+  interval: 30s
+  scrapeTimeout: 10s
+  labels:
+    release: prometheus-stack
