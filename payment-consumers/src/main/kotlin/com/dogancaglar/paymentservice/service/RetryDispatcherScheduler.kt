@@ -3,83 +3,106 @@ package com.dogancaglar.paymentservice.service
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.PaymentEventPublisher
 import com.dogancaglar.paymentservice.adapter.outbound.redis.PaymentRetryQueueAdapter
-import com.dogancaglar.paymentservice.adapter.outbound.redis.PaymentRetryRedisCache
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
-import com.dogancaglar.paymentservice.domain.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.fasterxml.jackson.databind.ObjectMapper
-import io.micrometer.core.instrument.Gauge
-import io.micrometer.core.instrument.MeterRegistry
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
+import io.micrometer.core.instrument.*
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.AtomicInteger
 
 @Component
 class RetryDispatcherScheduler(
-    private val paymentRetryQueueAdapter: PaymentRetryQueueAdapter,
-    private val paymentEventPublisher: PaymentEventPublisher,
+    private val retryQueue: PaymentRetryQueueAdapter,
+    private val publisher: PaymentEventPublisher,
     private val meterRegistry: MeterRegistry,
-    private val kafkaTx: KafkaTxExecutor,
-    private val paymentRetryRedisCache: PaymentRetryRedisCache,
-    @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper
-
+    private val kafkaTx: KafkaTxExecutor
 ) {
-    private val logger = LoggerFactory.getLogger(RetryDispatcherScheduler::class.java)
+    private val logger = LoggerFactory.getLogger(javaClass)
+    private val batchSize = AtomicInteger(0)
 
-    // Use an AtomicReference for the current batch size metric (updated each run)
-    private val batchSize = AtomicReference(0.0)
+    // Static tags to make dashboards easier
+    private val topicTag = Tag.of("topic", EventMetadatas.PaymentOrderPspCallRequestedMetadata.topic)
+
+    // Create meters once
+    private val processedCounter: Counter =
+        Counter.builder("redis_retry_events_total")
+            .description("Total retry events successfully re-published")
+            .tag("result", "processed")
+            .tags(listOf(topicTag))
+            .register(meterRegistry)
+
+    private val failedCounter: Counter =
+        Counter.builder("redis_retry_events_total")
+            .description("Total retry events that failed to re-publish")
+            .tag("result", "failed")
+            .tags(listOf(topicTag))
+            .register(meterRegistry)
+
+    private val batchTimer: Timer =
+        Timer.builder("redis_retry_dispatch_batch_seconds")
+            .description("Total time to dispatch a retry batch")
+            .publishPercentiles(0.5, 0.95, 0.99)
+            .tags(listOf(topicTag))
+            .register(meterRegistry)
+
+    private val perEventTimer: Timer =
+        Timer.builder("redis_retry_dispatch_event_seconds")
+            .description("Time to publish a single retry event")
+            .publishPercentiles(0.5, 0.95, 0.99)
+            .tags(listOf(topicTag))
+            .register(meterRegistry)
 
     init {
-        // Expose current batch size gauge (live view)
-        Gauge.builder("redis_retry_batch_size", batchSize, AtomicReference<Double>::get)
-            .description("Number of retry events processed in last dispatch batch")
+        // Gauge = last batch size; registered once
+        Gauge.builder("redis_retry_batch_size") { batchSize.get().toDouble() }
+            .description("Number of retry events processed in the last batch")
+            .tags(listOf(topicTag))
             .register(meterRegistry)
     }
 
-    @Scheduled(fixedDelay = 5000)
-    fun dispatchPaymentOrderRetriesViaRedisQueue() {
-        meterRegistry.timer("redis_retry_dispatch_execution_seconds").record(Runnable {
-            val dueEnvelopes = paymentRetryQueueAdapter.pollDueRetries(1000)
-            batchSize.set(dueEnvelopes.size.toDouble())
+    @Scheduled(fixedDelay = 5_000)
+    fun dispatch() {
+        val batchSample = Timer.start(meterRegistry)
 
-            val processedCounter = meterRegistry.counter("redis_retry_events_processed_total")
-            val failedCounter = meterRegistry.counter("redis_retry_events_failed_total")
+        var success = 0
+        var fail = 0
 
-            // One TX per message (simple & safe). You could batch if needed.
-            dueEnvelopes.forEach { envelope ->
-                try {
-                    kafkaTx.run {
-                        paymentEventPublisher.publish(
-                            preSetEventIdFromCaller = envelope.eventId,
-                            aggregateId = envelope.aggregateId,
-                            eventMetaData = EventMetadatas.PaymentOrderRetryRequestedMetadata,
-                            data = envelope.data,
-                            parentEventId = envelope.parentEventId,
-                            traceId = envelope.traceId
-                        )
-                    }
-                    processedCounter.increment()
-                } catch (e: Exception) {
-                    failedCounter.increment()
-                    // 🔁 Put it back so we don't lose it if the Kafka TX aborted
-                    rescheduleExisting(envelope, 5_000)
-                    logger.error("Failed to dispatch retry event: ${e.message}", e)
+        val due: List<EventEnvelope<PaymentOrderPspCallRequested>> =
+            retryQueue.pollDueRetries(1000)
+
+        batchSize.set(due.size)
+
+        for (env in due) {
+            val evtSample = Timer.start(meterRegistry)
+            try {
+                kafkaTx.run {
+                    publisher.publish(
+                        preSetEventIdFromCaller = env.eventId,
+                        aggregateId = env.aggregateId,
+                        eventMetaData = EventMetadatas.PaymentOrderPspCallRequestedMetadata,
+                        data = env.data,
+                        parentEventId = env.parentEventId,
+                        traceId = env.traceId
+                    )
                 }
+                success++
+            } catch (e: Exception) {
+                fail++
+                logger.error(
+                    "Failed to dispatch PSP retry envelope agg={} id={}: {}",
+                    env.aggregateId, env.eventId, e.message, e
+                )
+            } finally {
+                evtSample.stop(perEventTimer)
             }
+        }
 
-        })
+        // one increment per batch → cheaper & cleaner graphs
+        if (success > 0) processedCounter.increment(success.toDouble())
+        if (fail > 0) failedCounter.increment(fail.toDouble())
+
+        batchSample.stop(batchTimer)
     }
-
-    fun rescheduleExisting(
-        envelope: EventEnvelope<PaymentOrderRetryRequested>,
-        delayMs: Long = 5_000
-    ) {
-        val json = objectMapper.writeValueAsString(envelope)
-        val retryAt = System.currentTimeMillis() + delayMs
-        paymentRetryRedisCache.scheduleRetry(json, retryAt.toDouble())
-    }
-
-
 }

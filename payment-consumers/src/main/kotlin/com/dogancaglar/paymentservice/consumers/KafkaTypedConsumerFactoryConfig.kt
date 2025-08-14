@@ -4,11 +4,13 @@ package com.dogancaglar.paymentservice.consumers
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.Topics
 import com.dogancaglar.common.logging.GenericLogFields
-import com.dogancaglar.paymentservice.domain.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.PaymentOrderRetryRequested
 import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
 import io.micrometer.core.instrument.MeterRegistry
+import org.apache.kafka.clients.consumer.Consumer
+import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.RetriableException
 import org.apache.kafka.common.errors.SerializationException
@@ -23,6 +25,7 @@ import org.springframework.dao.*
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.kafka.core.*
 import org.springframework.kafka.listener.*
+import org.springframework.kafka.listener.adapter.RecordFilterStrategy
 import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries
 import org.springframework.kafka.support.serializer.DeserializationException
 import org.springframework.messaging.handler.annotation.support.DefaultMessageHandlerMethodFactory
@@ -127,7 +130,9 @@ class KafkaTypedConsumerFactoryConfig(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         consumerFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler,
-        ackMode: ContainerProperties.AckMode = ContainerProperties.AckMode.RECORD
+        ackMode: ContainerProperties.AckMode = ContainerProperties.AckMode.RECORD,
+        expectedEventType: String? = null,        // ← NEW
+        ackDiscarded: Boolean = true              // ← NEW
     ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>> =
         ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>>().apply {
             this.consumerFactory = consumerFactory
@@ -136,9 +141,15 @@ class KafkaTypedConsumerFactoryConfig(
             @Suppress("UNCHECKED_CAST")
             setRecordInterceptor(interceptor as RecordInterceptor<String, EventEnvelope<T>>)
             setCommonErrorHandler(errorHandler)
-            containerProperties.ackMode = ackMode  // ← change from RECORD
+            containerProperties.ackMode = ackMode
             setConcurrency(concurrency)
             isBatchListener = false
+
+            // ← NEW: enforce semantic type at the container level
+            expectedEventType?.let {
+                setRecordFilterStrategy(eventTypeFilter(expectedEventType))
+                setAckDiscarded(ackDiscarded)
+            }
         }
 
     @Bean("${Topics.PAYMENT_ORDER_CREATED}-factory")
@@ -155,26 +166,30 @@ class KafkaTypedConsumerFactoryConfig(
             interceptor = interceptor,
             consumerFactory = customFactory,
             errorHandler = errorHandler,
-            ackMode = ContainerProperties.AckMode.MANUAL
+            ackMode = ContainerProperties.AckMode.MANUAL,
+            expectedEventType = EventMetadatas.PaymentOrderCreatedMetadata.eventType,
         )
     }
 
-    @Bean("${Topics.PAYMENT_ORDER_RETRY}-factory")
-    fun paymentRetryRequestedFactory(
+    @Bean("${Topics.PAYMENT_ORDER_PSP_CALL_REQUESTED}-factory")
+    fun paymentOrderPspCallRequestedFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
         customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler
-    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderRetryRequested>> {
-        val cfg =
-            cfgFor(EventMetadatas.PaymentOrderRetryRequestedMetadata.topic, "${Topics.PAYMENT_ORDER_RETRY}-factory")
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderPspCallRequested>> {
+        val cfg = cfgFor(
+            EventMetadatas.PaymentOrderPspCallRequestedMetadata.topic,
+            "${Topics.PAYMENT_ORDER_PSP_CALL_REQUESTED}-factory"
+        )
         return createTypedFactory(
             clientId = cfg.id,
             concurrency = cfg.concurrency,
             interceptor = interceptor,
             consumerFactory = customFactory,
             errorHandler = errorHandler,
-            ackMode = ContainerProperties.AckMode.MANUAL
+            ackMode = ContainerProperties.AckMode.MANUAL,
+            expectedEventType = EventMetadatas.PaymentOrderPspCallRequestedMetadata.eventType,
         )
     }
 
@@ -195,31 +210,68 @@ class KafkaTypedConsumerFactoryConfig(
             interceptor = interceptor,
             consumerFactory = customFactory,
             errorHandler = errorHandler,
-            ackMode = ContainerProperties.AckMode.MANUAL
+            ackMode = ContainerProperties.AckMode.MANUAL,
+            expectedEventType = EventMetadatas.PaymentOrderStatusCheckScheduledMetadata.eventType,
         )
     }
 
     @Bean
-    fun mdcRecordInterceptor(): RecordInterceptor<String, EventEnvelope<*>> = RecordInterceptor { record, _ ->
-        fun header(key: String) = record.headers().lastHeader(key)?.value()?.let { String(it) }
-        listOf(
-            GenericLogFields.TRACE_ID,
-            GenericLogFields.EVENT_ID,
-            GenericLogFields.PARENT_EVENT_ID
-        ).forEach { key -> header(key)?.let { MDC.put(key, it) } }
-        MDC.put(
-            GenericLogFields.AGGREGATE_ID,
-            record.value()?.aggregateId ?: record.key()
-        )
-        record
-    }
+    fun mdcRecordInterceptor(): RecordInterceptor<String, EventEnvelope<*>> = HeaderMdcInterceptor()
 
     @Bean
     fun messageHandlerMethodFactory(): DefaultMessageHandlerMethodFactory = DefaultMessageHandlerMethodFactory()
+
+
+    private fun eventTypeFilter(expected: String): RecordFilterStrategy<String, EventEnvelope<*>> =
+        RecordFilterStrategy { rec: ConsumerRecord<String, EventEnvelope<*>> ->
+            val ok = rec.value()?.eventType == expected
+            if (!ok) {
+                // Returning true => drop this record
+                // (we’ll enable ackDiscarded so its offset is committed)
+                true
+            } else {
+                false
+            }
+        }
 
 
     private fun cfgFor(topic: String, beanName: String): DynamicKafkaConsumersProperties.DynamicConsumer =
         dynamicProps.dynamicConsumers.firstOrNull { it.topic == topic }
             ?: error("Missing app.kafka.dynamic-consumers entry for topic '$topic' (required by bean '$beanName').")
 
+}
+
+class HeaderMdcInterceptor : RecordInterceptor<String, EventEnvelope<*>> {
+
+    private val prevCtx = ThreadLocal<Map<String, String>?>()
+
+    private fun putFrom(record: ConsumerRecord<String, EventEnvelope<*>>) {
+        fun h(k: String) = record.headers().lastHeader(k)?.value()?.let { String(it) }
+
+        // prefer headers; fall back to envelope
+        MDC.put(GenericLogFields.TRACE_ID, h("traceId") ?: record.value().traceId)
+        MDC.put(GenericLogFields.EVENT_ID, h("eventId") ?: record.value().eventId.toString())
+        MDC.put(GenericLogFields.PARENT_EVENT_ID, h("parentEventId") ?: record.value().parentEventId?.toString())
+        MDC.put(GenericLogFields.AGGREGATE_ID, record.value().aggregateId ?: record.key())
+        MDC.put(GenericLogFields.EVENT_TYPE, h("eventType") ?: record.value().eventType)
+    }
+
+    override fun intercept(
+        record: ConsumerRecord<String, EventEnvelope<*>>,
+        consumer: Consumer<String, EventEnvelope<*>>
+    ): ConsumerRecord<String, EventEnvelope<*>>? {
+        prevCtx.set(MDC.getCopyOfContextMap())
+        putFrom(record)
+        return record // return null to skip; we’re not skipping here
+    }
+
+
+    override fun afterRecord(
+        record: ConsumerRecord<String, EventEnvelope<*>>,
+        consumer: Consumer<String, EventEnvelope<*>>
+    ) {
+        val prev = prevCtx.get()
+        if (prev != null) MDC.setContextMap(prev) else MDC.clear()
+        prevCtx.remove()
+    }
 }

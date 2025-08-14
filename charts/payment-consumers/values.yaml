@@ -1,9 +1,73 @@
+
 image:
   repository: dcaglar1987/payment-consumers
   tag: latest
   pullPolicy: Always
 
-replicaCount: 1
+
+
 
 spring:
   profile: local
+  kafka:
+    properties:
+      security.protocol: PLAINTEXT
+      session.timeout.ms: 45000
+replicaCount: 1
+resources:
+  requests: { cpu: "750m", memory: "312Mi" }
+  limits:   { cpu: "1500m", memory: "550Mi" }
+
+jvmOpts: >-
+  -XX:+UseG1GC
+  -Xms252m -Xmx252m
+  -XX:MaxGCPauseMillis=200
+  -XX:InitiatingHeapOccupancyPercent=30
+  -XX:+UseStringDeduplication
+  -Xlog:gc*:stdout:time,uptime,level,tags
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 3
+  metrics:
+    - type: External
+      external:
+        metric:
+          name: kafka_consumer_group_lag
+          selector:
+            matchLabels:
+              consumergroup: payment-order-created-consumer-group
+        target:
+          type: AverageValue
+          averageValue: "1000"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      selectPolicy: Max
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+
+service:
+  type: ClusterIP
+  port: 8080
+  portName: http
+
+serviceMonitor:
+  enabled: false
+  path: /actuator/prometheus
+  interval: 30s
+  scrapeTimeout: 10s
+  labels:
+    release: prometheus-stack

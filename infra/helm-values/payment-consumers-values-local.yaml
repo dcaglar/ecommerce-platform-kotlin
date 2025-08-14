@@ -1,22 +1,12 @@
-autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 4
-  targetCPUUtilizationPercentage: 70
-# image
 image:
   repository: dcaglar1987/payment-consumers
   tag: latest
   pullPolicy: Always
 
-# replica count
-replicaCount: 1
 
-# JVM / JFR
-jvmOpts: >-
-  -XX:+UseZGC -Xms600m -Xmx600m
 
-# Spring profile & datasource
+
+
 spring:
   profile: local
   kafka:
@@ -24,10 +14,9 @@ spring:
       security.protocol: PLAINTEXT
       session.timeout.ms: 45000
 
-resources:
-  requests:
-    cpu: 400m
-    memory: 512Mi       # Safe lower bound for small pods
-  limits:
-    cpu: "1"
-    memory: 1Gi
+
+
+serviceMonitor:
+  enabled: true
+  labels:
+    release: prometheus-stack

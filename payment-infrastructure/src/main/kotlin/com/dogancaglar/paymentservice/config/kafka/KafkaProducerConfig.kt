@@ -13,7 +13,6 @@ import org.springframework.kafka.core.DefaultKafkaProducerFactory
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.core.MicrometerProducerListener
 import org.springframework.kafka.core.ProducerFactory
-import org.springframework.kafka.support.serializer.JsonSerializer
 import org.springframework.kafka.transaction.KafkaTransactionManager
 
 @Configuration
@@ -23,26 +22,25 @@ class KafkaProducerConfig(
 ) {
 
     @Bean("businessEventProducerFactory")
-    fun paymentOrderEventProducerFactory(meterRegistry: MeterRegistry): DefaultKafkaProducerFactory<String, EventEnvelope<*>> {
+    fun businessEventProducerFactory(meterRegistry: MeterRegistry): DefaultKafkaProducerFactory<String, EventEnvelope<*>> {
+        // Start from application.yml producer props
         val props = bootKafkaProps.buildProducerProperties().toMutableMap()
 
-
-        // serializers
+        // Be explicit about serializers (value is your EventEnvelope serializer)
         props[ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG] = StringSerializer::class.java
         props[ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG] = EventEnvelopeKafkaSerializer::class.java
-        props[JsonSerializer.ADD_TYPE_INFO_HEADERS] = false
 
-        // reliability (EOS)
+        // Reliability knobs (fine to keep even if present in YAML)
         props[ProducerConfig.ACKS_CONFIG] = "all"
         props[ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG] = true
-        props[ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION] = 5   // safe with idempotence
-        props[ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG] = 120_000        // generous end-to-end timeout
+        props[ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION] = 5
+        props[ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG] = 120_000
+
         return DefaultKafkaProducerFactory<String, EventEnvelope<*>>(props).apply {
-            // This is the critical bit: makes the factory transactional.
+            // Transactional producer for EOS + offset commits
             setTransactionIdPrefix("business-tx-$instanceId-")
             addListener(MicrometerProducerListener(meterRegistry))
         }
-
     }
 
     @Bean

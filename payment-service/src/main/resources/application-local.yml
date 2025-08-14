@@ -1,53 +1,48 @@
 app:
   instance-id: ${POD_NAME:${HOSTNAME:${random.value}}}
   cache:
-    ttl-seconds: 3600  # 1 hour redis  TTL for PSP result cache
+    ttl-seconds: 3600
   payment-service:
     api-key: secretpaymentapikey12345
+
+  # TopicAdminConfig reads these
   kafka:
     specs:
-      payment_order_created_topic:
-        partitions: 8
-        replicas: 1
-        createDlq: true
-      payment_order_retry_request_topic:
-        partitions: 8
-        replicas: 1
-        createDlq: true
-      payment_status_check_scheduler_topic:
-        partitions: 1
-        replicas: 1
-        createDlq: true
-      payment_order_succeeded_topic:
-        partitions: 8
-        replicas: 1
-        createDlq: true
+      payment_order_created_topic:            { partitions: 8, replicas: 1, createDlq: true }
+      payment_order_psp_call_requested_topic: { partitions: 8, replicas: 1, createDlq: true }
+      payment_status_check_scheduler_topic:   { partitions: 1, replicas: 1, createDlq: true }
+      payment_order_succeeded_topic:          { partitions: 8, replicas: 1, createDlq: true }
+
 server:
-  tomcat:
-    mbeanregistry:
-      enabled: true
-    threads:
-      max: 4
   port: 8080
+  tomcat:
+    mbeanregistry.enabled: true
+    threads.max: 4
+
 spring:
+  application:
+    name: payment-service
   security:
     oauth2:
       resourceserver:
         jwt:
           issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}
+
+  kafka:
+    # client defaults used by your custom ProducerFactory too
     properties:
       security.protocol: PLAINTEXT
       session.timeout.ms: 45000
     producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaSerializer
       properties:
         linger.ms: 5
         compression.type: lz4
-        spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
-  # Only the bootstrap-servers should be overridden in profiles
+
   datasource:
     url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME} # This will be injected from a Kubernetes Secret
+    username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
       maximum-pool-size: 10
@@ -55,34 +50,37 @@ spring:
       connection-timeout: 1500
       idle-timeout: 600000
       max-lifetime: 1800000
-  # Only the url, username, password should be overridden in profiles
+
   data:
     redis:
       url: ${SPRING_DATA_REDIS_URL}
       lettuce:
         pool:
-          max-active: 64
-          max-idle: 64
-          min-idle: 8
-          max-wait: 2000ms
-    # Only the url should be overridden in profiles
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+
   liquibase:
     enabled: true
     change-log: classpath:db/changelog/changelog.master.xml
+
+spring.jackson.time-zone: UTC
+
 mybatis:
   mapper-locations: classpath:mapper/*.xml
+
 management:
   endpoints:
-    web:
-      exposure:
-        include: "prometheus,metrics,health"
+    web.exposure.include: "prometheus,metrics,health"
   endpoint:
     health:
       enabled: true
       show-details: always
-    prometheus:
-      enabled: true
+    prometheus.enabled: true
   metrics:
+    tags:
+      application: payment-service
     enable:
       all: false
       tomcat.threads.current: true      # current thread count
@@ -92,44 +90,29 @@ management:
       tomcat.threads: true
       hikaricp.connections: true
       hikaricp.connections.acquire: true
-      outbox.event.backlog: true
-      outbox.dispatched: true
-      outbox.dispatcher.duration: true
-      kafka.consumer.fetch.manager.records.lag: true
       kafka.producer.topic.record.send: true
       process.cpu.usage: true
       jvm.threads.live: true
       jvm.memory.used: true
       jvm.memory.max: true
       jvm.gc.pause: true
-      scheduler.outbox.active.threads: true
-      scheduler.outbox.pool.size.threads: true
-      scheduler.outbox.queue.size: true
-      kafka.consumer.fetch.manager.records.consumed: true
-      kafka.consumer.fetch.manager.fetch.latency: true
-      kafka.consumer.io.time: true
+      # YOUR custom meters (exact names with underscores)
+      outbox_dispatched_total: true
+      outbox_dispatch_failed_total: true
+      outbox_event_backlog: true
+      outbox_dispatcher_duration: true
     binders:
       tomcat:
         enabled: true
     distribution:
       percentiles-histogram:
         http.server.requests: true
+        outbox_dispatcher_duration: true
       percentiles:
         http.server.requests: 0.5,0.95,0.99
-    export:
-      prometheus:
-        enabled: true
-
-
-  outbox-dispatcher:
-    thread-count: 2
-    batch-size: 100
-    pool-size: 2
-
-spring.jackson.time-zone: UTC
+        outbox_dispatcher_duration: 0.5,0.95,0.99
+    export.prometheus.enabled: true
 
 logging:
   level:
     org.springframework.kafka.core: DEBUG
-    org.springframework.kafka.listener.DefaultErrorHandler: DEBUG
-

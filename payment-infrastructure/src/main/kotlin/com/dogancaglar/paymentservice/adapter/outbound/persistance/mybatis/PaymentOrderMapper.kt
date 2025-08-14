@@ -26,4 +26,7 @@ interface PaymentOrderMapper {
 
     fun insert(paymentOrder: PaymentOrderEntity): Int
     fun upsert(paymentOrder: PaymentOrderEntity): Int
+
+    fun casLockAttempt(@Param("id") id: Long, @Param("expectedAttempt") expectedAttempt: Int): Int
+    fun bumpAttemptFrom(@Param("id") id: Long, @Param("fromAttempt") fromAttempt: Int): Int
 }

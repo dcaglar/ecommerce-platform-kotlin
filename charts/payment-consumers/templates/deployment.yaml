@@ -1,19 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{include "payment-consumers.fullname" .}}
+  name: {{ include "payment-consumers.fullname" . }}
   labels:
-    {{- include "payment-consumers.labels" . | nindent 4}}
+    {{- include "payment-consumers.labels" . | nindent 4 }}
 spec:
-  replicas: {{.Values.replicaCount}}
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: {{include "payment-consumers.fullname" .}}
+      app: {{ include "payment-consumers.fullname" . }}
   template:
     metadata:
       labels:
-        app: {{include "payment-consumers.fullname" .}}
+        app: {{ include "payment-consumers.fullname" . }}
     spec:
+      terminationGracePeriodSeconds: 60
       initContainers:
         - name: create-consumer-user
           image: postgres:16-alpine
@@ -39,14 +40,18 @@ spec:
                 secretKeyRef:
                   name: payment-db-credentials
                   key: PAYMENT_CONSUMERS_APP_DB_USER
+            - name: SPRING_DATA_REDIS_URL
+              value: redis://redis-master:6379
             - name: CONSUMER_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: payment-db-credentials
                   key: PAYMENT_CONSUMERS_APP_DB_PASSWORD
           command: ["/bin/sh", "-c"]
+          # NOTE: unquoted EOF so $VARS expand in the shell
           args:
-            - |
+            - | 
+              set -e
               export PGPASSWORD="$DB_ADMIN_PASSWORD"
               until pg_isready -h payment-db-postgresql -U postgres -d "$DB_NAME"; do
                 echo "Waiting for Postgres to be ready…"
@@ -64,13 +69,14 @@ spec:
               GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "$CONSUMER_USER";
               GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "$CONSUMER_USER";
               EOF
+
       containers:
         - name: payment-consumers
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{.Values.image.pullPolicy}}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - containerPort: 8080
-            - containerPort: 9010
+            - name: http          # <-- add this
+              containerPort: 8080
           env:
             - name: JAVA_TOOL_OPTIONS
               value: "{{ .Values.jvmOpts }}"
@@ -95,5 +101,21 @@ spec:
                 secretKeyRef:
                   name: payment-db-credentials
                   key: PAYMENT_CONSUMERS_APP_DB_PASSWORD
-            # Add other env vars as needed
-      # Add other spec fields as needed
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 12
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 60   # 1 minute (comment fixed)
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 12
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

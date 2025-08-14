@@ -1,21 +1,15 @@
 #!/bin/bash
 set -euo pipefail
 
-NAMESPACE="payment"
 
-helm uninstall kafka -n payment || true
+helm uninstall kafka -n payment --ignore-not-found
 
-kubectl delete pvc -n payment data-kafka-controller-0 || true
 
-kubectl delete pvc -n payment data-kafka-controller-1 || true
+  kubectl -n payment delete statefulset kafka-controller --ignore-not-found
+kubectl delete pvc -n payment data-kafka-controller-0 --ignore-not-found
+  kubectl -n payment  delete secret kafka-kraft --ignore-not-found
 
-kubectl delete pvc -n payment data-kafka-controller-2 || true
 
-kubectl delete pvc -n payment data-kafka-broker-0 || true
-
-kubectl delete pvc -n payment data-kafka-broker-1 || true
-
-kubectl delete pvc -n payment data-kafka-broker-2 || true
 
 
 

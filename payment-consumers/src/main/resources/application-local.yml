@@ -1,29 +1,26 @@
 app:
   instance-id: ${POD_NAME:${HOSTNAME:${random.value}}}
-  cache:
-    ttl-seconds: 3600  # 1 hour redis  TTL for PSP result cache
-  payment-service:
-    api-key: secretpaymentapikey12345
+  cache.ttl-seconds: 3600
+  payment-service.api-key: secretpaymentapikey12345
 
-  kafka: # Kafka configuration for dynamic consumers
+  kafka:
     dynamic-consumers:
-      - id: payment-order-executor
+      - id: payment-order-enqueuer
         topic: payment_order_created_topic
-        group-id: payment-order-created-consumer-group
-        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderExecutor
+        group-id: payment-order-enqueuer-consumer-group
+        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderEnqueuer
         concurrency: 4
-
-      - id: payment-retry-executor
-        topic: payment_order_retry_request_topic
-        group-id: payment-order-retry-consumer-group
-        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderRetryCommandExecutor
-        concurrency: 4
-
+      - id: payment-order-psp-call-executor
+        topic: payment_order_psp_call_requested_topic
+        group-id: payment-order-psp-call-executor-consumer-group
+        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderPspCallExecutor
+        concurrency: 8
       - id: payment-status-check-executor-scheduler
         topic: payment_status_check_scheduler_topic
         group-id: payment-status-check-scheduler-consumer-group
         class-name: com.dogancaglar.paymentservice.port.inbound.consumers.ScheduledPaymentStatusCheckExecutor
         concurrency: 1
+
 server:
   port: 8080
   tomcat:
@@ -34,10 +31,14 @@ server:
       suffix: .log
       pattern: '%h %l %u %t "%r" %s %b %D'
       buffered: true
+
 spring:
+  application:
+    name: payment-consumers
+
   datasource:
     url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME} # This will be injected from a Kubernetes Secret
+    username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
       maximum-pool-size: 10
@@ -45,32 +46,41 @@ spring:
       connection-timeout: 1500
       idle-timeout: 600000
       max-lifetime: 1800000
+
   kafka:
     producer:
       acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaSerializer
-      properties: #maybe change partition assignment strategy
+      transaction-id-prefix: payment-service-tx-
+      properties:
         enable.idempotence: true
         max.in.flight.requests.per.connection: 5
         delivery.timeout.ms: 120000
         linger.ms: 5
         compression.type: lz4
+
     consumer:
+      fetch-max-bytes: 20971520
+      max-partition-fetch-bytes: 2097152
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       max-poll-records: 25
-      properties:
-        fetch.max.wait.ms: 50
-        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
-        spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
-        isolation.level: read_committed
       enable-auto-commit: false
+      properties:
+        spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+        isolation.level: read_committed
+        receive.buffer.bytes: 65536
+        fetch.max.wait.ms: 50
+
     properties:
       security.protocol: PLAINTEXT
       session.timeout.ms: 45000
+
   data:
     redis:
-      url: redis://redis-master:6379
+      url: ${SPRING_DATA_REDIS_URL}
       timeout: 2000ms
       lettuce:
         pool:
@@ -78,130 +88,86 @@ spring:
           max-idle: 8
           min-idle: 0
           max-wait: -1ms
+
 management:
   endpoints:
-    web:
-      exposure:
-        include: "prometheus,metrics,health"
+    web.exposure.include: "prometheus,metrics,health"
   endpoint:
     health:
       enabled: true
       show-details: always
-    prometheus:
-      enabled: true
+    prometheus.enabled: true
   metrics:
+    tags:
+      application: payment-consumers
     enable:
       all: false
       hikaricp.connections: true
       hikaricp.connections.acquire: true
       kafka.consumer.fetch.manager.records.lag: true
       kafka.producer.topic.record.send: true
+      kafka.consumer.fetch.manager.records.consumed: true
+      kafka.consumer.fetch.manager.fetch.latency: true
+      kafka.consumer.io.time: true
       process.cpu.usage: true
       jvm.threads.live: true
       jvm.memory.used: true
       jvm.memory.max: true
       jvm.gc.pause: true
-      kafka.consumer.fetch.manager.records.consumed: true
-      kafka.consumer.fetch.manager.fetch.latency: true
-      kafka.consumer.io.time: true
+      # binders
+
+      # your custom meters (base names)
+      psp_calls_total: true
+      psp_call_latency: true
+      redis_retry_zset_size: true
+      redis_retry_batch_size: true
+      redis_retry_events_total: true
+      redis_retry_dispatch_batch_seconds: true
+      redis_retry_dispatch_event_seconds: true
+    distribution:
+      # timers you want histograms for (you already call publishPercentileHistogram() in code,
+      # this just makes it explicit in config too)
+      percentiles-histogram:
+        psp_call_latency: true
+        redis_retry_dispatch_batch_seconds: true
+        redis_retry_dispatch_event_seconds: true
+      percentiles:
+        psp_call_latency: 0.5,0.95,0.99
+        redis_retry_dispatch_batch_seconds: 0.5,0.95,0.99
+        redis_retry_dispatch_event_seconds: 0.5,0.95,0.99
     export:
       prometheus:
         enabled: true
+
 psp:
   simulation:
     currentScenario: NORMAL
     scenarios:
       NORMAL:
-        timeouts:
-          enabled: false
-          probability: 0       # 0% of requests time out
+        timeouts: { enabled: false, probability: 0 }
         latency:
-          fast:
-            probability: 100    # 100% are fast (50–150ms)
-            minMs: 50
-            maxMs: 150
-          moderate:
-            probability: 0    # 0% are moderate (150–300ms)
-            minMs: 150
-            maxMs: 300
-          slow:
-            probability: 0     # 0% are slow (300–600ms)
-            minMs: 300
-            maxMs: 600
-        response:
-          successful: 70
-          retryable: 20
-          statusCheck: 0
-          nonRetryable: 10
+          fast:     { probability: 100, minMs: 50,  maxMs: 150 }
+          moderate: { probability: 0,   minMs: 150, maxMs: 300 }
+          slow:     { probability: 0,   minMs: 300, maxMs: 600 }
+        response:   { successful: 70, retryable: 20, statusCheck: 0, nonRetryable: 10 }
       PEAK:
-        timeouts:
-          enabled: true
-          probability: 25      # 25% timeouts
+        timeouts: { enabled: true, probability: 25 }
         latency:
-          fast:
-            probability: 30    # 30% fast (250–500ms)
-            minMs: 250
-            maxMs: 500
-          moderate:
-            probability: 50    # 50% moderate (501–1500ms)
-            minMs: 501
-            maxMs: 1500
-          slow:
-            probability: 20    # 20% slow (1501–2500ms)
-            minMs: 1501
-            maxMs: 2500
-        response:
-          successful: 50
-          retryable: 45
-          statusCheck: 0
-          nonRetryable: 5
+          fast:     { probability: 30, minMs: 250,  maxMs: 500 }
+          moderate: { probability: 50, minMs: 501,  maxMs: 1500 }
+          slow:     { probability: 20, minMs: 1501, maxMs: 2500 }
+        response:   { successful: 50, retryable: 45, statusCheck: 0, nonRetryable: 5 }
       DEGRADED:
-        timeouts:
-          enabled: true
-          probability: 30      # 30% timeouts
+        timeouts: { enabled: true, probability: 30 }
         latency:
-          fast:
-            probability: 20    # 20% fast (2000–2200ms)
-            minMs: 2000
-            maxMs: 2200
-          moderate:
-            probability: 20    # 20% moderate (2201–2600ms)
-            minMs: 2201
-            maxMs: 2600
-          slow:
-            probability: 60    # 60% slow (2601–2990ms)
-            minMs: 2601
-            maxMs: 2990
-        response:
-          successful: 50
-          retryable: 40
-          statusCheck: 0
-          nonRetryable: 10
+          fast:     { probability: 20, minMs: 2000, maxMs: 2200 }
+          moderate: { probability: 20, minMs: 2201, maxMs: 2600 }
+          slow:     { probability: 60, minMs: 2601, maxMs: 2990 }
+        response:   { successful: 50, retryable: 40, statusCheck: 0, nonRetryable: 10 }
       BEST_PSP_EVER:
-        timeouts:
-          enabled: false
-          probability: 0
+        timeouts: { enabled: false, probability: 0 }
         latency:
-          fast:
-            probability: 100   # 100% fast (1–2ms)
-            minMs: 1
-            maxMs: 2
-          moderate:
-            probability: 0
-            minMs: 0
-            maxMs: 0
-          slow:
-            probability: 0
-            minMs: 0
-            maxMs: 0
-        response:
-          successful: 100
-          retryable: 0
-          statusCheck: 0
-          nonRetryable: 0
-
-
-logging:
-  level:
-    org.springframework.kafka.core: DEBUG
-    org.springframework.kafka.listener.DefaultErrorHandler: DEBUG
+          fast:     { probability: 100, minMs: 1, maxMs: 2 }
+          moderate: { probability: 0,   minMs: 0, maxMs: 0 }
+          slow:     { probability: 0,   minMs: 0, maxMs: 0 }
+        response:   { successful: 100, retryable: 0, statusCheck: 0, nonRetryable: 0 }

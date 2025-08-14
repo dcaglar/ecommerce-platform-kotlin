@@ -1,16 +1,17 @@
+# templates/service.yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: payment-service
+  name: {{ include "payment-service.fullname" . }}
   labels:
-    app: payment-service    # <-- This label is CRUCIAL for ServiceMonitor selector!
-    release: prometheus-stack
+    app: {{ include "payment-service.fullname" . }}
+     {{- include "payment-service.labels" . | nindent 4 }}
 spec:
-  type: NodePort
-  ports:
-    - name: http           # <-- Name must match ServiceMonitor's 'port'
-      port: 8080
-      targetPort: 8080
-      nodePort: 32081
+  type: {{ .Values.service.type | default "ClusterIP" }}
   selector:
-    app: payment-service
+    app: {{ include "payment-service.fullname" . }}
+  ports:
+    - name: {{ .Values.service.portName | default "http" }}
+      port: {{ .Values.service.port | default 8080 }}
+      targetPort: {{ .Values.service.portName | default "http" }}
+      protocol: TCP

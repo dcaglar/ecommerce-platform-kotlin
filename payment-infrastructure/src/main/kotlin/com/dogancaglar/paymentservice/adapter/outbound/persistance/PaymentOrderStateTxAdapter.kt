@@ -27,7 +27,11 @@ class PaymentOrderStateTxAdapter(
 
     @Transactional
     override fun markFailedForRetry(order: PaymentOrder, reason: String?, lastError: String?): PaymentOrder {
-        val updated = order.markAsFailed().withRetryReason(reason).withLastError(lastError)
+        val updated = order
+            .markAsFailed()
+            .incrementRetry()                                // <-- increment attempt in DB
+            .withRetryReason(reason)
+            .withLastError(lastError)
             .withUpdatedAt(LocalDateTime.now(clock))
         paymentOrderRepository.save(updated)
         return updated

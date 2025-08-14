@@ -38,4 +38,10 @@ class PaymentOrderOutboundAdapter(
         val maxPAymentOrderIdLong = paymentOrderMapper.getMaxPaymentOrderId() ?: 0
         return PaymentOrderId(maxPAymentOrderIdLong)
     }
+
+    override fun casLockAttempt(paymentOrderId: PaymentOrderId, expectedAttempt: Int): Boolean =
+        paymentOrderMapper.casLockAttempt(paymentOrderId.value, expectedAttempt) == 1
+
+    override fun bumpAttempt(paymentOrderId: PaymentOrderId, fromAttempt: Int): Boolean =
+        paymentOrderMapper.bumpAttemptFrom(paymentOrderId.value, fromAttempt) == 1
 }

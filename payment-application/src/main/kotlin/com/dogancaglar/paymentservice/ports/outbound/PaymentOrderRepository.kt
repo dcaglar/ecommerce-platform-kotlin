@@ -12,4 +12,8 @@ interface PaymentOrderRepository {
     fun countByPaymentIdAndStatusIn(paymentId: PaymentId, statuses: List<String>): Long
     fun existsByPaymentIdAndStatus(paymentId: PaymentId, status: String): Boolean
     fun getMaxPaymentOrderId(): PaymentOrderId
+
+
+    fun casLockAttempt(paymentOrderId: PaymentOrderId, expectedAttempt: Int): Boolean
+    fun bumpAttempt(paymentOrderId: PaymentOrderId, fromAttempt: Int): Boolean
 }

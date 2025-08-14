@@ -15,7 +15,6 @@ resources:
 service:
   type: ClusterIP
   port: 9308
-  annotations: {}   # If you scrape via ServiceMonitor, no need for prometheus.io/* here
 
 # If you use kube-prometheus-stack (Prometheus Operator), enable this:
 prometheus:
@@ -23,9 +22,7 @@ prometheus:
     enabled: true
     # Set this to the namespace where your Prometheus runs (often "monitoring");
     # leave empty if your Prometheus selects across all namespaces.
-    namespace: ""
-    interval: 15s
-    scrapeTimeout: 10s
+    namespace: "payment"
     # Label so Prometheus can pick it up (adjust to your Prometheus release name)
     additionalLabels:
       release: prometheus-stack
