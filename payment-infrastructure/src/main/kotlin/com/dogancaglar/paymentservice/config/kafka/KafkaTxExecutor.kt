@@ -2,7 +2,6 @@
 package com.dogancaglar.paymentservice.config.kafka
 
 import com.dogancaglar.common.event.EventEnvelope
-import org.apache.kafka.clients.consumer.ConsumerGroupMetadata
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
 import org.springframework.beans.factory.annotation.Qualifier
@@ -16,12 +15,12 @@ class KafkaTxExecutor(
 ) {
     fun <R> run(
         offsets: Map<TopicPartition, OffsetAndMetadata>,
-        groupId: String,
+        groupMeta: org.apache.kafka.clients.consumer.ConsumerGroupMetadata,
         block: () -> R
     ): R =
         kafkaTemplate.executeInTransaction { ops ->
             val result = block()
-            ops.sendOffsetsToTransaction(offsets, ConsumerGroupMetadata(groupId))
+            ops.sendOffsetsToTransaction(offsets, groupMeta)
             result as (R & Any)
         }
 
