@@ -12,18 +12,31 @@ import org.springframework.stereotype.Repository
 class PaymentOrderOutboundAdapter(
     private val paymentOrderMapper: PaymentOrderMapper
 ) : PaymentOrderRepository {
-    override fun save(paymentOrder: PaymentOrder) {
-        val entity = PaymentOrderEntityMapper.toEntity(paymentOrder)
-        paymentOrderMapper.upsert(entity)
+
+
+    override fun updateReturningIdempotent(order: PaymentOrder): PaymentOrder? {
+        val e = PaymentOrderEntityMapper.toEntity(order)
+        val updated = paymentOrderMapper.updateReturningIdempotent(e)
+        if (updated != null) return PaymentOrderEntityMapper.toDomain(updated)
+
+        // No row updated → terminal or missing. Re-read to reflect truth if present.
+        val found = paymentOrderMapper.findByPaymentOrderId(e.paymentOrderId).firstOrNull()
+        return found?.let(PaymentOrderEntityMapper::toDomain)
     }
 
-    override fun upsertAll(orders: List<PaymentOrder>): Unit {
+
+    override fun insertAll(orders: List<PaymentOrder>): Unit {
         val entities = orders.map { PaymentOrderEntityMapper.toEntity(it) }
-        entities.forEach { paymentOrderMapper.upsert(it) }
+        paymentOrderMapper.insertAllIgnore(entities)
     }
 
     override fun countByPaymentId(paymentId: PaymentId): Long {
         return paymentOrderMapper.countByPaymentId(paymentId.value)
+    }
+
+    override fun findByPaymentOrderId(paymentOrderId: PaymentOrderId): List<PaymentOrder> {
+        return paymentOrderMapper.findByPaymentOrderId(paymentOrderId.value)
+            .map { PaymentOrderEntityMapper.toDomain(it) }
     }
 
     override fun countByPaymentIdAndStatusIn(paymentId: PaymentId, statuses: List<String>): Long {
@@ -35,13 +48,7 @@ class PaymentOrderOutboundAdapter(
     }
 
     override fun getMaxPaymentOrderId(): PaymentOrderId {
-        val maxPAymentOrderIdLong = paymentOrderMapper.getMaxPaymentOrderId() ?: 0
-        return PaymentOrderId(maxPAymentOrderIdLong)
+        val maxPaymentOrderIdLong = paymentOrderMapper.getMaxPaymentOrderId() ?: 0
+        return PaymentOrderId(maxPaymentOrderIdLong)
     }
-
-    override fun casLockAttempt(paymentOrderId: PaymentOrderId, expectedAttempt: Int): Boolean =
-        paymentOrderMapper.casLockAttempt(paymentOrderId.value, expectedAttempt) == 1
-
-    override fun bumpAttempt(paymentOrderId: PaymentOrderId, fromAttempt: Int): Boolean =
-        paymentOrderMapper.bumpAttemptFrom(paymentOrderId.value, fromAttempt) == 1
 }

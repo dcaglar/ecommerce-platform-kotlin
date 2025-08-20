@@ -27,6 +27,13 @@
         payment_orders WHERE payment_id = #{paymentId}
     </select>
 
+    <select id="findByPaymentOrderId" resultMap="PaymentOrderResultMap">
+        SELECT payment_order_id, public_payment_order_id, payment_id, public_payment_id, seller_id, amount_value,
+        amount_currency, status, created_at, updated_at, retry_count, retry_reason, last_error_message
+        FROM payment_orders
+        WHERE payment_order_id = #{paymentOrderId}
+    </select>
+
     <select id="countByPaymentId" resultType="long">
         SELECT COUNT(*) FROM payment_orders WHERE payment_id = #{paymentId}
     </select>
@@ -47,6 +54,22 @@
         SELECT MAX(payment_order_id) FROM payment_orders
     </select>
 
+
+    <insert id="insertAllIgnore" parameterType="java.util.List">
+        INSERT INTO payment_orders (
+        payment_order_id, public_payment_order_id, payment_id, public_payment_id, seller_id,
+        amount_value, amount_currency, status, created_at, updated_at, retry_count, retry_reason, last_error_message
+        )
+        VALUES
+        <foreach collection="list" item="po" separator=",">
+            (#{po.paymentOrderId}, #{po.publicPaymentOrderId}, #{po.paymentId}, #{po.publicPaymentId}, #{po.sellerId},
+            #{po.amountValue}, #{po.amountCurrency}, #{po.status}, #{po.createdAt}, #{po.updatedAt},
+            #{po.retryCount}, #{po.retryReason}, #{po.lastErrorMessage})
+        </foreach>
+        ON CONFLICT (payment_order_id) DO NOTHING
+    </insert>
+
+
     <insert id="insert"
             parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentOrderEntity">
         INSERT INTO payment_orders (
@@ -58,42 +81,28 @@
         )
     </insert>
 
-    <insert id="upsert"
-            parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentOrderEntity">
-        INSERT INTO payment_orders (
-        payment_order_id, public_payment_order_id, payment_id, public_payment_id, seller_id, amount_value,
-        amount_currency, status, created_at, updated_at, retry_count, retry_reason, last_error_message
-        ) VALUES (
-        #{paymentOrderId}, #{publicPaymentOrderId}, #{paymentId}, #{publicPaymentId}, #{sellerId}, #{amountValue},
-        #{amountCurrency}, #{status}, #{createdAt}, #{updatedAt}, #{retryCount}, #{retryReason}, #{lastErrorMessage}
+    <select id="updateReturningIdempotent"
+            parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentOrderEntity"
+            resultMap="PaymentOrderResultMap">
+        WITH updated AS (
+        UPDATE payment_orders p
+        SET
+        status = CASE
+        WHEN p.status IN ('SUCCESSFUL','FINALIZED_FAILED') THEN p.status
+        ELSE #{status}
+        END,
+        updated_at = GREATEST(p.updated_at, #{updatedAt}),
+        retry_count = GREATEST(p.retry_count, #{retryCount}),
+        retry_reason = COALESCE(#{retryReason}, p.retry_reason),
+        last_error_message = COALESCE(#{lastErrorMessage}, p.last_error_message)
+        WHERE p.payment_order_id = #{paymentOrderId}
+        AND p.status NOT IN ('SUCCESSFUL','FINALIZED_FAILED')
+        RETURNING
+        p.payment_order_id, p.public_payment_order_id, p.payment_id, p.public_payment_id,
+        p.seller_id, p.amount_value, p.amount_currency, p.status, p.created_at, p.updated_at,
+        p.retry_count, p.retry_reason, p.last_error_message
         )
-        ON CONFLICT (payment_order_id) DO UPDATE SET
-        public_payment_order_id = EXCLUDED.public_payment_order_id,
-        payment_id = EXCLUDED.payment_id,
-        public_payment_id = EXCLUDED.public_payment_id,
-        seller_id = EXCLUDED.seller_id,
-        amount_value = EXCLUDED.amount_value,
-        amount_currency = EXCLUDED.amount_currency,
-        status = EXCLUDED.status,
-        created_at = EXCLUDED.created_at,
-        updated_at = EXCLUDED.updated_at,
-        retry_count = EXCLUDED.retry_count,
-        retry_reason = EXCLUDED.retry_reason,
-        last_error_message = EXCLUDED.last_error_message;
-    </insert>
+        SELECT * FROM updated
+    </select>
 
-    <update id="casLockAttempt">
-        UPDATE payment_orders
-        SET updated_at = now()
-        WHERE payment_order_id = #{id}
-        AND retry_count = #{expectedAttempt}
-    </update>
-
-    <update id="bumpAttemptFrom">
-        UPDATE payment_orders
-        SET retry_count = #{fromAttempt} + 1,
-        updated_at = now()
-        WHERE payment_order_id = #{id}
-        AND retry_count = #{fromAttempt}
-    </update>
 </mapper>

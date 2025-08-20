@@ -44,9 +44,9 @@ curl -i -X POST http://localhost:8081/payments \
     "buyerId": "BUYER-123",
     "totalAmount": { "value": 199.49, "currency": "EUR" },
     "paymentOrders": [
-      { "sellerId": "SELLER-001", "amount": { "value": 49.99, "currency": "EUR" }},
-      { "sellerId": "SELLER-002", "amount": { "value": 29.50, "currency": "EUR" }},
-      { "sellerId": "SELLER-003", "amount": { "value": 120.00, "currency": "EUR" }}
+      { "sellerId": "SELLER-111", "amount": { "value": 49.99, "currency": "EUR" }},
+      { "sellerId": "SELLER-222", "amount": { "value": 29.50, "currency": "EUR" }},
+      { "sellerId": "SELLER-333", "amount": { "value": 120.00, "currency": "EUR" }}
     ]
   }'
 ```
@@ -77,10 +77,10 @@ stern -n payment 'payment-service'| grep 'POST'
 ## 7️⃣ Run Load Tests
 
 From project root, run:
-
+ 
 ```bash 
 VUS=10  RPS=10 DURATION=2m k6 run load-tests/baseline-smoke-test.js
-VUS=15  RPS=15 DURATION=30m k6 run load-tests/baseline-smoke-test.js
+VUS=15  RPS=15 DURATION=10m k6 run load-tests/baseline-smoke-test.js
 VUS=20  RPS=20 DURATION=50m k6 run load-tests/baseline-smoke-test.js
 VUS=40 RPS=40 DURATION=20m k6 run load-tests/baseline-smoke-test.js
 ```

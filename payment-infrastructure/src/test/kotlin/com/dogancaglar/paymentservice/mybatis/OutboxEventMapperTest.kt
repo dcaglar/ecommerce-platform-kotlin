@@ -1,6 +1,7 @@
-package com.dogancaglar.mybatis
+package com.dogancaglar.paymentservice.mybatis
 
 
+import com.dogancaglar.paymentservice.InfraTestBoot
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.OutboxEventEntity
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.OutboxEventMapper
 import com.dogancaglar.paymentservice.application.usecases.ProcessPaymentService
@@ -25,7 +26,7 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import java.time.LocalDateTime
 
 @MybatisTest
-@ContextConfiguration(classes = [com.dogancaglar.paymentservice.InfraTestBoot::class])
+@ContextConfiguration(classes = [InfraTestBoot::class])
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers
 @TestPropertySource(properties = ["spring.liquibase.enabled=false"])

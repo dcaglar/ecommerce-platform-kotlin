@@ -1,6 +1,5 @@
 package com.dogancaglar.paymentservice.domain.events
 
-import java.time.Clock
 import java.time.LocalDateTime
 
 
@@ -30,14 +29,14 @@ private constructor(
             eventType: String,
             aggregateId: String,
             payload: String,
-            clock: Clock? = Clock.systemUTC()
+            createdAt: LocalDateTime
         ) = OutboxEvent(
             oeid = oeid,
             eventType = eventType,
             aggregateId = aggregateId,
             payload = payload,
             status = "NEW",
-            createdAt = LocalDateTime.now(clock)
+            createdAt = createdAt
         )
 
         fun restore(

@@ -42,7 +42,7 @@ open class CreatePaymentService(
         val payment = PaymentFactory(clock).createPayment(command, paymentId, paymentOrderIdList)
 
         paymentRepository.save(payment)
-        paymentOrderRepository.upsertAll(payment.paymentOrders)
+        paymentOrderRepository.insertAll(payment.paymentOrders)
 
         val outboxBatch = payment.paymentOrders.map { toOutBoxEvent(it) }
         outboxEventPort.saveAll(outboxBatch)
@@ -88,7 +88,7 @@ open class CreatePaymentService(
             eventType = envelope.eventType,
             aggregateId = envelope.aggregateId,
             payload = serializationPort.toJson(envelope),
-            clock = clock,
+            createdAt = paymentOrder.createdAt,
         )
     }
 }

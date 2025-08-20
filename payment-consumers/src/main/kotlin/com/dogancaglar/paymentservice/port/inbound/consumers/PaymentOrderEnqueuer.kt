@@ -32,17 +32,21 @@ class PaymentOrderEnqueuer(
         containerFactory = "${Topics.PAYMENT_ORDER_CREATED}-factory",
         groupId = CONSUMER_GROUPS.PAYMENT_ORDER_ENQUEUER
     )
-    fun onCreated(record: ConsumerRecord<String, EventEnvelope<PaymentOrderCreated>>) {
+    fun onCreated(
+        record: ConsumerRecord<String, EventEnvelope<PaymentOrderCreated>>,
+        consumer: org.apache.kafka.clients.consumer.Consumer<*, *>
+    ) {
         val consumed = record.value()
         val created = consumed.data
         val order = factory.fromEvent(created)
 
         val tp = TopicPartition(record.topic(), record.partition())
         val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
-
+        val groupMeta =
+            consumer.groupMetadata()                        // <— real metadata (generation, member id, epoch)
         LogContext.with(consumed) {
             if (order.status != PaymentOrderStatus.INITIATED) {
-                kafkaTx.run(offsets, CONSUMER_GROUPS.PAYMENT_ORDER_ENQUEUER) {}
+                kafkaTx.run(offsets, groupMeta) {}
                 logger.info("⏩ Skip enqueue (status={}) agg={}", order.status, consumed.aggregateId)
                 return@with
             }
@@ -56,7 +60,7 @@ class PaymentOrderEnqueuer(
                 parentEventId = consumed.eventId
             )
 
-            kafkaTx.run(offsets, CONSUMER_GROUPS.PAYMENT_ORDER_ENQUEUER) {
+            kafkaTx.run(offsets, groupMeta) {
                 publisher.publishSync(
                     preSetEventIdFromCaller = outEnv.eventId,
                     aggregateId = outEnv.aggregateId,

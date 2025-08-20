@@ -42,7 +42,7 @@ filebeatConfig:
       hosts: ["https://elasticsearch-master:9200"]
       ssl.verification_mode: none 
       username: elastic
-      password: gs96EMuK5IWOIGFv
+      password: fUNIuW1Kdl3qFUyh%
       index: "ecommerce-logs-%{+yyyy.MM.dd}"
       bulk_max_size: 2048
 

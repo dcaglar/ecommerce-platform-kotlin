@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Param
 interface PaymentOrderMapper {
     // Removed @Select annotation to avoid duplicate mapping with XML
     fun findByPaymentId(@Param("paymentId") paymentId: Long): List<PaymentOrderEntity>
+    fun findByPaymentOrderId(@Param("paymentOrderId") paymentOrderId: Long): List<PaymentOrderEntity>
 
     // Removed @Select annotation to avoid duplicate mapping with XML
     fun countByPaymentId(@Param("paymentId") paymentId: Long): Long
@@ -24,9 +25,12 @@ interface PaymentOrderMapper {
     // Removed @Select annotation to avoid duplicate mapping with XML
     fun getMaxPaymentOrderId(): Long?
 
-    fun insert(paymentOrder: PaymentOrderEntity): Int
-    fun upsert(paymentOrder: PaymentOrderEntity): Int
 
-    fun casLockAttempt(@Param("id") id: Long, @Param("expectedAttempt") expectedAttempt: Int): Int
-    fun bumpAttemptFrom(@Param("id") id: Long, @Param("fromAttempt") fromAttempt: Int): Int
+    fun insertAllIgnore(list: List<PaymentOrderEntity>): Int              // new: bulk create simple
+
+
+    fun updateReturningIdempotent(paymentOrder: PaymentOrderEntity): PaymentOrderEntity?
+
+
 }
+
