@@ -1,4 +1,5 @@
 app:
+  instance-id: ${POD_NAME:${HOSTNAME:${random.value}}}
   cache:
     ttl-seconds: 3600  # 1 hour redis  TTL for PSP result cache
   payment-service:
@@ -6,17 +7,17 @@ app:
 
   kafka: # Kafka configuration for dynamic consumers
     dynamic-consumers:
-      - id: payment-order-executor
+      - id: payment-order-enqueuer
         topic: payment_order_created_topic
-        group-id: payment-order-created-consumer-group
-        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderExecutor
-        concurrency: 1
+        group-id: payment-order-enqueuer-consumer-group
+        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderEnqueuer
+        concurrency: 4
 
-      - id: payment-retry-executor
-        topic: payment_order_retry_request_topic
-        group-id: payment-order-retry-consumer-group
-        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderRetryCommandExecutor
-        concurrency: 1
+      - id: payment-order-psp-call-executor
+        topic: payment_order_psp_call_requested_topic
+        group-id: payment-order-psp-call-executor-consumer-group
+        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderPspCallExecutor
+        concurrency: 8
 
       - id: payment-status-check-executor-scheduler
         topic: payment_status_check_scheduler_topic
