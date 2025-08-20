@@ -7,7 +7,7 @@ import com.dogancaglar.paymentservice.adapter.outbound.redis.PspResultRedisCache
 import com.dogancaglar.paymentservice.application.usecases.ProcessPaymentService
 import com.dogancaglar.paymentservice.domain.util.PaymentFactory
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderFactory
-import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
+import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderStatePort
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.time.Clock
@@ -18,14 +18,14 @@ class PaymentProcessorServiceConfig {
 
     @Bean
     fun processPaymentService(
-        paymentOrderModificationPort: PaymentOrderModificationPort,
+        paymentOrderStatePort: PaymentOrderStatePort,
         paymentEventPublisher: PaymentEventPublisher,
         paymentRetryQueueAdapter: PaymentRetryQueueAdapter,
         pspResultRedisCacheAdapter: PspResultRedisCacheAdapter,
         clock: Clock,
     ): ProcessPaymentService {
         return ProcessPaymentService(
-            paymentOrderModificationPort = paymentOrderModificationPort,
+            paymentOrderStatePort = paymentOrderStatePort,
             eventPublisher = paymentEventPublisher,
             retryQueuePort = paymentRetryQueueAdapter,
             pspResultCache = pspResultRedisCacheAdapter,
