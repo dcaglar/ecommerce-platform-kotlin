@@ -1,4 +1,3 @@
-
 image:
   repository: dcaglar1987/payment-consumers
   tag: latest
@@ -24,7 +23,6 @@ jvmOpts: >-
   -XX:MaxGCPauseMillis=200
   -XX:InitiatingHeapOccupancyPercent=30
   -XX:+UseStringDeduplication
-  -Xlog:gc*:stdout:time,uptime,level,tags
 
 autoscaling:
   enabled: true

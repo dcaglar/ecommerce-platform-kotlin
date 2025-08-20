@@ -6,6 +6,7 @@ import com.dogancaglar.port.out.web.dto.PaymentRequestDTO
 import com.dogancaglar.port.out.web.dto.PaymentResponseDTO
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 @Service
 class PaymentService(
@@ -13,6 +14,7 @@ class PaymentService(
 ) {
     private val logger = LoggerFactory.getLogger(PaymentService::class.java)
 
+    @Transactional
     fun createPayment(request: PaymentRequestDTO): PaymentResponseDTO {
         try {
             val command = PaymentRequestMapper.toCommand(request)

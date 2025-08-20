@@ -12,7 +12,6 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.inbound.ProcessPspResultUseCase
 import com.dogancaglar.paymentservice.ports.outbound.PaymentGatewayPort
-import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -31,7 +30,6 @@ class PaymentOrderPspCallExecutor(
     private val processPspResult: ProcessPspResultUseCase,
     private val pspClient: PaymentGatewayPort,
     private val meterRegistry: MeterRegistry,
-    private val orders: PaymentOrderRepository,
     private val kafkaTx: KafkaTxExecutor,
     @Qualifier("paymentOrderPspPool") private val pspExecutor: ThreadPoolTaskExecutor
 ) {
@@ -42,32 +40,29 @@ class PaymentOrderPspCallExecutor(
         containerFactory = "${Topics.PAYMENT_ORDER_PSP_CALL_REQUESTED}-factory",
         groupId = CONSUMER_GROUPS.PAYMENT_ORDER_PSP_CALL_EXECUTOR
     )
-    fun onPspRequested(record: ConsumerRecord<String, EventEnvelope<PaymentOrderPspCallRequested>>) {
+    fun onPspRequested(
+        record: ConsumerRecord<String, EventEnvelope<PaymentOrderPspCallRequested>>,
+        consumer: org.apache.kafka.clients.consumer.Consumer<*, *>
+    ) {
         val env = record.value()
         val work = env.data
         val tp = TopicPartition(record.topic(), record.partition())
         val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
-
+        val groupMeta =
+            consumer.groupMetadata()
         LogContext.with(env) {
             val id = PaymentOrderId(work.paymentOrderId.toLong())
 
-            // 1) CAS attempt fence
-            if (!orders.casLockAttempt(id, expectedAttempt = work.retryCount)) {
-                kafkaTx.run(offsets, CONSUMER_GROUPS.PAYMENT_ORDER_PSP_CALL_EXECUTOR) {}
-                logger.info("⏩ Stale attempt={} agg={}", work.retryCount, env.aggregateId)
-                return@with
-            }
 
             // 2) Build domain snapshot from event (no DB load)
             val orderForPsp: PaymentOrder = PaymentOrderDomainEventMapper.fromEvent(work)
 
-            // 3) Call PSP
+            // 3) Call PSP-idempotent
             val status = safePspCall(orderForPsp)
 
-            // 4) Persist + bump attempt atomically with offset commit
-            kafkaTx.run(offsets, CONSUMER_GROUPS.PAYMENT_ORDER_PSP_CALL_EXECUTOR) {
+            // 4) Persist + publish kafka, since under kafka tx, offset is not moving forward till event is published
+            kafkaTx.run(offsets, groupMeta) {
                 processPspResult.processPspResult(event = work, pspStatus = status)
-                orders.bumpAttempt(id, fromAttempt = work.retryCount)
             }
         }
     }

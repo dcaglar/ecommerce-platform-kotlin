@@ -22,4 +22,24 @@ object PaymentOrderEntityMapper {
             lastErrorMessage = order.lastErrorMessage
         )
     }
+
+    fun toDomain(entity: PaymentOrderEntity): PaymentOrder {
+        return PaymentOrder(
+            paymentOrderId = com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId(entity.paymentOrderId),
+            publicPaymentOrderId = entity.publicPaymentOrderId,
+            paymentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentId(entity.paymentId),
+            publicPaymentId = entity.publicPaymentId,
+            sellerId = com.dogancaglar.paymentservice.domain.model.vo.SellerId(entity.sellerId),
+            amount = com.dogancaglar.paymentservice.domain.model.Amount(
+                currency = entity.amountCurrency,
+                value = entity.amountValue
+            ),
+            status = entity.status,
+            createdAt = entity.createdAt,
+            updatedAt = entity.updatedAt,
+            retryCount = entity.retryCount,
+            retryReason = entity.retryReason,
+            lastErrorMessage = entity.lastErrorMessage
+        )
+    }
 }

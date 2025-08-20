@@ -10,7 +10,7 @@ class OutboxEventEntity(
     val aggregateId: String,
     val payload: String,
     var status: String = "NEW",
-    val createdAt: LocalDateTime = LocalDateTime.now(UTC)
+    val createdAt: LocalDateTime
 ) {
     constructor(
         oeid: Long,

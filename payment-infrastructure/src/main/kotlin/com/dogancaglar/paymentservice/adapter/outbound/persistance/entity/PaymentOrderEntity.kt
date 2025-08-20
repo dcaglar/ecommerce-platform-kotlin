@@ -14,7 +14,7 @@ class PaymentOrderEntity(
     val amountCurrency: String,
     val status: PaymentOrderStatus,
     val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime? = LocalDateTime.now(),
+    val updatedAt: LocalDateTime = LocalDateTime.now(),
     val retryCount: Int = 0,
     val retryReason: String? = null,
     val lastErrorMessage: String? = null

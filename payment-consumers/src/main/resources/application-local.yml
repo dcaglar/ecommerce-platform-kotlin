@@ -52,7 +52,6 @@ spring:
       acks: all
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaSerializer
-      transaction-id-prefix: payment-service-tx-
       properties:
         enable.idempotence: true
         max.in.flight.requests.per.connection: 5
@@ -171,3 +170,6 @@ psp:
           moderate: { probability: 0,   minMs: 0, maxMs: 0 }
           slow:     { probability: 0,   minMs: 0, maxMs: 0 }
         response:   { successful: 100, retryable: 0, statusCheck: 0, nonRetryable: 0 }
+
+logging.level.org.springframework.kafka.listener.KafkaMessageListenerContainer: DEBUG
+logging.level.org.apache.kafka.clients.consumer.internals.ConsumerCoordinator: DEBUG

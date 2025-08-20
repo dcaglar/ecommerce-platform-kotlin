@@ -21,7 +21,7 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
             queueCapacity = 16       // or 16; keeps back-pressure tight
             setThreadNamePrefix("po-psp-")
             setTaskDecorator(decorator)
-            setRejectedExecutionHandler(ThreadPoolExecutor.CallerRunsPolicy())
+            setRejectedExecutionHandler(ThreadPoolExecutor.AbortPolicy())
             setWaitForTasksToCompleteOnShutdown(true)
             initialize()
         }

@@ -12,3 +12,28 @@ CREATE TABLE outbox_event (
 
 CREATE INDEX idx_outbox_event_status ON outbox_event(status);
 CREATE INDEX idx_outbox_event_created_at ON outbox_event(created_at);
+
+
+-- public.payment_orders definition
+
+-- Drop table
+
+DROP TABLE IF EXISTS  payment_orders;
+
+CREATE TABLE payment_orders (
+	payment_order_id int8 NOT NULL,
+	public_payment_order_id varchar(255) NOT NULL,
+	payment_id int8 NOT NULL,
+	public_payment_id varchar(255) NOT NULL,
+	seller_id varchar(255) NOT NULL,
+	amount_value numeric(19, 2) NOT NULL,
+	amount_currency varchar(10) NOT NULL,
+	status varchar(50) NOT NULL,
+	created_at timestamp NOT NULL,
+	updated_at timestamp NULL,
+	retry_count int4 NULL,
+	retry_reason varchar(255) NULL,
+	last_error_message varchar(255) NULL,
+	CONSTRAINT payment_orders_pkey PRIMARY KEY (payment_order_id),
+	CONSTRAINT payment_orders_public_payment_order_id_key UNIQUE (public_payment_order_id)
+);

@@ -26,6 +26,6 @@ class PaymentController(
         val responseDTO = paymentService.createPayment(request);
         logger.info("📥 Received payment request for order: ${responseDTO.orderId} , payment id is  ${responseDTO.paymentId}")
         //todo remember to change  to http 201 or 202
-        return ResponseEntity.ok(paymentService.createPayment(request))
+        return ResponseEntity.ok(responseDTO)
     }
 }

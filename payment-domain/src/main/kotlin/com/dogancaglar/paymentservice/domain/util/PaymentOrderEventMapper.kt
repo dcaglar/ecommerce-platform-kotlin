@@ -42,7 +42,7 @@ object PaymentOrderDomainEventMapper {
             paymentId = order.paymentId.value.toString(),
             publicPaymentId = order.publicPaymentId,
             sellerId = order.sellerId.value,
-            retryCount = 0,
+            retryCount = order.retryCount,          // usually 0 on create
             createdAt = LocalDateTime.now(),
             status = order.status.name,
             amountValue = order.amount.value,

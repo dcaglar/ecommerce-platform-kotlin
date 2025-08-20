@@ -30,6 +30,9 @@ class PaymentOrder constructor(
     fun withLastError(error: String?) = copy(lastErrorMessage = error)
     fun withUpdatedAt(now: LocalDateTime) = copy(updatedAt = now)
 
+    fun isTerminal(): Boolean =
+        this.status == PaymentOrderStatus.SUCCESSFUL || this.status == PaymentOrderStatus.FINALIZED_FAILED
+
     // ⚠️ We reimplement 'copy' ourselves because it's no longer a data class
     private fun copy(
         status: PaymentOrderStatus = this.status,
@@ -131,4 +134,6 @@ class PaymentOrder constructor(
         retryReason = retryReason,
         lastErrorMessage = lastErrorMessage
     )
+
+
 }
