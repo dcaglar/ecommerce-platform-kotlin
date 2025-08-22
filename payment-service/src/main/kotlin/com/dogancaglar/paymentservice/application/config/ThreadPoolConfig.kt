@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.task.TaskDecorator
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Component
 
@@ -48,28 +47,26 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
     }
 
     @Bean
-    fun taskScheduler(): ThreadPoolTaskScheduler {
+    fun outboxEventPartitionMaintenanceScheduler(): ThreadPoolTaskScheduler {
         val scheduler = ThreadPoolTaskScheduler()
-        scheduler.poolSize = 2 // or any number you want
+        scheduler.poolSize =
+            4 // or we ca increase it maybe 2 or 4 or 8, but this is dedicated to partition maintenance job
         scheduler.setTaskDecorator(decorator)
-        scheduler.setThreadNamePrefix("my-scheduled-task-spring")
+        scheduler.setThreadNamePrefix("outbox-mainenance-pool-")
         scheduler.initialize()
         return scheduler
     }
 
+    @Bean("taskScheduler")
+    fun defaultSpringScheduler(decorator: MdcTaskDecorator): ThreadPoolTaskScheduler =
+        ThreadPoolTaskScheduler().apply {
+            poolSize = 2
+            setThreadNamePrefix("spring-scheduled-")
+            setTaskDecorator(decorator)
+            setWaitForTasksToCompleteOnShutdown(true)
+            initialize()
+        }
 
-    @Bean
-    fun externalPspExecutorPoolConfig(): ThreadPoolTaskExecutor {
-        val executor = ThreadPoolTaskExecutor()
-        executor.corePoolSize = 16      // One per partition/consumer thread
-        executor.maxPoolSize = 16       // Allow for some burst/buffering
-        executor.setQueueCapacity(32)  // Buffer for transient spikes (tune per your workload)
-        executor.setTaskDecorator(decorator)
-        executor.setThreadNamePrefix("payment-order-retry-executor-")
-        executor.setWaitForTasksToCompleteOnShutdown(true)
-        executor.initialize()
-        return executor
-    }
 
 }
 

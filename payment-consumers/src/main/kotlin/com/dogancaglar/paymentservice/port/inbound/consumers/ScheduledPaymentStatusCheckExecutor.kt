@@ -61,7 +61,7 @@ class ScheduledPaymentStatusCheckExecutor(
             logger.error("⏱️ PSP status timed out for orderId=${order.paymentOrderId}, retrying...", e)
             processPspResultUseCase.processPspResult(
                 event = paymentOrderStatusCheckRequested,
-                pspStatus = PaymentOrderStatus.TIMEOUT
+                pspStatus = PaymentOrderStatus.TIMEOUT_EXCEEDED_1S_TRANSIENT
             )
         } catch (e: Exception) {
             when (e) {
@@ -104,7 +104,7 @@ class ScheduledPaymentStatusCheckExecutor(
         } catch (e: TimeoutException) {
             logger.warn("PSP call timed out for {}", order.paymentOrderId)
             future.cancel(true)
-            PaymentOrderStatus.TIMEOUT
+            PaymentOrderStatus.TIMEOUT_EXCEEDED_1S_TRANSIENT
         } finally {
             logger.info(
                 "TIMING: PSP call took {} ms for {}",

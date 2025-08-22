@@ -45,7 +45,7 @@ class PaymentOrderEnqueuer(
         val groupMeta =
             consumer.groupMetadata()                        // <— real metadata (generation, member id, epoch)
         LogContext.with(consumed) {
-            if (order.status != PaymentOrderStatus.INITIATED) {
+            if (order.status != PaymentOrderStatus.INITIATED_PENDING) {
                 kafkaTx.run(offsets, groupMeta) {}
                 logger.info("⏩ Skip enqueue (status={}) agg={}", order.status, consumed.aggregateId)
                 return@with

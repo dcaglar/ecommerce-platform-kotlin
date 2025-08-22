@@ -21,17 +21,17 @@ class PaymentOrder constructor(
     val lastErrorMessage: String? = null
 ) {
 
-    fun markAsFailed() = copy(status = PaymentOrderStatus.FAILED)
-    fun markAsPaid() = copy(status = PaymentOrderStatus.SUCCESSFUL)
-    fun markAsPending() = copy(status = PaymentOrderStatus.PENDING)
-    fun markAsFinalizedFailed() = copy(status = PaymentOrderStatus.FINALIZED_FAILED)
+    fun markAsFailed() = copy(status = PaymentOrderStatus.FAILED_TRANSIENT_ERROR)
+    fun markAsPaid() = copy(status = PaymentOrderStatus.SUCCESSFUL_FINAL)
+    fun markAsPending() = copy(status = PaymentOrderStatus.PENDING_STATUS_CHECK_LATER)
+    fun markAsFinalizedFailed() = copy(status = PaymentOrderStatus.FAILED_FINAL)
     fun incrementRetry() = copy(retryCount = retryCount + 1)
     fun withRetryReason(reason: String?) = copy(retryReason = reason)
     fun withLastError(error: String?) = copy(lastErrorMessage = error)
     fun withUpdatedAt(now: LocalDateTime) = copy(updatedAt = now)
 
     fun isTerminal(): Boolean =
-        this.status == PaymentOrderStatus.SUCCESSFUL || this.status == PaymentOrderStatus.FINALIZED_FAILED
+        this.status == PaymentOrderStatus.SUCCESSFUL_FINAL || this.status == PaymentOrderStatus.FAILED_FINAL
 
     // ⚠️ We reimplement 'copy' ourselves because it's no longer a data class
     private fun copy(
@@ -72,7 +72,7 @@ class PaymentOrder constructor(
                 publicPaymentId = publicPaymentId, // Keep as String
                 sellerId = sellerId,
                 amount = amount,
-                status = PaymentOrderStatus.INITIATED,
+                status = PaymentOrderStatus.INITIATED_PENDING,
                 createdAt = createdAt,
                 updatedAt = createdAt
             )
