@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.stereotype.Component
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
@@ -74,15 +75,29 @@ class PaymentOrderPspCallExecutor(
     private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
         val sample = Timer.start(meterRegistry)
         var resultLabel = "EXCEPTION"        // default if an unexpected error bubbles
-        val future = pspExecutor.submit<PaymentOrderStatus> { pspClient.charge(order) }
-        return try {
-            val status = future.get(1, TimeUnit.SECONDS)
-            resultLabel = status.name
-            status
-        } catch (_: TimeoutException) {
-            future.cancel(true)
-            resultLabel = "TIMEOUT"
-            PaymentOrderStatus.TIMEOUT
+        try {
+            val future = pspExecutor.submit<PaymentOrderStatus> { pspClient.charge(order) }
+            return try {
+                val status = future.get(1, TimeUnit.SECONDS)
+                resultLabel = status.name
+                status
+            } catch (t: TimeoutException) {
+                logger.warn("PSP call timeout: {}", t.message)
+                future.cancel(true)
+                resultLabel = "TIMEOUT"
+                PaymentOrderStatus.TIMEOUT_EXCEEDED_1S_TRANSIENT
+            } catch (e: InterruptedException) {
+                logger.warn("PSP call interrupted: {}", e.message)
+                future.cancel(true)
+                Thread.currentThread().interrupt()
+                resultLabel = "INTERRUPTED"
+                PaymentOrderStatus.TIMEOUT_EXCEEDED_1S_TRANSIENT
+            }
+        } catch (e: RejectedExecutionException) {
+            // pool saturated; fail fast without blocking listener
+            logger.warn("PSP call rejected due to executor saturation: {}", e.message)
+            resultLabel = "REJECTED"
+            return PaymentOrderStatus.TIMEOUT_EXCEEDED_1S_TRANSIENT     // or a distinct status
         } catch (e: Exception) {
             // Let DefaultErrorHandler handle it, but tag metrics correctly
             resultLabel = "EXCEPTION"

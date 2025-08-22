@@ -20,9 +20,15 @@ class PaymentGatewayAdapter(
             ?: throw IllegalStateException("No scenario config for ${config.scenario}")
 
     override fun charge(order: PaymentOrder): PaymentOrderStatus {
-        simulator.simulate();
-        val pspResponse = getPaymentResult()
-        return PSPStatusMapper.fromPspStatus(pspResponse.status)
+        try {
+            simulator.simulate();
+            val pspResponse = getPaymentResult()
+            return PSPStatusMapper.fromPspStatus(pspResponse.status)
+        } catch (ie: InterruptedException) {
+            logger.warn("Interrupted during PSP call simulation", ie)
+            Thread.currentThread().interrupt()   // don’t swallow interrupts
+            return PaymentOrderStatus.TIMEOUT_EXCEEDED_1S_TRANSIENT
+        }
     }
 
     override fun chargeRetry(order: PaymentOrder): PaymentOrderStatus {
@@ -40,10 +46,10 @@ class PaymentGatewayAdapter(
     private fun getPaymentResult(): PSPResponse {
         val roll = Random.nextInt(100)
         val result = when {
-            roll < active.response.successful -> PaymentOrderStatus.SUCCESSFUL  //final
-            roll < active.response.successful + active.response.retryable -> PaymentOrderStatus.FAILED     //retry payment
-            roll < active.response.successful + active.response.retryable + active.response.nonRetryable -> PaymentOrderStatus.DECLINED    //final stage
-            else -> PaymentOrderStatus.PENDING
+            roll < active.response.successful -> PaymentOrderStatus.SUCCESSFUL_FINAL  //final
+            roll < active.response.successful + active.response.retryable -> PaymentOrderStatus.FAILED_TRANSIENT_ERROR     //retry payment
+            roll < active.response.successful + active.response.retryable + active.response.nonRetryable -> PaymentOrderStatus.DECLINED_FINAL    //final stage
+            else -> PaymentOrderStatus.PENDING_STATUS_CHECK_LATER
         }
         return PSPResponse(result.toString());
     }
@@ -51,10 +57,10 @@ class PaymentGatewayAdapter(
     private fun getRetryPaymentResult(): PSPResponse {
         val roll = Random.nextInt(100)
         val result = when {
-            roll < active.response.successful -> PaymentOrderStatus.SUCCESSFUL  //final
-            roll < active.response.successful + active.response.retryable -> PaymentOrderStatus.FAILED     //retry payment
-            roll < active.response.successful + active.response.retryable + active.response.nonRetryable -> PaymentOrderStatus.DECLINED    //final stage
-            else -> PaymentOrderStatus.PENDING
+            roll < active.response.successful -> PaymentOrderStatus.SUCCESSFUL_FINAL  //final
+            roll < active.response.successful + active.response.retryable -> PaymentOrderStatus.FAILED_TRANSIENT_ERROR     //retry payment
+            roll < active.response.successful + active.response.retryable + active.response.nonRetryable -> PaymentOrderStatus.DECLINED_FINAL    //final stage
+            else -> PaymentOrderStatus.PENDING_STATUS_CHECK_LATER
         }
         return PSPResponse(result.toString());
     }
@@ -62,9 +68,9 @@ class PaymentGatewayAdapter(
     private fun getPaymentStatusResult(): PSPResponse {
         val roll = Random.nextInt(100)
         val result = when {
-            roll < 50 -> PaymentOrderStatus.CAPTURE_PENDING //schedule a status check for hours later
-            roll < 70 -> PaymentOrderStatus.SUCCESSFUL      // final success
-            else -> PaymentOrderStatus.DECLINED
+            roll < 50 -> PaymentOrderStatus.CAPTURE_PENDING_STATUS_CHECK_LATER //schedule a status check for hours later
+            roll < 70 -> PaymentOrderStatus.SUCCESSFUL_FINAL      // final success
+            else -> PaymentOrderStatus.DECLINED_FINAL
         } //final declibe
         return PSPResponse(result.toString());
     }

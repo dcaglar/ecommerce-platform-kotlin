@@ -48,7 +48,7 @@ open class ProcessPaymentService(
 
         try {
             when {
-                pspStatus == PaymentOrderStatus.SUCCESSFUL -> {
+                pspStatus == PaymentOrderStatus.SUCCESSFUL_FINAL -> {
                     val dbStart = System.currentTimeMillis()
                     handleSuccessfulPayment(order)
                     logger.info(
