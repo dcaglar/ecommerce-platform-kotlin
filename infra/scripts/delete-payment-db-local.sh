@@ -4,7 +4,7 @@ set -euo pipefail
 NAMESPACE="payment"
 
 echo "🚀 Helm unistal payment-db resource"
-helm uninstall payment-db -n "$NAMESPACE"
+helm uninstall payment-db -n "$NAMESPACE"  --ignore-not-found
 
 
 echo "🚀 Deleting payment-db pvc"

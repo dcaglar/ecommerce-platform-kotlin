@@ -68,11 +68,6 @@ class PaymentOrderPspCallExecutor(
                 }
             } finally {
                 sample.stop(pspLatency)
-                meterRegistry.counter(
-                    "psp_calls_total",
-                    "result",
-                    status?.name ?: "EXCEPTION"
-                ).increment()
             }
         }
     }

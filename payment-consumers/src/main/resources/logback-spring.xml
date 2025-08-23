@@ -34,7 +34,7 @@
         </appender>
 
         <!-- Root logger at INFO for containers -->
-        <root level="DEBUG">
+        <root level="INFO">
             <appender-ref ref="JSON"/>
         </root>
     </springProfile>

@@ -37,7 +37,7 @@ class PaymentGatewayAdapter(
             }
             // Wait up to 1s for PSP result
             val status = future.get(1, TimeUnit.SECONDS)
-            causeLabel = "OK"
+            causeLabel = status.name
             status
         } catch (t: TimeoutException) {
             // Time limit exceeded → cancel and map to transient timeout
@@ -72,7 +72,7 @@ class PaymentGatewayAdapter(
             causeLabel = "REJECTED"
             return PaymentOrderStatus.TIMEOUT_EXCEEDED_1S_TRANSIENT
         } finally {
-            meterRegistry.counter("psp_calls_by_cause_total", "cause", causeLabel).increment()
+            meterRegistry.counter("psp_calls_total", "result", causeLabel).increment()
         }
     }
 
