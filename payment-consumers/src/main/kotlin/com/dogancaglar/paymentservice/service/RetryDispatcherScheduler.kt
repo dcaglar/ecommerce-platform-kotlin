@@ -20,7 +20,7 @@ class RetryDispatcherScheduler(
     private val publisher: PaymentEventPublisher,
     private val meterRegistry: MeterRegistry,
     private val kafkaTx: KafkaTxExecutor,
-    @Qualifier("retryDispatcherScheduler") private val scheduler: ThreadPoolTaskScheduler
+    @Qualifier("retryDispatcherSpringScheduler") private val scheduler: ThreadPoolTaskScheduler
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val batchSize = AtomicInteger(0)
@@ -69,7 +69,11 @@ class RetryDispatcherScheduler(
 
     @Scheduled(fixedDelay = 5_000)
     fun dispatch() {
-        if (!running.compareAndSet(false, true)) return
+        // Prevent overlapping runs
+        if (!running.compareAndSet(false, true)) {
+            logger.warn("Previous dispatch still running, skipping this run")
+            return
+        }
 
         scheduler.execute {
             try {

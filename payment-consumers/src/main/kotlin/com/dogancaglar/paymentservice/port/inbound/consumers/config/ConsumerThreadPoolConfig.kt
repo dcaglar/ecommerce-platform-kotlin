@@ -35,13 +35,24 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
             queueCapacity = 4
             setThreadNamePrefix("ps-psp-")
             setTaskDecorator(decorator)
-            setRejectedExecutionHandler(ThreadPoolExecutor.CallerRunsPolicy())
+            setRejectedExecutionHandler(ThreadPoolExecutor.AbortPolicy())
             setWaitForTasksToCompleteOnShutdown(true)
             initialize()
         }
 
 
-    @Bean("retryDispatcherScheduler")
+    @Bean("taskScheduler")
+    fun defaultSpringScheduler(): ThreadPoolTaskScheduler =
+        ThreadPoolTaskScheduler().apply {
+            poolSize = 2
+            setThreadNamePrefix("payment-consumers-spring-scheduled-")
+            setTaskDecorator(decorator)
+            setWaitForTasksToCompleteOnShutdown(true)
+            initialize()
+        }
+
+
+    @Bean("retryDispatcherSpringScheduler")
     fun retryDispatcherScheduler(decorator: MdcTaskDecorator) =
         ThreadPoolTaskScheduler().apply {
             poolSize = 1                      // one runner is enough; raise if you really want concurrent batches

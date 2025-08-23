@@ -77,9 +77,9 @@ stern -n payment 'payment-service'| grep 'POST'
 ## 7️⃣ Run Load Tests
 
 From project root, run:
- 
+
 ```bash 
-VUS=10  RPS=10 DURATION=2m k6 run load-tests/baseline-smoke-test.js
+VUS=10  RPS=10 DURATION=20m k6 run load-tests/baseline-smoke-test.js
 VUS=15  RPS=15 DURATION=10m k6 run load-tests/baseline-smoke-test.js
 VUS=20  RPS=20 DURATION=50m k6 run load-tests/baseline-smoke-test.js
 VUS=40 RPS=40 DURATION=20m k6 run load-tests/baseline-smoke-test.js

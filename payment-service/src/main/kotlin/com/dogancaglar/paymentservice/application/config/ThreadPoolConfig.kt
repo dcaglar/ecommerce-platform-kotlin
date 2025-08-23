@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component
 
 @Configuration
 class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val decorator: MdcTaskDecorator) {
-    @Bean("outboxTaskScheduler")
+    @Bean("outboxJobTaskScheduler")
     fun outboxTaskScheduler(
         @Value("\${outbox-dispatcher.pool-size:8}") poolSize: Int,
     ): ThreadPoolTaskScheduler {
@@ -50,7 +50,7 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
     fun outboxEventPartitionMaintenanceScheduler(): ThreadPoolTaskScheduler {
         val scheduler = ThreadPoolTaskScheduler()
         scheduler.poolSize =
-            4 // or we ca increase it maybe 2 or 4 or 8, but this is dedicated to partition maintenance job
+            2 // or we ca increase it maybe 2 or 4 or 8, but this is dedicated to partition maintenance job
         scheduler.setTaskDecorator(decorator)
         scheduler.setThreadNamePrefix("outbox-mainenance-pool-")
         scheduler.initialize()
@@ -58,10 +58,10 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
     }
 
     @Bean("taskScheduler")
-    fun defaultSpringScheduler(decorator: MdcTaskDecorator): ThreadPoolTaskScheduler =
+    fun defaultSpringScheduler(): ThreadPoolTaskScheduler =
         ThreadPoolTaskScheduler().apply {
             poolSize = 2
-            setThreadNamePrefix("spring-scheduled-")
+            setThreadNamePrefix("payment-service-spring-scheduled-")
             setTaskDecorator(decorator)
             setWaitForTasksToCompleteOnShutdown(true)
             initialize()
