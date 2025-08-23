@@ -125,19 +125,19 @@ psp:
     scenarios:
       NORMAL:
         timeouts:
-          enabled: false
-          probability: 0       # 1% of requests time out
+          enabled: true
+          probability: 20       # 2% of total requests time out
         latency:
           fast:
-            probability: 100    # 70% are fast (50–150ms)
+            probability: 100    # rest of 100% are fast (50–150ms)
             minMs: 50
             maxMs: 150
           moderate:
-            probability: 0    # 25% are moderate (150–300ms)
+            probability: 0    # 0% are moderate (150–300ms)
             minMs: 150
             maxMs: 300
           slow:
-            probability: 0     # 5% are slow (300–600ms)
+            probability: 0     # 0% are slow (300–600ms)
             minMs: 300
             maxMs: 600
         response:

@@ -80,7 +80,7 @@ echo "🔍 ServiceMonitors in 'payment' with release=prometheus-stack:"
 kubectl -n payment get servicemonitors -l release=prometheus-stack || true
 
 APP_NS=${APP_NS:-payment}
-GROUP=${GROUP:-payment-order-created-consumer-group}
+GROUP=${GROUP:-payment-order-psp-call-executor-consumer-group}
 METRIC_PATH="/apis/external.metrics.k8s.io/v1beta1/namespaces/${APP_NS}/kafka_consumer_group_lag?labelSelector=consumergroup%3D${GROUP}"
 
 echo "🔎 Test external metric for consumergroup=${GROUP}: ${METRIC_PATH}"
