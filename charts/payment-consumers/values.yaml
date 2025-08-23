@@ -35,7 +35,7 @@ autoscaling:
           name: kafka_consumer_group_lag
           selector:
             matchLabels:
-              consumergroup: payment-order-created-consumer-group
+              consumergroup: payment-order-psp-call-executor-consumer-group
         target:
           type: AverageValue
           averageValue: "1000"

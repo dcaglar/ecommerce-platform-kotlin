@@ -18,22 +18,22 @@ import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.annotation.KafkaListener
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.stereotype.Component
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 
 @Component
 class PaymentOrderPspCallExecutor(
     private val processPspResult: ProcessPspResultUseCase,
     private val pspClient: PaymentGatewayPort,
     private val meterRegistry: MeterRegistry,
-    private val kafkaTx: KafkaTxExecutor,
-    @Qualifier("paymentOrderPspPool") private val pspExecutor: ThreadPoolTaskExecutor
+    private val kafkaTx: KafkaTxExecutor
 ) {
+
     private val logger = LoggerFactory.getLogger(javaClass)
+
+    private val pspLatency: Timer = Timer.builder("psp_call_latency")
+        .publishPercentileHistogram()
+        .register(meterRegistry)
 
     @KafkaListener(
         topics = [Topics.PAYMENT_ORDER_PSP_CALL_REQUESTED],
@@ -48,48 +48,27 @@ class PaymentOrderPspCallExecutor(
         val work = env.data
         val tp = TopicPartition(record.topic(), record.partition())
         val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
-        val groupMeta =
-            consumer.groupMetadata()
+        val groupMeta = consumer.groupMetadata()
+
         LogContext.with(env) {
             val id = PaymentOrderId(work.paymentOrderId.toLong())
 
-
-            // 2) Build domain snapshot from event (no DB load)
+            // Build domain snapshot (no DB load)
             val orderForPsp: PaymentOrder = PaymentOrderDomainEventMapper.fromEvent(work)
 
-            // 3) Call PSP-idempotent
-            val status = safePspCall(orderForPsp)
+            // Call PSP (adapter handles timeouts/interrupts)
+            var status: PaymentOrderStatus? = null
+            val sample = Timer.start(meterRegistry)
+            try {
+                status = pspClient.charge(orderForPsp)
 
-            // 4) Persist + publish kafka, since under kafka tx, offset is not moving forward till event is published
-            kafkaTx.run(offsets, groupMeta) {
-                processPspResult.processPspResult(event = work, pspStatus = status)
+                // Persist + publish under Kafka tx
+                kafkaTx.run(offsets, groupMeta) {
+                    processPspResult.processPspResult(event = work, pspStatus = status!!)
+                }
+            } finally {
+                sample.stop(pspLatency)
             }
-        }
-    }
-
-    private val pspLatency: Timer = Timer.builder("psp_call_latency")
-        .publishPercentileHistogram()        // -> *_seconds_bucket in Prom
-        .register(meterRegistry)
-
-    private fun safePspCall(order: PaymentOrder): PaymentOrderStatus {
-        val sample = Timer.start(meterRegistry)
-        var resultLabel = "EXCEPTION"        // default if an unexpected error bubbles
-        val future = pspExecutor.submit<PaymentOrderStatus> { pspClient.charge(order) }
-        return try {
-            val status = future.get(1, TimeUnit.SECONDS)
-            resultLabel = status.name
-            status
-        } catch (_: TimeoutException) {
-            future.cancel(true)
-            resultLabel = "TIMEOUT"
-            PaymentOrderStatus.TIMEOUT
-        } catch (e: Exception) {
-            // Let DefaultErrorHandler handle it, but tag metrics correctly
-            resultLabel = "EXCEPTION"
-            throw e
-        } finally {
-            sample.stop(pspLatency)
-            meterRegistry.counter("psp_calls_total", "result", resultLabel).increment()
         }
     }
 }

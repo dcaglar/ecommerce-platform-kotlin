@@ -32,7 +32,7 @@ class OutboxDispatcherJob(
     private val kafkaTx: KafkaTxExecutor,
     private val meterRegistry: MeterRegistry,
     private val objectMapper: ObjectMapper,
-    @Qualifier("outboxTaskScheduler") private val taskScheduler: ThreadPoolTaskScheduler,
+    @Qualifier("outboxJobTaskScheduler") private val taskScheduler: ThreadPoolTaskScheduler,
     @Value("\${outbox-dispatcher.thread-count:8}") private val threadCount: Int,
     @Value("\${outbox-dispatcher.batch-size:250}") private val batchSize: Int,
     private val clock: Clock

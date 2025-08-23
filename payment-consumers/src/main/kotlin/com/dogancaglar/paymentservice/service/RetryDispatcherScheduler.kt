@@ -8,7 +8,9 @@ import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
 import io.micrometer.core.instrument.*
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.scheduling.annotation.Scheduled
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Component
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -17,10 +19,13 @@ class RetryDispatcherScheduler(
     private val retryQueue: PaymentRetryQueueAdapter,
     private val publisher: PaymentEventPublisher,
     private val meterRegistry: MeterRegistry,
-    private val kafkaTx: KafkaTxExecutor
+    private val kafkaTx: KafkaTxExecutor,
+    @Qualifier("retryDispatcherSpringScheduler") private val scheduler: ThreadPoolTaskScheduler
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val batchSize = AtomicInteger(0)
+    private val running = java.util.concurrent.atomic.AtomicBoolean(false)
+
 
     // Static tags to make dashboards easier
     private val topicTag = Tag.of("topic", EventMetadatas.PaymentOrderPspCallRequestedMetadata.topic)
@@ -64,6 +69,22 @@ class RetryDispatcherScheduler(
 
     @Scheduled(fixedDelay = 5_000)
     fun dispatch() {
+        // Prevent overlapping runs
+        if (!running.compareAndSet(false, true)) {
+            logger.warn("Previous dispatch still running, skipping this run")
+            return
+        }
+
+        scheduler.execute {
+            try {
+                dispatchOnce()
+            } finally {
+                running.set(false)
+            }
+        }
+    }
+
+    fun dispatchOnce() {
         val batchSample = Timer.start(meterRegistry)
 
         var success = 0

@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.task.TaskDecorator
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Component
 import java.util.concurrent.ThreadPoolExecutor
 
@@ -21,21 +22,7 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
             queueCapacity = 16       // or 16; keeps back-pressure tight
             setThreadNamePrefix("po-psp-")
             setTaskDecorator(decorator)
-            setRejectedExecutionHandler(ThreadPoolExecutor.CallerRunsPolicy())
-            setWaitForTasksToCompleteOnShutdown(true)
-            initialize()
-        }
-
-    @Bean("paymentRetryPspPool")
-    fun paymentRetryPspPool(decorator: TaskDecorator): ThreadPoolTaskExecutor =
-        ThreadPoolTaskExecutor().apply {
-            corePoolSize = 4
-            maxPoolSize = 6
-            queueCapacity = 16
-            setThreadNamePrefix("pr-psp-")
-            setTaskDecorator(decorator)
-            setRejectedExecutionHandler(ThreadPoolExecutor.CallerRunsPolicy())
-            setWaitForTasksToCompleteOnShutdown(true)
+            setRejectedExecutionHandler(ThreadPoolExecutor.AbortPolicy())
             initialize()
         }
 
@@ -48,23 +35,32 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
             queueCapacity = 4
             setThreadNamePrefix("ps-psp-")
             setTaskDecorator(decorator)
-            setRejectedExecutionHandler(ThreadPoolExecutor.CallerRunsPolicy())
+            setRejectedExecutionHandler(ThreadPoolExecutor.AbortPolicy())
             setWaitForTasksToCompleteOnShutdown(true)
             initialize()
         }
 
-    @Bean
-    fun externalPspExecutorPoolConfig(): ThreadPoolTaskExecutor {
-        val executor = ThreadPoolTaskExecutor()
-        executor.corePoolSize = 1      // One per partition/consumer thread
-        executor.maxPoolSize = 2       // Allow for some burst/buffering
-        executor.setQueueCapacity(4)  // Buffer for transient spikes (tune per your workload)
-        executor.setTaskDecorator(decorator)
-        executor.setThreadNamePrefix("payment-order-retry-executor-")
-        executor.setWaitForTasksToCompleteOnShutdown(true)
-        executor.initialize()
-        return executor
-    }
+
+    @Bean("taskScheduler")
+    fun defaultSpringScheduler(): ThreadPoolTaskScheduler =
+        ThreadPoolTaskScheduler().apply {
+            poolSize = 2
+            setThreadNamePrefix("payment-consumers-spring-scheduled-")
+            setTaskDecorator(decorator)
+            setWaitForTasksToCompleteOnShutdown(true)
+            initialize()
+        }
+
+
+    @Bean("retryDispatcherSpringScheduler")
+    fun retryDispatcherScheduler(decorator: MdcTaskDecorator) =
+        ThreadPoolTaskScheduler().apply {
+            poolSize = 1                      // one runner is enough; raise if you really want concurrent batches
+            setThreadNamePrefix("retry-dispatcher-")
+            setTaskDecorator(decorator)
+            setWaitForTasksToCompleteOnShutdown(true)
+            initialize()
+        }
 
 
 }

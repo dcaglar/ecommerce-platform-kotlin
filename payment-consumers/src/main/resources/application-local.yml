@@ -71,52 +71,73 @@ spring:
           max-wait: -1ms
 management:
   endpoints:
-    web:
-      exposure:
-        include: "prometheus,metrics,health"
+    web.exposure.include: "prometheus,metrics,health"
   endpoint:
     health:
       enabled: true
       show-details: always
-    prometheus:
-      enabled: true
+    prometheus.enabled: true
   metrics:
+    tags:
+      application: payment-consumers
     enable:
       all: false
       hikaricp.connections: true
       hikaricp.connections.acquire: true
       kafka.consumer.fetch.manager.records.lag: true
       kafka.producer.topic.record.send: true
+      kafka.consumer.fetch.manager.records.consumed: true
+      kafka.consumer.fetch.manager.fetch.latency: true
+      kafka.consumer.io.time: true
       process.cpu.usage: true
       jvm.threads.live: true
       jvm.memory.used: true
       jvm.memory.max: true
       jvm.gc.pause: true
-      kafka.consumer.fetch.manager.records.consumed: true
-      kafka.consumer.fetch.manager.fetch.latency: true
-      kafka.consumer.io.time: true
+      # binders
+
+      # your custom meters (base names)
+      psp_calls_total: true
+      psp_call_latency: true
+      redis_retry_zset_size: true
+      redis_retry_batch_size: true
+      redis_retry_events_total: true
+      redis_retry_dispatch_batch_seconds: true
+      redis_retry_dispatch_event_seconds: true
+    distribution:
+      # timers you want histograms for (you already call publishPercentileHistogram() in code,
+      # this just makes it explicit in config too)
+      percentiles-histogram:
+        psp_call_latency: true
+        redis_retry_dispatch_batch_seconds: true
+        redis_retry_dispatch_event_seconds: true
+      percentiles:
+        psp_call_latency: 0.5,0.95,0.99
+        redis_retry_dispatch_batch_seconds: 0.5,0.95,0.99
+        redis_retry_dispatch_event_seconds: 0.5,0.95,0.99
     export:
       prometheus:
         enabled: true
+
 psp:
   simulation:
     currentScenario: NORMAL
     scenarios:
       NORMAL:
         timeouts:
-          enabled: false
-          probability: 0       # 1% of requests time out
+          enabled: true
+          probability: 20       # 2% of total requests time out
         latency:
           fast:
-            probability: 100    # 70% are fast (50–150ms)
+            probability: 100    # rest of 100% are fast (50–150ms)
             minMs: 50
             maxMs: 150
           moderate:
-            probability: 0    # 25% are moderate (150–300ms)
+            probability: 0    # 0% are moderate (150–300ms)
             minMs: 150
             maxMs: 300
           slow:
-            probability: 0     # 5% are slow (300–600ms)
+            probability: 0     # 0% are slow (300–600ms)
             minMs: 300
             maxMs: 600
         response:

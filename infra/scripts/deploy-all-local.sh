@@ -20,6 +20,9 @@ echo "🚀 Deploying redis..."
 echo "🚀 Deploying kafka..."
 "$SCRIPT_DIR/deploy-kafka-local.sh"
 
+echo "🚀 Deploying kafka exporter..."
+"$SCRIPT_DIR/deploy-kafka-exporter-local.sh"
+
 
 echo "✅ All components deployed!"
 
