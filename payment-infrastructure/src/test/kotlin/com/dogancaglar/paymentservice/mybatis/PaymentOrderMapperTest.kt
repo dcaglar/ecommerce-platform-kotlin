@@ -96,7 +96,7 @@ class PaymentOrderMapperTest {
 
         // Fetch and assert status remains SUCCESSFUL
         val persisted = paymentOrderMapper.findByPaymentOrderId(paymentOrderId.value).first()
-        assertEquals(PaymentOrderStatus.SUCCESSFUL, persisted.status)
+        assertEquals(PaymentOrderStatus.SUCCESSFUL_FINAL, persisted.status)
     }
 
     @Test
@@ -121,7 +121,7 @@ class PaymentOrderMapperTest {
         paymentOrderMapper.updateReturningIdempotent(PaymentOrderEntityMapper.toEntity(pending))
 
         val row = paymentOrderMapper.findByPaymentOrderId(paymentOrderId.value).first()
-        assertEquals(PaymentOrderStatus.PENDING, row.status)
+        assertEquals(PaymentOrderStatus.PENDING_STATUS_CHECK_LATER, row.status)
         // updated_at should be >= init.updated_at; exact value depends on DB function, so we don’t assert equality here
     }
 }

@@ -88,7 +88,7 @@
         UPDATE payment_orders p
         SET
         status = CASE
-        WHEN p.status IN ('SUCCESSFUL','FINALIZED_FAILED') THEN p.status
+        WHEN p.status IN ('SUCCESSFUL_FINAL','FAILED_FINAL','DECLINED_FINAL') THEN p.status
         ELSE #{status}
         END,
         updated_at = GREATEST(p.updated_at, #{updatedAt}),
@@ -96,7 +96,7 @@
         retry_reason = COALESCE(#{retryReason}, p.retry_reason),
         last_error_message = COALESCE(#{lastErrorMessage}, p.last_error_message)
         WHERE p.payment_order_id = #{paymentOrderId}
-        AND p.status NOT IN ('SUCCESSFUL','FINALIZED_FAILED')
+        AND p.status NOT IN ('SUCCESSFUL_FINAL','FAILED_FINAL','DECLINED_FINAL')
         RETURNING
         p.payment_order_id, p.public_payment_order_id, p.payment_id, p.public_payment_id,
         p.seller_id, p.amount_value, p.amount_currency, p.status, p.created_at, p.updated_at,
