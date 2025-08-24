@@ -11,12 +11,14 @@ jvmOpts: >-
   -XX:MaxGCPauseMillis=200
   -XX:InitiatingHeapOccupancyPercent=30
   -XX:+UseStringDeduplication
+  -XX:MaxMetaspaceSize=128m
+  -XX:MaxDirectMemorySize=96m
 spring:
   profile: "local"
 
 replicaCount: 1
 resources:
-  requests: { cpu: "500m", memory: "412Mi" }
+  requests: { cpu: "200m", memory: "412Mi" }
   limits:   { cpu: "750m", memory: "750Mi" }
 
 
