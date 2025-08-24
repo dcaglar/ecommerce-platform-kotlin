@@ -57,7 +57,7 @@ kubectl top node
 
 kubectl top pods -n payment
 
-kubectl top pods -n monitoring --sort-by=memory
+kubectl top pods -n payment --sort-by=memory
 
 kubectl top pods -n logging
 

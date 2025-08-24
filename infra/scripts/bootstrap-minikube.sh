@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROFILE="${MINIKUBE_PROFILE:-payments}"
-MEMORY="${MINIKUBE_MEMORY:-10000}"
+MEMORY="${MINIKUBE_MEMORY:-10000}"   # MB
 CPUS="${MINIKUBE_CPUS:-6}"
-K8S_VERSION="${K8S_VERSION:-}"   # e.g. v1.29.4 (optional)
+K8S_VERSION="${K8S_VERSION:-}"       # e.g. v1.29.4 (optional)
 
-echo ">> Starting minikube profile: $PROFILE (memory=${MEMORY}MB, cpus=${CPUS})"
-if minikube profile list -o json 2>/dev/null | grep -q "\"Name\": \"${PROFILE}\""; then
-  minikube -p "$PROFILE" status >/dev/null || \
-  minikube -p "$PROFILE" start --memory="$MEMORY" --cpus="$CPUS" ${K8S_VERSION:+--kubernetes-version="$K8S_VERSION"}
+echo ">> Starting minikube (memory=${MEMORY}MB, cpus=${CPUS})"
+if ! minikube status >/dev/null 2>&1; then
+  args=(start --memory="${MEMORY}" --cpus="${CPUS}")
+  [[ -n "${K8S_VERSION}" ]] && args+=("--kubernetes-version=${K8S_VERSION}")
+  minikube "${args[@]}"
 else
-  minikube -p "$PROFILE" start --memory="$MEMORY" --cpus="$CPUS" ${K8S_VERSION:+--kubernetes-version="$K8S_VERSION"}
+  echo ">> Minikube already running."
 fi
 
 echo ">> Enabling metrics-server addon"
-minikube -p "$PROFILE" addons enable metrics-server >/dev/null
+minikube addons enable metrics-server >/dev/null || true
 
 # Optional useful addons (uncomment if you want them)
 # minikube -p "$PROFILE" addons enable ingress
@@ -27,4 +27,4 @@ kubectl -n kube-system wait deploy/metrics-server --for=condition=Available --ti
 echo ">> Sanity check:"
 kubectl top nodes || echo "metrics may take ~1 min to appear"
 
-echo "✅ Cluster ready (profile: $PROFILE)"
+echo "✅ Cluster ready"

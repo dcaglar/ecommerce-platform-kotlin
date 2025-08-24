@@ -54,7 +54,7 @@ class PaymentGatewayAdapter(
                 }
             }
             // Wait up to 1s for PSP result
-            val status = future.get(1, TimeUnit.SECONDS)
+            val status = future.get(500, TimeUnit.MILLISECONDS)
             causeLabel = status.name
             status
         } catch (t: TimeoutException) {
