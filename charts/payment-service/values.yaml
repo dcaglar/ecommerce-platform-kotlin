@@ -11,6 +11,8 @@ jvmOpts: >-
   -XX:MaxGCPauseMillis=200
   -XX:InitiatingHeapOccupancyPercent=30
   -XX:+UseStringDeduplication
+  -XX:MaxMetaspaceSize=128m
+  -XX:MaxDirectMemorySize=96m
 spring:
   profile: "local"
 
