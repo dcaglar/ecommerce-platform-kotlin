@@ -16,7 +16,7 @@ spring:
 
 replicaCount: 1
 resources:
-  requests: { cpu: "500m", memory: "412Mi" }
+  requests: { cpu: "200m", memory: "412Mi" }
   limits:   { cpu: "750m", memory: "750Mi" }
 
 

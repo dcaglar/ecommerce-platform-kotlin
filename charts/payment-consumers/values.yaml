@@ -14,8 +14,8 @@ spring:
       session.timeout.ms: 45000
 replicaCount: 1
 resources:
-  requests: { cpu: "750m", memory: "312Mi" }
-  limits:   { cpu: "1500m", memory: "550Mi" }
+  requests: { cpu: "200m", memory: "312Mi" }
+  limits:   { cpu: "750m", memory: "550Mi" }
 
 jvmOpts: >-
   -XX:+UseG1GC
@@ -26,8 +26,8 @@ jvmOpts: >-
 
 autoscaling:
   enabled: true
-  minReplicas: 2
-  maxReplicas: 3
+  minReplicas: 3
+  maxReplicas: 6
   metrics:
     - type: External
       external:

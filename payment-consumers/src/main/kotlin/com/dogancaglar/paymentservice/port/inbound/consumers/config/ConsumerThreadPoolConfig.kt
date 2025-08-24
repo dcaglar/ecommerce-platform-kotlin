@@ -17,9 +17,9 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
     @Bean("paymentOrderPspPool")
     fun paymentOrderPspPool(decorator: TaskDecorator): ThreadPoolTaskExecutor =
         ThreadPoolTaskExecutor().apply {
-            corePoolSize = 4          // match per-pod listener concurrency
-            maxPoolSize = 6
-            queueCapacity = 16       // or 16; keeps back-pressure tight
+            corePoolSize = 8          // match per-pod listener concurrency
+            maxPoolSize = 8
+            queueCapacity = 64       // or 16; keeps back-pressure tight
             setThreadNamePrefix("po-psp-")
             setTaskDecorator(decorator)
             setRejectedExecutionHandler(ThreadPoolExecutor.AbortPolicy())

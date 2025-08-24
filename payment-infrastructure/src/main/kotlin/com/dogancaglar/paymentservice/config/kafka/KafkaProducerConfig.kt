@@ -35,6 +35,8 @@ class KafkaProducerConfig(
         props[ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG] = true
         props[ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION] = 5
         props[ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG] = 120_000
+        props[ProducerConfig.TRANSACTION_TIMEOUT_CONFIG] = 30_000
+        props[ProducerConfig.CLIENT_ID_CONFIG] = "business-event-producer-$instanceId"
 
         return DefaultKafkaProducerFactory<String, EventEnvelope<*>>(props).apply {
             // Transactional producer for EOS + offset commits
