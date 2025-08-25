@@ -5,7 +5,6 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.util.PSPStatusMapper
 import com.dogancaglar.paymentservice.ports.outbound.PaymentGatewayPort
 import io.micrometer.core.instrument.MeterRegistry
-import io.micrometer.core.instrument.Timer
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
@@ -21,14 +20,6 @@ class PaymentGatewayAdapter(
     private val meterRegistry: MeterRegistry        // <--- add this
 ) : PaymentGatewayPort {
 
-    private val pspQueueDelay = Timer.builder("psp_queue_delay")
-        .publishPercentileHistogram()
-        .register(meterRegistry)
-
-    private val pspExecDuration = Timer.builder("psp_exec_duration")
-        .publishPercentileHistogram()
-        .register(meterRegistry)
-
     private val logger = LoggerFactory.getLogger(javaClass)
 
     private val active: PspSimulationProperties.ScenarioConfig
@@ -39,22 +30,13 @@ class PaymentGatewayAdapter(
     override fun charge(order: PaymentOrder): PaymentOrderStatus {
         var causeLabel = "EXCEPTION"
         var future: Future<PaymentOrderStatus>? = null
-        val enqueuedAt = System.nanoTime()
-
         return try {
             future = pspExecutor.submit<PaymentOrderStatus>
             {
-                val startedAt = System.nanoTime()
-                pspQueueDelay.record(startedAt - enqueuedAt, TimeUnit.NANOSECONDS)
-                val t0 = System.nanoTime()
-                try {
-                    doCharge(order)
-                } finally {
-                    pspExecDuration.record(System.nanoTime() - t0, TimeUnit.NANOSECONDS)
-                }
+                doCharge(order)
             }
             // Wait up to 1s for PSP result
-            val status = future.get(500, TimeUnit.MILLISECONDS)
+            val status = future.get(1, TimeUnit.SECONDS)
             causeLabel = status.name
             status
         } catch (t: TimeoutException) {
@@ -98,14 +80,7 @@ class PaymentGatewayAdapter(
     private fun doCharge(order: PaymentOrder): PaymentOrderStatus {
         // If this thread gets interrupted (e.g., due to cancel(true)),
         // any blocking/interruptible call below will throw InterruptedException.
-        try {
-            simulator.simulate()
-        } catch (ie: InterruptedException) {
-            meterRegistry.counter("psp_worker_interrupts_total").increment()
-            // DO NOT re-interrupt here; just propagate.
-            throw ie
-        }
-
+        simulator.simulate()
         val pspResponse = getPaymentResult()
         return PSPStatusMapper.fromPspStatus(pspResponse.status)
     }

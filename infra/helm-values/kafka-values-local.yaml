@@ -17,7 +17,7 @@ controller:
       # ephemeral-storage: 1Gi
     limits:
       cpu: "1"
-      memory: 3Gi
+      memory: 2Gi
       # Optional; raise or remove if you don't want a hard cap on local disk:
       # ephemeral-storage: 4Gi
 
@@ -25,26 +25,18 @@ controller:
   # (Use the key your chart supports; many charts use extraEnv, some use env)
   extraEnv:
     - name: KAFKA_HEAP_OPTS
-      value: "-Xms1000m -Xmx1000m"
+      value: "-Xms512m -Xmx512m"
     # Reasonable JVM perf defaults for Kafka on small nodes
     - name: KAFKA_JVM_PERFORMANCE_OPTS
       value: "-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExplicitGCInvokesConcurrent"
   overrideConfiguration:
     # Roles & listeners
-    group.initial.rebalance.delay.ms: 1000
     auto.create.topics.enable: false
     process.roles: controller,broker
     controller.listener.names: CONTROLLER
     inter.broker.listener.name: INTERNAL
     listeners: CLIENT://:9092,INTERNAL://:9094,CONTROLLER://:9093
     listener.security.protocol.map: CLIENT:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
-    log.retention.hours: 24
-    log.segment.bytes: 67108864            # 64 MiB
-    log.retention.check.interval.ms: 300000
-
-      # Prefer a single log cleaner thread in a small node
-    log.cleaner.threads: 1
-
     advertised.listeners: >
       CLIENT://kafka.payment.svc.cluster.local:9092,
       INTERNAL://kafka-controller-0.kafka-controller-headless.payment.svc.cluster.local:9094

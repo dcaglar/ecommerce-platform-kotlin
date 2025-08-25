@@ -57,7 +57,7 @@ kubectl top node
 
 kubectl top pods -n payment
 
-kubectl top pods -n payment --sort-by=memory
+kubectl top pods -n monitoring --sort-by=memory
 
 kubectl top pods -n logging
 
@@ -79,50 +79,10 @@ stern -n payment 'payment-service'| grep 'POST'
 From project root, run:
 
 ```bash 
-VUS=10  RPS=10 DURATION=3m k6 run load-tests/baseline-smoke-test.js
+VUS=10  RPS=10 DURATION=20m k6 run load-tests/baseline-smoke-test.js
 VUS=15  RPS=15 DURATION=10m k6 run load-tests/baseline-smoke-test.js
 VUS=20  RPS=20 DURATION=50m k6 run load-tests/baseline-smoke-test.js
 VUS=40 RPS=40 DURATION=20m k6 run load-tests/baseline-smoke-test.js
-```
-
-# this is total allocatable memory on the node
-
-```
- kubectl get nodes -o custom-columns=NAME:.metadata.name,ALLOCATABLE:.status.allocatable.memory
-```
-
-# # Current usage per node (needs metrics-server)
-
-```
-kubectl top nodes
-```
-
-# # Describe node to see resource requests/limits across all pods on the node
-
-```
-NODE=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
-kubectl describe node "$NODE" \
-| sed -n '/Allocated resources:/,/Events:/p'
-
-```
-
-Allocated resources:
-(Total limits may be over 100 percent, i.e., overcommitted.)
-Resource Requests Limits
-  --------           --------      ------
-cpu 4970m (71%)   8850m (126%)
-memory 4794Mi (40%)  7690Mi (65%)
-ephemeral-storage 100Mi (0%)    3Gi (0%)
-hugepages-1Gi 0 (0%)        0 (0%)
-hugepages-2Mi 0 (0%)        0 (0%)
-hugepages-32Mi 0 (0%)        0 (0%)
-hugepages-64Ki 0 (0%)        0 (0%)
-Events:              <none>
-
-``` 
-kubectl top nodes
-	kubectl top pods -A --sort-by=memory
-	kubectl top pods -A --sort-by=cpu
 ```
 
 connect to db after port-forwarding:

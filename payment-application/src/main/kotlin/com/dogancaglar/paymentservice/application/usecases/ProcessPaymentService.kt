@@ -37,7 +37,7 @@ open class ProcessPaymentService(
 
     companion object const
 
-    val MAX_RETRIES: Int = 5
+    val MAX_RETRIES: Int = 10
 
     override fun processPspResult(
         event: PaymentOrderEvent,
@@ -87,7 +87,7 @@ open class ProcessPaymentService(
         }
     }
 
-    private fun handleRetryEvent1(order: PaymentOrder, reason: String?, lastError: String?) {
+    private fun handleRetryEvent(order: PaymentOrder, reason: String?, lastError: String?) {
         pspResultCache.remove(order.paymentOrderId)
 
         val persisted = paymentOrderModificationPort.markFailedForRetry(order, reason, lastError) // ← persisted row
@@ -110,30 +110,6 @@ open class ProcessPaymentService(
         val backoffMs = computeEqualJitterBackoff(nextAttempt)
         logRetrySchedule(persisted, nextAttempt, System.currentTimeMillis() + backoffMs, reason, lastError)
 
-        retryQueuePort.scheduleRetry(
-            paymentOrder = persisted,
-            retryReason = reason,
-            backOffMillis = backoffMs,
-            lastErrorMessage = lastError
-        )
-    }
-
-    private fun handleRetryEvent(order: PaymentOrder, reason: String?, lastError: String?) {
-        val retriesSoFar = order.retryCount        // from the event; attempt i (0 for initial)
-
-        if (retriesSoFar >= MAX_RETRIES) {
-            retryQueuePort.resetRetryCounter(order.paymentOrderId)
-            handleNonRetryableFailEvent(order, reason)
-            return
-        }
-
-        // Persist the failure → this increments to retriesSoFar + 1
-        val persisted = paymentOrderModificationPort.markFailedForRetry(order, reason, lastError)
-
-        val nextAttempt = persisted.retryCount     // == retriesSoFar + 1
-        val backoffMs = computeEqualJitterBackoff(nextAttempt)
-
-        logRetrySchedule(persisted, nextAttempt, System.currentTimeMillis() + backoffMs, reason, lastError)
         retryQueuePort.scheduleRetry(
             paymentOrder = persisted,
             retryReason = reason,
