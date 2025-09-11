@@ -3,45 +3,44 @@ package com.dogancaglar.paymentservice.application
 import com.dogancaglar.paymentservice.application.constants.IdNamespaces
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
-import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
+import org.springframework.boot.ApplicationArguments
+import org.springframework.boot.ApplicationRunner
+import org.springframework.context.annotation.DependsOn
+import org.springframework.jdbc.BadSqlGrammarException
 import org.springframework.stereotype.Component
 import paymentservice.port.outbound.IdGeneratorPort
 
 @Component
+@DependsOn("liquibase") // ensure migrations done
 class IdResyncStartup(
     private val idGeneratorPort: IdGeneratorPort,
     private val paymentOrderRepository: PaymentOrderRepository,
     private val paymentRepository: PaymentRepository
-) {
+) : ApplicationRunner {
 
-    private val logger = LoggerFactory.getLogger(IdResyncStartup::class.java)
+    private val log = LoggerFactory.getLogger(javaClass)
 
-    @PostConstruct
-    fun syncRedisIdWithDatabase() {
+    override fun run(args: ApplicationArguments) {
         try {
-            val maxPaymentOrderIdInDb = paymentOrderRepository.getMaxPaymentOrderId().value.toLong()
-            val floor = maxPaymentOrderIdInDb + 100 // Give some breathing space
+            val maxOrder = paymentOrderRepository.getMaxPaymentOrderId().value.toLong()
+            val minOrder = maxOrder + 100
+            val maxPayment = paymentRepository.getMaxPaymentId().value.toLong()
+            val minPayment = maxPayment + 100
 
-            val maxPaymentIdInDb = paymentRepository.getMaxPaymentId().value.toLong()
-            val floorIdInDb = maxPaymentIdInDb.plus(100) // Give some breathing space
-            logger.info(
-                "🔁 Resyncing Redis ID generator ${
-                    IdNamespaces.PAYMENT_ORDER
-                }: setting minimum to $floor (max in DB: $maxPaymentOrderIdInDb)"
-            )
+            log.info("🔁 Resyncing Redis ID generator {}: setting minimum to {} (max in DB: {})",
+                IdNamespaces.PAYMENT_ORDER, minOrder, maxOrder)
+            log.info("🔁 Resyncing Redis ID generator {}: setting minimum to {} (max in DB: {})",
+                IdNamespaces.PAYMENT, minPayment, maxPayment)
 
-
-            logger.info(
-                "🔁 Resyncing Redis ID generator ${
-                    IdNamespaces.PAYMENT
-                }: setting minimum to $floor (max in DB: $maxPaymentOrderIdInDb)"
-            )
-            idGeneratorPort.setMinValue(IdNamespaces.PAYMENT_ORDER, floor)
-
-            idGeneratorPort.setMinValue(IdNamespaces.PAYMENT, floorIdInDb)
+            idGeneratorPort.setMinValue(IdNamespaces.PAYMENT_ORDER, minOrder)
+            idGeneratorPort.setMinValue(IdNamespaces.PAYMENT, minPayment)
+        } catch (e: BadSqlGrammarException) {
+            // Likely schema not present on the chosen DataSource
+            log.error("❌ Skipping ID resync: schema missing (did Liquibase run on webDataSource?)", e)
+            throw IllegalStateException("Liquibase did not initialize schema before ID resync", e)
         } catch (e: Exception) {
-            logger.error("❌ Failed to resync Redis ID generator from DB: ${e.message}", e)
+            log.error("❌ Failed to resync Redis ID generator from DB: {}", e.message, e)
             throw IllegalStateException("Redis ID generator resync failed", e)
         }
     }

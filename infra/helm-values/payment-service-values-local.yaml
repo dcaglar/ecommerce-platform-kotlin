@@ -1,14 +1,63 @@
-
-image:
-  tag: "latest"
-  pullPolicy: Always
-  repository: dcaglar1987/payment-service
-
-
+spring:
+  profile: "local"
 
 
 runPrivilegeGrantJob: true
 
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 2
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 300   # wait ~5m before adding another pod
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 300
+
+
+jvmOpts: >-
+  -XX:+UseG1GC
+  -Xms372m -Xmx372m
+  -XX:MaxGCPauseMillis=200
+  -XX:InitiatingHeapOccupancyPercent=30
+  -XX:+UseStringDeduplication
+  -XX:MaxMetaspaceSize=128m
+  -XX:MaxDirectMemorySize=96m
+
+replicaCount: 1
+resources:
+  requests: { cpu: "200m", memory: "412Mi" }
+  limits:   { cpu: "750m", memory: "750Mi" }
+
+
+
+ingress:
+  enabled: true
+  className: nginx
+  host: ${INGRESS_HOST}
+  path: /
+  pathType: Prefix
+  annotations: {}
+  tls: []   # HTTP for minikube
+
+serviceMonitor:
+  enabled: true
+  path: /actuator/prometheus
+  interval: 15s
+  scrapeTimeout: 10s
+  scheme: http
+  labels:
+    release: prometheus-stack
 
 
 service:
@@ -16,13 +65,3 @@ service:
   port: 8080
   portName: http
 
-serviceMonitor:
-  enabled: true
-  labels:
-    release: prometheus-stack
-
-
-
-
-spring:
-  profile: local

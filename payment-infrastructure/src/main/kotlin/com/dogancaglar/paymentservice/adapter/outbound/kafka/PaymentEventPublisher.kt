@@ -55,7 +55,7 @@ class PaymentEventPublisher(
             val future = kafkaTemplate.send(record)
             future.whenComplete { _, ex ->
                 if (ex == null) {
-                    logger.info(
+                    logger.debug(
                         "📨 Event published to traceid logcontext.traceid=${LogContext.getTraceId()} traceIdFromEnvelope=${envelope.traceId},parentEventId=${envelope.parentEventId}"
                     )
                 } else {
@@ -86,7 +86,7 @@ class PaymentEventPublisher(
         LogContext.with(envelope) {
             try {
                 kafkaTemplate.send(record).get(timeoutSeconds, TimeUnit.SECONDS)
-                logger.info("📨 PUBLISH SYNC SUCCEEDED (topic={})", eventMetaData.topic)
+                logger.debug("📨 PUBLISH SYNC SUCCEEDED (topic={})", eventMetaData.topic)
             } catch (ex: Exception) {
                 logger.error(
                     "❌ [SYNC] Failed to publish eventId={} to topic={}: {}",

@@ -9,6 +9,27 @@ auth:
   secretKeys:
     adminPasswordKey: ADMIN_POSTGRES_PASSWORD
 primary:
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 10
+    failureThreshold: 12
+    successThreshold: 1
+
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 10
+    failureThreshold: 6
+    successThreshold: 1
+
+  startupProbe:
+    enabled: true
+    periodSeconds: 10
+    timeoutSeconds: 10
+    failureThreshold: 30
   resources:
     requests:
       cpu: 200m
@@ -24,7 +45,7 @@ primary:
     maintenance_work_mem = '64MB'          # VACUUM/CREATE INDEX
 
     # connections (lower = less RAM)
-    max_connections = 30
+    max_connections = 57
 
     # WAL / checkpoints (lighter on disk/CPU)
     checkpoint_timeout = '10min'

@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.DependsOn
 import org.springframework.context.event.EventListener
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.scheduling.annotation.Scheduled
@@ -20,8 +21,9 @@ import java.time.temporal.ChronoUnit
 
 
 @Component
+@DependsOn("idResyncStartup")
 class OutboxPartitionCreator(
-    private val jdbcTemplate: JdbcTemplate,
+    @Qualifier("maintenanceJdbcTemplate") private val jdbcTemplate: JdbcTemplate,
     private val clock: Clock,
     @Qualifier("outboxEventPartitionMaintenanceScheduler") private val taskScheduler: ThreadPoolTaskScheduler
 ) {
@@ -33,8 +35,8 @@ class OutboxPartitionCreator(
 
     @EventListener(ApplicationReadyEvent::class)
     @Scheduled(
-        initialDelayString = "\${outbox.partition.initial-delay:PT10M}",
-        fixedDelayString = "\${outbox.partition.fixed-delay:PT10M}"
+        initialDelayString = "\${outbox-partition.initial-delay:PT10M}",
+        fixedDelayString = "\${outbox-partition.fixed-delay:PT10M}"
     )
     fun ensureCurrentAndNextScheduled() {
         val now = LocalDateTime.now(clock)

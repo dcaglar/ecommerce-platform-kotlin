@@ -6,6 +6,31 @@ listeners:
   interbroker: {protocol: PLAINTEXT, containerPort: 9094, name: INTERNAL}
 
 controller:
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 90       # give JVM + log init some slack
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 12          # ~2 minutes before restart
+    successThreshold: 1
+
+    # Fast to remove from Service while starting/loaded, but never restarts the pod
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 20
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6           # ~1 minute to go NotReady
+    successThreshold: 1
+
+    # Crucial after unclean shutdowns / metadata log recovery
+  startupProbe:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 45          # ~7.5 minutes boot window
+    successThreshold: 1
   replicaCount: 1
   controllerOnly: false
   # ✅ Resources for the Kafka container (fix OOMKills)
@@ -13,20 +38,12 @@ controller:
     requests:
       cpu: 500m
       memory: 1Gi
-      # Optional; if you see eviction due to local disk, set this:
-      # ephemeral-storage: 1Gi
     limits:
       cpu: "1"
       memory: 2Gi
-      # Optional; raise or remove if you don't want a hard cap on local disk:
-      # ephemeral-storage: 4Gi
-
-  # ✅ Pin JVM heap so it fits inside the container limit
-  # (Use the key your chart supports; many charts use extraEnv, some use env)
   extraEnv:
     - name: KAFKA_HEAP_OPTS
-      value: "-Xms512m -Xmx512m"
-    # Reasonable JVM perf defaults for Kafka on small nodes
+      value: "-Xms1200m -Xmx1200m"        # heap < limit to avoid OOM
     - name: KAFKA_JVM_PERFORMANCE_OPTS
       value: "-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExplicitGCInvokesConcurrent"
   overrideConfiguration:
@@ -53,6 +70,16 @@ controller:
     transaction.state.log.num.partitions: 1
     # Kafka 4.x also logs this one; keep it small in single node
     share.coordinator.state.topic.num.partitions: 1
+    log.retention.bytes: 268435456         # 256 MiB total per log (delete old)
+    log.retention.hours: 2                  # or use minutes for tighter control
+    log.segment.bytes: 67108864             # 64 MiB segments (fewer big mmaps)
+    log.cleaner.enable: "true"
+    cleanup.policy: delete
+
+  # (optional) avoid huge fetch/produce batches in dev
+    replica.fetch.max.bytes: 1048576        # 1 MiB
+    message.max.bytes: 1048576              # 1 MiB
+    fetch.message.max.bytes: 1048576
 
 broker:
   # No separate broker-only set for single-node

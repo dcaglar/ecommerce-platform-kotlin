@@ -1,32 +1,31 @@
-# minimal-values.yaml
+# minimal-values.yaml — tight dev caps (~70% node RAM target)
 
 prometheusOperator:
   resources:
-    requests: { cpu: 50m, memory: 128Mi }
-    limits:   { cpu: 200m, memory: 256Mi }
+    requests: { cpu: 30m,  memory: 96Mi }
+    limits:   { cpu: 150m, memory: 192Mi }
   admissionWebhooks:
     enabled: false
     patch:
       enabled: false
   tls:
     enabled: false
+
 prometheus:
   prometheusSpec:
     containers:
       - name: config-reloader
         resources:
-          requests:
-            cpu: 10m
-            memory: 32Mi
-          limits:
-            cpu: 50m
-            memory: 64Mi
+          requests: { cpu: 5m,  memory: 24Mi }
+          limits:   { cpu: 30m, memory: 48Mi }
+    # Prometheus server pod
     resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 500m
+      requests: { cpu: 80m,  memory: 128Mi }
+      limits:   { cpu: 300m, memory: 256Mi }   # tighter cap
+    retention: 6h
+    walCompression: true
+    scrapeInterval: 60s
+    evaluationInterval: 60s
     serviceMonitorSelector:
       matchLabels:
         release: prometheus-stack
@@ -36,31 +35,35 @@ alertmanager:
     containers:
       - name: config-reloader
         resources:
-          requests:
-            cpu: 10m
-            memory: 32Mi
-          limits:
-            cpu: 50m
-            memory: 64Mi
+          requests: { cpu: 5m,  memory: 24Mi }
+          limits:   { cpu: 30m, memory: 48Mi }
+    resources:
+      requests: { cpu: 30m, memory: 48Mi }
+      limits:   { cpu: 150m, memory: 128Mi }
 
 grafana:
+  resources:
+    requests: { cpu: 40m, memory: 96Mi }
+    limits:   { cpu: 200m, memory: 256Mi }
   sidecar:
     datasources:
       resources:
-        requests:
-          cpu: 10m
-          memory: 32Mi
-        limits:
-          cpu: 50m
-          memory: 64Mi
+        requests: { cpu: 5m,  memory: 24Mi }
+        limits:   { cpu: 30m, memory: 48Mi }
     dashboards:
       resources:
-        requests:
-          cpu: 10m
-          memory: 32Mi
-        limits:
-          cpu: 50m
-          memory: 64Mi
+        requests: { cpu: 5m,  memory: 24Mi }
+        limits:   { cpu: 30m, memory: 48Mi }
+kube-state-metrics:
+  resources:
+    requests: { cpu: 30m,  memory: 48Mi }
+    limits:   { cpu: 150m, memory: 128Mi }
+
+prometheus-node-exporter:
+  resources:
+    requests: { cpu: 15m,  memory: 24Mi }
+    limits:   { cpu: 80m,  memory: 96Mi }
+
 
 prometheusAdapter:
   enabled: false

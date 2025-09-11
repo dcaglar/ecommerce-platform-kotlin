@@ -59,21 +59,25 @@ spec:
                   name: payment-db-credentials
                   key: PAYMENT_SERVICE_APP_DB_PASSWORD
           livenessProbe:
-            httpGet:
-              path: /actuator/health
-              port: http
-            initialDelaySeconds: 60
-            periodSeconds: 30
+            httpGet: {path: /actuator/health/liveness, port: 9000}
+            initialDelaySeconds: 90
             timeoutSeconds: 10
-            failureThreshold: 12
+            periodSeconds: 10
+            failureThreshold: 6
+
           readinessProbe:
-            httpGet:
-              path: /actuator/health
-              port: http
-            initialDelaySeconds: 60   # 1 minute (comment fixed)
-            periodSeconds: 30
-            timeoutSeconds: 10
-            failureThreshold: 12
+            httpGet: {path: /actuator/health/readiness, port: 9000}
+            initialDelaySeconds: 90
+            timeoutSeconds: 5
+            periodSeconds: 10
+            failureThreshold: 6
+
+          startupProbe:
+            httpGet: {path: /actuator/health/liveness, port: 9000}
+            initialDelaySeconds: 15
+            timeoutSeconds: 5
+            periodSeconds: 10
+            failureThreshold: 90
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
 

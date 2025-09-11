@@ -39,9 +39,8 @@ class OutboxBufferAdapter(
     override fun countByStatus(status: String): Long =
         outboxEventMapper.countByStatus(status)
 
-    override fun findBatchForDispatch(batchSize: Int): List<OutboxEvent> =
-        outboxEventMapper.findBatchForDispatch(batchSize)
-            .map { entity: OutboxEventEntity -> OutboxEventEntityMapper.toDomain(entity) }
+    override fun findBatchForDispatch(batchSize: Int,workerId:String) =error("Unsupported here")
+
 
 }
 

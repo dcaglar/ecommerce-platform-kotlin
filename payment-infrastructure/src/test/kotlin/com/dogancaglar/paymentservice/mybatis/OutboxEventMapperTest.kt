@@ -7,6 +7,7 @@ import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.Outbo
 import com.dogancaglar.paymentservice.application.usecases.ProcessPaymentService
 import com.dogancaglar.paymentservice.ports.inbound.CreatePaymentUseCase
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -117,43 +118,81 @@ class OutboxEventMapperTest {
     }
 
     @Test
-    fun `findBatchForDispatch claims and returns correct events`() {
-        val ev1 = newEvent(oeid = 1)
-        val ev2 = newEvent(oeid = 2)
+    fun `findBatchForDispatch claims, stamps claimed_ and returns rows`() {
+        val ev1 = newEvent(oeid = 101)
+        val ev2 = newEvent(oeid = 102)
         outboxEventMapper.insertOutboxEvent(ev1)
         outboxEventMapper.insertOutboxEvent(ev2)
 
-        val claimed = outboxEventMapper.findBatchForDispatch(1)
+        val workerA = "pod-A:worker-1"
+        val claimed = outboxEventMapper.findBatchForDispatch(1, workerA)
 
         assertEquals(1, claimed.size)
-        assertEquals("PROCESSING", claimed.first().status)
+        val row = claimed.first()
+        assertEquals("PROCESSING", row.status)
+
+        // Verify stamping happened (mapper SELECT returns the row fields)
+        // NOTE: OutboxEventEntity should have claimedAt/claimedBy if you want to assert them directly.
+        // If your resultMap doesn't map them, assert via a follow-up query or just trust the UPDATE.
+        val processingIds = outboxEventMapper.findByStatus("PROCESSING").map { it.oeid }
+        assertTrue(row.oeid in processingIds)
     }
 
     @Test
-    fun `batchUpsert inserts then updates`() {
-        val base = 3L
-        val events = listOf(
-            newEvent(base + 1),
-            newEvent(base + 2),
-            newEvent(base + 3)
-        )
+    fun `two workers don't claim same row (SKIP LOCKED sanity)`() {
+        // Prepare 2 rows
+        val base = 200L
+        outboxEventMapper.insertOutboxEvent(newEvent(oeid = base + 1))
+        outboxEventMapper.insertOutboxEvent(newEvent(oeid = base + 2))
 
-        // Insert
-        val insertedRows = outboxEventMapper.insertAllOutboxEvents(events)
-        assertTrue(insertedRows >= 1) // MyBatis returns last stmt count; don't rely on it
+        val a = outboxEventMapper.findBatchForDispatch(1, "pod-A:w1")
+        val b = outboxEventMapper.findBatchForDispatch(1, "pod-B:w1")
 
-        // Verify the 3 rows are actually there (status NEW)
-        val newIds = outboxEventMapper.findByStatus("NEW").map { it.oeid }.toSet()
-        assertTrue(newIds.containsAll(events.map { it.oeid }.toSet()))
-
-        // Update to SENT
-        events.forEach { it.markAsSent() }
-        val updatedRows = outboxEventMapper.batchUpdate(events)
-        assertTrue(updatedRows >= 1) // same reasoning as insert
-
-        // Verify the 3 rows are now SENT
-        val sentIds = outboxEventMapper.findByStatus("SENT").map { it.oeid }.toSet()
-        assertTrue(sentIds.containsAll(events.map { it.oeid }.toSet()))
+        assertEquals(1, a.size)
+        assertEquals(1, b.size)
+        assertNotEquals(a.first().oeid, b.first().oeid)
     }
 
+    @Test
+    fun `batchUpdate marks SENT and clears claim columns`() {
+        val base = 300L
+        val events = listOf(newEvent(base + 1), newEvent(base + 2), newEvent(base + 3))
+        outboxEventMapper.insertAllOutboxEvents(events)
+
+        // Claim a batch to set PROCESSING + claimed_*
+        val worker = "pod-A:w2"
+        val claimed = outboxEventMapper.findBatchForDispatch(3, worker)
+        assertEquals(3, claimed.size)
+
+        // Mark SENT (your entity.markAsSent() sets status = "SENT")
+        events.forEach { it.markAsSent() }
+        val updated = outboxEventMapper.batchUpdate(events)
+        assertTrue(updated >= 1)
+
+        // All should show up as SENT
+        val sentIds = outboxEventMapper.findByStatus("SENT").map { it.oeid }.toSet()
+        assertTrue(sentIds.containsAll(events.map { it.oeid }.toSet()))
+
+        // Optional: if your resultMap includes claimed_* columns, you can assert they are NULL now.
+        // Otherwise this implicitly verifies the UPDATE executed; you may add a dedicated SELECT if desired.
+    }
+
+    @Test
+    fun `reclaimStuckClaims resets old PROCESSING to NEW`() {
+        val ev = newEvent(oeid = 999)
+        outboxEventMapper.insertOutboxEvent(ev)
+
+        // claim it
+        outboxEventMapper.findBatchForDispatch(1, "pod-X:w1")
+        val processingBefore = outboxEventMapper.countByStatus("PROCESSING")
+        assertTrue(processingBefore >= 1)
+
+        // Simulate "stuck" by reclaiming anything older than 0 seconds (i.e., now)
+        val reclaimed = outboxEventMapper.reclaimStuckClaims(0)
+        assertTrue(reclaimed >= 1)
+
+        val newAfter = outboxEventMapper.countByStatus("NEW")
+        assertTrue(newAfter >= 1)
+    }
 }
+

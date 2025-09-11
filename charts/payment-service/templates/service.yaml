@@ -1,4 +1,3 @@
-# templates/service.yaml
 apiVersion: v1
 kind: Service
 metadata:
@@ -11,7 +10,11 @@ spec:
   selector:
     app: {{ include "payment-service.fullname" . }}
   ports:
-    - name: {{ .Values.service.portName | default "http" }}
-      port: {{ .Values.service.port | default 8080 }}
-      targetPort: {{ .Values.service.portName | default "http" }}
+    - name: {{.Values.service.portName | default "http"}}
+      port: {{.Values.service.port | default 8080}}
+      targetPort: {{.Values.service.portName | default "http"}}
+      protocol: TCP
+    - name: mgmt
+      port: 9000
+      targetPort: 9000
       protocol: TCP

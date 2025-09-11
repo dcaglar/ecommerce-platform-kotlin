@@ -11,8 +11,11 @@ interface OutboxEventMapper {
 
     // Removed @Select annotation to avoid duplicate mapping with XML
     fun findBatchForDispatch(
-        @Param("batchSize") batchSize: Int
+        @Param("batchSize") batchSize: Int,
+        @Param("workerId") workerId: String
     ): List<OutboxEventEntity>
+
+
 
     fun insertOutboxEvent(event: OutboxEventEntity): Int
     fun insertAllOutboxEvents(events: List<OutboxEventEntity>): Int
@@ -20,6 +23,8 @@ interface OutboxEventMapper {
         @Param("oeid") oeid: Long,
         @Param("status") status: String
     ): Int
+
+    fun reclaimStuckClaims(olderThanSeconds: Int): Int
 
     fun batchUpdate(events: List<OutboxEventEntity>): Int
 

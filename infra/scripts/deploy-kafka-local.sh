@@ -2,7 +2,11 @@
 set -euo pipefail
 
 NS="payment"
-VALUES_FILE="infra/helm-values/kafka-values-local.yaml"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$SCRIPT_DIR/../.."
+cd "$REPO_ROOT"
+
+VALUES_FILE="$REPO_ROOT/infra/helm-values/kafka-values-local.yaml"
 
 # Add/update Bitnami charts repo (this is the Helm *chart* repo, not OCI images)
 helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null 2>&1 || true

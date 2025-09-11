@@ -1,0 +1,29 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "payment-service.fullname" . }}
+  labels:
+{{ include "payment-service.labels" . | nindent 4 }}
+{{- with .Values.ingress.annotations }}
+  annotations:
+{{ toYaml . | nindent 4 }}
+{{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className | default "nginx" }}
+  rules:
+    - host: {{ required "ingress.host is required when ingress.enabled=true" .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: {{ .Values.ingress.path | default "/" }}
+            pathType: {{ .Values.ingress.pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ include "payment-service.fullname" . }}
+                port:
+                  number: {{ .Values.service.port | default 8080 }}
+{{- with .Values.ingress.tls }}
+  tls:
+{{ toYaml . | nindent 4 }}
+{{- end }}
+{{- end }}

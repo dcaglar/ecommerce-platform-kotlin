@@ -40,21 +40,24 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME} # This will be injected from a Kubernetes Secret
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
-      connection-timeout: 1500
+      maximum-pool-size: 3      # 6 pods max → 18 total
+      minimum-idle: 0
+      connection-timeout: 3000  # consumers can wait a bit but not forever
       idle-timeout: 600000
       max-lifetime: 1800000
+      validation-timeout: 1000
   kafka:
-    producer:
-      value-serializer: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaSerializer
-      properties: #maybe change partition assignment strategy
-        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
-        spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
     consumer:
+      max-poll-records: 500
+      fetch-min-bytes: 1048576        # 1 MiB before broker responds (latency vs efficiency)
+      fetch-max-wait: 25ms            # cap the wait so latency doesn’t spike
+      # Per-partition and total fetch caps (keep under broker limits)
+      max-partition-fetch-bytes: 4194304   # 4 MiB
+      fetch-max-bytes: 67108864
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
+        spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
         partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
     properties:
       security.protocol: PLAINTEXT
@@ -70,6 +73,9 @@ spring:
           min-idle: 0
           max-wait: -1ms
 management:
+  health:
+    probes:
+      enabled: true
   endpoints:
     web.exposure.include: "prometheus,metrics,health"
   endpoint:
@@ -99,6 +105,8 @@ management:
       # your custom meters (base names)
       psp_calls_total: true
       psp_call_latency: true
+      psp_queue_delay: true
+      psp_exec_duration: true
       redis_retry_zset_size: true
       redis_retry_batch_size: true
       redis_retry_events_total: true
@@ -211,9 +219,3 @@ psp:
           retryable: 0
           statusCheck: 0
           nonRetryable: 0
-
-
-logging:
-  level:
-    org.springframework.kafka.core: DEBUG
-    org.springframework.kafka.listener.DefaultErrorHandler: DEBUG

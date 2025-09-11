@@ -103,19 +103,19 @@ spec:
                   key: PAYMENT_CONSUMERS_APP_DB_PASSWORD
           livenessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/liveness   # <-- does NOT touch DB
               port: http
             initialDelaySeconds: 60
-            periodSeconds: 30
-            timeoutSeconds: 10
-            failureThreshold: 12
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
           readinessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/readiness  # <-- includes DB/Redis/Kafka indicators
               port: http
-            initialDelaySeconds: 60   # 1 minute (comment fixed)
-            periodSeconds: 30
-            timeoutSeconds: 10
-            failureThreshold: 12
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

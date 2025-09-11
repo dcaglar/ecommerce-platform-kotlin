@@ -9,5 +9,5 @@ interface OutboxEventPort {
     fun save(event: OutboxEvent): OutboxEvent
     fun updateAll(events: List<OutboxEvent>)
     fun countByStatus(status: String): Long
-    fun findBatchForDispatch(batchSize: Int): List<OutboxEvent>
+    fun findBatchForDispatch(batchSize: Int,workerId: String): List<OutboxEvent>
 }

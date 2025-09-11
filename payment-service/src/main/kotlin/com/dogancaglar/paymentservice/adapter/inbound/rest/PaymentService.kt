@@ -14,7 +14,7 @@ class PaymentService(
 ) {
     private val logger = LoggerFactory.getLogger(PaymentService::class.java)
 
-    @Transactional
+    @Transactional(transactionManager = "webTxManager", timeout = 2)
     fun createPayment(request: PaymentRequestDTO): PaymentResponseDTO {
         try {
             val command = PaymentRequestMapper.toCommand(request)

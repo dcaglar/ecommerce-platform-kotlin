@@ -34,7 +34,13 @@ class KafkaProducerConfig(
         props[ProducerConfig.ACKS_CONFIG] = "all"
         props[ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG] = true
         props[ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION] = 5
-        props[ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG] = 120_000
+        props[ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG] = 20_000
+        props[ProducerConfig.LINGER_MS_CONFIG] =8
+        props[ProducerConfig.COMPRESSION_TYPE_CONFIG] ="zstd"
+        props[ProducerConfig.BATCH_SIZE_CONFIG] =131072
+        props[ProducerConfig.BUFFER_MEMORY_CONFIG] =67108864
+
+        props[ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG] = 60_000
 
         return DefaultKafkaProducerFactory<String, EventEnvelope<*>>(props).apply {
             // Transactional producer for EOS + offset commits

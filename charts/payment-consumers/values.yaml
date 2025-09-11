@@ -12,22 +12,25 @@ spring:
     properties:
       security.protocol: PLAINTEXT
       session.timeout.ms: 45000
-replicaCount: 1
+replicaCount: 3
 resources:
-  requests: { cpu: "750m", memory: "312Mi" }
-  limits:   { cpu: "1500m", memory: "550Mi" }
+  requests: { cpu: "200m", memory: "450Mi" }
+  limits:   { cpu: "750m", memory: "900Mi" }
 
 jvmOpts: >-
   -XX:+UseG1GC
-  -Xms252m -Xmx252m
+  -Xms384m -Xmx384m
+  -XX:MaxMetaspaceSize=128m
+  -XX:MaxDirectMemorySize=96m
   -XX:MaxGCPauseMillis=200
   -XX:InitiatingHeapOccupancyPercent=30
   -XX:+UseStringDeduplication
 
+
 autoscaling:
   enabled: true
-  minReplicas: 2
-  maxReplicas: 3
+  minReplicas: 3
+  maxReplicas: 6
   metrics:
     - type: External
       external:
@@ -38,7 +41,7 @@ autoscaling:
               consumergroup: payment-order-psp-call-executor-consumer-group
         target:
           type: AverageValue
-          averageValue: "1000"
+          averageValue: "500"
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 0
@@ -48,7 +51,7 @@ autoscaling:
           value: 100
           periodSeconds: 60
         - type: Pods
-          value: 2
+          value: 3
           periodSeconds: 60
     scaleDown:
       stabilizationWindowSeconds: 300

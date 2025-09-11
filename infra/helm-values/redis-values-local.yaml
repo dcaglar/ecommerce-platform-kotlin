@@ -1,5 +1,19 @@
 architecture: standalone
 
+livenessProbe:
+  enabled: true
+  periodSeconds: 10
+  timeoutSeconds: 10
+  failureThreshold: 6
+readinessProbe:
+  enabled: true
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+startupProbe:
+  enabled: true
+  periodSeconds: 10
+  failureThreshold: 60
 auth:
   enabled: false
 

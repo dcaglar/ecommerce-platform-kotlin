@@ -21,10 +21,13 @@
         SELECT COUNT(*) FROM outbox_event WHERE status = #{status}
     </select>
 
+
     <select id="findBatchForDispatch" resultMap="OutboxEventResultMap">
         WITH claimed AS (
         UPDATE outbox_event
-        SET status = 'PROCESSING'
+        SET status = 'PROCESSING',
+        claimed_at = clock_timestamp(),
+        claimed_by = #{workerId}
         WHERE (oeid, created_at) IN (
         SELECT oeid, created_at
         FROM outbox_event
@@ -35,7 +38,8 @@
         )
         RETURNING oeid, event_type, aggregate_id, payload, status, created_at
         )
-        SELECT oeid, event_type, aggregate_id, payload, status, created_at FROM claimed
+        SELECT oeid, event_type, aggregate_id, payload, status, created_at
+        FROM claimed
     </select>
 
     <insert id="insertOutboxEvent"
@@ -65,12 +69,32 @@
     </update>
 
 
+
+    <update id="reclaimStuckClaims" parameterType="int">
+        UPDATE outbox_event
+        SET status = 'NEW',
+        claimed_at = NULL,
+        claimed_by = NULL
+        WHERE status = 'PROCESSING'
+        AND claimed_at &lt; (clock_timestamp() - (#{olderThanSeconds} || ' seconds')::interval)
+    </update>
+
+
+
+
     <update id="batchUpdate" parameterType="java.util.List">
-        <foreach collection="list" item="event" separator=";">
-            UPDATE outbox_event
-            SET status = #{event.status}
-            WHERE oeid = #{event.oeid}
-            AND created_at = #{event.createdAt}
+        WITH rows(oeid, created_at, status) AS (
+        VALUES
+        <foreach collection="list" item="e" separator=",">
+            (#{e.oeid}, #{e.createdAt}, #{e.status})
         </foreach>
+        )
+        UPDATE outbox_event o
+        SET status = rows.status,
+        claimed_at = NULL,
+        claimed_by = NULL
+        FROM rows
+        WHERE o.oeid = rows.oeid
+        AND o.created_at = rows.created_at
     </update>
 </mapper>
