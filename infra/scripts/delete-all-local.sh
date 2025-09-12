@@ -60,6 +60,9 @@ fi
 
 
 
+
+
+
 echo "🚀deleting   monitoring stack prometheus-adapter"
 
 helm uninstall -n monitoring  prometheus-adapter --ignore-not-found

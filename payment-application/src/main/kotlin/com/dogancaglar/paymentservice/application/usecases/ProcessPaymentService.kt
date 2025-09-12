@@ -87,37 +87,6 @@ open class ProcessPaymentService(
         }
     }
 
-    private fun handleRetryEvent1(order: PaymentOrder, reason: String?, lastError: String?) {
-        pspResultCache.remove(order.paymentOrderId)
-
-        val persisted = paymentOrderModificationPort.markFailedForRetry(order, reason, lastError) // ← persisted row
-
-        if (persisted.isTerminal()) {
-            logger.info(
-                "Skip retry; order {} already terminal ({})",
-                persisted.publicPaymentOrderId, persisted.status
-            )
-            return
-        }
-
-        val nextAttempt = persisted.retryCount
-        if (nextAttempt > MAX_RETRIES) {
-            retryQueuePort.resetRetryCounter(persisted.paymentOrderId)
-            handleNonRetryableFailEvent(persisted, reason)
-            return
-        }
-
-        val backoffMs = computeEqualJitterBackoff(nextAttempt)
-        logRetrySchedule(persisted, nextAttempt, System.currentTimeMillis() + backoffMs, reason, lastError)
-
-        retryQueuePort.scheduleRetry(
-            paymentOrder = persisted,
-            retryReason = reason,
-            backOffMillis = backoffMs,
-            lastErrorMessage = lastError
-        )
-    }
-
     private fun handleRetryEvent(order: PaymentOrder, reason: String?, lastError: String?) {
         val retriesSoFar = order.retryCount        // from the event; attempt i (0 for initial)
 

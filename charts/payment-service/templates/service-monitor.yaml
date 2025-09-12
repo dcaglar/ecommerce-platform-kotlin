@@ -14,11 +14,11 @@ spec:
     matchLabels:
       app: {{ include "payment-service.fullname" . }}   # must match Service.metadata.labels
   endpoints:
-    - port: {{ .Values.service.portName | default "http" }}
-      path: {{ .Values.serviceMonitor.path | default "/actuator/prometheus" }}
-      interval: {{ .Values.serviceMonitor.interval | default "30s" }}
-      scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout | default "10s" }}
-      scheme: {{ .Values.serviceMonitor.scheme | default "http" }}
+    - port: mgmt
+      path: {{.Values.serviceMonitor.path | default "/actuator/prometheus"}}
+      interval: {{.Values.serviceMonitor.interval | default "30s"}}
+      scrapeTimeout: {{.Values.serviceMonitor.scrapeTimeout | default "10s"}}
+      scheme: {{.Values.serviceMonitor.scheme | default "http"}}
   # optional: only needed if the Service is in another namespace than this SM
   # namespaceSelector:
   #   matchNames:

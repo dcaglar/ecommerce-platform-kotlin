@@ -20,7 +20,6 @@ class PaymentGatewayAdapter(
     @Qualifier("paymentOrderPspPool") private val pspExecutor: ThreadPoolTaskExecutor,
     private val meterRegistry: MeterRegistry        // <--- add this
 ) : PaymentGatewayPort {
-
     private val pspQueueDelay = Timer.builder("psp_queue_delay")
         .publishPercentileHistogram()
         .register(meterRegistry)
@@ -93,7 +92,6 @@ class PaymentGatewayAdapter(
             meterRegistry.counter("psp_calls_total", "result", causeLabel).increment()
         }
     }
-
     /** Actual PSP work runs on the pool worker thread. */
     private fun doCharge(order: PaymentOrder): PaymentOrderStatus {
         // If this thread gets interrupted (e.g., due to cancel(true)),
@@ -109,6 +107,7 @@ class PaymentGatewayAdapter(
         val pspResponse = getPaymentResult()
         return PSPStatusMapper.fromPspStatus(pspResponse.status)
     }
+
 
     override fun chargeRetry(order: PaymentOrder): PaymentOrderStatus {
         simulator.simulate()

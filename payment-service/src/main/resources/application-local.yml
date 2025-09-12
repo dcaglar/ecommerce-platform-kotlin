@@ -12,12 +12,58 @@ app:
       payment_order_psp_call_requested_topic: { partitions: 48, replicas: 1, createDlq: true }
       payment_status_check_scheduler_topic:   { partitions: 1, replicas: 1, createDlq: true }
       payment_order_succeeded_topic:          { partitions: 8, replicas: 1, createDlq: true }
+  # manual datasource configs for web ourboxdispatcher and parttionen maintencance job
+  datasource:
+    web:
+      jdbc-url: ${SPRING_DATASOURCE_URL}
+      username: ${SPRING_DATASOURCE_USERNAME}
+      password: ${SPRING_DATASOURCE_PASSWORD}
+      driver-class-name: org.postgresql.Driver
+      pool-name: web-pool
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 1000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+
+    outbox:
+      jdbc-url: ${SPRING_DATASOURCE_URL}
+      username: ${SPRING_DATASOURCE_USERNAME}
+      password: ${SPRING_DATASOURCE_PASSWORD}
+      driver-class-name: org.postgresql.Driver
+      pool-name: outbox-pool
+      maximum-pool-size: 6
+      minimum-idle: 3
+      connection-timeout: 1000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+    maintenance:
+      jdbc-url: ${SPRING_DATASOURCE_URL}
+      username: ${SPRING_DATASOURCE_USERNAME}
+      password: ${SPRING_DATASOURCE_PASSWORD}
+      driver-class-name: org.postgresql.Driver
+      pool-name: maint-pool
+      maximum-pool-size: 1
+      minimum-idle: 0
+      connection-timeout: 1500
+      validation-timeout: 1500
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
 
 server:
   port: 8080
   tomcat:
-    mbeanregistry.enabled: true
-    threads.max: 4
+    mbeanregistry:
+      enabled: true
+    threads:
+      max: 16
+    accept-count: 64
+
 
 spring:
   application:
@@ -33,23 +79,18 @@ spring:
     properties:
       security.protocol: PLAINTEXT
       session.timeout.ms: 45000
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaSerializer
-      properties:
-        linger.ms: 5
-        compression.type: lz4
 
-  datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
-    hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
-      connection-timeout: 1500
-      idle-timeout: 600000
-      max-lifetime: 1800000
+#  datasource:
+#    url: ${SPRING_DATASOURCE_URL}
+#    username: ${SPRING_DATASOURCE_USERNAME}
+#    password: ${SPRING_DATASOURCE_PASSWORD}
+#    hikari:
+#      maximum-pool-size: 5          # keep what we agreed
+#      minimum-idle: 5
+#      connection-timeout: 1000      # < TimeLimiter; turns “hidden queueing” into a clear 503-worthy error
+#      validation-timeout: 1000
+#      leak-detection-threshold: 60000
+
 
   data:
     redis:
@@ -71,8 +112,16 @@ mybatis:
   mapper-locations: classpath:mapper/*.xml
 
 management:
+  server:
+    port: 9000
+  health:
+    probes:
+      enabled: true
   endpoints:
-    web.exposure.include: "prometheus,metrics,health"
+    web:
+      base-path: /actuator
+      exposure:
+        include: "prometheus,metrics,health"
   endpoint:
     health:
       enabled: true
@@ -113,6 +162,17 @@ management:
         outbox_dispatcher_duration: 0.5,0.95,0.99
     export.prometheus.enabled: true
 
-logging:
-  level:
-    org.springframework.kafka.core: DEBUG
+outbox-dispatcher:
+  thread-count: 3
+  batch-size: 200
+  pool-size: 2
+
+db:
+  web:
+    statement-timeout-ms: 500
+    lock-timeout-ms: 250
+    idle-in-tx-timeout-ms: 0
+  outbox:
+      statement-timeout-ms: 2000
+      lock-timeout-ms: 200
+      idle-in-tx-timeout-ms: 0

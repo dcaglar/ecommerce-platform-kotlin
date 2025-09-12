@@ -5,35 +5,7 @@ image:
 
 
 
-jvmOpts: >-
-  -XX:+UseG1GC
-  -Xms372m -Xmx372m
-  -XX:MaxGCPauseMillis=200
-  -XX:InitiatingHeapOccupancyPercent=30
-  -XX:+UseStringDeduplication
-  -XX:MaxMetaspaceSize=128m
-  -XX:MaxDirectMemorySize=96m
-spring:
-  profile: "local"
-
-replicaCount: 1
-resources:
-  requests: { cpu: "200m", memory: "412Mi" }
-  limits:   { cpu: "750m", memory: "750Mi" }
-
 
 runPrivilegeGrantJob: true
 
 
-service:
-  type: ClusterIP
-  port: 8080
-  portName: http
-
-serviceMonitor:
-  enabled: false
-  path: /actuator/prometheus
-  interval: 30s
-  scrapeTimeout: 10s
-  labels:
-    release: prometheus-stack

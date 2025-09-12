@@ -36,4 +36,20 @@
             <column name="created_at"/>
         </createIndex>
     </changeSet>
+
+    <changeSet id="05-add-claim-columns" author="dogancaglar">
+        <addColumn tableName="outbox_event">
+            <column name="claimed_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="claimed_by" type="VARCHAR(128)"/>
+        </addColumn>
+    </changeSet>
+
+    <!-- speeds up: WHERE status='PROCESSING' AND claimed_at < now() - X -->
+    <changeSet id="06-index-status-claimed_at" author="dogancaglar">
+        <createIndex indexName="idx_outbox_status_claimed_at" tableName="outbox_event">
+            <column name="status"/>
+            <column name="claimed_at"/>
+        </createIndex>
+    </changeSet>
+
 </databaseChangeLog>

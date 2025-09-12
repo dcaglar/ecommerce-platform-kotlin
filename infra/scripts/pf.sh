@@ -1,58 +1,157 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Prevent double-start
-LOCKFILE="/tmp/k8s-port-forward.lock"
-if [ -f "$LOCKFILE" ]; then
-    echo "Port-forward script is already running! (Remove $LOCKFILE to force re-run.)"
-    exit 1
-fi
-touch "$LOCKFILE"
-
-# Set namespace vars
+# --- config --------------------------------------------------------------
 PAYMENT_NS=payment
 MONITORING_NS=monitoring
-LOGGING_NS=logging
 
-# Store all PIDs in an array
-PIDS=()
+# Set PF_INGRESS=true to force PF for ingress if you ever switch back from LoadBalancer
+PF_INGRESS=${PF_INGRESS:-false}
+ING_NS=ingress-nginx
+INGRESS_LOCAL_PORT=${INGRESS_LOCAL_PORT:-8081}   # only used if PF_INGRESS=true
 
-function port_forward {
-  svc=$1; local_port=$2; remote_port=$3; ns=$4
-  while true; do
-    kubectl port-forward svc/$svc $local_port:$remote_port -n $ns
-    echo "Port-forward for $svc dropped. Reconnecting in 2s..."
+LOCKFILE="/tmp/k8s-port-forward.lock"
+
+# --- helpers -------------------------------------------------------------
+die() { echo "❌ $*" >&2; exit 1; }
+
+lock() {
+  if [[ -f "$LOCKFILE" ]]; then die "Port-forward script already running (rm $LOCKFILE to force)"; fi
+  : > "$LOCKFILE"
+}
+
+remove_lock() { rm -f "$LOCKFILE" 2>/dev/null || true; }
+
+wait_for_endpoints() {
+  local ns="$1" svc="$2"
+  echo "⏳ waiting for endpoints $ns/$svc ..."
+  # wait until at least one address shows up
+  until kubectl -n "$ns" get endpoints "$svc" \
+    -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null | grep -q .; do
     sleep 2
   done
 }
 
-# Trap cleanup: kill all background jobs & remove lockfile on exit
-cleanup() {
-  echo "Killing all port-forwards..."
-  for pid in "${PIDS[@]}"; do
-    kill "$pid" 2>/dev/null
+kill_local_port() {
+  local port="$1"
+  # macOS & Linux (lsof present by default on mac; often on linux)
+  if command -v lsof >/dev/null 2>&1; then
+    local pids
+    pids=$(lsof -ti tcp:"$port" || true)
+    if [[ -n "$pids" ]]; then
+      echo "🔪 freeing localhost:$port (pids: $pids)"
+      kill $pids 2>/dev/null || true
+      sleep 0.2
+      # if still alive, force kill
+      pids=$(lsof -ti tcp:"$port" || true)
+      [[ -n "$pids" ]] && kill -9 $pids 2>/dev/null || true
+    fi
+  else
+    # fallback using ss (linux)
+    if command -v ss >/dev/null 2>&1; then
+      local pids
+      pids=$(ss -lptn "sport = :$port" 2>/dev/null | awk -F'pid=' '/pid=/{sub(/\).*/,"",$2); print $2}')
+      if [[ -n "$pids" ]]; then
+        echo "🔪 freeing localhost:$port (pids: $pids)"
+        kill $pids 2>/dev/null || true
+        sleep 0.2
+        pids=$(ss -lptn "sport = :$port" 2>/dev/null | awk -F'pid=' '/pid=/{sub(/\).*/,"",$2); print $2}')
+        [[ -n "$pids" ]] && kill -9 $pids 2>/dev/null || true
+      fi
+    fi
+  fi
+}
+
+pf_loop_svc() {
+  local ns="$1" svc="$2" lport="$3" rport="$4"
+  local backoff=2
+  wait_for_endpoints "$ns" "$svc"
+  while true; do
+    echo "▶️  kubectl -n $ns port-forward svc/$svc $lport:$rport"
+    # --address 127.0.0.1 limits to localhost; --request-timeout=0 disables client-side timeout
+    if kubectl --request-timeout=0 --address=127.0.0.1 -n "$ns" port-forward "svc/$svc" "$lport:$rport"; then
+      # exited normally (rare for PF), reset backoff and loop (will reconnect)
+      backoff=2
+    else
+      echo "⚠️  svc/$svc port-forward dropped. retry in ${backoff}s…"
+      sleep "$backoff"; backoff=$(( backoff < 60 ? backoff*2 : 60 ))
+      # If the socket didn’t close cleanly, free it before retrying
+      kill_local_port "$lport"
+    fi
   done
-  rm -f "$LOCKFILE"
+}
+
+cleanup() {
+  echo "🛑 stopping all port-forwards…"
+  # kill background kubectl PFs
+  for pid in "${PIDS[@]:-}"; do
+    kill "$pid" 2>/dev/null || true
+  done
+  # ensure local ports are freed
+  for port in "${LOCAL_PORTS[@]:-}"; do
+    kill_local_port "$port"
+  done
+  remove_lock
   exit 0
 }
-trap cleanup SIGINT SIGTERM
 
-# Start port-forwards
-port_forward keycloak 8080 8080 $PAYMENT_NS & PIDS+=($!)
-port_forward payment-db-postgresql 5432 5432 $PAYMENT_NS & PIDS+=($!)
-port_forward payment-service 8081 8080 $PAYMENT_NS & PIDS+=($!)
-port_forward payment-consumers 8082 8080 $PAYMENT_NS & PIDS+=($!)
+# Ensure cleanup on most termination signals and on normal exit
+trap cleanup INT TERM HUP QUIT
+trap 'remove_lock' EXIT
 
-# Prefer the operator's service for Prometheus
-if kubectl -n $MONITORING_NS get svc prometheus-operated >/dev/null 2>&1; then
-  port_forward prometheus-operated 9090 9090 $MONITORING_NS & PIDS+=($!)
-else
-  port_forward prometheus-stack-kube-prom-prometheus 9090 9090 $MONITORING_NS & PIDS+=($!)
+# --- main ---------------------------------------------------------------
+lock
+
+declare -a PIDS=()
+declare -a LOCAL_PORTS=()
+
+# Define the forwards we want: ns kind/name  local  remote
+FORWARDS=()
+
+# Ingress (only if PF_INGRESS=true; otherwise you’re using minikube tunnel / LoadBalancer)
+if [[ "$PF_INGRESS" == "true" ]]; then
+  FORWARDS+=("$ING_NS svc/ingress-nginx-controller $INGRESS_LOCAL_PORT 80")
 fi
-port_forward prometheus-stack-grafana 3000 80 $MONITORING_NS & PIDS+=($!)
-port_forward kafka 9092 9092 $PAYMENT_NS & PIDS+=($!)
-#port_forward kibana-kibana 5601 5601 $LOGGING_NS & PIDS+=($!)
 
-echo "All port-forwards running. Press Ctrl+C in this terminal to stop ALL."
+# Keycloak
+FORWARDS+=("$PAYMENT_NS svc/keycloak 8080 8080")
 
+# Postgres
+FORWARDS+=("$PAYMENT_NS svc/payment-db-postgresql 5432 5432")
+
+#prometheus-operated 9090 9090 $MONITORING_NS & PIDS+=($!)
+FORWARDS+=("$MONITORING_NS svc/prometheus-operated 9090 9090")
+
+# Grafana
+FORWARDS+=("$MONITORING_NS svc/prometheus-stack-grafana 3000 80")
+
+#paymetn-service management
+FORWARDS+=("$PAYMENT_NS svc/payment-service 9000 9000")
+
+# Pre-free all local ports and start PF loops
+for spec in "${FORWARDS[@]}"; do
+  # shellcheck disable=SC2086
+  set -- $spec
+  ns="$1"; ref="$2"; lport="$3"; rport="$4"
+
+  kill_local_port "$lport"
+  LOCAL_PORTS+=("$lport")
+
+  # Extract just the service name for pf_loop_svc
+  svc="${ref#svc/}"
+
+  pf_loop_svc "$ns" "$svc" "$lport" "$rport" & PIDS+=("$!")
+done
+
+echo "✅ Port-forwards running:"
+[[ "$PF_INGRESS" == "true" ]] && echo "   - Ingress     → http://127.0.0.1:${INGRESS_LOCAL_PORT} (Host header still required)"
+echo "   - Keycloak    → http://127.0.0.1:8080"
+echo "   - Postgres    → 127.0.0.1:5432"
+echo "   - Grafana     → http://127.0.0.1:3000"
+echo "   - Promotheus     → http://127.0.0.1:9090"
+if [[ "$PF_INGRESS" != "true" ]]; then
+  echo "   - Ingress     → via LoadBalancer (ensure 'minikube tunnel' is running)"
+fi
+
+echo "Press Ctrl+C to stop."
 wait
-

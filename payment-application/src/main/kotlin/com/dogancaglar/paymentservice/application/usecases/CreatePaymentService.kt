@@ -75,7 +75,7 @@ open class CreatePaymentService(
             PaymentLogFields.PUBLIC_PAYMENT_ID to paymentOrderCreatedEvent.publicPaymentId
         )
         LogContext.with(envelope, additionalContext = extraLogFields) {
-            logger.info(
+            logger.debug(
                 "Creating OutboxEvent for eventType={}, aggregateId={}, eventId={}",
                 envelope.eventType,
                 envelope.aggregateId,

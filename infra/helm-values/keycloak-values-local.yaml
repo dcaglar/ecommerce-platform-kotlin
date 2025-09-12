@@ -30,3 +30,16 @@ resources:
   limits:
     memory: 1Gi
     cpu: 500m
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 300    # generous warmup (was 120)
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6

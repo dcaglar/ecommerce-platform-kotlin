@@ -36,7 +36,8 @@ Generate an OAuth access token for the payment-service client:
 Use the generated access token to call the Payment API:
 
 ```bash
-curl -i -X POST http://localhost:8081/payments \
+curl -i -X POST http://127.0.0.1/payments \
+  -H "Host: payment.192.168.49.2.nip.io" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/access.token)" \
   -d '{
@@ -57,9 +58,27 @@ kubectl top node
 
 kubectl top pods -n payment
 
-kubectl top pods -n payment --sort-by=memory
+kubectl top pods -n monitoring --sort-by=memory
 
-kubectl top pods -n logging
+kubectl get pods -A \                                                                                                                                   
+-o custom-columns='NS:.metadata.namespace,NAME:.metadata.name,REQ_CPU:.spec.containers[*].resources.requests.cpu,LIM_CPU:.spec.containers[*].resources.limits.cpu,REQ_MEM:.spec.containers[*].resources.requests.memory,LIM_MEM:.spec.containers[*].resources.limits.memory' \
+| column -t | less
+
+
+# Per-pod requests/limits at a glance
+kubectl get pods -A \
+-o custom-columns='NS:.metadata.namespace,NAME:.metadata.name,REQ_CPU:.spec.containers[*].resources.requests.cpu,LIM_CPU:.spec.containers[*].resources.limits.cpu,REQ_MEM:.spec.containers[*].resources.requests.memory,LIM_MEM:.spec.containers[*].resources.limits.memory' \
+| column -t | less
+
+# Sort by biggest memory limit (first container per pod)
+kubectl get pods -A \
+--sort-by='.spec.containers[0].resources.limits.memory' \
+-o custom-columns='NS:.metadata.namespace,NAME:.metadata.name,LIM_MEM:.spec.containers[0].resources.limits.memory'
+
+# Live usage (needs metrics-server)
+kubectl top pods -A | sort -k3 -h
+
+
 
 kubectl logs -n payment payment-service | grep 'POST /payments'
 
@@ -79,56 +98,39 @@ stern -n payment 'payment-service'| grep 'POST'
 From project root, run:
 
 ```bash 
-VUS=10  RPS=10 DURATION=3m k6 run load-tests/baseline-smoke-test.js
-VUS=15  RPS=15 DURATION=10m k6 run load-tests/baseline-smoke-test.js
-VUS=20  RPS=20 DURATION=50m k6 run load-tests/baseline-smoke-test.js
-VUS=40 RPS=40 DURATION=20m k6 run load-tests/baseline-smoke-test.js
-```
+CLIENT_TIMEOUT=3100ms VUS=10  RPS=10 DURATION=20m k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms VUS=15  RPS=15 DURATION=10m k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms VUS=20  RPS=20 DURATION=50m k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms VUS=40 RPS=40 DURATION=20m k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms VUS=80 RPS=80 DURATION=20m k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms VUS=100 RPS=100 DURATION=20m k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms VUS=120 RPS=100 DURATION=20m k6 run load-tests/baseline-smoke-test.js
 
-# this is total allocatable memory on the node
-
-```
- kubectl get nodes -o custom-columns=NAME:.metadata.name,ALLOCATABLE:.status.allocatable.memory
-```
-
-# # Current usage per node (needs metrics-server)
-
-```
-kubectl top nodes
-```
-
-# # Describe node to see resource requests/limits across all pods on the node
-
-```
-NODE=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
-kubectl describe node "$NODE" \
-| sed -n '/Allocated resources:/,/Events:/p'
-
-```
-
-Allocated resources:
-(Total limits may be over 100 percent, i.e., overcommitted.)
-Resource Requests Limits
-  --------           --------      ------
-cpu 4970m (71%)   8850m (126%)
-memory 4794Mi (40%)  7690Mi (65%)
-ephemeral-storage 100Mi (0%)    3Gi (0%)
-hugepages-1Gi 0 (0%)        0 (0%)
-hugepages-2Mi 0 (0%)        0 (0%)
-hugepages-32Mi 0 (0%)        0 (0%)
-hugepages-64Ki 0 (0%)        0 (0%)
-Events:              <none>
-
-``` 
-kubectl top nodes
-	kubectl top pods -A --sort-by=memory
-	kubectl top pods -A --sort-by=cpu
 ```
 
 connect to db after port-forwarding:
 
 ```bash
 RPS=50 DURATION=10m k6 run load-tests/baseline-smoke-test.js
+```
+health
+```bash
+curl -v \
+  -H "Host: payment.192.168.49.2.nip.io" \
+  http://127.0.0.1/actuator/health/liveness
+  
+curl -v \
+  -H "Host: payment.192.168.49.2.nip.io" \
+  http://127.0.0.1/actuator/prometheus
+  
+curl -v \
+  -H "Host: payment.192.168.49.2.nip.io" \
+  http://127.0.0.1/actuator
+
+
+curl -v \
+  -H "Host: payment.192.168.49.2.nip.io" \
+  http://127.0.0.1/actuator
 ```
 
 ---s
@@ -234,6 +236,69 @@ kubectl -n payment run kafka-client --restart=Never \
 
 
 
+
+
+
+
+# this is total allocatable memory on the node
+
+```
+ kubectl get nodes -o custom-columns=NAME:.metadata.name,ALLOCATABLE:.status.allocatable.memory
+```
+
+# # Current usage per node (needs metrics-server)
+
+```
+kubectl top nodes
+```
+
+# # Describe node to see resource requests/limits across all pods on the node
+
+```
+NODE=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
+kubectl describe node "$NODE" \
+| sed -n '/Allocated resources:/,/Events:/p'
+
+```
+
+Allocated resources:
+(Total limits may be over 100 percent, i.e., overcommitted.)
+Resource Requests Limits
+  --------           --------      ------
+cpu 4970m (71%)   8850m (126%)
+memory 4794Mi (40%)  7690Mi (65%)
+ephemeral-storage 100Mi (0%)    3Gi (0%)
+hugepages-1Gi 0 (0%)        0 (0%)
+hugepages-2Mi 0 (0%)        0 (0%)
+hugepages-32Mi 0 (0%)        0 (0%)
+hugepages-64Ki 0 (0%)        0 (0%)
+Events:              <none>
+
+``` 
+kubectl top nodes
+	kubectl top pods -A --sort-by=memory
+	kubectl top pods -A --sort-by=cpu
+
+```
+
+
+kubectl describe node minikube | egrep -i 'Capacity|Allocatable|Pressure|evict|threshold'
+
+kubectl get pods -A -o custom-columns="NAMESPACE:.metadata.namespace,NAME:.metadata.name,CPU_REQUEST:.spec.containers[*].resources.requests.cpu,MEM_REQUEST:.spec.containers[*].resources.requests.memory,CPU_LIMIT:.spec.containers[*].resources.limits.cpu,MEM_LIMIT:.spec.containers[*].resources.limits.memory"
+kubectl top pods -A --containers | sort -k4 -h  
+kubectl top pods -A --containers | sort -k2 -h   
+kubectl get events -A --sort-by=.lastTimestamp | tail -n 60
+
+kubectl get pods -A -o wide
+
+NODE=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
+kubectl describe node "$NODE" \
+| sed -n '/Allocated resources:/,/Events:/p'
+
+kubectl top nodes
+
+kubectl get --raw /apis/metrics.k8s.io/v1beta1/pods -n payment \
+| jq -r '.items[] | "\(.metadata.name)  \(.timestamp)"'
 
 
 

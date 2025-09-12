@@ -1,12 +1,29 @@
 architecture: standalone
 
+livenessProbe:
+  enabled: true
+  periodSeconds: 10
+  timeoutSeconds: 10
+  failureThreshold: 6
+readinessProbe:
+  enabled: true
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+startupProbe:
+  enabled: true
+  periodSeconds: 10
+  failureThreshold: 60
 auth:
   enabled: false
 
 master:
-  persistence:
-    enabled: true
-    size: 5Gi
+  resources:
+    requests: { cpu: "50m",  memory: "64Mi" }
+    limits:   { cpu: "300m", memory: "256Mi" }
+  configuration: |-
+    maxmemory 160mb
+    maxmemory-policy allkeys-lru
 
   # Reference your existing ConfigMap (must exist in the same namespace)
   existingConfigmap: redis-config
