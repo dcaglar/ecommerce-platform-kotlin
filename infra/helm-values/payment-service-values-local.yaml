@@ -47,7 +47,9 @@ ingress:
   host: ${INGRESS_HOST}
   path: /
   pathType: Prefix
-  annotations: {}
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "10"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "10"
   tls: []   # HTTP for minikube
 
 serviceMonitor:

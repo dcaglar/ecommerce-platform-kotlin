@@ -36,7 +36,8 @@ Generate an OAuth access token for the payment-service client:
 Use the generated access token to call the Payment API:
 
 ```bash
-curl -i -X POST http://localhost:8081/payments \
+curl -i -X POST http://127.0.0.1/payments \
+  -H "Host: payment.192.168.49.2.nip.io" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/access.token)" \
   -d '{
@@ -102,6 +103,8 @@ CLIENT_TIMEOUT=3100ms VUS=15  RPS=15 DURATION=10m k6 run load-tests/baseline-smo
 CLIENT_TIMEOUT=3100ms VUS=20  RPS=20 DURATION=50m k6 run load-tests/baseline-smoke-test.js
 CLIENT_TIMEOUT=3100ms VUS=40 RPS=40 DURATION=20m k6 run load-tests/baseline-smoke-test.js
 CLIENT_TIMEOUT=3100ms VUS=80 RPS=80 DURATION=20m k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms VUS=100 RPS=100 DURATION=20m k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms VUS=120 RPS=100 DURATION=20m k6 run load-tests/baseline-smoke-test.js
 
 ```
 
@@ -275,7 +278,27 @@ Events:              <none>
 kubectl top nodes
 	kubectl top pods -A --sort-by=memory
 	kubectl top pods -A --sort-by=cpu
+
 ```
+
+
+kubectl describe node minikube | egrep -i 'Capacity|Allocatable|Pressure|evict|threshold'
+
+kubectl get pods -A -o custom-columns="NAMESPACE:.metadata.namespace,NAME:.metadata.name,CPU_REQUEST:.spec.containers[*].resources.requests.cpu,MEM_REQUEST:.spec.containers[*].resources.requests.memory,CPU_LIMIT:.spec.containers[*].resources.limits.cpu,MEM_LIMIT:.spec.containers[*].resources.limits.memory"
+kubectl top pods -A --containers | sort -k4 -h  
+kubectl top pods -A --containers | sort -k2 -h   
+`kubectl get events -A --sort-by=.lastTimestamp | tail -n 60
+`kubectl get pods -A -o wide
+
+NODE=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
+kubectl describe node "$NODE" \
+| sed -n '/Allocated resources:/,/Events:/p'
+
+kubectl top nodes
+
+kubectl get --raw /apis/metrics.k8s.io/v1beta1/pods -n payment \
+| jq -r '.items[] | "\(.metadata.name)  \(.timestamp)"'
+
 
 
 

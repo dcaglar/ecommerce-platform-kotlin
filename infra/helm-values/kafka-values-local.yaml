@@ -35,17 +35,13 @@ controller:
   controllerOnly: false
   # ✅ Resources for the Kafka container (fix OOMKills)
   resources:
-    requests:
-      cpu: 500m
-      memory: 1Gi
-    limits:
-      cpu: "1"
-      memory: 2Gi
+    requests: {cpu: 400m, memory: 768Mi}
+    limits: {cpu: "1",  memory: 1280Mi}
   extraEnv:
     - name: KAFKA_HEAP_OPTS
-      value: "-Xms1200m -Xmx1200m"        # heap < limit to avoid OOM
+      value: "-Xms640m -Xmx768m"       # heap < limit to avoid OOM
     - name: KAFKA_JVM_PERFORMANCE_OPTS
-      value: "-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExplicitGCInvokesConcurrent"
+      value: "-XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -XX:MaxGCPauseMillis=200 -XX:+ExplicitGCInvokesConcurrent"
   overrideConfiguration:
     # Roles & listeners
     auto.create.topics.enable: false

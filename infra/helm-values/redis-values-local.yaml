@@ -18,9 +18,12 @@ auth:
   enabled: false
 
 master:
-  persistence:
-    enabled: true
-    size: 5Gi
+  resources:
+    requests: { cpu: "50m",  memory: "64Mi" }
+    limits:   { cpu: "300m", memory: "256Mi" }
+  configuration: |-
+    maxmemory 160mb
+    maxmemory-policy allkeys-lru
 
   # Reference your existing ConfigMap (must exist in the same namespace)
   existingConfigmap: redis-config

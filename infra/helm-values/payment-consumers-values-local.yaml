@@ -1,3 +1,6 @@
+spring:
+  profile: local
+
 image:
   repository: dcaglar1987/payment-consumers
   tag: latest
@@ -5,14 +8,53 @@ image:
 
 
 
+resources:
+  requests: { cpu: "200m", memory: "400Mi" }
+  limits:   { cpu: "750m", memory: "640Mi" }
 
 
-spring:
-  profile: local
-  kafka:
-    properties:
-      security.protocol: PLAINTEXT
-      session.timeout.ms: 45000
+jvmOpts: >-
+  -XX:+UseG1GC
+  -Xms320m -Xmx384m
+  -XX:MaxMetaspaceSize=120m
+  -XX:MaxDirectMemorySize=90m
+  -XX:MaxGCPauseMillis=200
+  -XX:InitiatingHeapOccupancyPercent=30
+  -XX:+UseStringDeduplication
+
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 6
+  metrics:
+    - type: External
+      external:
+        metric:
+          name: kafka_consumer_group_lag
+          selector:
+            matchLabels:
+              consumergroup: payment-order-psp-call-executor-consumer-group
+        target:
+          type: AverageValue
+          averageValue: "500"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      selectPolicy: Max
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+        - type: Pods
+          value: 3
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
 
 
 

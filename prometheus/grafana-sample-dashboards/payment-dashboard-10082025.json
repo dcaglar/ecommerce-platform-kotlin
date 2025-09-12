@@ -12,16 +12,10 @@
   "__elements": {},
   "__requires": [
     {
-      "type": "panel",
-      "id": "gauge",
-      "name": "Gauge",
-      "version": ""
-    },
-    {
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "12.1.0"
+      "version": "12.1.1"
     },
     {
       "type": "datasource",
@@ -139,7 +133,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -241,7 +235,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -320,7 +314,7 @@
             }
           },
           "mappings": [],
-          "max": 99,
+          "max": 60,
           "min": 0,
           "thresholds": {
             "mode": "percentage",
@@ -339,7 +333,7 @@
               }
             ]
           },
-          "unit": "percent"
+          "unit": "none"
         },
         "overrides": []
       },
@@ -363,7 +357,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -371,13 +365,39 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "(\n  tomcat_threads_busy_threads{name=\"http-nio-8080\"}\n  /\n  tomcat_threads_config_max_threads{name=\"http-nio-8080\"}\n)",
-          "legendFormat": "__auto",
+          "expr": "max by (pod, name) (\n  tomcat_threads_busy_threads{application=\"payment-service\", namespace=\"payment\"}\n)",
+          "legendFormat": "tomcat-busy-{{pod}}",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max by (pod, name) (\n  tomcat_threads_current_threads{application=\"payment-service\", namespace=\"payment\"}\n)",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "tomcat-current-thread-{{pod}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max by (pod, name) (\n  tomcat_threads_config_max_threads{application=\"payment-service\", namespace=\"payment\"}\n)",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "tomcat-max-thread-{{pod}}",
+          "range": true,
+          "refId": "C"
         }
       ],
-      "title": "Tomcat Thread Pool Utilizatioin %",
+      "title": "Tomcat Thread Pool",
       "type": "timeseries"
     },
     {
@@ -424,7 +444,6 @@
             }
           },
           "mappings": [],
-          "max": 2,
           "min": 0,
           "thresholds": {
             "mode": "percentage",
@@ -459,7 +478,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -467,10 +486,23 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(http_server_requests_seconds_count{status=~\"5..\", uri=\"/payments\"}[1m]))",
-          "legendFormat": "Error rate",
+          "expr": "100 *\nsum(rate(http_server_requests_seconds_count{application=\"payment-service\",status=~\"2..\"}[1m]))\n/\nsum(rate(http_server_requests_seconds_count{application=\"payment-service\"}[1m]))",
+          "legendFormat": "__auto",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "100 *\nsum(rate(http_server_requests_seconds_count{application=\"payment-service\",status=~\"5..\"}[$__rate_interval]))\n/\nsum(rate(http_server_requests_seconds_count{application=\"payment-service\"}[$__rate_interval]))",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "HTTP Success/Failure Rate",
@@ -545,36 +577,11 @@
           },
           "unit": "percent"
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "DB Pool Utilization"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 4,
+        "h": 10,
+        "w": 6,
         "x": 0,
         "y": 9
       },
@@ -592,7 +599,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -600,26 +607,13 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "(hikaricp_connections_active{job=\"payment-service\"}/hikaricp_connections_max{job=\"payment-service\"})*100",
-          "legendFormat": "{{pool}}",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "(hikaricp_connections_active{job=\"payment-consumers\"}/hikaricp_connections_max{job=\"payment-consumers\"})*100",
-          "hide": false,
-          "instant": false,
+          "expr": "100 * (\n  hikaricp_connections_active{\n    application=\"payment-service\", pool=\"web-pool\"\n  }\n/\n  hikaricp_connections_max{\n    application=\"payment-service\", pool=\"web-pool\"\n  }\n)",
           "legendFormat": "{{pod}}",
           "range": true,
-          "refId": "B"
+          "refId": "A"
         }
       ],
-      "title": "DB Connection Pool Utilization (%)",
+      "title": "WEB DB Pool  Utilization (%)",
       "type": "timeseries"
     },
     {
@@ -666,149 +660,7 @@
             }
           },
           "mappings": [],
-          "max": 5000,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "yellow",
-                "value": 150
-              },
-              {
-                "color": "red",
-                "value": 300
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "payment-service"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 3,
-        "x": 4,
-        "y": 9
-      },
-      "id": 11,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.1.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "hikaricp_connections_acquire_seconds_max{job=\"payment-service\"}*1000",
-          "legendFormat": "{{pool}}",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "hikaricp_connections_acquire_seconds_max{job=\"payment-consumers\"}*1000",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "{{pod}}",
-          "range": true,
-          "refId": "B"
-        }
-      ],
-      "title": "DB Acquire Time (max seconds)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "dashed+area"
-            }
-          },
-          "mappings": [],
-          "max": 160,
+          "max": 15,
           "min": 0,
           "thresholds": {
             "mode": "absolute",
@@ -831,9 +683,9 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 4,
-        "x": 7,
+        "h": 10,
+        "w": 6,
+        "x": 6,
         "y": 9
       },
       "id": 10,
@@ -850,7 +702,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -858,26 +710,13 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "hikaricp_connections_pending{job=\"payment-service\"}",
-          "legendFormat": "{{pool}}",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "hikaricp_connections_pending{job=\"payment-consumers\"}",
-          "hide": false,
-          "instant": false,
+          "expr": "max by (pod, pool) (\n  hikaricp_connections_pending{\n    application=\"payment-service\",\n    namespace=\"payment\",\n    pool=\"web-pool\"\n  }\n)",
           "legendFormat": "{{pod}}",
           "range": true,
-          "refId": "B"
+          "refId": "A"
         }
       ],
-      "title": "DB Pool Pending Connections",
+      "title": "WEB DB Pool  Pending Connection",
       "type": "timeseries"
     },
     {
@@ -888,10 +727,43 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed+area"
+            }
           },
           "mappings": [],
-          "max": 100,
+          "max": 1500,
           "min": 0,
           "thresholds": {
             "mode": "absolute",
@@ -902,128 +774,39 @@
               },
               {
                 "color": "yellow",
-                "value": 80
+                "value": 150
               },
               {
                 "color": "red",
-                "value": 90
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 3,
-        "x": 11,
-        "y": 9
-      },
-      "id": 15,
-      "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "sizing": "auto"
-      },
-      "pluginVersion": "12.1.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "process_cpu_usage{job=\"payment-service\"} * 100",
-          "legendFormat": "payment-service",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "process_cpu_usage{job=\"payment-consumers\"} * 100",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "payment-consumers",
-          "range": true,
-          "refId": "B"
-        }
-      ],
-      "title": "Payment-Serviice-CPU Usage (%)",
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "fieldMinMax": false,
-          "mappings": [],
-          "max": 1000,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "yellow",
                 "value": 300
-              },
-              {
-                "color": "red",
-                "value": 600
               }
             ]
           },
-          "unit": "none"
+          "unit": "ms"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 3,
-        "x": 14,
+        "h": 10,
+        "w": 6,
+        "x": 12,
         "y": 9
       },
-      "id": 17,
+      "id": 11,
       "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "sizing": "auto"
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -1031,27 +814,14 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "jvm_threads_live_threads{job=\"payment-service\"}",
-          "legendFormat": "payment-service",
+          "expr": "max by (pod) (\n  hikaricp_connections_acquire_seconds_max{application=\"payment-service\",pool=\"web-pool\"}\n) *1000",
+          "legendFormat": "{{pod}}",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "jvm_threads_live_threads{job=\"payment-consumers\"}",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "payment-consumers",
-          "range": true,
-          "refId": "B"
         }
       ],
-      "title": "JVM Live Threads",
-      "type": "gauge"
+      "title": "WEB DB Pool Acquire Time (max seconds)",
+      "type": "timeseries"
     },
     {
       "datasource": {
@@ -1115,9 +885,9 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 3,
-        "x": 17,
+        "h": 10,
+        "w": 6,
+        "x": 18,
         "y": 9
       },
       "id": 16,
@@ -1134,7 +904,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -1142,26 +912,622 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "max(jvm_gc_pause_seconds_max{job=\"payment-service\"}) * 1000",
-          "legendFormat": "payment-service",
+          "expr": "(rate(hikaricp_connections_usage_seconds_sum{application=\"payment-service\",pool=\"web-pool\"}[1m])\n/\nrate(hikaricp_connections_usage_seconds_count{application=\"payment-service\",pool=\"web-pool\"}[1m]))*1000",
+          "legendFormat": "{{pod}}",
           "range": true,
           "refId": "A"
+        }
+      ],
+      "title": "WEB DB Pool-Avg Tx Time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "area"
+            }
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "orange",
+                "value": 80
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent"
         },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 6,
+        "x": 0,
+        "y": 19
+      },
+      "id": 50,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "max(jvm_gc_pause_seconds_max{job=\"payment-consumers\"}) * 1000",
+          "expr": "100 * (\n  hikaricp_connections_active{\n    application=\"payment-service\", pool=\"outbox-pool\"\n  }\n/\n  hikaricp_connections_max{\n    application=\"payment-service\", pool=\"outbox-pool\"\n  }\n)",
+          "legendFormat": "{{pod}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "OutboxJob  DB Connection Pool Utilization (%)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed+area"
+            }
+          },
+          "mappings": [],
+          "max": 15,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 6,
+        "x": 6,
+        "y": 19
+      },
+      "id": 49,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max by (pod, pool) (\n  hikaricp_connections_pending{\n    application=\"payment-service\",\n    namespace=\"payment\",\n    pool=\"outbox-pool\"\n  }\n)",
+          "legendFormat": "{{pod}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Outbox-DB Pool Pending Connections",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed+area"
+            }
+          },
+          "mappings": [],
+          "max": 1500,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 150
+              },
+              {
+                "color": "red",
+                "value": 300
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 6,
+        "x": 12,
+        "y": 19
+      },
+      "id": 52,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max by (pod) (\n  hikaricp_connections_acquire_seconds_max{application=\"payment-service\",pool=\"outbox-pool\"}\n) *1000",
+          "legendFormat": "{{pod}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "OutBoxJob DB Pool Acquire Time (max seconds)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 6,
+        "x": 18,
+        "y": 19
+      },
+      "id": 53,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "(rate(hikaricp_connections_usage_seconds_sum{application=\"payment-service\",pool=\"outbox-pool\"}[1m])\n/\nrate(hikaricp_connections_usage_seconds_count{application=\"payment-service\",pool=\"outbox-pool\"}[1m]))*1000",
+          "legendFormat": "{{pod}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "OutboxJobDB Pool-Avg Tx Time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 6,
+        "x": 0,
+        "y": 29
+      },
+      "id": 17,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_live_threads{job=\"payment-service\"}",
           "hide": false,
           "instant": false,
-          "legendFormat": "payment-consumers",
+          "legendFormat": "{{pod}}",
           "range": true,
           "refId": "B"
         }
       ],
-      "title": "GC Pause (max ms)",
+      "title": "jvm_threads_live_threads",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 6,
+        "x": 6,
+        "y": 29
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "process_cpu_usage{job=\"payment-service\"} * 100",
+          "legendFormat": "{{pod}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "process_cpu_usage",
       "type": "timeseries"
     },
     {
@@ -1285,10 +1651,10 @@
         ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 4,
-        "x": 20,
-        "y": 9
+        "h": 9,
+        "w": 6,
+        "x": 12,
+        "y": 29
       },
       "id": 14,
       "options": {
@@ -1304,7 +1670,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -1390,15 +1756,126 @@
               }
             ]
           },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 6,
+        "x": 18,
+        "y": 29
+      },
+      "id": 51,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max(jvm_gc_pause_seconds_max{job=\"payment-service\"}) * 1000",
+          "legendFormat": "payment-service",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max(jvm_gc_pause_seconds_max{job=\"payment-consumers\"}) * 1000",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "payment-consumers",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "GC Pause (max ms)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
           "unit": "rowsps"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 9,
-        "w": 5,
+        "w": 6,
         "x": 0,
-        "y": 17
+        "y": 38
       },
       "id": 39,
       "options": {
@@ -1414,7 +1891,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -1488,113 +1965,15 @@
               }
             ]
           },
-          "unit": "mps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 5,
-        "x": 5,
-        "y": 17
-      },
-      "id": 44,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.1.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "sum by (topic) (\n  rate(kafka_producer_topic_record_send_total{application=\"payment-service\"}[$__rate_interval])\n)",
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "PaymentOrderCreated Produce Rate-OutboxDispacther job",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
           "unit": "none"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 9,
-        "w": 5,
-        "x": 10,
-        "y": 17
+        "w": 7,
+        "x": 6,
+        "y": 38
       },
       "id": 40,
       "options": {
@@ -1610,7 +1989,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -1683,17 +2062,18 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "mps"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 9,
         "w": 5,
-        "x": 15,
-        "y": 17
+        "x": 13,
+        "y": 38
       },
-      "id": 35,
+      "id": 44,
       "options": {
         "legend": {
           "calcs": [],
@@ -1707,7 +2087,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -1715,13 +2095,13 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (topic) (\n  kafka_consumer_fetch_manager_records_lag{application=\"payment-consumers\"}\n)",
+          "expr": "sum by (topic) (\n  rate(kafka_producer_topic_record_send_total{application=\"payment-service\"}[$__rate_interval])\n)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Consumer Lag by topic",
+      "title": "PaymentOrderCreated Produce Rate-OutboxDispacther job",
       "type": "timeseries"
     },
     {
@@ -1781,114 +2161,16 @@
               }
             ]
           }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 4,
-        "x": 20,
-        "y": 17
-      },
-      "id": 34,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.1.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "sum by (topic) (\n  max by (topic, partition) (\n    kafka_topic_partition_current_offset{\n      topic=~\"^payment.*\\\\.DLQ$\"\n    }\n  )\n)",
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "DQL offset By topic",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "recps"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 9,
         "w": 6,
-        "x": 0,
-        "y": 26
+        "x": 18,
+        "y": 38
       },
-      "id": 42,
+      "id": 48,
       "options": {
         "legend": {
           "calcs": [],
@@ -1902,7 +2184,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -1910,110 +2192,37 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (topic) (\n  rate(kafka_consumer_fetch_manager_records_consumed_total{application=\"payment-consumers\"}[$__rate_interval])\n)",
-          "legendFormat": "__auto",
+          "expr": "histogram_quantile(\n  0.5,\n  sum by (le) (rate(outbox_dispatcher_duration_seconds_bucket[$__rate_interval]))\n)",
+          "legendFormat": "p50",
           "range": true,
           "refId": "A"
-        }
-      ],
-      "title": "Consume Rate By Topic",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
         },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 5,
-        "x": 6,
-        "y": 26
-      },
-      "id": 4,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.1.0",
-      "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (topic) (\n  rate(kafka_producer_topic_record_send_total{application=\"payment-consumers\"}[$__rate_interval])\n)",
-          "legendFormat": "__auto",
+          "expr": "histogram_quantile(\n  0.95,\n  sum by (le) (rate(outbox_dispatcher_duration_seconds_bucket[$__rate_interval]))\n)",
+          "hide": false,
+          "legendFormat": "p95",
           "range": true,
-          "refId": "A"
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(\n  0.99,\n  sum by (le) (rate(outbox_dispatcher_duration_seconds_bucket[$__rate_interval]))\n)",
+          "hide": false,
+          "legendFormat": "p99",
+          "range": true,
+          "refId": "C"
         }
       ],
-      "title": "Produce Rate-Payment Consumers",
+      "title": "Outbox Batch Duration",
       "type": "timeseries"
     },
     {
@@ -2079,9 +2288,9 @@
       },
       "gridPos": {
         "h": 9,
-        "w": 5,
-        "x": 11,
-        "y": 26
+        "w": 6,
+        "x": 0,
+        "y": 47
       },
       "id": 36,
       "options": {
@@ -2097,7 +2306,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -2176,9 +2385,130 @@
       },
       "gridPos": {
         "h": 9,
-        "w": 4,
-        "x": 16,
-        "y": 26
+        "w": 6,
+        "x": 6,
+        "y": 47
+      },
+      "id": 46,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(\n  0.50,\n  sum by (le) (rate(psp_exec_duration_seconds_bucket{application=\"payment-consumers\"}[5m]))\n) * 1000",
+          "legendFormat": "p50",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(\n  0.95,\n  sum by (le) (rate(psp_exec_duration_seconds_bucket{application=\"payment-consumers\"}[5m]))\n) * 1000",
+          "hide": false,
+          "legendFormat": "p95",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(\n  0.99,\n  sum by (le) (rate(psp_exec_duration_seconds_bucket{application=\"payment-consumers\"}[5m]))\n) * 1000",
+          "hide": false,
+          "legendFormat": "p99",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Psp Exec Time Percentiles",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 6,
+        "x": 12,
+        "y": 47
       },
       "id": 37,
       "options": {
@@ -2194,7 +2524,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -2293,6 +2623,419 @@
                 "value": 80
               }
             ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 6,
+        "x": 18,
+        "y": 47
+      },
+      "id": 34,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (topic) (\n  max by (topic, partition) (\n    kafka_topic_partition_current_offset{\n      topic=~\"^payment.*\\\\.DLQ$\"\n    }\n  )\n)",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "DQL offset By topic",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 6,
+        "x": 0,
+        "y": 56
+      },
+      "id": 47,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(\n  0.50,\n  sum by (le) (rate(psp_queue_delay_seconds_bucket{application=\"payment-consumers\"}[5m]))\n) * 1000",
+          "legendFormat": "p50",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(\n  0.95,\n  sum by (le) (rate(psp_queue_delay_seconds_bucket{application=\"payment-consumers\"}[5m]))\n) *1000",
+          "hide": false,
+          "legendFormat": "p95",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(\n  0.99,\n  sum by (le) (rate(psp_queue_delay_seconds_bucket{application=\"payment-consumers\"}[5m]))\n) *1000",
+          "hide": false,
+          "legendFormat": "p99",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Psp Queue Delay Percentiles",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 6,
+        "x": 6,
+        "y": 56
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (topic) (\n  rate(kafka_producer_topic_record_send_total{application=\"payment-consumers\"}[$__rate_interval])\n)",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Produce Rate-Payment Consumers",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "recps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 6,
+        "x": 12,
+        "y": 56
+      },
+      "id": 42,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (topic) (\n  rate(kafka_consumer_fetch_manager_records_consumed_total{application=\"payment-consumers\"}[$__rate_interval])\n)",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Consume Rate By Topic",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
           },
           "unit": "percentunit"
         },
@@ -2300,9 +3043,9 @@
       },
       "gridPos": {
         "h": 9,
-        "w": 4,
-        "x": 20,
-        "y": 26
+        "w": 6,
+        "x": 18,
+        "y": 56
       },
       "id": 41,
       "options": {
@@ -2318,7 +3061,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -2464,7 +3207,7 @@
         "h": 9,
         "w": 6,
         "x": 0,
-        "y": 35
+        "y": 65
       },
       "id": 7,
       "options": {
@@ -2480,7 +3223,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -2561,7 +3304,7 @@
         "h": 9,
         "w": 6,
         "x": 6,
-        "y": 35
+        "y": 65
       },
       "id": 3,
       "options": {
@@ -2577,7 +3320,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -2658,7 +3401,7 @@
         "h": 9,
         "w": 6,
         "x": 12,
-        "y": 35
+        "y": 65
       },
       "id": 43,
       "options": {
@@ -2674,7 +3417,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -2747,6 +3490,103 @@
                 "value": 80
               }
             ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 6,
+        "x": 18,
+        "y": 65
+      },
+      "id": 35,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (topic) (\n  kafka_consumer_fetch_manager_records_lag{application=\"payment-consumers\"}\n)",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Consumer Lag by topic",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
           },
           "unit": "ops"
         },
@@ -2756,7 +3596,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 35
+        "y": 74
       },
       "id": 45,
       "options": {
@@ -2772,7 +3612,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.0",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -2788,369 +3628,6 @@
       ],
       "title": "Retry Dispatcther Job-Throughput",
       "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 6,
-        "x": 0,
-        "y": 44
-      },
-      "id": 47,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.1.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "histogram_quantile(\n  0.50,\n  sum by (le) (rate(psp_queue_delay_seconds_bucket{application=\"payment-consumers\"}[5m]))\n) * 1000",
-          "legendFormat": "p50",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "histogram_quantile(\n  0.95,\n  sum by (le) (rate(psp_queue_delay_seconds_bucket{application=\"payment-consumers\"}[5m]))\n) *1000",
-          "hide": false,
-          "legendFormat": "p95",
-          "range": true,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "histogram_quantile(\n  0.99,\n  sum by (le) (rate(psp_queue_delay_seconds_bucket{application=\"payment-consumers\"}[5m]))\n) *1000",
-          "hide": false,
-          "legendFormat": "p99",
-          "range": true,
-          "refId": "C"
-        }
-      ],
-      "title": "Psp Queue Delay Percentiles",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 6,
-        "x": 6,
-        "y": 44
-      },
-      "id": 46,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.1.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "histogram_quantile(\n  0.50,\n  sum by (le) (rate(psp_exec_duration_seconds_bucket{application=\"payment-consumers\"}[5m]))\n) * 1000",
-          "legendFormat": "p50",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "histogram_quantile(\n  0.95,\n  sum by (le) (rate(psp_exec_duration_seconds_bucket{application=\"payment-consumers\"}[5m]))\n) * 1000",
-          "hide": false,
-          "legendFormat": "p95",
-          "range": true,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "histogram_quantile(\n  0.99,\n  sum by (le) (rate(psp_exec_duration_seconds_bucket{application=\"payment-consumers\"}[5m]))\n) * 1000",
-          "hide": false,
-          "legendFormat": "p99",
-          "range": true,
-          "refId": "C"
-        }
-      ],
-      "title": "Psp Exec Time Percentiles",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 6,
-        "x": 12,
-        "y": 44
-      },
-      "id": 48,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.1.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "histogram_quantile(\n  0.5,\n  sum by (le) (rate(outbox_dispatcher_duration_seconds_bucket[$__rate_interval]))\n)",
-          "legendFormat": "p50",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "histogram_quantile(\n  0.95,\n  sum by (le) (rate(outbox_dispatcher_duration_seconds_bucket[$__rate_interval]))\n)",
-          "hide": false,
-          "legendFormat": "p95",
-          "range": true,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "histogram_quantile(\n  0.99,\n  sum by (le) (rate(outbox_dispatcher_duration_seconds_bucket[$__rate_interval]))\n)",
-          "hide": false,
-          "legendFormat": "p99",
-          "range": true,
-          "refId": "C"
-        }
-      ],
-      "title": "Outbox Batch Duration",
-      "type": "timeseries"
     }
   ],
   "refresh": "30s",
@@ -3160,13 +3637,13 @@
     "list": []
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Payment Dashboard",
   "uid": "20250615df",
-  "version": 11,
+  "version": 4,
   "weekStart": ""
 }

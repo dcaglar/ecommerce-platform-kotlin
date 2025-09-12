@@ -5,61 +5,6 @@ image:
 
 
 
-
-spring:
-  profile: local
-  kafka:
-    properties:
-      security.protocol: PLAINTEXT
-      session.timeout.ms: 45000
-replicaCount: 3
-resources:
-  requests: { cpu: "200m", memory: "450Mi" }
-  limits:   { cpu: "750m", memory: "900Mi" }
-
-jvmOpts: >-
-  -XX:+UseG1GC
-  -Xms384m -Xmx384m
-  -XX:MaxMetaspaceSize=128m
-  -XX:MaxDirectMemorySize=96m
-  -XX:MaxGCPauseMillis=200
-  -XX:InitiatingHeapOccupancyPercent=30
-  -XX:+UseStringDeduplication
-
-
-autoscaling:
-  enabled: true
-  minReplicas: 3
-  maxReplicas: 6
-  metrics:
-    - type: External
-      external:
-        metric:
-          name: kafka_consumer_group_lag
-          selector:
-            matchLabels:
-              consumergroup: payment-order-psp-call-executor-consumer-group
-        target:
-          type: AverageValue
-          averageValue: "500"
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 0
-      selectPolicy: Max
-      policies:
-        - type: Percent
-          value: 100
-          periodSeconds: 60
-        - type: Pods
-          value: 3
-          periodSeconds: 60
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-        - type: Percent
-          value: 50
-          periodSeconds: 60
-
 service:
   type: ClusterIP
   port: 8080

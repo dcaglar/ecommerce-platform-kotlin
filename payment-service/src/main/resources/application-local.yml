@@ -173,6 +173,6 @@ db:
     lock-timeout-ms: 250
     idle-in-tx-timeout-ms: 0
   outbox:
-      statement-timeout-ms: 2000      # batch queries can run longer
+      statement-timeout-ms: 2000
       lock-timeout-ms: 200
-      idle-in-tx-timeout-ms: 0        # disable; rely on Spring’s 60s tx timeout
+      idle-in-tx-timeout-ms: 0
