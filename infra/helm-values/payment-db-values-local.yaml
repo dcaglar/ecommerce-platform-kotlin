@@ -45,7 +45,7 @@ primary:
     maintenance_work_mem = '64MB'          # VACUUM/CREATE INDEX
 
     # connections (lower = less RAM)
-    max_connections = 57
+    max_connections = 67
 
     # WAL / checkpoints (lighter on disk/CPU)
     checkpoint_timeout = '10min'

@@ -287,8 +287,9 @@ kubectl describe node minikube | egrep -i 'Capacity|Allocatable|Pressure|evict|t
 kubectl get pods -A -o custom-columns="NAMESPACE:.metadata.namespace,NAME:.metadata.name,CPU_REQUEST:.spec.containers[*].resources.requests.cpu,MEM_REQUEST:.spec.containers[*].resources.requests.memory,CPU_LIMIT:.spec.containers[*].resources.limits.cpu,MEM_LIMIT:.spec.containers[*].resources.limits.memory"
 kubectl top pods -A --containers | sort -k4 -h  
 kubectl top pods -A --containers | sort -k2 -h   
-`kubectl get events -A --sort-by=.lastTimestamp | tail -n 60
-`kubectl get pods -A -o wide
+kubectl get events -A --sort-by=.lastTimestamp | tail -n 60
+
+kubectl get pods -A -o wide
 
 NODE=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
 kubectl describe node "$NODE" \
