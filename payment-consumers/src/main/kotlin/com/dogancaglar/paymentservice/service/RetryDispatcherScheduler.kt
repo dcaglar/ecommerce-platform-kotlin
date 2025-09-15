@@ -90,14 +90,18 @@ class RetryDispatcherScheduler(
         var success = 0
         var fail = 0
 
-        val due: List<EventEnvelope<PaymentOrderPspCallRequested>> =
-            retryQueue.pollDueRetries(1000)
+
+        val due = retryQueue.pollDueRetriesToInflight(1000)
+
+
 
         batchSize.set(due.size)
 
-        for (env in due) {
+        for (item in due) {
             val evtSample = Timer.start(meterRegistry)
+            val env = item.envelope
             try {
+
                 kafkaTx.run {
                     publisher.publish(
                         preSetEventIdFromCaller = env.eventId,
@@ -108,6 +112,7 @@ class RetryDispatcherScheduler(
                         traceId = env.traceId
                     )
                 }
+                retryQueue.removeFromInflight(item.raw)
                 success++
             } catch (e: Exception) {
                 fail++
@@ -125,5 +130,14 @@ class RetryDispatcherScheduler(
         if (fail > 0) failedCounter.increment(fail.toDouble())
 
         batchSample.stop(batchTimer)
+    }
+
+    /** Requeue stale inflight items (e.g., if we crashed after popping) */
+    @Scheduled(fixedDelay = 30_000)
+    fun reclaimInflight() {
+        val before = System.currentTimeMillis()
+        retryQueue.reclaimInflight(olderThanMs = 60_000)
+        val took = System.currentTimeMillis() - before
+        logger.debug("Reclaimed stale inflight ({} ms)", took)
     }
 }

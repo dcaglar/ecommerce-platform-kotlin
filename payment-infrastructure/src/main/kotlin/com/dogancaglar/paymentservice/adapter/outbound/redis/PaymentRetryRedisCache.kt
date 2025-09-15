@@ -10,6 +10,8 @@ open class PaymentRetryRedisCache(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val queue = "payment_retry_queue"
+    private val inflight = "payment_retry_inflight"   // ZSET: member = raw JSON, score = first-picked timestamp
+
     fun getRetryCount(paymentOrderId: Long): Int {
         val retryKey = "retry:count:$paymentOrderId"
         return redisTemplate.opsForValue()[retryKey]?.toInt() ?: 0
@@ -82,59 +84,74 @@ open class PaymentRetryRedisCache(
 
     fun zsetSize(): Long =
         redisTemplate.opsForZSet().zCard(queue) ?: 0L
-    /*
-    fun scheduleRetry(
-        paymentOrder: PaymentOrder,
-        backOffMillis: Long
-    ) {
-        // ... envelope creation, scheduling logic unchanged ...
-        val paymentOrderRetryRequested = PaymentOrderDomainEventMapper.toPaymentOrderRetryRequestEvent(order = paymentOrder)
-        val envelope = DomainEventEnvelopeFactory.envelopeFor(
-            data = paymentOrderRetryRequested,
-            eventMetaData = EventMetadatas.PaymentOrderRetryRequestedMetadata,
-            aggregateId = paymentOrderRetryRequested.publicPaymentOrderId,
-            traceId = LogContext.getTraceId()!!,
-            parentEventId = LogContext.getEventId()
-        )
-        LogContext.with(
-            envelope = envelope, additionalContext = mapOf<String, String>(
-                LogFields.RETRY_COUNT to paymentOrderRetryRequested.retryCount.toString(),
-                LogFields.RETRY_BACKOFF_MILLIS to backOffMillis.toString(),
-                LogFields.RETRY_REASON to "PSP_TIMEOUT",
-                LogFields.RETRY_ERROR_MESSAGE to "PSP call timed out, retrying"
-            )
-        ) {
-            {
-                logger.info("Sending to redis with expantoal backoff jittery $")
-                val json = objectMapper.writeValueAsString(envelope);
-                val retryAt = System.currentTimeMillis() + backOffMillis
-                redisTemplate.opsForZSet().add(queue, json, retryAt.toDouble())
+
+
+    /**
+     * Pops up to [max] due items atomically from the main ZSET and moves them
+     * into an inflight ZSET. Returns the raw JSON bytes for each moved item.
+     *
+     * Semantics:
+     *   - Items with score <= now are considered DUE and moved to inflight with score=now.
+     *   - Items with score > now are reinserted back to the main queue unchanged.
+     * Crash after this call will NOT lose due items; they are in 'inflight'.
+     */
+    fun popDueToInflight(max: Long = 1000): List<ByteArray> {
+        val now = System.currentTimeMillis().toDouble()
+        val conn = redisTemplate.connectionFactory?.connection ?: return emptyList()
+
+        val popped = conn.zSetCommands().zPopMin(queue.toByteArray(), max) ?: emptyList()
+        if (popped.isEmpty()) return emptyList()
+
+        val due = mutableListOf<ByteArray>()
+        val notDue = mutableListOf<Pair<ByteArray, Double>>()
+
+        popped.forEach { tup ->
+            val value = tup.value // ByteArray
+            val score = tup.score
+            if (score <= now) {
+                // move to inflight with timestamp 'now'
+                conn.zSetCommands().zAdd(inflight.toByteArray(), now, value)
+                due += value
+            } else {
+                notDue += value to score
             }
         }
+
+        // Put not-due back to main queue with original score
+        notDue.forEach { (valBytes, score) ->
+            conn.zSetCommands().zAdd(queue.toByteArray(), score, valBytes)
+        }
+        return due
     }
 
-
-    override fun pollDueRetries(): List<EventEnvelope<PaymentOrderRetryRequested>> {
-        val now = System.currentTimeMillis().toDouble()
-        val dueItems = redisTemplate.opsForZSet().rangeByScore(queue, 0.0, now)
-
-        val dueEnvelops = dueItems?.mapNotNull { json ->
-            try {
-                // Deserializing the full EventEnvelope
-                val envelope: EventEnvelope<PaymentOrderRetryRequested> =
-                    objectMapper.readValue(json, object : TypeReference<EventEnvelope<PaymentOrderRetryRequested>>() {})
-                redisTemplate.opsForZSet().remove(queue, json)
-                envelope // You return only the domain event
-            } catch (e: Exception) {
-                // Optionally log and skip corrupted entries
-                null
-            }
-        } ?: emptyList()
-        return dueEnvelops
+    /** Remove one item from inflight ZSET by its exact raw JSON bytes. */
+    fun removeFromInflight(raw: ByteArray) {
+        val conn = redisTemplate.connectionFactory?.connection ?: return
+        conn.zSetCommands().zRem(inflight.toByteArray(), raw)
     }
 
-    */
+    /** Number of items currently inflight. */
+    fun inflightSize(): Long {
+        val conn = redisTemplate.connectionFactory?.connection ?: return 0L
+        return conn.zSetCommands().zCard(inflight.toByteArray()) ?: 0L
+    }
 
+    /**
+     * Reclaim inflight items older than [olderThanMs] back to the main queue.
+     * Uses the current time as the new score (ready immediately).
+     */
+    fun reclaimInflight(olderThanMs: Long = 60_000) {
+        val cutoff = (System.currentTimeMillis() - olderThanMs).toDouble()
+        val nowScore = System.currentTimeMillis().toDouble()
+        val conn = redisTemplate.connectionFactory?.connection ?: return
 
-    // ...pollDueRetries, resetRetryCounter as before...
+        val members: MutableSet<ByteArray> =
+            conn.zSetCommands().zRangeByScore(inflight.toByteArray(), 0.0, cutoff) ?: return
+
+        // Requeue each stale member as due-now, then remove from inflight
+        members.forEach { member ->
+            conn.zSetCommands().zAdd(queue.toByteArray(), nowScore, member)
+            conn.zSetCommands().zRem(inflight.toByteArray(), member)
+        }
+    }
 }

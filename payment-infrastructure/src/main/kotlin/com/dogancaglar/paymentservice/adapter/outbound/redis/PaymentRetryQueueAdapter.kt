@@ -6,6 +6,7 @@ import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.RetryItem
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
@@ -80,18 +81,6 @@ class PaymentRetryQueueAdapter(
         }
     }
 
-    override fun pollDueRetries(maxBatchSize: Long): List<EventEnvelope<PaymentOrderPspCallRequested>> {
-        val dueItems = paymentRetryRedisCache.pollDueRetriesAtomic(maxBatchSize)
-        return dueItems.mapNotNull { json ->
-            try {
-                objectMapper.readValue(json, object : TypeReference<EventEnvelope<PaymentOrderPspCallRequested>>() {})
-            } catch (e: Exception) {
-                logger.error("❌ Failed to deserialize retry envelope", e)
-                null
-            }
-        }
-    }
-
     // Optional ops helpers
     override fun getRetryCount(paymentOrderId: PaymentOrderId): Int =
         paymentRetryRedisCache.getRetryCount(paymentOrderId.value)
@@ -99,4 +88,30 @@ class PaymentRetryQueueAdapter(
     override fun resetRetryCounter(paymentOrderId: PaymentOrderId) {
         paymentRetryRedisCache.resetRetryCounter(paymentOrderId.value)
     }
+
+
+    /** New: pop to inflight and return [RetryItem]s. */
+    override fun pollDueRetriesToInflight(maxBatchSize: Long): List<RetryItem> {
+        val raws: List<ByteArray> = paymentRetryRedisCache.popDueToInflight(maxBatchSize)
+        if (raws.isEmpty()) return emptyList()
+        val items = mutableListOf<RetryItem>()
+        for (raw in raws) {
+            try {
+                val env: EventEnvelope<PaymentOrderPspCallRequested> =
+                    objectMapper.readValue(raw, object : TypeReference<EventEnvelope<PaymentOrderPspCallRequested>>() {})
+                items += RetryItem(env, raw)
+            } catch (e: Exception) {
+                // If we cannot deserialize, drop from inflight to avoid poison loops
+                paymentRetryRedisCache.removeFromInflight(raw)
+            }
+        }
+        return items
+    }
+
+
+    fun removeFromInflight(raw: ByteArray) =
+        paymentRetryRedisCache.removeFromInflight(raw)
+
+    fun reclaimInflight(olderThanMs: Long = 60_000) =
+        paymentRetryRedisCache.reclaimInflight(olderThanMs)
 }
