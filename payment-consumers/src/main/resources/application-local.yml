@@ -19,6 +19,12 @@ app:
         class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderPspCallExecutor
         concurrency: 8
 
+      - id: payment-order-psp-result-applier
+        topic: payment_order_psp_result_updated_topic
+        group-id: payment-order-psp-result-updated-consumer-group
+        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderPspResultApplier
+        concurrency: 8
+
       - id: payment-status-check-executor-scheduler
         topic: payment_status_check_scheduler_topic
         group-id: payment-status-check-scheduler-consumer-group

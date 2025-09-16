@@ -9,6 +9,7 @@ import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspResultUpdated
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -207,6 +208,26 @@ class KafkaTypedConsumerFactoryConfig(
             errorHandler = errorHandler,
             ackMode = ContainerProperties.AckMode.MANUAL,
             expectedEventType = EventMetadatas.PaymentOrderPspCallRequestedMetadata.eventType,
+        )
+    }
+
+
+    @Bean("${Topics.PAYMENT_ORDER_PSP_RESULT_UPDATED}-factory")
+    fun pspResultUpdatedFactory(
+        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
+        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderPspResultUpdated>> {
+        val cfg = cfgFor(EventMetadatas.PaymentOrderPspResultUpdatedMetadata.topic, "${Topics.PAYMENT_ORDER_PSP_RESULT_UPDATED}-factory")
+        return createTypedFactory(
+            clientId = cfg.id,
+            concurrency = cfg.concurrency,
+            interceptor = interceptor,
+            consumerFactory = customFactory,
+            errorHandler = errorHandler,
+            ackMode = ContainerProperties.AckMode.MANUAL,
+            expectedEventType = EventMetadatas.PaymentOrderPspResultUpdatedMetadata.eventType,
         )
     }
 

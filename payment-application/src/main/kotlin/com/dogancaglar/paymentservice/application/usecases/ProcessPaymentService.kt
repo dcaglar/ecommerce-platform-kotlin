@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.application.usecases
 
 import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.paymentservice.domain.PaymentOrderEvent
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderEvent
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder

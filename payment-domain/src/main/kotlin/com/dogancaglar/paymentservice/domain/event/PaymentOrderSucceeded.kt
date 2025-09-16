@@ -1,6 +1,5 @@
 package com.dogancaglar.paymentservice.domain.event
 
-import com.dogancaglar.paymentservice.domain.PaymentOrderEvent
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.math.BigDecimal
 import java.time.LocalDateTime
