@@ -54,12 +54,12 @@ spring:
       validation-timeout: 1000
   kafka:
     consumer:
-      max-poll-records: 500
-      fetch-min-bytes: 1048576        # 1 MiB before broker responds (latency vs efficiency)
+      max-poll-records: 200
+      fetch-min-bytes: 262144      #  256k before broker responds (latency vs efficiency)
       fetch-max-wait: 25ms            # cap the wait so latency doesn’t spike
       # Per-partition and total fetch caps (keep under broker limits)
-      max-partition-fetch-bytes: 4194304   # 4 MiB
-      fetch-max-bytes: 67108864
+      max-partition-fetch-bytes: 1048576   # 4 MiB
+      fetch-max-bytes: 33554432
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:

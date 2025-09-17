@@ -1,8 +1,12 @@
-auth:
-  adminUser: admin
-  adminPassword: adminpassword
+replicaCount: 1
 
-proxy: edge
+postgresql:
+  enabled: true
+  auth:
+    username: bn_keycloak
+    password: bitnami
+    database: bitnami_keycloak
+  # leave ports at defaults (5432). Do NOT override.
 
 service:
   type: NodePort
@@ -11,17 +15,18 @@ service:
   nodePorts:
     http: 32080
 
-postgresql:
-  enabled: true
-  auth:
-    username: bn_keycloak
-    password: bitnami
-    database: bitnami_keycloak
-  service:
-    ports:
-      postgresql: 5434
-  containerPorts:
-    postgresql: 5434
+# single-node cache; also blank out KC_CACHE_STACK so no jdbc-ping surprise
+extraEnvVars:
+  - name: KC_CACHE
+    value: "local"
+  - name: KC_CACHE_STACK
+    value: "kubernetes"
+  - name: KC_PROXY
+    value: "edge"
+  - name: KEYCLOAK_ADMIN
+    value: "admin"
+  - name: KEYCLOAK_ADMIN_PASSWORD
+    value: "adminpassword"
 
 resources:
   requests:
@@ -30,9 +35,10 @@ resources:
   limits:
     memory: 1Gi
     cpu: 500m
+
 livenessProbe:
   enabled: true
-  initialDelaySeconds: 300    # generous warmup (was 120)
+  initialDelaySeconds: 300
   periodSeconds: 10
   timeoutSeconds: 5
   failureThreshold: 6

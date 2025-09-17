@@ -14,7 +14,7 @@ object JacksonUtil {
             .registerModule(JavaTimeModule())
             .registerKotlinModule()
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-        logger.info("📦 Objectmapper config using ObjectMapper: $objectMapper")
+        logger.debug("📦 Objectmapper config using ObjectMapper: $objectMapper")
         return objectMapper
     }
 }

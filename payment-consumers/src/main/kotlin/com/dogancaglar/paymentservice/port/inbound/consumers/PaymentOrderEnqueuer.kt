@@ -47,7 +47,7 @@ class PaymentOrderEnqueuer(
         LogContext.with(consumed) {
             if (order.status != PaymentOrderStatus.INITIATED_PENDING) {
                 kafkaTx.run(offsets, groupMeta) {}
-                logger.info("⏩ Skip enqueue (status={}) agg={}", order.status, consumed.aggregateId)
+                logger.warn("⏩ Skip enqueue (status={}) agg={}", order.status, consumed.aggregateId)
                 return@with
             }
 
@@ -69,7 +69,7 @@ class PaymentOrderEnqueuer(
                     traceId = outEnv.traceId,
                     parentEventId = outEnv.parentEventId
                 )
-                logger.info("📤 Enqueued PSP work attempt=0 agg={} traceId={}", outEnv.aggregateId, outEnv.traceId)
+                logger.debug("📤 Enqueued PSP work attempt=0 agg={} traceId={}", outEnv.aggregateId, outEnv.traceId)
             }
         }
     }

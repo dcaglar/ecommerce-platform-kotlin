@@ -98,6 +98,7 @@ stern -n payment 'payment-service'| grep 'POST'
 From project root, run:
 
 ```bash 
+CLIENT_TIMEOUT=3100ms VUS=1  RPS=1 DURATION=20m k6 run load-tests/baseline-smoke-test.js
 CLIENT_TIMEOUT=3100ms VUS=10  RPS=10 DURATION=20m k6 run load-tests/baseline-smoke-test.js
 CLIENT_TIMEOUT=3100ms VUS=15  RPS=15 DURATION=10m k6 run load-tests/baseline-smoke-test.js
 CLIENT_TIMEOUT=3100ms VUS=20  RPS=20 DURATION=50m k6 run load-tests/baseline-smoke-test.js
@@ -302,8 +303,6 @@ kubectl get --raw /apis/metrics.k8s.io/v1beta1/pods -n payment \
 
 
 
-
-
-
-
-
+kubectl get --raw \
+"/apis/external.metrics.k8s.io/v1beta1/namespaces/payment/kafka_consumer_group_lag" \
+| jq -r '.items[] | [.metricLabels.consumergroup, .value, .timestamp] | @tsv'

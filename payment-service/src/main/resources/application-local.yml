@@ -12,7 +12,7 @@ app:
       payment_order_psp_call_requested_topic: { partitions: 48, replicas: 1, createDlq: true }
       payment_status_check_scheduler_topic:   { partitions: 1, replicas: 1, createDlq: true }
       payment_order_succeeded_topic:          { partitions: 8, replicas: 1, createDlq: true }
-      payment_order_psp_result_updated_topic: {partitions: 8, replicas: 1, createDlq: true}
+      payment_order_psp_result_updated_topic: {partitions: 48, replicas: 1, createDlq: true}
   # manual datasource configs for web ourboxdispatcher and parttionen maintencance job
   datasource:
     web:
@@ -21,8 +21,8 @@ app:
       password: ${SPRING_DATASOURCE_PASSWORD}
       driver-class-name: org.postgresql.Driver
       pool-name: web-pool
-      maximum-pool-size: 10
-      minimum-idle: 5
+      maximum-pool-size: 12
+      minimum-idle: 6
       connection-timeout: 1000
       validation-timeout: 1000
       idle-timeout: 600000
@@ -35,7 +35,7 @@ app:
       password: ${SPRING_DATASOURCE_PASSWORD}
       driver-class-name: org.postgresql.Driver
       pool-name: outbox-pool
-      maximum-pool-size: 6
+      maximum-pool-size: 8
       minimum-idle: 3
       connection-timeout: 1000
       validation-timeout: 1000
@@ -164,9 +164,9 @@ management:
     export.prometheus.enabled: true
 
 outbox-dispatcher:
-  thread-count: 3
+  thread-count: 4
   batch-size: 200
-  pool-size: 2
+  pool-size: 4
 
 db:
   web:

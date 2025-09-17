@@ -63,7 +63,7 @@ class TraceFilter : OncePerRequestFilter() {
 
             val msg = if (path == "/payments") "💵💵 HTTP PAYMENT REQUEST END" else "HTTP OTHER REQUEST END"
 
-            log.info(
+            log.debug(
                 "🚀 {} {} {} status={} total={}ms app={}ms flush={}ms committed={} contentLength={} bufferSize={} traceId={}",
                 request.method, path, msg, response.status, totalMs, appMs, flushMs,
                 committedBeforeFlush, contentLengthHdr ?: "n/a", bufferSizeAtCommit ?: "n/a", traceId

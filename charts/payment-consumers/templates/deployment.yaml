@@ -101,21 +101,27 @@ spec:
                 secretKeyRef:
                   name: payment-db-credentials
                   key: PAYMENT_CONSUMERS_APP_DB_PASSWORD
+
+
+          startupProbe:
+            httpGet: {path: /actuator/health/liveness, port: http}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 60      # ~10min max for cold boot (trim once stable)
+
           livenessProbe:
-            httpGet:
-              path: /actuator/health/liveness   # <-- does NOT touch DB
-              port: http
-            initialDelaySeconds: 60
+            httpGet: {path: /actuator/health/liveness, port: http}
+            initialDelaySeconds: 90   # don’t check too early
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 6
+            failureThreshold: 12      # ~2min tolerance
+
           readinessProbe:
-            httpGet:
-              path: /actuator/health/readiness  # <-- includes DB/Redis/Kafka indicators
-              port: http
-            initialDelaySeconds: 60
+            httpGet: {path: /actuator/health/readiness, port: http}
+            initialDelaySeconds: 90
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 6
+            failureThreshold: 12
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

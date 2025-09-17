@@ -66,7 +66,7 @@ class PaymentRetryQueueAdapter(
             val redisEnd = System.currentTimeMillis()
 
             val totalEnd = System.currentTimeMillis()
-            logger.info(
+            logger.debug(
                 "TIMING: scheduleRetry | serialize: {} ms | redis: {} ms | total: {} ms | agg={} attempt={} retryAt={}",
                 (serializationEnd - serializationStart),
                 (redisEnd - redisStart),

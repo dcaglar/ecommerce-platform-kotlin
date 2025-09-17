@@ -42,7 +42,7 @@ class PaymentEventPublisher(
             preSetEventIdFromCaller, aggregateId, eventMetaData, data, traceId, parentEventId
         )
         LogContext.with(envelope) {
-            logger.info(
+            logger.debug(
                 "Publishing event type={} id={} parentId={} traceId={} agg={}",
                 envelope.eventType,
                 envelope.eventId,
@@ -51,7 +51,6 @@ class PaymentEventPublisher(
                 envelope.aggregateId
             )
             val record = buildRecord(eventMetaData, envelope)
-            logger.info("PUBLISHING EVENT")
             val future = kafkaTemplate.send(record)
             future.whenComplete { _, ex ->
                 if (ex == null) {

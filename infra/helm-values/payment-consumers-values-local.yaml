@@ -15,13 +15,12 @@ resources:
 
 jvmOpts: >-
   -XX:+UseG1GC
-  -Xms320m -Xmx384m
-  -XX:MaxMetaspaceSize=120m
-  -XX:MaxDirectMemorySize=90m
+  -Xms256m -Xmx320m
+  -XX:MaxMetaspaceSize=96m
+  -XX:MaxDirectMemorySize=64m
   -XX:MaxGCPauseMillis=200
   -XX:InitiatingHeapOccupancyPercent=30
   -XX:+UseStringDeduplication
-
 
 autoscaling:
   enabled: true
@@ -35,6 +34,16 @@ autoscaling:
           selector:
             matchLabels:
               consumergroup: payment-order-psp-call-executor-consumer-group
+        target:
+          type: AverageValue
+          averageValue: "500"
+    - type: External
+      external:
+        metric:
+          name: kafka_consumer_group_lag
+          selector:
+            matchLabels:
+              consumergroup: payment-order-psp-result-updated-consumer-group
         target:
           type: AverageValue
           averageValue: "500"

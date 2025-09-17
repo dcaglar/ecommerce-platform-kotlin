@@ -1,5 +1,9 @@
+# ---- Image (Bitnami Legacy) ----
 image:
-  tag: 16.3.0-debian-12-r12
+  registry: docker.io
+  repository: bitnamilegacy/postgresql
+  tag: 16.4.0-debian-12-r0   # override at deploy if you prefer another existing legacy tag
+  pullPolicy: IfNotPresent
 
 postgresqlSharedPreloadLibraries: "pgaudit,pg_stat_statements"
 
@@ -8,6 +12,7 @@ auth:
   database: payment_db
   secretKeys:
     adminPasswordKey: ADMIN_POSTGRES_PASSWORD
+
 primary:
   livenessProbe:
     enabled: true
@@ -30,6 +35,7 @@ primary:
     periodSeconds: 10
     timeoutSeconds: 10
     failureThreshold: 30
+
   resources:
     requests:
       cpu: 200m
@@ -37,6 +43,7 @@ primary:
     limits:
       cpu: 800m
       memory: 1Gi
+
   extendedConfiguration: |
     # memory / caches
     shared_buffers = '256MB'               # ≈ 25% of 1Gi limit
@@ -45,7 +52,7 @@ primary:
     maintenance_work_mem = '64MB'          # VACUUM/CREATE INDEX
 
     # connections (lower = less RAM)
-    max_connections = 67
+    max_connections = 75
 
     # WAL / checkpoints (lighter on disk/CPU)
     checkpoint_timeout = '10min'

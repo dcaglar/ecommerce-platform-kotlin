@@ -11,9 +11,11 @@ import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentGatewayPort
+import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -29,7 +31,8 @@ class PaymentOrderPspCallExecutor(
     private val pspClient: PaymentGatewayPort,
     private val meterRegistry: MeterRegistry,
     private val kafkaTx: KafkaTxExecutor,
-    private val publisher: EventPublisherPort
+    private val publisher: EventPublisherPort,
+    private val paymentOrderRepository: PaymentOrderRepository //read only
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -55,6 +58,36 @@ class PaymentOrderPspCallExecutor(
         val groupMeta = consumer.groupMetadata()
 
         LogContext.with(env) {
+            val current = paymentOrderRepository
+                .findByPaymentOrderId(PaymentOrderId(work.paymentOrderId.toLong()))
+                .firstOrNull()
+            if (current == null) {
+                logger.warn(
+                    "Dropping PSP call: no PaymentOrder row found for agg={} attempt={}",
+                    env.aggregateId, work.retryCount
+                )
+                kafkaTx.run(offsets, groupMeta) {}
+                return@with
+            }
+
+            if (current.isTerminal()) {
+                logger.warn(
+                    "Dropping PSP call: terminal status={} agg={} attempt={}",
+                    current.status, env.aggregateId, work.retryCount
+                )
+                kafkaTx.run(offsets, groupMeta) {}
+                return@with
+            }
+
+            val attempt = work.retryCount
+            if (current.retryCount > attempt) {
+                logger.warn(
+                    "Dropping PSP call: stale attempt agg={} dbRetryCount={} > eventRetryCount={}",
+                    env.aggregateId, current.retryCount, attempt
+                )
+                kafkaTx.run(offsets, groupMeta) {}
+                return@with
+            }
             // Build domain snapshot (no DB load)
             val orderForPsp: PaymentOrder = PaymentOrderDomainEventMapper.fromEvent(work)
 
@@ -62,7 +95,6 @@ class PaymentOrderPspCallExecutor(
             var mappedStatus: PaymentOrderStatus? = null
             var errorCode: String? = null
             var errorDetail: String? = null
-
             val startMs = System.currentTimeMillis()
             mappedStatus = pspClient.charge(orderForPsp)
             val tookMs = System.currentTimeMillis() - startMs

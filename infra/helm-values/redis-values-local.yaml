@@ -1,23 +1,18 @@
+# infra/helm-values/redis-values-local.yaml
 architecture: standalone
 
-livenessProbe:
-  enabled: true
-  periodSeconds: 10
-  timeoutSeconds: 10
-  failureThreshold: 6
-readinessProbe:
-  enabled: true
-  periodSeconds: 10
-  timeoutSeconds: 5
-  failureThreshold: 6
-startupProbe:
-  enabled: true
-  periodSeconds: 10
-  failureThreshold: 60
 auth:
   enabled: false
 
+image:
+  registry: docker.io
+  repository: bitnamisecure/redis
+  tag: latest            # <- multi-arch, pullable
+  pullPolicy: IfNotPresent
+
 master:
+  # comment this out if you don't actually have such a ConfigMap
+  # existingConfigmap: redis-config
   resources:
     requests: { cpu: "50m",  memory: "64Mi" }
     limits:   { cpu: "300m", memory: "256Mi" }
@@ -25,11 +20,28 @@ master:
     maxmemory 160mb
     maxmemory-policy allkeys-lru
 
-  # Reference your existing ConfigMap (must exist in the same namespace)
   existingConfigmap: redis-config
 
-  metrics:
-    enabled: true                  # redis-exporter side-car
-    serviceMonitor:
-      enabled: true
-      namespace: payment
+global:
+  security:
+    allowInsecureImages: true
+# TURN OFF metrics (and ServiceMonitor) to avoid pulling extra images
+metrics:
+  enabled: false
+
+livenessProbe:
+  enabled: true
+  periodSeconds: 10
+  timeoutSeconds: 10
+  failureThreshold: 6
+
+readinessProbe:
+  enabled: true
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+
+startupProbe:
+  enabled: true
+  periodSeconds: 10
+  failureThreshold: 60
