@@ -68,6 +68,19 @@
         WHERE oeid = #{oeid}
     </update>
 
+    <update id="unclaimSpecific" parameterType="map">
+        UPDATE outbox_event
+        SET status    = 'NEW',
+        claimed_at = NULL,
+        claimed_by = NULL
+        WHERE status = 'PROCESSING'
+        AND claimed_by = #{workerId}
+        AND oeid IN
+        <foreach collection="oeids" item="id" open="(" separator="," close=")">
+            #{id,jdbcType=BIGINT}
+        </foreach>
+    </update>
+
 
 
     <update id="reclaimStuckClaims" parameterType="int">

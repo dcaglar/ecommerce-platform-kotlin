@@ -46,12 +46,14 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME} # This will be injected from a Kubernetes Secret
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
-      maximum-pool-size: 3      # 6 pods max → 18 total
-      minimum-idle: 0
-      connection-timeout: 3000  # consumers can wait a bit but not forever
-      idle-timeout: 600000
-      max-lifetime: 1800000
-      validation-timeout: 1000
+    maximum-pool-size: 5          # was 3
+    minimum-idle: 1               # 0 → 1 keeps 1 warm without hoarding
+    connection-timeout: 1500      # 1.5s is tight but keeps callers from piling up
+    validation-timeout: 1000
+    idle-timeout: 600000          # 10m
+    max-lifetime: 1740000         # 29m (slightly < 30m to avoid herd reaps)
+    keepalive-time: 300000        # 5m, prevents LB/NAT idle drops (Hikari option)
+    leak-detection-threshold: 60000   # optional; logs if a checkout > 60s
   kafka:
     consumer:
       max-poll-records: 200
@@ -71,13 +73,13 @@ spring:
   data:
     redis:
       url: redis://redis-master:6379
-      timeout: 2000ms
+      timeout: 2s
       lettuce:
         pool:
-          max-active: 8
-          max-idle: 8
+          max-active: 12
+          max-idle: 6
           min-idle: 0
-          max-wait: -1ms
+          max-wait: 1s
 management:
   health:
     probes:

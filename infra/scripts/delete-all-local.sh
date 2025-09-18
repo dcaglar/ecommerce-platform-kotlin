@@ -63,34 +63,5 @@ fi
 
 
 
-echo "🚀deleting   monitoring stack prometheus-adapter"
-
-helm uninstall -n monitoring  prometheus-adapter --ignore-not-found
-
-echo "🚀deleting   monitoring stack prometheus-stack"
-
-helm uninstall -n monitoring  prometheus-stack --ignore-not-found
-
-
-echo "🚀 Deleting ALL PVCs in namespace monitoring (dev wipe)"
-kubectl get pvc -n monitoring -o name | xargs -r kubectl delete -n monitoring || true
-
-echo "🚀 Deleting PVs orphaned from namespace monitoring"
-PVS=$(kubectl get pv -o jsonpath='{range .items[?(@.spec.claimRef.namespace=="monitoring")]}{.metadata.name}{"\n"}{end}')
-if [ -n "$PVS" ]; then
-  for pv in $PVS; do
-    echo "🧹 Deleting PV $pv"
-    if ! kubectl delete pv "$pv" --wait=true --timeout=30s; then
-      echo "🔧 PV $pv stuck; removing finalizers and forcing delete"
-      kubectl patch pv "$pv" --type=merge -p '{"metadata":{"finalizers":[]}}' || true
-      kubectl delete pv "$pv" --wait=false || true
-    fi
-  done
-else
-  echo "✅ No PVs found for namespace monitoring"
-fi
-
-
-
 
 

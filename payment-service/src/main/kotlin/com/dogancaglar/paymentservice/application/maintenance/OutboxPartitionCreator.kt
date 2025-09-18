@@ -33,6 +33,8 @@ class OutboxPartitionCreator(
     private val PARTITION_SIZE_MIN = 30L
 
 
+
+
     @EventListener(ApplicationReadyEvent::class)
     @Scheduled(
         initialDelayString = "\${outbox-partition.initial-delay:PT10M}",
@@ -77,6 +79,12 @@ class OutboxPartitionCreator(
             try {
                 jdbcTemplate.execute(sql)
                 logger.info("Ensured partition exists: $partitionName for [$fromStr, $toStr)")
+
+
+
+                /** 2) Immediately disable autovacuum on the child */
+                jdbcTemplate.execute("""ALTER TABLE $partitionName SET (autovacuum_enabled = false);""")
+                logger.info("Disabled autovacuum on child partition: $partitionName")
             } catch (e: Exception) {
                 logger.error("Error creating partition $partitionName: ${e.message}", e)
             } finally {
@@ -170,6 +178,8 @@ class OutboxPartitionCreator(
         }
 
     }
+
+
 
 
     @Scheduled(fixedDelay = 30 * 60 * 1000, initialDelay = 15 * 60 * 1000)

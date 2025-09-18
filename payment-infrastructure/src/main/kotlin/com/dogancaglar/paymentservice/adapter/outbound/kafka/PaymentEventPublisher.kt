@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component
 import java.nio.charset.StandardCharsets
 import java.util.*
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 /**
  * Publishes any domain event wrapped in [EventEnvelope] to Kafka,
@@ -70,7 +71,6 @@ class PaymentEventPublisher(
         }
         return envelope
     }
-
     override fun <T> publishSync(
         preSetEventIdFromCaller: UUID?,
         aggregateId: String,
@@ -82,19 +82,36 @@ class PaymentEventPublisher(
     ): EventEnvelope<T> {
         val envelope = buildEnvelope(preSetEventIdFromCaller, aggregateId, eventMetaData, data, traceId, parentEventId)
         val record = buildRecord(eventMetaData, envelope)
+
         LogContext.with(envelope) {
+            val fut = kafkaTemplate.send(record)
             try {
-                kafkaTemplate.send(record).get(timeoutSeconds, TimeUnit.SECONDS)
-                logger.debug("📨 PUBLISH SYNC SUCCEEDED (topic={})", eventMetaData.topic)
-            } catch (ex: Exception) {
-                logger.error(
-                    "❌ [SYNC] Failed to publish eventId={} to topic={}: {}",
-                    envelope.eventId,
-                    eventMetaData.topic,
-                    ex.message,
-                    ex
-                )
+                fut.get(timeoutSeconds, TimeUnit.SECONDS)
+                logger.debug("📨 publishSync OK topic={} key={} eventId={}",
+                    eventMetaData.topic, envelope.aggregateId, envelope.eventId)
+            } catch (ex: TimeoutException) {
+                logger.warn("⏱️ publishSync TIMEOUT {}s topic={} key={} eventId={}",
+                    timeoutSeconds, eventMetaData.topic, envelope.aggregateId, envelope.eventId)
                 throw ex
+            } catch (ex: InterruptedException) {
+                Thread.currentThread().interrupt()
+                logger.warn("🛑 publishSync INTERRUPTED topic={} key={} eventId={}",
+                    eventMetaData.topic, envelope.aggregateId, envelope.eventId, ex)
+                throw ex
+            } catch (ex: java.util.concurrent.ExecutionException) {
+                val rc = ex.cause ?: ex
+                when (rc) {
+                    is org.apache.kafka.common.errors.RetriableException,
+                    is org.apache.kafka.common.errors.TransactionAbortedException -> {
+                        logger.warn("🔁 RETRIABLE publishSync failure topic={} key={} eventId={} cause={}",
+                            eventMetaData.topic, envelope.aggregateId, envelope.eventId, rc::class.simpleName, rc)
+                    }
+                    else -> {
+                        logger.error("❌ NON-RETRIABLE publishSync failure topic={} key={} eventId={} cause={}: {}",
+                            eventMetaData.topic, envelope.aggregateId, envelope.eventId, rc::class.simpleName, rc.message, rc)
+                    }
+                }
+                throw rc
             }
         }
         return envelope

@@ -99,6 +99,7 @@ From project root, run:
 
 ```bash 
 CLIENT_TIMEOUT=3100ms VUS=1  RPS=1 DURATION=20m k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms VUS=5  RPS=5 DURATION=20m k6 run load-tests/baseline-smoke-test.js
 CLIENT_TIMEOUT=3100ms VUS=10  RPS=10 DURATION=20m k6 run load-tests/baseline-smoke-test.js
 CLIENT_TIMEOUT=3100ms VUS=15  RPS=15 DURATION=10m k6 run load-tests/baseline-smoke-test.js
 CLIENT_TIMEOUT=3100ms VUS=20  RPS=20 DURATION=50m k6 run load-tests/baseline-smoke-test.js
@@ -306,3 +307,67 @@ kubectl get --raw /apis/metrics.k8s.io/v1beta1/pods -n payment \
 kubectl get --raw \
 "/apis/external.metrics.k8s.io/v1beta1/namespaces/payment/kafka_consumer_group_lag" \
 | jq -r '.items[] | [.metricLabels.consumergroup, .value, .timestamp] | @tsv'
+
+
+# 1) Start a client pod (no restart policy)
+kubectl run -n payment kafka-client \
+--restart=Never \
+--image=docker.io/bitnami/kafka:4.0.0-debian-12-r10 \
+--command -- sleep infinity
+
+# 2) Shell into it
+kubectl exec -it -n payment kafka-client -- bash
+
+# 3) Use the tools (bootstrap is the in-cluster DNS your chart exposed)
+kafka-topics.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 --list
+kafka-consumer-groups.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 --list
+
+kafka-consumer-groups.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 \
+--group payment-order-psp-call-executor-consumer-group --describe
+
+kafka-topics.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 \
+--topic payment_order_psp_call_requested_topic --describe
+
+kafka-topics.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 \
+--topic payment_order_created_topic --describe
+
+
+/opt/bitnami/kafka/bin/kafka-topics.sh \
+--bootstrap-server kafka.payment.svc.cluster.local:9092 \
+--describe --topic __transaction_state
+
+
+/opt/bitnami/kafka/bin/kafka-get-offsets.sh \
+--bootstrap-server kafka.payment.svc.cluster.local:9092 \
+--topic payment_order_created_topic \
+--time -1
+
+
+/opt/bitnami/kafka/bin/kafka-console-consumer.sh \
+--bootstrap-server kafka.payment.svc.cluster.local:9092 \
+--topic payment_order_created_topic \
+--partition 2 --offset 46538> \
+--max-messages 1 --timeout-ms 10000 \
+--property print.partition=true --property print.key=true --property print.timestamp=true
+
+
+# 4) When done
+kubectl delete pod -n payment kafka-client
+
+# 0) Set a throwaway topic name
+export TOPIC=_ping_$(date +%s)
+
+# 1) Create the topic (clusters often disable auto-create)
+/opt/bitnami/kafka/bin/kafka-topics.sh \
+--bootstrap-server kafka.payment.svc.cluster.local:9092 \
+--create --topic "$TOPIC" --partitions 1 --replication-factor 1
+
+# 2) (optional) Describe it
+/opt/bitnami/kafka/bin/kafka-topics.sh \
+--bootstrap-server kafka.payment.svc.cluster.local:9092 \
+--describe --topic "$TOPIC"
+
+# 3) Start a consumer (leave running)
+/opt/bitnami/kafka/bin/kafka-console-consumer.sh \
+--bootstrap-server kafka.payment.svc.cluster.local:9092 \
+--topic "$TOPIC" --from-beginning

@@ -24,7 +24,9 @@ interface OutboxEventMapper {
         @Param("status") status: String
     ): Int
 
+    fun unclaimSpecific(params: Map<String, Any>): Int
     fun reclaimStuckClaims(olderThanSeconds: Int): Int
+
 
     fun batchUpdate(events: List<OutboxEventEntity>): Int
 

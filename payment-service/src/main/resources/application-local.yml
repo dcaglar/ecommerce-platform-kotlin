@@ -35,10 +35,10 @@ app:
       password: ${SPRING_DATASOURCE_PASSWORD}
       driver-class-name: org.postgresql.Driver
       pool-name: outbox-pool
-      maximum-pool-size: 8
+      maximum-pool-size: 6
       minimum-idle: 3
-      connection-timeout: 1000
-      validation-timeout: 1000
+      connection-timeout: 1500
+      validation-timeout: 1500
       idle-timeout: 600000
       max-lifetime: 1800000
 
@@ -96,13 +96,16 @@ spring:
   data:
     redis:
       url: ${SPRING_DATA_REDIS_URL}
+      timeout: 2s               # was 750ms → too tight for local under load
       lettuce:
         pool:
-          max-active: 8
-          max-idle: 8
-          min-idle: 0
-          max-wait: -1ms
-
+          enabled: true
+          max-active: 24
+          max-idle: 12
+          min-idle: 2
+          max-wait: 1s
+          shutdown-timeout: 100ms
+          time-between-eviction-runs: 15s
   liquibase:
     enabled: true
     change-log: classpath:db/changelog/changelog.master.xml
@@ -164,9 +167,9 @@ management:
     export.prometheus.enabled: true
 
 outbox-dispatcher:
-  thread-count: 4
-  batch-size: 200
-  pool-size: 4
+  thread-count: 2
+  batch-size: 75
+  pool-size: 2
 
 db:
   web:

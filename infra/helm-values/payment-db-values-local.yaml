@@ -48,11 +48,19 @@ primary:
     # memory / caches
     shared_buffers = '256MB'               # ≈ 25% of 1Gi limit
     effective_cache_size = '512MB'         # OS page cache estimate
-    work_mem = '4MB'                       # per sort/hash (per parallel op)
+    work_mem = '3MB'                       # per sort/hash (per parallel op)
     maintenance_work_mem = '64MB'          # VACUUM/CREATE INDEX
+    
+    
+    
+    max_parallel_workers_per_gather = 0
+    max_parallel_workers = 4
+    max_worker_processes = 4
+    
+    temp_file_limit = '2GB'
 
     # connections (lower = less RAM)
-    max_connections = 75
+    max_connections = 85
 
     # WAL / checkpoints (lighter on disk/CPU)
     checkpoint_timeout = '10min'

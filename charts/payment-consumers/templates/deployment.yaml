@@ -68,6 +68,11 @@ spec:
               GRANT ALL PRIVILEGES ON SCHEMA public TO "$CONSUMER_USER";
               GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "$CONSUMER_USER";
               GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "$CONSUMER_USER";
+              
+              -- 🔧 Per-role default session settings (picked up on new connections)
+              ALTER ROLE "$CONSUMER_USER" SET statement_timeout = '2s';
+              ALTER ROLE "$CONSUMER_USER" SET lock_timeout      = '250ms';
+              ALTER ROLE "$CONSUMER_USER" SET idle_in_transaction_session_timeout = '0';
               EOF
 
       containers:
