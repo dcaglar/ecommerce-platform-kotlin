@@ -26,6 +26,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
+import java.util.UUID
 
 @Service
 @DependsOn( "outboxPartitionCreator")
@@ -113,45 +114,40 @@ class OutboxDispatcherJob(
         return claimed
     }
 
+    fun publishBatch(
+        events: List<OutboxEvent>
+    ): Triple<List<OutboxEvent>, List<OutboxEvent>, List<OutboxEvent>> {
 
-    fun publishBatch(events: List<OutboxEvent>) :  Triple<List<OutboxEvent>, List<OutboxEvent>, List<OutboxEvent>> {
-        val succeeded = mutableListOf<OutboxEvent>()
-        val toUnclaim = mutableListOf<OutboxEvent>()
-        val keepClaimed = mutableListOf<OutboxEvent>() // let reclaimer handle
-        for (event in events) {
-            try {
-                val envType = objectMapper.typeFactory
-                    .constructParametricType(EventEnvelope::class.java, PaymentOrderCreated::class.java)
-                val env: EventEnvelope<PaymentOrderCreated> = objectMapper.readValue(event.payload, envType)
+        if (events.isEmpty()) return Triple(emptyList(), emptyList(), emptyList())
 
-                LogContext.with(env) {
-                    // Kafka producer transaction only (kafkaTx.run)
-                    kafkaTx.run {
-                        paymentEventPublisher.publishSync(
-                            preSetEventIdFromCaller = env.eventId,
-                            aggregateId = env.aggregateId,
-                            eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
-                            data = env.data,
-                            traceId = env.traceId,
-                            parentEventId = env.parentEventId
-                        )
-                    }
-                }
-                event.markAsSent()
-                succeeded += event
-            }catch (ex: Exception) {
-                if (isTransientKafkaError(ex)) {
-                    toUnclaim += event
-                    logger.warn("Transient publish failure; will UNCLAIM event {}: {}", event.oeid, ex.toString())
-                } else {
-                    keepClaimed += event
-                    logger.error("Permanent-ish publish failure; KEEPING CLAIMED event {} (reclaimer will handle): {}",
-                        event.oeid, ex.toString())
-                }
-                logger.error("Failed to publish event {}: {}", event.oeid, ex.message, ex)
+        return try {
+            // 1) Deserialize DB rows into typed envelopes (pure CPU)
+            val envType = objectMapper.typeFactory
+                .constructParametricType(EventEnvelope::class.java, PaymentOrderCreated::class.java)
+
+            @Suppress("UNCHECKED_CAST")
+            val envelopes: List<EventEnvelope<PaymentOrderCreated>> =
+                events.map { evt -> objectMapper.readValue(evt.payload, envType) as EventEnvelope<PaymentOrderCreated> }
+
+            // 2) Send atomically in one Kafka transaction
+            val ok = paymentEventPublisher.publishBatchAtomically(
+                envelopes = envelopes,
+                eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
+                timeout = java.time.Duration.ofSeconds(30)
+            )
+
+            if (ok) {
+                // all-or-nothing success
+                val succeeded = events.onEach { it.markAsSent() }
+                Triple(succeeded, emptyList(), emptyList())
+            } else {
+                // treat as transient; unclaim now so they retry soon
+                Triple(emptyList(), events.toList(), emptyList())
             }
+        } catch (t: Throwable) {
+            logger.warn("Batch publish aborted; will UNCLAIM {} rows: {}", events.size, t.toString())
+            Triple(emptyList(), events.toList(), emptyList())
         }
-        return Triple(succeeded, toUnclaim, keepClaimed)
     }
 
     @Transactional(transactionManager = "outboxTxManager", timeout = 5)
@@ -175,6 +171,8 @@ class OutboxDispatcherJob(
             backlog.addAndGet(n.toLong())
         }
     }
+
+
 
 
     fun dispatchBatchWorker() {

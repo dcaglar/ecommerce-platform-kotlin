@@ -311,6 +311,7 @@ kube-system     kube-controller-manager-minikube                            200m
 # # Current live usage per pod in the node sort by memory or cpu
 ```
 kubectl top pods -A --containers --sort-by=memory
+kubectl top pods -n payment --containers --sort-by=memory
 kubectl top pods -A --containers --sort-by=cpu
 ```
 

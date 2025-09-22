@@ -6,26 +6,27 @@ image:
   tag: latest
   pullPolicy: Always
 
-
-
 resources:
-  requests: { cpu: "400m", memory: "400Mi" }
-  limits:   { cpu: "1", memory: "800Mi" }
-
+  requests: { cpu: "400m", memory: "512Mi" }   # scheduler guarantee
+  limits:   { cpu: "1",    memory: "896Mi" }   # hard ceiling; ~0.875 Gi keeps total node budget sane
 
 jvmOpts: >-
   -XX:+UseG1GC
-  -Xms256m -Xmx320m
-  -XX:MaxMetaspaceSize=96m
-  -XX:MaxDirectMemorySize=64m
+  -XX:+AlwaysActAsServerClassMachine
+  -XX:+UseStringDeduplication
+  -XX:MaxRAMPercentage=45         
+  -XX:InitialRAMPercentage=45
+  -XX:MaxMetaspaceSize=128m
+  -XX:MaxDirectMemorySize=128m
+  -XX:ThreadStackSize=512         
   -XX:MaxGCPauseMillis=200
   -XX:InitiatingHeapOccupancyPercent=30
-  -XX:+UseStringDeduplication
+
 
 autoscaling:
   enabled: true
   minReplicas: 3
-  maxReplicas: 6
+  maxReplicas: 5
   metrics:
     - type: External
       external:

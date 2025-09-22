@@ -2,6 +2,7 @@ package com.dogancaglar.paymentservice.ports.outbound
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
+import java.time.Duration
 import java.util.*
 
 interface EventPublisherPort {
@@ -14,6 +15,12 @@ interface EventPublisherPort {
         parentEventId: UUID? = null
     ): EventEnvelope<T>
 
+
+    fun <T> publishBatchAtomically(
+        envelopes: List<EventEnvelope<*>>,
+        eventMetaData: EventMetadata<T>,
+        timeout: Duration = Duration.ofSeconds(30)
+    ): Boolean
     /**
      * Publishes an event synchronously (blocking until confirmation).
      */

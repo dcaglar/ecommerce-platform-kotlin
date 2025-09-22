@@ -13,7 +13,9 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Component
 import java.nio.charset.StandardCharsets
+import java.time.Duration
 import java.util.*
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
@@ -30,6 +32,8 @@ class PaymentEventPublisher(
     private val meterRegistry: MeterRegistry
 ) : EventPublisherPort {
     private val logger = LoggerFactory.getLogger(javaClass)
+
+
 
     override fun <T> publish(
         preSetEventIdFromCaller: UUID?,
@@ -116,6 +120,38 @@ class PaymentEventPublisher(
         }
         return envelope
     }
+
+
+    override fun <T> publishBatchAtomically(
+        envelopes: List<EventEnvelope<*>>,
+        eventMetaData: EventMetadata<T>,
+        timeout: Duration
+    ): Boolean {
+        if (envelopes.isEmpty()) return true
+
+        return try {
+            kafkaTemplate.executeInTransaction<Unit> { kt ->
+                val futures = envelopes.map { anyEnv ->
+                    @Suppress("UNCHECKED_CAST")
+                    val envT = anyEnv as EventEnvelope<T>
+                    val rec = buildRecord(eventMetaData, envT)
+                    kt.send(rec)
+                }
+                java.util.concurrent.CompletableFuture
+                    .allOf(*futures.toTypedArray())
+                    .get(timeout.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS)
+                Unit
+            }
+            true
+        } catch (t: java.util.concurrent.TimeoutException) {
+            logger.warn("⏱️ batch publish TIMEOUT after {} ms for {} events", timeout.toMillis(), envelopes.size)
+            false
+        } catch (t: Throwable) {
+            logger.warn("❌ batch publish ABORT for {} events: {}", envelopes.size, t.toString())
+            false
+        }
+    }
+
 
     private fun <T> buildEnvelope(
         preSetEventIdFromCaller: UUID?,
