@@ -155,7 +155,9 @@ class KafkaTypedConsumerFactoryConfig(
         ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>>().apply {
             this.consumerFactory = consumerFactory
             containerProperties.clientId = clientId
+            containerProperties.pollTimeout = 1000           // block up to 1s waiting for data
             containerProperties.isMicrometerEnabled = true
+            containerProperties.idleBetweenPolls = 250 // nap 250ms after an empty poll
             @Suppress("UNCHECKED_CAST")
             setRecordInterceptor(interceptor as RecordInterceptor<String, EventEnvelope<T>>)
             setCommonErrorHandler(errorHandler)

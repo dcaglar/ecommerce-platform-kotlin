@@ -41,6 +41,8 @@ resources:
 
 
 
+
+
 ingress:
   enabled: true
   className: nginx

@@ -97,15 +97,6 @@ spring:
     redis:
       url: ${SPRING_DATA_REDIS_URL}
       timeout: 2s               # was 750ms → too tight for local under load
-      lettuce:
-        pool:
-          enabled: true
-          max-active: 24
-          max-idle: 12
-          min-idle: 2
-          max-wait: 1s
-          shutdown-timeout: 100ms
-          time-between-eviction-runs: 15s
   liquibase:
     enabled: true
     change-log: classpath:db/changelog/changelog.master.xml

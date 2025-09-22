@@ -74,12 +74,6 @@ spring:
     redis:
       url: redis://redis-master:6379
       timeout: 2s
-      lettuce:
-        pool:
-          max-active: 12
-          max-idle: 6
-          min-idle: 0
-          max-wait: 1s
 management:
   health:
     probes:

@@ -9,8 +9,8 @@ image:
 
 
 resources:
-  requests: { cpu: "200m", memory: "400Mi" }
-  limits:   { cpu: "750m", memory: "640Mi" }
+  requests: { cpu: "400m", memory: "400Mi" }
+  limits:   { cpu: "1", memory: "800Mi" }
 
 
 jvmOpts: >-
@@ -30,33 +30,21 @@ autoscaling:
     - type: External
       external:
         metric:
-          name: kafka_consumer_group_lag
+          name: kafka_consumer_group_lag_worst2
           selector:
             matchLabels:
-              consumergroup: payment-order-psp-call-executor-consumer-group
+            # If you left 'namespace' as a label in the series, do NOT put it here.
+            # The adapter already maps resource namespace for HPA. Only keep labels that actually exist on the series.
         target:
-          type: AverageValue
-          averageValue: "500"
-    - type: External
-      external:
-        metric:
-          name: kafka_consumer_group_lag
-          selector:
-            matchLabels:
-              consumergroup: payment-order-psp-result-updated-consumer-group
-        target:
-          type: AverageValue
-          averageValue: "500"
+          type: Value
+          value: "2400"   # 2,400 messages == 2,400,000m
   behavior:
     scaleUp:
-      stabilizationWindowSeconds: 0
+      stabilizationWindowSeconds: 120
       selectPolicy: Max
       policies:
-        - type: Percent
-          value: 100
-          periodSeconds: 60
         - type: Pods
-          value: 3
+          value: 1
           periodSeconds: 60
     scaleDown:
       stabilizationWindowSeconds: 300

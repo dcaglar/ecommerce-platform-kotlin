@@ -75,13 +75,27 @@ helm upgrade --install prometheus-adapter prometheus-community/prometheus-adapte
 rules:
   default: false
   external:
-    - seriesQuery: '${SERIES_QUERY}'
-      resources:${RES_OVERRIDES_YAML}
+    - seriesQuery: 'kafka_consumergroup_lag{consumergroup!=""}'   # keep namespace mapping if you require it
+      resources:
+        overrides:
+          namespace:
+            resource: namespace
       name:
-        as: ${EXTERNAL_METRIC_NAME}
+        as: kafka_consumer_group_lag_worst2
       metricsQuery: |
-        sum by (namespace, consumergroup) (
-          max_over_time(kafka_consumergroup_lag{<<.LabelMatchers>>}[2m])
+        # Smooth, floor at 0, then pick the WORST (max) of the two target groups per namespace
+        topk(1,
+          sum by (namespace, consumergroup) (
+            clamp_min(
+              avg_over_time(
+                kafka_consumergroup_lag{
+                  <<.LabelMatchers>>,
+                  consumergroup=~"payment-order-psp-call-executor-consumer-group|payment-order-psp-result-updated-consumer-group"
+                }[1m]
+              ),
+              0
+            )
+          )
         )
 EOF
 
