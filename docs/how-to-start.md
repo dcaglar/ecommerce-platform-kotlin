@@ -1,15 +1,5 @@
 # 🚀 How to Start
 
-This guide walks you through starting up the full stack, getting tokens, and running load tests.
-
----
-
-## 1️⃣ create jfr record manually
-
-kubectl exec -n payment -- jcmd 1 JFR.dump name=payment-service filename=/var/log/jfr/pay.jfr
-payment-service-5c4c5b74-podname
-
-grep 'POST /payments'
 
 ## 1️⃣ connect to be
 
@@ -52,46 +42,6 @@ curl -i -X POST http://127.0.0.1/payments \
   }'
 ```
 
-kubectl top pods -A
-
-kubectl top node
-
-kubectl top pods -n payment
-
-kubectl top pods -n monitoring --sort-by=memory
-
-kubectl get pods -A \                                                                                                                                   
--o custom-columns='NS:.metadata.namespace,NAME:.metadata.name,REQ_CPU:.spec.containers[*].resources.requests.cpu,LIM_CPU:.spec.containers[*].resources.limits.cpu,REQ_MEM:.spec.containers[*].resources.requests.memory,LIM_MEM:.spec.containers[*].resources.limits.memory' \
-| column -t | less
-
-
-# Per-pod requests/limits at a glance
-kubectl get pods -A \
--o custom-columns='NS:.metadata.namespace,NAME:.metadata.name,REQ_CPU:.spec.containers[*].resources.requests.cpu,LIM_CPU:.spec.containers[*].resources.limits.cpu,REQ_MEM:.spec.containers[*].resources.requests.memory,LIM_MEM:.spec.containers[*].resources.limits.memory' \
-| column -t | less
-
-# Sort by biggest memory limit (first container per pod)
-kubectl get pods -A \
---sort-by='.spec.containers[0].resources.limits.memory' \
--o custom-columns='NS:.metadata.namespace,NAME:.metadata.name,LIM_MEM:.spec.containers[0].resources.limits.memory'
-
-# Live usage (needs metrics-server)
-kubectl top pods -A | sort -k3 -h
-
-
-
-kubectl logs -n payment payment-service | grep 'POST /payments'
-
-kubectl exec -n payment payment-service- -- ls -lh /var/log/jfr
-kubectl exec -n payment payment-service- -- jcmd 1 JFR.dump name=payment-service
-
-find / -name 'access_log*.log' 2>/dev/null
-
-kubectl cp payment/payment-service-:/var/log/jfr/pay.jfr ./pay.jfr
-
-stern -n payment 'payment-service'| grep 'POST'
-
----d\
 
 ## 7️⃣ Run Load Tests
 
@@ -108,44 +58,24 @@ CLIENT_TIMEOUT=3100ms VUS=80 RPS=80 DURATION=20m k6 run load-tests/baseline-smok
 CLIENT_TIMEOUT=3100ms VUS=100 RPS=100 DURATION=20m k6 run load-tests/baseline-smoke-test.js
 CLIENT_TIMEOUT=3100ms VUS=120 RPS=100 DURATION=20m k6 run load-tests/baseline-smoke-test.js
 
+
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=10 PRE_VUS=40 MAX_VUS=160 k6 run load-tests/baseline-smoke-test.js 
+
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=20 PRE_VUS=40 MAX_VUS=160 k6 run load-tests/baseline-smoke-test.js 
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=40 PRE_VUS=40 MAX_VUS=160 k6 run load-tests/baseline-smoke-test.js 
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=60 PRE_VUS=40 MAX_VUS=160 k6 run load-tests/baseline-smoke-test.js 
+
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=100 PRE_VUS=40 MAX_VUS=160 k6 run load-tests/baseline-smoke-test.js 
+
 ```
 
 connect to db after port-forwarding:
 
-```bash
-RPS=50 DURATION=10m k6 run load-tests/baseline-smoke-test.js
-```
-health
-```bash
-curl -v \
-  -H "Host: payment.192.168.49.2.nip.io" \
-  http://127.0.0.1/actuator/health/liveness
-  
-curl -v \
-  -H "Host: payment.192.168.49.2.nip.io" \
-  http://127.0.0.1/actuator/prometheus
-  
-curl -v \
-  -H "Host: payment.192.168.49.2.nip.io" \
-  http://127.0.0.1/actuator
 
-
-curl -v \
-  -H "Host: payment.192.168.49.2.nip.io" \
-  http://127.0.0.1/actuator
-```
 
 ---s
 
-## 🔗 Useful URLs
 
-- Keycloak Admin: [http://localhost:8080/](http://localhost:8080/) (if port-forwarded)
-- Payment API: [http://payment.local/payments](http://payment.local/payments)
-- Kafka UI: [http://localhost:8088/](http://localhost:8088/)
-- Grafana: [http://localhost:3000/](http://localhost:3000/) (admin/admin)
-- Kibana: [http://localhost:5601/](http://localhost:5601/)
-
----
 
 ## 📝 Notes
 
@@ -157,6 +87,32 @@ curl -v \
   export BS="kafka.payment.svc.cluster.local:9092"
   BS_BROKER=kafka-controller-0.kafka-controller-headless.payment.svc.cluster.local:9092
   BS_CONSUMER=kafka.payment.svc.cluster.local
+
+
+✅ Uninstalled kafka, and deleted pvc from namespace: payment
+dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % helm uninstall -n payment payment-service
+release "payment-service" uninstalled
+dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % helm uninstall -n payment payment-consumers
+release "payment-consumers" uninstalled
+
+--remove exporter
+helm -n payment uninstall kafka-exporter
+
+--sanity checks and set bootstrap server url
+export BS="kafka-broker-0.kafka-broker-headless.payment.svc.cluster.local:9092"
+--create consumer-fofset and transaction stane on kafka-client
+/opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "$BS" \
+--create --topic __consumer_offsets --replica-assignment 100,100,100 \
+--config cleanup.policy=compact
+
+/opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "$BS" \
+--create --topic __transaction_state --replica-assignment 100 \
+--config cleanup.policy=compact
+
+kubectl -n payment run kafka-client --restart=Never \
+--image docker.io/bitnami/kafka:4.0.0-debian-12-r10 --command -- sleep infinity
+
+
 
 # __consumer_offsets (matches OFFSETS_TOPIC_NUM_PARTITIONS=1 and RF=1)
 
@@ -211,29 +167,6 @@ kafka-topics.sh --bootstrap-server "$BS" --create \
 --partitions 1 \
 --replication-factor 1 \
 --config cleanup.policy=compact
-
-✅ Uninstalled kafka, and deleted pvc from namespace: payment
-dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % helm uninstall -n payment payment-service
-release "payment-service" uninstalled
-dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % helm uninstall -n payment payment-consumers
-release "payment-consumers" uninstalled
-
---remove exporter
-helm -n payment uninstall kafka-exporter
-
---sanity checks and set bootstrap server url
-export BS="kafka-broker-0.kafka-broker-headless.payment.svc.cluster.local:9092"
---create consumer-fofset and transaction stane on kafka-client
-/opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "$BS" \
---create --topic __consumer_offsets --replica-assignment 100,100,100 \
---config cleanup.policy=compact
-
-/opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "$BS" \
---create --topic __transaction_state --replica-assignment 100 \
---config cleanup.policy=compact
-
-kubectl -n payment run kafka-client --restart=Never \
---image docker.io/bitnami/kafka:4.0.0-debian-12-r10 --command -- sleep infinity
 
 
 
@@ -334,6 +267,7 @@ payment         payment-consumers-75c989db5-n6qnx                           paym
 
 ```
 kubectl get events -A --sort-by=.lastTimestamp | tail -n 60
+
 ```
 
 Example Output
@@ -366,6 +300,23 @@ kubectl get --raw \
 "/apis/external.metrics.k8s.io/v1beta1/namespaces/payment/kafka_consumer_group_lag_worst2"
 
 
+
+dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % helm template payment-consumers charts/payment-consumers \                                                     
+-n payment \
+-f infra/helm-values/payment-consumers-values-local.yaml  --debug > rendered.yaml
+
+
+
+APP_NS=payment
+METRIC=kafka_consumer_group_lag_worst2
+GROUP="payment-order-psp-call-executor-consumer-group"
+
+# URL-encode the group (only needed if it contains special chars)
+ENC_GROUP=$(python3 -c 'import urllib.parse,os;print(urllib.parse.quote(os.environ["GROUP"]))' 2>/dev/null || echo "$GROUP")
+
+kubectl get --raw "/apis/external.metrics.k8s.io/v1beta1/namespaces/${APP_NS}/${METRIC}?labelSelector=consumergroup%3D${ENC_GROUP}" | jq .
+
+
 # 1) Start a client pod (no restart policy)
 kubectl run -n payment kafka-client \
 --restart=Never \
@@ -385,6 +336,71 @@ kafka-consumer-groups.sh --bootstrap-server kafka.payment.svc.cluster.local:9092
 kafka-topics.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 \
 --topic payment_order_psp_call_requested_topic --describe
 
+
+# 3) REad from a topic by creating  a seperate consumer group,start from beginning
+kafka-console-consumer.sh \
+--bootstrap-server kafka.payment.svc.cluster.local:9092 \
+--topic payment_order_psp_call_requested_topic.DLQ \
+--from-beginning \
+--group dlq-debug-psp-$(date +%s) \
+--property print.headers=true \
+--property print.timestamp=true \
+--max-messages 20
+
+
+kafka-console-consumer.sh \
+--bootstrap-server kafka.payment.svc.cluster.local:9092 \
+--topic payment_order_psp_result_updated_topic.DLQ \
+--from-beginning \
+--group dlq-debug-psp-result-$(date +%s) \
+--property print.headers=true \
+--property print.timestamp=true \
+--max-messages 20
+
+# 3) To see the total message in a topic per paartiton.(use consumer group you created above)
+I have no name!@kafka-client:/$ kafka-consumer-groups.sh   --bootstrap-server kafka.payment.svc.cluster.local:9092   --group dlq-debug-psp-1758716393   --describe
+
+Consumer group 'dlq-debug-psp-1758716393' has no active members.
+
+GROUP                    TOPIC                                      PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG             CONSUMER-ID     HOST            CLIENT-ID
+dlq-debug-psp-1758716393 payment_order_psp_call_requested_topic.DLQ 7          60              103             43              -               -               -
+dlq-debug-psp-1758716393 payment_order_psp_call_requested_topic.DLQ 38         38              133             95              -               -               -
+dlq-debug-psp-1758716393 payment_order_psp_call_requested_topic.DLQ 9          27              105             78              -               -               -
+dlq-debug-psp-1758716393 payment_order_psp_call_requested_topic.DLQ 40         32              75              43              -               -               -
+dlq-debug-psp-1758716393 payment_order_psp_call_requested_topic.DLQ 11         31              98              67              -               -               -
+dlq-debug-psp-1758716393 payment_order_psp_call_requested_topic.DLQ 42         32              125             93              -               -               -
+dlq-debug-psp-1758716393 payment_order_psp_call_requested_topic.DLQ 13         28              63              35              -               -               -
+dlq-debug-psp-1758716393 payment_order_psp_call_requested_topic.DLQ 44         27              99              72              -               -               -
+dlq-debug-psp-1758716393 payment_order_psp_call_requested_topic.DLQ 15         20              72              52              -               -               -
+dlq-debug-psp-1758716393 payment_order_psp_call_requested_topic.DLQ 46         16              22              6               -               -               -
+dlq-debug-psp-1758716393 payment_order_psp_call_requested_topic.DLQ 17         33              91              58              -               -               -
+dlq-debug-psp-1758716393 payment_order_psp_call_requested_topic.DLQ 19         37              135             98              -               -               -
+dlq-debug-psp-1758716393 payment_order_psp_call_requested_topic.DLQ 21         35              113             78              -               -               -
+dlq-debug-psp-1758716393 payment_order_psp_call_requested_topic.DLQ 22         44              108             64              -               -               -
+dlq-debug-psp-1758716393 payment_order_psp_call_requested_topic.DLQ 24         36              106             70              -               -               -
+dlq-debug-psp-1758716393 payment_order_psp_call_requested_topic.DLQ 26         37              113             76              -               -               -
+
+
+#  Just watch new DLQ messages (don’t touch old ones)
+kafka-console-consumer.sh \
+--bootstrap-server kafka.payment.svc.cluster.local:9092 \
+--topic payment_order_psp_call_requested_topic.DLQ \
+--group dlq-watch-$(date +%s) \
+--property print.headers=true \
+--property print.timestamp=true \
+--consumer-property auto.offset.reset=latest
+
+
+kafka-console-consumer.sh \
+--bootstrap-server kafka.payment.svc.cluster.local:9092 \
+--topic payment_order_psp_result_updated_topic.DLQ \
+--group dlq-watch-$(date +%s) --property print.headers=true \
+--property print.timestamp=true \
+--consumer-property auto.offset.reset=latest
+
+
+
+
 kafka-topics.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 \
 --topic payment_order_created_topic --describe
 
@@ -392,20 +408,6 @@ kafka-topics.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 \
 /opt/bitnami/kafka/bin/kafka-topics.sh \
 --bootstrap-server kafka.payment.svc.cluster.local:9092 \
 --describe --topic __transaction_state
-
-
-/opt/bitnami/kafka/bin/kafka-get-offsets.sh \
---bootstrap-server kafka.payment.svc.cluster.local:9092 \
---topic payment_order_created_topic \
---time -1
-
-
-/opt/bitnami/kafka/bin/kafka-console-consumer.sh \
---bootstrap-server kafka.payment.svc.cluster.local:9092 \
---topic payment_order_created_topic \
---partition 2 --offset 46538> \
---max-messages 1 --timeout-ms 10000 \
---property print.partition=true --property print.key=true --property print.timestamp=true
 
 
 
@@ -419,25 +421,3 @@ I have no name!@kafka-client:/$
 kafka-consumer-groups.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 \
 --describe --group payment-order-psp-*
 
-
-
-# 4) When done
-kubectl delete pod -n payment kafka-client
-
-# 0) Set a throwaway topic name
-export TOPIC=_ping_$(date +%s)
-
-# 1) Create the topic (clusters often disable auto-create)
-/opt/bitnami/kafka/bin/kafka-topics.sh \
---bootstrap-server kafka.payment.svc.cluster.local:9092 \
---create --topic "$TOPIC" --partitions 1 --replication-factor 1
-
-# 2) (optional) Describe it
-/opt/bitnami/kafka/bin/kafka-topics.sh \
---bootstrap-server kafka.payment.svc.cluster.local:9092 \
---describe --topic "$TOPIC"
-
-# 3) Start a consumer (leave running)
-/opt/bitnami/kafka/bin/kafka-console-consumer.sh \
---bootstrap-server kafka.payment.svc.cluster.local:9092 \
---topic "$TOPIC" --from-beginning

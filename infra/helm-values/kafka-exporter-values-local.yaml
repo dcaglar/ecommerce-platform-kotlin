@@ -1,4 +1,3 @@
-# Send the exporter to your Kafka service (in-cluster)
 kafkaServer:
   - kafka.payment.svc.cluster.local:9092
 
@@ -16,13 +15,9 @@ service:
   type: ClusterIP
   port: 9308
 
-# If you use kube-prometheus-stack (Prometheus Operator), enable this:
 prometheus:
   serviceMonitor:
     enabled: true
-    # Set this to the namespace where your Prometheus runs (often "monitoring");
-    # leave empty if your Prometheus selects across all namespaces.
-    namespace: "payment"
-    # Label so Prometheus can pick it up (adjust to your Prometheus release name)
+    namespace: "payment"              # ServiceMonitor lives in payment
     additionalLabels:
-      release: prometheus-stack
+      release: prometheus-stack       # 👈 Prometheus will pick it up

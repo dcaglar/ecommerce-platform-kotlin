@@ -1,4 +1,4 @@
- {{- if .Values.autoscaling.enabled }}
+{{- if .Values.autoscaling.enabled }}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -13,8 +13,8 @@ spec:
   maxReplicas: {{ .Values.autoscaling.maxReplicas }}
   metrics:
     {{- required "autoscaling.metrics must be a non-empty list" .Values.autoscaling.metrics | toYaml | nindent 4 }}
-   {{- with .Values.autoscaling.behavior }}
+  {{- with .Values.autoscaling.behavior }}
   behavior:
     {{- toYaml . | nindent 4 }}
-   {{- end }}
-   {{- end }}
+  {{- end }}
+  {{- end }}

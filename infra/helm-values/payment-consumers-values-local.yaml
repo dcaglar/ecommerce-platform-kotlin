@@ -7,21 +7,25 @@ image:
   pullPolicy: Always
 
 resources:
-  requests: { cpu: "400m", memory: "512Mi" }   # scheduler guarantee
-  limits:   { cpu: "1",    memory: "896Mi" }   # hard ceiling; ~0.875 Gi keeps total node budget sane
+  requests: { cpu: "400m", memory: "512Mi" }
+  limits:   { cpu: "1",    memory: "896Mi" }
 
 jvmOpts: >-
   -XX:+UseG1GC
   -XX:+AlwaysActAsServerClassMachine
   -XX:+UseStringDeduplication
-  -XX:MaxRAMPercentage=45         
+  -XX:MaxRAMPercentage=45
   -XX:InitialRAMPercentage=45
   -XX:MaxMetaspaceSize=128m
   -XX:MaxDirectMemorySize=128m
-  -XX:ThreadStackSize=512         
+  -XX:ThreadStackSize=512
   -XX:MaxGCPauseMillis=200
   -XX:InitiatingHeapOccupancyPercent=30
 
+service:
+  type: ClusterIP
+  portName: http
+  port: 8080
 
 autoscaling:
   enabled: true
@@ -32,13 +36,9 @@ autoscaling:
       external:
         metric:
           name: kafka_consumer_group_lag_worst2
-          selector:
-            matchLabels:
-            # If you left 'namespace' as a label in the series, do NOT put it here.
-            # The adapter already maps resource namespace for HPA. Only keep labels that actually exist on the series.
         target:
           type: Value
-          value: "2400"   # 2,400 messages == 2,400,000m
+          value: "2400"   # keep as string quantity
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 120
@@ -54,9 +54,12 @@ autoscaling:
           value: 50
           periodSeconds: 60
 
-
-
 serviceMonitor:
   enabled: true
   labels:
-    release: prometheus-stack
+    release: prometheus-stack  # must match Prometheus' serviceMonitorSelector
+  path: /actuator/prometheus
+  interval: 30s
+  scrapeTimeout: 10s
+
+replicaCount: 3

@@ -4,7 +4,7 @@ metadata:
   name: {{ include "payment-consumers.fullname" . }}
   labels:
     app: {{ include "payment-consumers.fullname" . }}
-     {{- include "payment-consumers.labels" . | nindent 4 }}
+    {{- include "payment-consumers.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type | default "ClusterIP" }}
   selector:

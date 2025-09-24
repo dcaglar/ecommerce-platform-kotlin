@@ -1,130 +1,95 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Purpose: Install/upgrade Prometheus Adapter to expose Kafka consumer lag
-#          as an External Metric (for HPA). Run AFTER:
-#            1) kube-prometheus-stack is up
-#            2) kafka-exporter is scraped by Prometheus
-#            3) your consumer has created lag time-series
+# --- Config (override via env or args) ----------------------------------------
+RELEASE="${1:-payment-consumers}"                     # Helm release name
+CHART="${2:-./charts/payment-consumers}"              # Chart path or repo/chart
+NAMESPACE="${NAMESPACE:-payment}"                     # k8s namespace
+VALUES_FILES=()                                       # e.g. ("-f" "values.yaml" "-f" "values.local.yaml")
 
-# -------- Config --------
-NS=${NS:-monitoring}
-APP_NS=${APP_NS:-payment}
-GROUP=${GROUP:-payment-order-psp-call-executor-consumer-group}
-EXTERNAL_METRIC_NAME=${EXTERNAL_METRIC_NAME:-kafka_consumer_group_lag}
-REQUIRE_NAMESPACE_LABEL=${REQUIRE_NAMESPACE_LABEL:-true}
-METRICS_RELIST_INTERVAL=${METRICS_RELIST_INTERVAL:-30s}
+APP_LABEL="${APP_LABEL:-$(echo "$RELEASE" | tr '[:upper:]' '[:lower:]')}" # usually matches app label
+DEPLOY_NAME="${DEPLOY_NAME:-$RELEASE}"
 
-# modest caps so adapter won't be <none>
-ADAPTER_REQ_CPU=${ADAPTER_REQ_CPU:-20m}
-ADAPTER_LIM_CPU=${ADAPTER_LIM_CPU:-100m}
-ADAPTER_REQ_MEM=${ADAPTER_REQ_MEM:-32Mi}
-ADAPTER_LIM_MEM=${ADAPTER_LIM_MEM:-96Mi}
+# --- Deploy -------------------------------------------------------------------
+echo "▶️  Helm upgrade/install: $RELEASE in ns=$NAMESPACE using chart=$CHART"
+helm upgrade --install "$RELEASE" "$CHART" -n "$NAMESPACE" "${VALUES_FILES[@]}"
 
-echo "▶️  Installing external metric '${EXTERNAL_METRIC_NAME}' for consumergroup='${GROUP}' in ns='${APP_NS}'"
+echo
+echo "⏳ Waiting for rollout to complete..."
+echo "  $ kubectl rollout status deploy/$DEPLOY_NAME -n $NAMESPACE"
+kubectl rollout status "deploy/$DEPLOY_NAME" -n "$NAMESPACE"
 
-# -------- Discover Prometheus service --------
-PROM_SVC=""
-if kubectl -n "$NS" get svc prometheus-operated >/dev/null 2>&1; then
-  PROM_SVC=prometheus-operated
-elif kubectl -n "$NS" get svc prometheus-prometheus-stack-kube-prom-prometheus >/dev/null 2>&1; then
-  PROM_SVC=prometheus-prometheus-stack-kube-prom-prometheus
-elif kubectl -n "$NS" get svc prometheus-stack-kube-prom-prometheus >/dev/null 2>&1; then
-  # some older chart names
-  PROM_SVC=prometheus-stack-kube-prom-prometheus
+# --- Helper: print + run ------------------------------------------------------
+run() { echo -e "\n$ $*"; eval "$@"; }
+
+# --- Core: Pods/Describe/Events ----------------------------------------------
+echo -e "\n\n🔎  BASIC INSPECTION COMMANDS"
+run kubectl get deploy "$DEPLOY_NAME" -n "$NAMESPACE" -o wide
+run kubectl get rs -n "$NAMESPACE" | grep "$DEPLOY_NAME" || true
+run kubectl get pods -n "$NAMESPACE" -l "app=$APP_LABEL" -o wide
+run kubectl describe deploy "$DEPLOY_NAME" -n "$NAMESPACE" | sed -n '1,180p'
+run kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp | tail -n 30
+
+# --- Logs: initContainer + main container ------------------------------------
+echo -e "\n\n🧰  LOGS (initContainer + main container)"
+# one-liners you can copy during live debugging:
+echo "$ kubectl logs deploy/$DEPLOY_NAME -n $NAMESPACE -c create-consumer-user --since=10m"
+echo "$ kubectl logs deploy/$DEPLOY_NAME -n $NAMESPACE -c payment-consumers --since=10m"
+# and now show a small tail to confirm the init SQL ran
+POD="$(kubectl get pods -n "$NAMESPACE" -l "app=$APP_LABEL" -o jsonpath='{.items[0].metadata.name}')"
+if [[ -n "${POD:-}" ]]; then
+  run kubectl logs "$POD" -n "$NAMESPACE" -c create-consumer-user --tail=80 || true
+  run kubectl logs "$POD" -n "$NAMESPACE" -c payment-consumers --tail=50 || true
+fi
+
+# --- Health endpoints (if Actuator exposed) -----------------------------------
+echo -e "\n\n❤️  LIVENESS/READINESS (if Spring Actuator enabled on :8080)"
+echo "$ kubectl port-forward deploy/$DEPLOY_NAME 8080:8080 -n $NAMESPACE"
+echo "  Then visit:"
+echo "    http://localhost:8080/actuator/health/liveness"
+echo "    http://localhost:8080/actuator/health/readiness"
+
+# --- HPA + metrics (requires metrics-server) ----------------------------------
+echo -e "\n\n📈  HPA & METRICS"
+run kubectl get hpa -n "$NAMESPACE" | (grep "$DEPLOY_NAME" || true)
+echo "$ kubectl describe hpa/$DEPLOY_NAME -n $NAMESPACE"
+echo "$ kubectl top pods -n $NAMESPACE -l app=$APP_LABEL"
+echo "$ kubectl top nodes"
+
+# --- Config/Secrets quick checks ----------------------------------------------
+echo -e "\n\n🔐  CONFIGMAPS & SECRETS (existence and key names)"
+run kubectl get configmap payment-app-config -n "$NAMESPACE" -o yaml | sed -n '1,120p' || true
+run kubectl get secret payment-db-credentials -n "$NAMESPACE" -o jsonpath='{.data}' | jq -r 'keys[]' || true
+
+echo -e "\n📤  Decode specific secret keys (change keys as needed):"
+echo "$ kubectl get secret payment-db-credentials -n $NAMESPACE -o jsonpath='{.data.PAYMENT_CONSUMERS_APP_DB_USER}' | base64 -d; echo"
+echo "$ kubectl get secret payment-db-credentials -n $NAMESPACE -o jsonpath='{.data.PAYMENT_CONSUMERS_APP_DB_PASSWORD}' | base64 -d; echo"
+
+# --- Postgres quick login test (from a throwaway psql pod) --------------------
+echo -e "\n\n🐘  POSTGRES QUICK TEST (run if you want to verify consumer creds)"
+echo "# Launch a temp psql:"
+echo "$ kubectl run psql-tmp -n $NAMESPACE --rm -it --image=postgres:16-alpine --restart=Never -- bash"
+echo "# Inside the pod, run:"
+echo "  export DB_NAME=\$(kubectl get cm payment-app-config -n $NAMESPACE -o jsonpath='{.data.DB_NAME}')"
+echo "  export PGUSER=\$(kubectl get secret payment-db-credentials -n $NAMESPACE -o jsonpath='{.data.PAYMENT_CONSUMERS_APP_DB_USER}' | base64 -d)"
+echo "  export PGPASSWORD=\$(kubectl get secret payment-db-credentials -n $NAMESPACE -o jsonpath='{.data.PAYMENT_CONSUMERS_APP_DB_PASSWORD}' | base64 -d)"
+echo "  psql -h payment-db-postgresql -U \"\$PGUSER\" -d \"\$DB_NAME\" -c 'select current_user, now()'"
+
+# --- Kafka DLQ quick commands (if you have a kafka-client pod) ----------------
+echo -e "\n\n🪵  KAFKA DLQ QUICK CHECKS (assuming a pod named/labelled kafka-client)"
+echo "# Get a kafka-client pod name:"
+echo "$ KPod=\$(kubectl get pods -n $NAMESPACE -l app=kafka-client -o jsonpath='{.items[0].metadata.name}')"
+echo "# Tail only NEW DLQs:"
+echo "$ kubectl exec -n $NAMESPACE \"\$KPod\" -- bash -lc 'kafka-console-consumer.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 --topic payment_order_psp_call_requested_topic.DLQ --group dlq-watch-\$(date +%s) --property print.headers=true --property print.timestamp=true --consumer-property auto.offset.reset=latest'"
+echo "# Count backlog via a fresh group:"
+echo "$ kubectl exec -n $NAMESPACE \"\$KPod\" -- bash -lc 'kafka-consumer-groups.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 --group dlq-count-\$(date +%s) --describe | awk '\''\$1 ~ /\\.DLQ\$/ {sum+=\$NF} END{print sum+0}'\'' '"
+
+# --- Events on the specific pod (handy for CrashLoop) -------------------------
+echo -e "\n\n🚨  POD EVENTS (useful for CrashLoop, ImagePull, OOM, Probe failures)"
+if [[ -n "${POD:-}" ]]; then
+  run kubectl describe pod "$POD" -n "$NAMESPACE" | sed -n '/Events:/,$p'
 else
-  echo "❌ Prometheus service not found in namespace '$NS'" >&2
-  kubectl -n "$NS" get svc
-  exit 1
-fi
-PROM_URL="http://${PROM_SVC}.${NS}.svc.cluster.local"
-PROM_PORT=9090
-echo "ℹ️  Using Prometheus at ${PROM_URL}:${PROM_PORT}"
-
-# -------- Prevent accidental duplicate adapters --------
-if kubectl -n "$NS" get deploy/prometheus-adapter >/dev/null 2>&1; then
-  echo "ℹ️  Existing adapter deployment found in ${NS} (prometheus-adapter). Will upgrade it."
+  echo "$ kubectl describe pod <pod-name> -n $NAMESPACE | sed -n '/Events:/,\$p'"
 fi
 
-# -------- Build seriesQuery & rule snippet --------
-if [[ "${REQUIRE_NAMESPACE_LABEL}" == "true" ]]; then
-  SERIES_QUERY='kafka_consumergroup_lag{namespace!="",consumergroup!=""}'
-  RES_OVERRIDES_YAML='
-        overrides:
-          namespace:
-            resource: namespace'
-else
-  SERIES_QUERY='kafka_consumergroup_lag{consumergroup!=""}'
-  RES_OVERRIDES_YAML='' # no namespace mapping if label not present
-fi
-echo "ℹ️  seriesQuery = ${SERIES_QUERY}"
-
-# -------- Install / upgrade adapter --------
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
-helm upgrade --install prometheus-adapter prometheus-community/prometheus-adapter \
-  -n "$NS" \
-  --set "prometheus.url=${PROM_URL}" \
-  --set "prometheus.port=${PROM_PORT}" \
-  --set "logLevel=2" \
-  --set "metricsRelistInterval=${METRICS_RELIST_INTERVAL}" \
-  --set "resources.requests.cpu=${ADAPTER_REQ_CPU}" \
-  --set "resources.requests.memory=${ADAPTER_REQ_MEM}" \
-  --set "resources.limits.cpu=${ADAPTER_LIM_CPU}" \
-  --set "resources.limits.memory=${ADAPTER_LIM_MEM}" \
-  -f - <<EOF
-rules:
-  default: false
-  external:
-    - seriesQuery: 'kafka_consumergroup_lag{consumergroup!=""}'   # keep namespace mapping if you require it
-      resources:
-        overrides:
-          namespace:
-            resource: namespace
-      name:
-        as: kafka_consumer_group_lag_worst2
-      metricsQuery: |
-        # Smooth, floor at 0, then pick the WORST (max) of the two target groups per namespace
-        topk(1,
-          sum by (namespace, consumergroup) (
-            clamp_min(
-              avg_over_time(
-                kafka_consumergroup_lag{
-                  <<.LabelMatchers>>,
-                  consumergroup=~"payment-order-psp-call-executor-consumer-group|payment-order-psp-result-updated-consumer-group"
-                }[1m]
-              ),
-              0
-            )
-          )
-        )
-EOF
-
-# -------- Wait for deployment & APIService --------
-echo "⏳ Waiting for prometheus-adapter rollout..."
-kubectl -n "$NS" rollout status deploy/prometheus-adapter
-
-echo "⏳ Waiting for v1beta1.external.metrics.k8s.io APIService to become Available..."
-for i in {1..60}; do
-  cond="$(kubectl get apiservice v1beta1.external.metrics.k8s.io -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)"
-  [[ "$cond" == "True" ]] && { echo "✅ APIService is Available."; break; }
-  sleep 2
-done
-
-# -------- Probe the metric until it shows up --------
-ENC_GROUP=$(
-  python3 -c 'import urllib.parse, os; print(urllib.parse.quote(os.environ.get("GROUP",""), safe=""))' 2>/dev/null \
-  || echo "$GROUP"
-)
-PATH_Q="/apis/external.metrics.k8s.io/v1beta1/namespaces/${APP_NS}/${EXTERNAL_METRIC_NAME}?labelSelector=consumergroup%3D${ENC_GROUP}"
-
-echo "🔎 Probing external metric for consumergroup='${GROUP}': ${PATH_Q}"
-for i in {1..20}; do
-  if kubectl get --raw "${PATH_Q}" >/dev/null 2>&1; then
-    echo "✅ External metric '${EXTERNAL_METRIC_NAME}' is queryable."
-    break
-  fi
-  [[ $i -eq 20 ]] && echo "⚠️ Metric not queryable yet. Check adapter logs and Prometheus series." >&2
-  sleep 2
-done
-
-echo "✅ Done."
+echo -e "\n✅ Done. Above you have ready-to-copy commands for: rollout, pods, logs (init/app), HPA, metrics, events, secrets, DB login, and Kafka DLQ."

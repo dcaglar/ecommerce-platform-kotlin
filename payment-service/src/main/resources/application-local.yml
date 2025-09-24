@@ -52,7 +52,7 @@ app:
       minimum-idle: 0
       connection-timeout: 1500
       validation-timeout: 1500
-      idle-timeout: 600000
+      idle-timeout: 60000
       max-lifetime: 1800000
 
 
@@ -159,7 +159,7 @@ management:
 
 outbox-dispatcher:
   thread-count: 2
-  batch-size: 75
+  batch-size: 300
   pool-size: 2
 
 db:
