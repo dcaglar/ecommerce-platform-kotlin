@@ -5,6 +5,8 @@ object EVENT_TYPE {
     const val PAYMENT_ORDER_SUCCEDED = "payment_order_success"
     const val PAYMENT_ORDER_CREATED = "payment_order_created"
     const val PAYMENT_ORDER_PSP_CALL_REQUESTED = "payment_order_psp_call_requested"
+    const val PAYMENT_ORDER_PSP_RESULT_UPDATED = "payment_order_psp_result_updated"
+
 }
 
 
@@ -15,6 +17,7 @@ object Topics {
 
     // NEW: PSP work queue
     const val PAYMENT_ORDER_PSP_CALL_REQUESTED = "payment_order_psp_call_requested_topic"
+    const val PAYMENT_ORDER_PSP_RESULT_UPDATED = "payment_order_psp_result_updated_topic" // NEW
 
     fun dlqOf(topic: String) = "$topic.DLQ"
 
@@ -22,7 +25,8 @@ object Topics {
         PAYMENT_ORDER_CREATED,
         PAYMENT_STATUS_CHECK,
         PAYMENT_ORDER_SUCCEEDED,
-        PAYMENT_ORDER_PSP_CALL_REQUESTED
+        PAYMENT_ORDER_PSP_CALL_REQUESTED,
+        PAYMENT_ORDER_PSP_RESULT_UPDATED
     )
 }
 
@@ -31,6 +35,7 @@ object CONSUMER_GROUPS {
     const val PAYMENT_ORDER_PSP_CALL_EXECUTOR = "payment-order-psp-call-executor-consumer-group"
     const val PAYMENT_STATUS_CHECK_SCHEDULER = "payment-status-check-scheduler-consumer-group"
     const val PAYMENT_ORDER_SUCCEEDED = "payment-order-succeeded-consumer-group"
+    const val PAYMENT_ORDER_PSP_RESULT_UPDATED = "payment-order-psp-result-updated-consumer-group"
 
 
 }

@@ -17,35 +17,92 @@ BASE_URL = BASE_URL.replace(/\/+$/, '');
 if (!HOST_HEADER) throw new Error('Missing HOST (env HOST or endpoints.json host_header)');
 
 // ---------- load knobs ----------
-const VUS       = __ENV.VUS ? parseInt(__ENV.VUS) : 20;
+const MODE      = (__ENV.MODE || 'constant').toLowerCase(); // 'constant' | 'step'
+const VUS       = __ENV.VUS ? parseInt(__ENV.VUS) : undefined; // optional legacy
 const DURATION  = __ENV.DURATION || '20m';
 const RPS       = __ENV.RPS ? parseInt(__ENV.RPS) : 20;
 const CLIENT_TIMEOUT = __ENV.CLIENT_TIMEOUT || '3s';
+
+// Step mode stages: "rate:duration,rate:duration,..."
+const STAGES_STR = __ENV.STAGES || '20:1m,60:1m,80:1m,100:15m';
+
+// Expected p95 (ms) used to size VU pool if PRE_VUS not provided
+const LAT_MS    = __ENV.LAT_MS ? parseInt(__ENV.LAT_MS) : 60;
+
+// Allow overrides, else auto-calc
+const PRE_VUS   = __ENV.PRE_VUS ? parseInt(__ENV.PRE_VUS)
+  : Math.ceil(RPS * (LAT_MS / 1000) * 1.5) || 20;   // autosize if constant mode
+const MAX_VUS   = __ENV.MAX_VUS ? parseInt(__ENV.MAX_VUS)
+  : Math.max(3 * PRE_VUS, 100);
 
 // Optional thresholds (env overrides)
 const ERROR_RATE = __ENV.ERROR_RATE || '0';    // e.g. '0.01' for 1%
 const P95_MS     = __ENV.P95_MS || '500';
 
-// ---------- k6 options ----------
-export const options = {
-  noConnectionReuse: false,           // keep-alives ON for realistic load
-  discardResponseBodies: true,        // less memory GC
-  scenarios: {
-    constant_request_rate: {
-      executor: 'constant-arrival-rate',
-      rate: RPS,
-      timeUnit: '1s',
-      duration: DURATION,
-      preAllocatedVUs: VUS,
-      maxVUs: __ENV.MAX_VUS ? parseInt(__ENV.MAX_VUS) : 400, // more headroom, fewer drops
-      gracefulStop: '30s',
+// ---------- scenario builder ----------
+function buildOptions() {
+  const base = {
+    noConnectionReuse: false,           // keep-alives ON for realistic load
+    discardResponseBodies: true,        // less memory GC
+    thresholds: {
+      http_req_failed:   [`rate<=${ERROR_RATE}`],
+      http_req_duration: [`p(95)<=${P95_MS}`],
     },
-  },
-  thresholds: {
-    http_req_failed:   [`rate<=${ERROR_RATE}`],
-    http_req_duration: [`p(95)<=${P95_MS}`],
-  },
-};
+  };
+
+  if (MODE === 'step') {
+    const stages = STAGES_STR.split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(pair => {
+        const [rateStr, dur] = pair.split(':');
+        const rate = parseInt(rateStr);
+        if (!rate || !dur) throw new Error(`Bad STAGES entry: ${pair}`);
+        return { target: rate, duration: dur };
+      });
+
+    // choose a VU pool big enough for the largest step
+    const peakRate = stages.reduce((m, s) => Math.max(m, s.target), 0);
+    const preVUs   = __ENV.PRE_VUS
+      ? PRE_VUS
+      : Math.ceil(peakRate * (LAT_MS / 1000) * 1.5) || 30;
+    const maxVUs   = __ENV.MAX_VUS ? MAX_VUS : Math.max(3 * preVUs, 120);
+
+    return {
+      ...base,
+      scenarios: {
+        stepRate: {
+          executor: 'ramping-arrival-rate',
+          startRate: 0,
+          timeUnit: '1s',
+          preAllocatedVUs: preVUs,
+          maxVUs: maxVUs,
+          stages,
+          gracefulStop: '15s',
+        },
+      },
+    };
+  }
+
+  // default: constant mode
+  return {
+    ...base,
+    scenarios: {
+      constant_request_rate: {
+        executor: 'constant-arrival-rate',
+        rate: RPS,
+        timeUnit: '1s',
+        duration: DURATION,
+        preAllocatedVUs: PRE_VUS ?? 20,
+        maxVUs: MAX_VUS,
+        gracefulStop: '15s',
+      },
+    },
+  };
+}
+
+// ---------- k6 options ----------
+export const options = buildOptions();
 
 // ---------- auth ----------
 const ACCESS_TOKEN = open('../keycloak/access.token').replace(/[\r\n]+$/, '');
@@ -86,6 +143,7 @@ export function setup() {
   const now = Math.floor(Date.now() / 1000);
   const ttl = exp ? (exp - now) : -1;
   console.log(`🔐 token TTL: ${ttl}s (exp=${exp || 'n/a'})  BASE_URL=${BASE_URL}  HOST=${HOST_HEADER}`);
+  console.log(`🧪 mode=${MODE}  rps=${RPS}  duration=${DURATION}  preVUs=${options.scenarios[Object.keys(options.scenarios)[0]].preAllocatedVUs || 'n/a'}  maxVUs=${options.scenarios[Object.keys(options.scenarios)[0]].maxVUs || 'n/a'}`);
   return { authToken: ACCESS_TOKEN, tokenExp: exp };
 }
 
@@ -135,7 +193,6 @@ function aggregateTags(metric, tagKey) {
   const out = {};
   if (!metric || !metric.values) return out;
   for (const v of Object.values(metric.values)) {
-    // each v may have multiple tag sets; k6 folds by tags into 'tags' object
     if (v.tags && v.tags[tagKey] && typeof v.count === 'number') {
       const key = v.tags[tagKey];
       out[key] = (out[key] || 0) + v.count;

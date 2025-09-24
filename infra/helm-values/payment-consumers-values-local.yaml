@@ -6,48 +6,46 @@ image:
   tag: latest
   pullPolicy: Always
 
-
-
 resources:
-  requests: { cpu: "200m", memory: "400Mi" }
-  limits:   { cpu: "750m", memory: "640Mi" }
-
+  requests: { cpu: "400m", memory: "512Mi" }
+  limits:   { cpu: "1",    memory: "896Mi" }
 
 jvmOpts: >-
   -XX:+UseG1GC
-  -Xms320m -Xmx384m
-  -XX:MaxMetaspaceSize=120m
-  -XX:MaxDirectMemorySize=90m
+  -XX:+AlwaysActAsServerClassMachine
+  -XX:+UseStringDeduplication
+  -XX:MaxRAMPercentage=45
+  -XX:InitialRAMPercentage=45
+  -XX:MaxMetaspaceSize=128m
+  -XX:MaxDirectMemorySize=128m
+  -XX:ThreadStackSize=512
   -XX:MaxGCPauseMillis=200
   -XX:InitiatingHeapOccupancyPercent=30
-  -XX:+UseStringDeduplication
 
+service:
+  type: ClusterIP
+  portName: http
+  port: 8080
 
 autoscaling:
   enabled: true
   minReplicas: 3
-  maxReplicas: 6
+  maxReplicas: 5
   metrics:
     - type: External
       external:
         metric:
-          name: kafka_consumer_group_lag
-          selector:
-            matchLabels:
-              consumergroup: payment-order-psp-call-executor-consumer-group
+          name: kafka_consumer_group_lag_worst2
         target:
-          type: AverageValue
-          averageValue: "500"
+          type: Value
+          value: "2400"   # keep as string quantity
   behavior:
     scaleUp:
-      stabilizationWindowSeconds: 0
+      stabilizationWindowSeconds: 120
       selectPolicy: Max
       policies:
-        - type: Percent
-          value: 100
-          periodSeconds: 60
         - type: Pods
-          value: 3
+          value: 1
           periodSeconds: 60
     scaleDown:
       stabilizationWindowSeconds: 300
@@ -56,9 +54,12 @@ autoscaling:
           value: 50
           periodSeconds: 60
 
-
-
 serviceMonitor:
   enabled: true
   labels:
-    release: prometheus-stack
+    release: prometheus-stack  # must match Prometheus' serviceMonitorSelector
+  path: /actuator/prometheus
+  interval: 30s
+  scrapeTimeout: 10s
+
+replicaCount: 3

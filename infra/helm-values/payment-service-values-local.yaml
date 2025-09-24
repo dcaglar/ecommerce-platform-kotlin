@@ -27,17 +27,24 @@ autoscaling:
 
 jvmOpts: >-
   -XX:+UseG1GC
-  -Xms372m -Xmx372m
+  -XX:+AlwaysActAsServerClassMachine
+  -XX:+UseStringDeduplication
+  -XX:MaxRAMPercentage=45
+  -XX:InitialRAMPercentage=45
+  -XX:MaxMetaspaceSize=128m
+  -XX:MaxDirectMemorySize=128m
+  -XX:ThreadStackSize=512
   -XX:MaxGCPauseMillis=200
   -XX:InitiatingHeapOccupancyPercent=30
-  -XX:+UseStringDeduplication
-  -XX:MaxMetaspaceSize=128m
-  -XX:MaxDirectMemorySize=96m
 
 replicaCount: 1
 resources:
-  requests: { cpu: "200m", memory: "412Mi" }
-  limits:   { cpu: "750m", memory: "750Mi" }
+  requests: { cpu: "300m", memory: "512Mi" }
+  limits:   { cpu: "1",    memory: "1Gi"   }
+
+
+
+
 
 
 

@@ -1,5 +1,3 @@
-# minimal-values.yaml — tight dev caps (~70% node RAM target)
-
 prometheusOperator:
   resources:
     requests: { cpu: 30m,  memory: 96Mi }
@@ -18,10 +16,9 @@ prometheus:
         resources:
           requests: { cpu: 5m,  memory: 24Mi }
           limits:   { cpu: 30m, memory: 48Mi }
-    # Prometheus server pod
     resources:
       requests: { cpu: 80m,  memory: 128Mi }
-      limits:   { cpu: 300m, memory: 256Mi }   # tighter cap
+      limits:   { cpu: 300m, memory: 256Mi }
     retention: 6h
     walCompression: true
     scrapeInterval: 60s
@@ -29,6 +26,7 @@ prometheus:
     serviceMonitorSelector:
       matchLabels:
         release: prometheus-stack
+    serviceMonitorNamespaceSelector: {}   # 👈 allow ServiceMonitors from ALL namespaces
 
 alertmanager:
   alertmanagerSpec:
@@ -54,6 +52,7 @@ grafana:
       resources:
         requests: { cpu: 5m,  memory: 24Mi }
         limits:   { cpu: 30m, memory: 48Mi }
+
 kube-state-metrics:
   resources:
     requests: { cpu: 30m,  memory: 48Mi }
@@ -63,7 +62,6 @@ prometheus-node-exporter:
   resources:
     requests: { cpu: 15m,  memory: 24Mi }
     limits:   { cpu: 80m,  memory: 96Mi }
-
 
 prometheusAdapter:
   enabled: false

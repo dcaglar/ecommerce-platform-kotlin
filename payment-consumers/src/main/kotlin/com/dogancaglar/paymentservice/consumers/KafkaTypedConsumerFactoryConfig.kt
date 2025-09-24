@@ -9,6 +9,7 @@ import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspResultUpdated
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -79,29 +80,40 @@ class KafkaTypedConsumerFactoryConfig(
         kafkaExponentialBackOff: ExponentialBackOffWithMaxRetries
     ): DefaultErrorHandler {
 
-        val recoverer = ConsumerRecordRecoverer { rec, _ ->
+        val recoverer = ConsumerRecordRecoverer { rec, ex ->
             val src = rec.topic()
             val target = if (src.endsWith(".DLQ")) src else Topics.dlqOf(src)
             val key: String? = rec.key()?.toString()
 
-            // 1) If ErrorHandlingDeserializer failed, it put the original value bytes in this header
+            // Prefer original bytes captured by ErrorHandlingDeserializer
             val raw: ByteArray? = rec.headers().lastHeader(HDR_VALUE_BYTES)?.value()
 
-            val bytes: ByteArray = raw
+
+            val valueBytes: ByteArray = raw
                 ?: (rec.value() as? EventEnvelope<*>)?.let { env ->
                     EventEnvelopeKafkaSerializer().serialize(rec.topic(), env) ?: ByteArray(0)
-                }
-                ?: ByteArray(0)
+                } ?: ByteArray(0)
+            // Copy headers and add error diagnostics
+            val headers = org.apache.kafka.common.header.internals.RecordHeaders(rec.headers().toArray()).apply {
+                add("x-error-class", (ex?.javaClass?.name ?: "n/a").toByteArray())
+                add("x-error-message", ((ex?.message ?: "")
+                    .take(8_000)).toByteArray()) // cap to avoid jumbo headers
+                add("x-error-stacktrace", stackTraceString(ex, 16_000).toByteArray())
+                add("x-recovered-at", java.time.Instant.now().toString().toByteArray())
+                add("x-consumer-group", (rec.headers()
+                    .lastHeader(org.springframework.kafka.support.KafkaHeaders.GROUP_ID)?.let { String(it.value()) }
+                    ?: "unknown").toByteArray())
+            }
 
-            // Build ProducerRecord so we can pass a nullable key and forward headers
             val pr = ProducerRecord<String, ByteArray>(
                 target,
                 rec.partition(),
-                null,         // timestamp
+                null,
                 key,
-                bytes,
-                rec.headers() // preserve headers
+                valueBytes,
+                headers
             )
+
             dlqTemplate.send(pr)
         }
 
@@ -132,6 +144,13 @@ class KafkaTypedConsumerFactoryConfig(
         }
     }
 
+
+    private fun stackTraceString(ex: Throwable?, max: Int): String =
+        if (ex == null) "" else java.io.StringWriter().use { sw ->
+            ex.printStackTrace(java.io.PrintWriter(sw))
+            sw.toString().take(max)
+        }
+
     @Bean
     fun kafkaExponentialBackOff(): ExponentialBackOffWithMaxRetries =
         ExponentialBackOffWithMaxRetries(4).apply {
@@ -154,7 +173,9 @@ class KafkaTypedConsumerFactoryConfig(
         ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>>().apply {
             this.consumerFactory = consumerFactory
             containerProperties.clientId = clientId
+            containerProperties.pollTimeout = 1000           // block up to 1s waiting for data
             containerProperties.isMicrometerEnabled = true
+            containerProperties.idleBetweenPolls = 250 // nap 250ms after an empty poll
             @Suppress("UNCHECKED_CAST")
             setRecordInterceptor(interceptor as RecordInterceptor<String, EventEnvelope<T>>)
             setCommonErrorHandler(errorHandler)
@@ -207,6 +228,26 @@ class KafkaTypedConsumerFactoryConfig(
             errorHandler = errorHandler,
             ackMode = ContainerProperties.AckMode.MANUAL,
             expectedEventType = EventMetadatas.PaymentOrderPspCallRequestedMetadata.eventType,
+        )
+    }
+
+
+    @Bean("${Topics.PAYMENT_ORDER_PSP_RESULT_UPDATED}-factory")
+    fun pspResultUpdatedFactory(
+        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
+        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderPspResultUpdated>> {
+        val cfg = cfgFor(EventMetadatas.PaymentOrderPspResultUpdatedMetadata.topic, "${Topics.PAYMENT_ORDER_PSP_RESULT_UPDATED}-factory")
+        return createTypedFactory(
+            clientId = cfg.id,
+            concurrency = cfg.concurrency,
+            interceptor = interceptor,
+            consumerFactory = customFactory,
+            errorHandler = errorHandler,
+            ackMode = ContainerProperties.AckMode.MANUAL,
+            expectedEventType = EventMetadatas.PaymentOrderPspResultUpdatedMetadata.eventType,
         )
     }
 

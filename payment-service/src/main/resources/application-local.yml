@@ -12,6 +12,7 @@ app:
       payment_order_psp_call_requested_topic: { partitions: 48, replicas: 1, createDlq: true }
       payment_status_check_scheduler_topic:   { partitions: 1, replicas: 1, createDlq: true }
       payment_order_succeeded_topic:          { partitions: 8, replicas: 1, createDlq: true }
+      payment_order_psp_result_updated_topic: {partitions: 48, replicas: 1, createDlq: true}
   # manual datasource configs for web ourboxdispatcher and parttionen maintencance job
   datasource:
     web:
@@ -20,8 +21,8 @@ app:
       password: ${SPRING_DATASOURCE_PASSWORD}
       driver-class-name: org.postgresql.Driver
       pool-name: web-pool
-      maximum-pool-size: 10
-      minimum-idle: 5
+      maximum-pool-size: 12
+      minimum-idle: 6
       connection-timeout: 1000
       validation-timeout: 1000
       idle-timeout: 600000
@@ -36,8 +37,8 @@ app:
       pool-name: outbox-pool
       maximum-pool-size: 6
       minimum-idle: 3
-      connection-timeout: 1000
-      validation-timeout: 1000
+      connection-timeout: 1500
+      validation-timeout: 1500
       idle-timeout: 600000
       max-lifetime: 1800000
 
@@ -51,7 +52,7 @@ app:
       minimum-idle: 0
       connection-timeout: 1500
       validation-timeout: 1500
-      idle-timeout: 600000
+      idle-timeout: 60000
       max-lifetime: 1800000
 
 
@@ -95,13 +96,7 @@ spring:
   data:
     redis:
       url: ${SPRING_DATA_REDIS_URL}
-      lettuce:
-        pool:
-          max-active: 8
-          max-idle: 8
-          min-idle: 0
-          max-wait: -1ms
-
+      timeout: 2s               # was 750ms → too tight for local under load
   liquibase:
     enabled: true
     change-log: classpath:db/changelog/changelog.master.xml
@@ -163,8 +158,8 @@ management:
     export.prometheus.enabled: true
 
 outbox-dispatcher:
-  thread-count: 3
-  batch-size: 200
+  thread-count: 2
+  batch-size: 300
   pool-size: 2
 
 db:

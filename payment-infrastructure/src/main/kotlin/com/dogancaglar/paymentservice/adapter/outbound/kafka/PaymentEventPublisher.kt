@@ -13,8 +13,11 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Component
 import java.nio.charset.StandardCharsets
+import java.time.Duration
 import java.util.*
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 /**
  * Publishes any domain event wrapped in [EventEnvelope] to Kafka,
@@ -30,6 +33,8 @@ class PaymentEventPublisher(
 ) : EventPublisherPort {
     private val logger = LoggerFactory.getLogger(javaClass)
 
+
+
     override fun <T> publish(
         preSetEventIdFromCaller: UUID?,
         aggregateId: String,
@@ -42,7 +47,7 @@ class PaymentEventPublisher(
             preSetEventIdFromCaller, aggregateId, eventMetaData, data, traceId, parentEventId
         )
         LogContext.with(envelope) {
-            logger.info(
+            logger.debug(
                 "Publishing event type={} id={} parentId={} traceId={} agg={}",
                 envelope.eventType,
                 envelope.eventId,
@@ -51,7 +56,6 @@ class PaymentEventPublisher(
                 envelope.aggregateId
             )
             val record = buildRecord(eventMetaData, envelope)
-            logger.info("PUBLISHING EVENT")
             val future = kafkaTemplate.send(record)
             future.whenComplete { _, ex ->
                 if (ex == null) {
@@ -71,7 +75,6 @@ class PaymentEventPublisher(
         }
         return envelope
     }
-
     override fun <T> publishSync(
         preSetEventIdFromCaller: UUID?,
         aggregateId: String,
@@ -83,23 +86,72 @@ class PaymentEventPublisher(
     ): EventEnvelope<T> {
         val envelope = buildEnvelope(preSetEventIdFromCaller, aggregateId, eventMetaData, data, traceId, parentEventId)
         val record = buildRecord(eventMetaData, envelope)
+
         LogContext.with(envelope) {
+            val fut = kafkaTemplate.send(record)
             try {
-                kafkaTemplate.send(record).get(timeoutSeconds, TimeUnit.SECONDS)
-                logger.debug("📨 PUBLISH SYNC SUCCEEDED (topic={})", eventMetaData.topic)
-            } catch (ex: Exception) {
-                logger.error(
-                    "❌ [SYNC] Failed to publish eventId={} to topic={}: {}",
-                    envelope.eventId,
-                    eventMetaData.topic,
-                    ex.message,
-                    ex
-                )
+                fut.get(timeoutSeconds, TimeUnit.SECONDS)
+                logger.debug("📨 publishSync OK topic={} key={} eventId={}",
+                    eventMetaData.topic, envelope.aggregateId, envelope.eventId)
+            } catch (ex: TimeoutException) {
+                logger.warn("⏱️ publishSync TIMEOUT {}s topic={} key={} eventId={}",
+                    timeoutSeconds, eventMetaData.topic, envelope.aggregateId, envelope.eventId)
                 throw ex
+            } catch (ex: InterruptedException) {
+                Thread.currentThread().interrupt()
+                logger.warn("🛑 publishSync INTERRUPTED topic={} key={} eventId={}",
+                    eventMetaData.topic, envelope.aggregateId, envelope.eventId, ex)
+                throw ex
+            } catch (ex: java.util.concurrent.ExecutionException) {
+                val rc = ex.cause ?: ex
+                when (rc) {
+                    is org.apache.kafka.common.errors.RetriableException,
+                    is org.apache.kafka.common.errors.TransactionAbortedException -> {
+                        logger.warn("🔁 RETRIABLE publishSync failure topic={} key={} eventId={} cause={}",
+                            eventMetaData.topic, envelope.aggregateId, envelope.eventId, rc::class.simpleName, rc)
+                    }
+                    else -> {
+                        logger.error("❌ NON-RETRIABLE publishSync failure topic={} key={} eventId={} cause={}: {}",
+                            eventMetaData.topic, envelope.aggregateId, envelope.eventId, rc::class.simpleName, rc.message, rc)
+                    }
+                }
+                throw rc
             }
         }
         return envelope
     }
+
+
+    override fun <T> publishBatchAtomically(
+        envelopes: List<EventEnvelope<*>>,
+        eventMetaData: EventMetadata<T>,
+        timeout: Duration
+    ): Boolean {
+        if (envelopes.isEmpty()) return true
+
+        return try {
+            kafkaTemplate.executeInTransaction<Unit> { kt ->
+                val futures = envelopes.map { anyEnv ->
+                    @Suppress("UNCHECKED_CAST")
+                    val envT = anyEnv as EventEnvelope<T>
+                    val rec = buildRecord(eventMetaData, envT)
+                    kt.send(rec)
+                }
+                java.util.concurrent.CompletableFuture
+                    .allOf(*futures.toTypedArray())
+                    .get(timeout.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS)
+                Unit
+            }
+            true
+        } catch (t: java.util.concurrent.TimeoutException) {
+            logger.warn("⏱️ batch publish TIMEOUT after {} ms for {} events", timeout.toMillis(), envelopes.size)
+            false
+        } catch (t: Throwable) {
+            logger.warn("❌ batch publish ABORT for {} events: {}", envelopes.size, t.toString())
+            false
+        }
+    }
+
 
     private fun <T> buildEnvelope(
         preSetEventIdFromCaller: UUID?,

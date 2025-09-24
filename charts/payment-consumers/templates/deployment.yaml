@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "payment-consumers.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.replicaCount | default 1 }}
   selector:
     matchLabels:
       app: {{ include "payment-consumers.fullname" . }}
@@ -13,6 +13,7 @@ spec:
     metadata:
       labels:
         app: {{ include "payment-consumers.fullname" . }}
+        {{- include "payment-consumers.labels" . | nindent 8 }}
     spec:
       terminationGracePeriodSeconds: 60
       initContainers:
@@ -20,37 +21,22 @@ spec:
           image: postgres:16-alpine
           env:
             - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
             - name: DB_NAME
-              valueFrom:
-                configMapKeyRef:
-                  name: payment-app-config
-                  key: DB_NAME
+              valueFrom: { configMapKeyRef: { name: payment-app-config, key: DB_NAME } }
             - name: DB_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: payment-db-credentials
-                  key: ADMIN_POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: payment-db-credentials, key: ADMIN_POSTGRES_PASSWORD } }
             - name: SPRING_KAFKA_ADMIN_AUTO_CREATE
               value: "false"
             - name: CONSUMER_USER
-              valueFrom:
-                secretKeyRef:
-                  name: payment-db-credentials
-                  key: PAYMENT_CONSUMERS_APP_DB_USER
+              valueFrom: { secretKeyRef: { name: payment-db-credentials, key: PAYMENT_CONSUMERS_APP_DB_USER } }
             - name: SPRING_DATA_REDIS_URL
               value: redis://redis-master:6379
             - name: CONSUMER_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: payment-db-credentials
-                  key: PAYMENT_CONSUMERS_APP_DB_PASSWORD
-          command: ["/bin/sh", "-c"]
-          # NOTE: unquoted EOF so $VARS expand in the shell
+              valueFrom: { secretKeyRef: { name: payment-db-credentials, key: PAYMENT_CONSUMERS_APP_DB_PASSWORD } }
+          command: ["/bin/sh","-c"]
           args:
-            - | 
+            - |
               set -e
               export PGPASSWORD="$DB_ADMIN_PASSWORD"
               until pg_isready -h payment-db-postgresql -U postgres -d "$DB_NAME"; do
@@ -68,14 +54,19 @@ spec:
               GRANT ALL PRIVILEGES ON SCHEMA public TO "$CONSUMER_USER";
               GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "$CONSUMER_USER";
               GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "$CONSUMER_USER";
+
+              -- 🔧 Per-role default session settings (picked up on new connections)
+              ALTER ROLE "$CONSUMER_USER" SET statement_timeout = '2s';
+              ALTER ROLE "$CONSUMER_USER" SET lock_timeout      = '250ms';
+              ALTER ROLE "$CONSUMER_USER" SET idle_in_transaction_session_timeout = '0';
               EOF
 
       containers:
         - name: payment-consumers
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           ports:
-            - name: http          # <-- add this
+            - name: http
               containerPort: 8080
           env:
             - name: JAVA_TOOL_OPTIONS
@@ -87,35 +78,28 @@ spec:
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: kafka.payment.svc.cluster.local:9092
             - name: SPRING_DATASOURCE_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: payment-app-config
-                  key: PAYMENT_DB_URL
+              valueFrom: { configMapKeyRef: { name: payment-app-config, key: PAYMENT_DB_URL } }
             - name: SPRING_DATASOURCE_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: payment-db-credentials
-                  key: PAYMENT_CONSUMERS_APP_DB_USER
+              valueFrom: { secretKeyRef: { name: payment-db-credentials, key: PAYMENT_CONSUMERS_APP_DB_USER } }
             - name: SPRING_DATASOURCE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: payment-db-credentials
-                  key: PAYMENT_CONSUMERS_APP_DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: payment-db-credentials, key: PAYMENT_CONSUMERS_APP_DB_PASSWORD } }
+          startupProbe:
+            httpGet: { path: /actuator/health/liveness, port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 60
           livenessProbe:
-            httpGet:
-              path: /actuator/health/liveness   # <-- does NOT touch DB
-              port: http
-            initialDelaySeconds: 60
+            httpGet: { path: /actuator/health/liveness, port: http }
+            initialDelaySeconds: 90
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 6
+            failureThreshold: 12
           readinessProbe:
-            httpGet:
-              path: /actuator/health/readiness  # <-- includes DB/Redis/Kafka indicators
-              port: http
-            initialDelaySeconds: 60
+            httpGet: { path: /actuator/health/readiness, port: http }
+            initialDelaySeconds: 90
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 6
+            failureThreshold: 12
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

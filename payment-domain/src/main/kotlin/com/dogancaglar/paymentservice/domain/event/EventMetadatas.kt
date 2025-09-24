@@ -24,6 +24,13 @@ object EventMetadatas {
         override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderPspCallRequested>>() {}
     }
 
+    object PaymentOrderPspResultUpdatedMetadata : EventMetadata<PaymentOrderPspResultUpdated> {
+        override val topic = Topics.PAYMENT_ORDER_PSP_RESULT_UPDATED
+        override val eventType = EVENT_TYPE.PAYMENT_ORDER_PSP_RESULT_UPDATED
+        override val clazz = PaymentOrderPspResultUpdated::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderPspResultUpdated>>() {}
+    }
+
     object PaymentOrderSucceededMetadata : EventMetadata<PaymentOrderSucceeded> {
         override val topic = Topics.PAYMENT_ORDER_SUCCEEDED
         override val eventType = EVENT_TYPE.PAYMENT_ORDER_SUCCEDED
@@ -43,7 +50,8 @@ object EventMetadatas {
         PaymentOrderCreatedMetadata,
         PaymentOrderPspCallRequestedMetadata,
         PaymentOrderSucceededMetadata,
-        PaymentOrderStatusCheckScheduledMetadata
+        PaymentOrderStatusCheckScheduledMetadata,
+        PaymentOrderPspResultUpdatedMetadata
     )
 
 }

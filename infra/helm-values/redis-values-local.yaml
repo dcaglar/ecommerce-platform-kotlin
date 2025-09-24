@@ -1,35 +1,69 @@
+# infra/helm-values/redis-values-local.yaml
 architecture: standalone
 
-livenessProbe:
-  enabled: true
-  periodSeconds: 10
-  timeoutSeconds: 10
-  failureThreshold: 6
-readinessProbe:
-  enabled: true
-  periodSeconds: 10
-  timeoutSeconds: 5
-  failureThreshold: 6
-startupProbe:
-  enabled: true
-  periodSeconds: 10
-  failureThreshold: 60
 auth:
   enabled: false
 
+image:
+  registry: docker.io
+  repository: bitnamisecure/redis
+  tag: latest
+  pullPolicy: IfNotPresent
+
 master:
   resources:
-    requests: { cpu: "50m",  memory: "64Mi" }
-    limits:   { cpu: "300m", memory: "256Mi" }
-  configuration: |-
-    maxmemory 160mb
-    maxmemory-policy allkeys-lru
+    requests:
+      cpu: "200m"
+      memory: "128Mi"
+    limits:
+      cpu: "1000m"
+      memory: "512Mi"   # keep this if 1Gi isn't possible today
+  # Probes: give Redis time when busy
+  startupProbe:
+    enabled: true
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 90     # ~7.5 min (cold start / disk busy)
+  readinessProbe:
+    periodSeconds: 5
+    timeoutSeconds: 10
+    failureThreshold: 12     # ~1 min
+  livenessProbe:
+    periodSeconds: 5
+    timeoutSeconds: 10
+    failureThreshold: 12
 
-  # Reference your existing ConfigMap (must exist in the same namespace)
-  existingConfigmap: redis-config
+  # Keep Redis lightweight in local dev: no persistence, bounded memory
+  extraFlags:
+    - "--save ''"                 # disable RDB snapshots
+    - "--appendonly no"           # disable AOF
+    - "--maxmemory 380mb"         # safely below 512Mi limit
+    - "--maxmemory-policy allkeys-lru"
+    - "--tcp-keepalive 30"
+    - "--io-threads 2"
+    - "--io-threads-do-reads yes"
+    - "--latency-tracking yes"
 
-  metrics:
-    enabled: true                  # redis-exporter side-car
-    serviceMonitor:
-      enabled: true
-      namespace: payment
+# Don’t load a ConfigMap to avoid conflicts
+# master.existingConfigmap: <REMOVE THIS LINE>
+
+global:
+  security:
+    allowInsecureImages: true
+
+metrics:
+  enabled: false
+
+#apiVersion: v1
+#kind: ConfigMap
+#metadata:
+#  name: redis-config
+#  namespace: payment
+#data:
+#  redis.conf: |
+#    save 900 1
+#    save 300 10
+#    save 60 10000
+#
+#    appendonly yes
+#    appendfsync everysec

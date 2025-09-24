@@ -7,6 +7,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import org.springframework.stereotype.Repository
+import org.springframework.transaction.annotation.Transactional
 
 @Repository
 class PaymentOrderOutboundAdapter(
@@ -34,6 +35,7 @@ class PaymentOrderOutboundAdapter(
         return paymentOrderMapper.countByPaymentId(paymentId.value)
     }
 
+    @Transactional(timeout = 2, readOnly = true)
     override fun findByPaymentOrderId(paymentOrderId: PaymentOrderId): List<PaymentOrder> {
         return paymentOrderMapper.findByPaymentOrderId(paymentOrderId.value)
             .map { PaymentOrderEntityMapper.toDomain(it) }

@@ -32,6 +32,15 @@ class OutboxJobMyBatisAdapter(
       ))
   }
 
+    fun unclaimSpecific(workerId: String, oeids: List<Long>): Int {
+        if (oeids.isEmpty()) return 0
+        val params = mapOf(
+            "workerId" to workerId,
+            "oeids" to oeids
+        )
+        return mapper.unclaimSpecific(params)
+    }
+
     fun reclaimStuckClaims(olderThanSeconds: Int): Int =
         mapper.reclaimStuckClaims(olderThanSeconds)
 

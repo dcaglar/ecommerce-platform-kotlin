@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.domain.util
 
-import com.dogancaglar.paymentservice.domain.PaymentOrderEvent
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderEvent
 import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded

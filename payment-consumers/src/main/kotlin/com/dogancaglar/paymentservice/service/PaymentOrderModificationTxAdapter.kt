@@ -17,7 +17,7 @@ class PaymentOrderModificationTxAdapter(
     private val clock: Clock
 ) : PaymentOrderModificationPort {
 
-    @Transactional
+    @Transactional(timeout = 2)
     override fun markPaid(order: PaymentOrder): PaymentOrder {
         val draft = order.markAsPaid().withUpdatedAt(LocalDateTime.now(clock))
         val persisted = paymentOrderRepository.updateReturningIdempotent(draft)
@@ -26,7 +26,7 @@ class PaymentOrderModificationTxAdapter(
         return persisted
     }
 
-    @Transactional
+    @Transactional(timeout = 2)
     override fun markFailedForRetry(order: PaymentOrder, reason: String?, lastError: String?): PaymentOrder {
         val draft = order.markAsFailed()
             .incrementRetry()
@@ -38,7 +38,7 @@ class PaymentOrderModificationTxAdapter(
         return persisted
     }
 
-    @Transactional
+    @Transactional(timeout = 2)
     override fun markPendingAndScheduleStatusCheck(order: PaymentOrder, reason: String?, lastError: String?) {
         val draft = order.markAsPending()
             .incrementRetry()
@@ -58,7 +58,7 @@ class PaymentOrderModificationTxAdapter(
         }
     }
 
-    @Transactional
+    @Transactional(timeout = 2)
     override fun markFinalFailed(order: PaymentOrder, reason: String?): PaymentOrder {
         val draft = order.markAsFinalizedFailed()
             .withRetryReason(reason)
