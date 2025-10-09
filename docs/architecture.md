@@ -1,6 +1,6 @@
 # ecommerce-platform-kotlin · Architecture Guide
 
-*Last updated: **2025‑08‑14** – maintained by **Doğan Çağlar***
+*Last updated: **2025‑10‑09** – maintained by **Doğan Çağlar***
 
 ---
 
@@ -542,6 +542,7 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 
 ## 14 · Changelog
 
+- **2025‑10‑09**: Refactored consumer design — split `PaymentOrderPspCallExecutor` into two specialized consumers: `PaymentOrderPspCallExecutor` (PSP call) and `PaymentOrderPspResultApplier` (result application). Introduced two types of Kafka transactional producers with their own custom processing logic (consume→produce→commit and producer-only transactional modes).
 - **2025‑08‑14**: Major refresh. Added infra/Helm sections, DB/Kafka partitioning details, EventEnvelope,
   logging/Elastic search keys, and **lag‑based autoscaling**. Documented module split and the new
   `payment-infrastructure` auto‑config module.
