@@ -165,7 +165,7 @@ flowchart LR
 
 > **Split confirmed (Aug‑2025):** `PaymentOrderExecutor` was split into  
 > **Enqueuer** *(reads `payment_order_created` and enqueues PSP call tasks)* and  
-> **PaymentOrderPspCallExecutor** *(isolates PSP calling/latency).*  
+> **PaymentOrderPspCallExecutor (PSP call layer) + PaymentOrderPspResultApplier (DB state layer)** *(isolates PSP calling/latency).*  
 > This lets us scale PSP work separately and observe it clearly.
 
 ### 4.3 Payment‑Service Layer Diagram
@@ -184,7 +184,7 @@ flowchart TD
 flowchart TD
     C1["payment_order_created"] --> D1["Enqueuer (consumer)"]
     D1 --> E1["Kafka: payment_order_psp_call_requested"]
-    E1 --> F1["PaymentOrderPspCallExecutor"]
+    E1 --> F1["PaymentOrderPspCallExecutor (PSP call layer) + PaymentOrderPspResultApplier (DB state layer)"]
     F1 -->|SUCCESS| G1["Kafka: payment_order_succeeded"]
     F1 -->|RETRY| H1["Redis ZSet retry + Scheduler ➜ PSP_CALL_REQUESTED"]
     F1 -->|STATUS CHECK| I1["Scheduler ➜ payment_status_check"]
@@ -486,7 +486,7 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 - **payment-service**: REST API, DB writes, **OutboxDispatcherJob**.
 - **payment-consumers**:
     - `PaymentOrderEnqueuer` → reads `payment_order_created`, prepares PSP call requests.
-    - `PaymentOrderPspCallExecutor` → isolates external PSP calls; retry/status‑check are scheduled out of band.
+    - `PaymentOrderPspCallExecutor (PSP call layer) + PaymentOrderPspResultApplier (DB state layer)` → isolates external PSP calls; retry/status‑check are scheduled out of band.
 - Both depend on `payment-infrastructure` for shared wiring.
 
 ---
