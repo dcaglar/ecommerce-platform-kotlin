@@ -1,3 +1,16 @@
+global:
+  security:
+    allowInsecureImages:
+      image: true
+  imageRegistry: docker.io
+
+image:
+  registry: docker.io
+  repository: bitnamilegacy/kafka
+  tag: 4.0.0-debian-12-r10
+
+
+
 # Single-node, controller+broker in one pod; plaintext listeners; single-node-friendly internals.
 listeners:
   client: {protocol: PLAINTEXT, containerPort: 9092, name: CLIENT}
@@ -65,16 +78,19 @@ controller:
     transaction.state.log.num.partitions: 1
     # Kafka 4.x also logs this one; keep it small in single node
     share.coordinator.state.topic.num.partitions: 1
-    log.retention.bytes: 268435456         # 256 MiB total per log (delete old)
-    log.retention.hours: 2                  # or use minutes for tighter control
-    log.segment.bytes: 67108864             # 64 MiB segments (fewer big mmaps)
+    log.retention.bytes: 10737418240         # 128 MiB total per log (delete old)
+    log.retention.hours: 168                  # 7 days for tighter control
+    log.segment.bytes: 134217728             # 128 MiB (fewer, larger segments)
     log.cleaner.enable: "true"
     cleanup.policy: delete
 
+
   # (optional) avoid huge fetch/produce batches in dev
-    replica.fetch.max.bytes: 1048576        # 1 MiB
-    message.max.bytes: 1048576              # 1 MiB
-    fetch.message.max.bytes: 1048576
+    replica.fetch.max.bytes: 25165824        # 24 MiB (must be >= message.max.bytes)
+    message.max.bytes: 16777216              # 16 MiB
+    fetch.message.max.bytes: 16777216
+    max.request.size: 1048576
+    max.partition.fetch.bytes: 16777216
 
 broker:
   # No separate broker-only set for single-node

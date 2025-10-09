@@ -1,9 +1,6 @@
 package com.dogancaglar.paymentservice.application.maintenance
 
-
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.events.OutboxEvent
@@ -26,24 +23,20 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
-import java.util.UUID
 
 @Service
-@DependsOn( "outboxPartitionCreator")
+@DependsOn("outboxPartitionCreator")
 class OutboxDispatcherJob(
-    @Qualifier("outboxJobPort") private val outboxEventPort: OutboxEventPort,
-    private val paymentEventPublisher: EventPublisherPort,
-    private val kafkaTx: KafkaTxExecutor,
+    @param:Qualifier("outboxJobPort") private val outboxEventPort: OutboxEventPort,
+    @param:Qualifier("batchPaymentEventPublisher") private val syncPaymentEventPublisher: EventPublisherPort,
     private val meterRegistry: MeterRegistry,
     private val objectMapper: ObjectMapper,
-    @Qualifier("outboxJobTaskScheduler") private val taskScheduler: ThreadPoolTaskScheduler,
-    @Value("\${outbox-dispatcher.thread-count:2}") private val threadCount: Int,
-    @Value("\${outbox-dispatcher.batch-size:250}") private val batchSize: Int,
-    @Value("\${app.instance-id}") private val appInstanceId: String,
+    @param:Qualifier("outboxJobTaskScheduler") private val taskScheduler: ThreadPoolTaskScheduler,
+    @param:Value("\${outbox-dispatcher.thread-count:2}") private val threadCount: Int,
+    @param:Value("\${outbox-dispatcher.batch-size:250}") private val batchSize: Int,
+    @param:Value("\${app.instance-id}") private val appInstanceId: String,
     private val clock: Clock,
-    @Value("\${outbox-backlog.resync-interval:PT5M}") private val backlogResyncInterval: String
-
-
+    @param:Value("\${outbox-backlog.resync-interval:PT5M}") private val backlogResyncInterval: String
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val backlog = java.util.concurrent.atomic.AtomicLong(0)
@@ -55,27 +48,25 @@ class OutboxDispatcherJob(
             .register(meterRegistry)
     }
 
-
     @PostConstruct
     fun seedBacklogOnce() {
-        try {
-            backlog.set(outboxEventPort.countByStatus("NEW"))
-            logger.info("Seeded outbox backlog gauge with initial NEW count={}", backlog.get())
-        } catch (e: Exception) {
-            logger.warn("Failed to seed backlog gauge; will rely on deltas until next resync: {}", e.message, e)
-        }
+        resetBacklogFromDb("initial seed")
     }
 
-    /** Slow, optional drift-correct resync (disable with outbox-backlog.resync-interval=PT0S). */
+    /** Periodic drift correction */
     @Scheduled(fixedDelayString = "\${outbox-backlog.resync-interval:PT5M}")
     fun slowResyncBacklog() {
         if (backlogResyncInterval == "PT0S") return
+        resetBacklogFromDb("slow resync")
+    }
+
+    private fun resetBacklogFromDb(reason: String) {
         try {
             val fresh = outboxEventPort.countByStatus("NEW")
-            backlog.set(fresh)
-            logger.debug("Backlog slow-resync set to {}", fresh)
+            backlog.set(fresh.toLong())
+            logger.info("Backlog gauge reset to {} ({})", fresh, reason)
         } catch (e: Exception) {
-            logger.warn("Backlog slow-resync failed: {}", e.message)
+            logger.warn("Failed to reset backlog gauge ({}): {}", reason, e.message)
         }
     }
 
@@ -88,9 +79,6 @@ class OutboxDispatcherJob(
         }
     }
 
-
-
-
     @Scheduled(fixedDelay = 120000)
     @Transactional(transactionManager = "outboxTxManager", timeout = 5)
     fun reclaimStuck() {
@@ -98,50 +86,38 @@ class OutboxDispatcherJob(
             .reclaimStuckClaims(60 * 10)
         if (reclaimed > 0) {
             logger.warn("Reclaimer reset {} stuck outbox events to NEW", reclaimed)
-            backlog.addAndGet(reclaimed.toLong()) // ⬅️ keep gauge in sync
+            backlogAdd(reclaimed.toLong())
         }
     }
 
-
-
     @Transactional(transactionManager = "outboxTxManager", timeout = 2)
     fun claimBatch(batchSize: Int, workerId: String): List<OutboxEvent> {
-        // UPDATE ... WHERE status='NEW' ... FOR UPDATE SKIP LOCKED RETURNING ...
         val claimed = (outboxEventPort as OutboxJobMyBatisAdapter)
             .findBatchForDispatch(batchSize, workerId)
-        // Claiming moves rows NEW -> PROCESSING → decrease backlog estimate.
-        if (claimed.isNotEmpty()) backlog.addAndGet(-claimed.size.toLong())
+        if (claimed.isNotEmpty()) backlogAdd(-claimed.size.toLong())
         return claimed
     }
 
-    fun publishBatch(
-        events: List<OutboxEvent>
-    ): Triple<List<OutboxEvent>, List<OutboxEvent>, List<OutboxEvent>> {
-
+    fun publishBatch(events: List<OutboxEvent>)
+            : Triple<List<OutboxEvent>, List<OutboxEvent>, List<OutboxEvent>> {
         if (events.isEmpty()) return Triple(emptyList(), emptyList(), emptyList())
-
         return try {
-            // 1) Deserialize DB rows into typed envelopes (pure CPU)
             val envType = objectMapper.typeFactory
                 .constructParametricType(EventEnvelope::class.java, PaymentOrderCreated::class.java)
-
             @Suppress("UNCHECKED_CAST")
             val envelopes: List<EventEnvelope<PaymentOrderCreated>> =
                 events.map { evt -> objectMapper.readValue(evt.payload, envType) as EventEnvelope<PaymentOrderCreated> }
 
-            // 2) Send atomically in one Kafka transaction
-            val ok = paymentEventPublisher.publishBatchAtomically(
+            val ok = syncPaymentEventPublisher.publishBatchAtomically(
                 envelopes = envelopes,
                 eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
                 timeout = java.time.Duration.ofSeconds(30)
             )
 
             if (ok) {
-                // all-or-nothing success
                 val succeeded = events.onEach { it.markAsSent() }
                 Triple(succeeded, emptyList(), emptyList())
             } else {
-                // treat as transient; unclaim now so they retry soon
                 Triple(emptyList(), events.toList(), emptyList())
             }
         } catch (t: Throwable) {
@@ -153,13 +129,10 @@ class OutboxDispatcherJob(
     @Transactional(transactionManager = "outboxTxManager", timeout = 5)
     fun persistResults(succeeded: List<OutboxEvent>) {
         if (succeeded.isNotEmpty()) {
-            outboxEventPort.updateAll(succeeded) // clears claimed_* and sets SENT
+            outboxEventPort.updateAll(succeeded)
         }
     }
 
-
-
-    /** Tiny, isolated DB txn that frees failed rows immediately. */
     @Transactional(transactionManager = "outboxTxManager", timeout = 2)
     fun unclaimFailedNow(workerId: String, failed: List<OutboxEvent>) {
         if (failed.isEmpty()) return
@@ -167,33 +140,29 @@ class OutboxDispatcherJob(
         val n = adapter.unclaimSpecific(workerId, failed.map { it.oeid })
         if (n > 0) {
             logger.warn("Unclaimed {} failed outbox rows for worker={}", n, workerId)
-            // Unclaiming moves rows PROCESSING -> NEW → increase backlog estimate.
-            backlog.addAndGet(n.toLong())
+            backlogAdd(n.toLong())
         }
     }
-
-
-
 
     fun dispatchBatchWorker() {
         val start = System.currentTimeMillis()
         val threadName = Thread.currentThread().name
-        val workerId = "$appInstanceId:$threadName"                    // ⬅️ canonical worker id
-
+        val workerId = "$appInstanceId:$threadName"
 
         val events = claimBatch(batchSize, workerId)
         if (events.isEmpty()) {
-            logger.warn("No events to dispatch on {}", threadName)
+            logger.debug("No events to dispatch on {}", threadName)
             return
         }
 
-        val (succeeded, toUnclaim,keepClaimed) = publishBatch(events)
+        val (succeeded, toUnclaim, keepClaimed) = publishBatch(events)
         persistResults(succeeded)
 
         try {
             unclaimFailedNow(workerId, toUnclaim)
         } catch (t: Throwable) {
-            logger.warn("Unclaim failed for {} rows (worker={}) – will rely on reclaimer", toUnclaim.size, workerId, t)
+            logger.warn("Unclaim failed for {} rows (worker={}) – will rely on reclaimer",
+                toUnclaim.size, workerId, t)
         }
 
         if (succeeded.isNotEmpty()) {
@@ -212,17 +181,9 @@ class OutboxDispatcherJob(
 
         logger.info("Dispatched ok={} fail={} on {}", succeeded.size, failed.size, threadName)
     }
-    private fun rootCause(t: Throwable): Throwable {
-        var c: Throwable = t
-        while (c.cause != null && c.cause !== c) c = c.cause!!
-        return c
-    }
 
-    private fun isTransientKafkaError(t: Throwable): Boolean {
-        val rc = rootCause(t)
-        return rc is java.util.concurrent.TimeoutException ||
-                rc is org.apache.kafka.common.errors.RetriableException ||
-                rc is org.apache.kafka.common.errors.TransactionAbortedException
+    /** Adjust backlog but never let it go below zero. */
+    private fun backlogAdd(delta: Long) {
+        backlog.updateAndGet { curr -> maxOf(0, curr + delta) }
     }
-
 }

@@ -127,6 +127,7 @@ class KafkaTypedConsumerFactoryConfig(
                 org.springframework.dao.TransientDataAccessException::class.java,
                 org.springframework.dao.CannotAcquireLockException::class.java,
                 java.sql.SQLTransientException::class.java,
+                org.apache.kafka.clients.consumer.CommitFailedException::class.java,
             )
             addNotRetryableExceptions(
                 com.dogancaglar.paymentservice.service.MissingPaymentOrderException::class.java,
@@ -153,7 +154,7 @@ class KafkaTypedConsumerFactoryConfig(
 
     @Bean
     fun kafkaExponentialBackOff(): ExponentialBackOffWithMaxRetries =
-        ExponentialBackOffWithMaxRetries(4).apply {
+        ExponentialBackOffWithMaxRetries(5).apply {
             initialInterval = 2_000L
             multiplier = 2.0
             maxInterval = 30_000L
@@ -173,6 +174,9 @@ class KafkaTypedConsumerFactoryConfig(
         ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>>().apply {
             this.consumerFactory = consumerFactory
             containerProperties.clientId = clientId
+            consumerFactory.updateConfigs(
+                mapOf(org.apache.kafka.clients.consumer.ConsumerConfig.CLIENT_ID_CONFIG to clientId)
+            )
             containerProperties.pollTimeout = 1000           // block up to 1s waiting for data
             containerProperties.isMicrometerEnabled = true
             containerProperties.idleBetweenPolls = 250 // nap 250ms after an empty poll

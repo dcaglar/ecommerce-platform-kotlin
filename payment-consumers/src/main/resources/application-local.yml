@@ -11,7 +11,7 @@ app:
         topic: payment_order_created_topic
         group-id: payment-order-enqueuer-consumer-group
         class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderEnqueuer
-        concurrency: 4
+        concurrency: 8
 
       - id: payment-order-psp-call-executor
         topic: payment_order_psp_call_requested_topic
@@ -41,6 +41,10 @@ server:
       pattern: '%h %l %u %t "%r" %s %b %D'
       buffered: true
 spring:
+  application:
+    name: payment-consumers
+  lifecycle:
+    timeout-per-shutdown-phase: 45s
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME} # This will be injected from a Kubernetes Secret
@@ -56,12 +60,17 @@ spring:
       leak-detection-threshold: 60000   # optional; logs if a checkout > 60s
   kafka:
     consumer:
-      max-poll-records: 200
-      fetch-min-bytes: 262144      #  256k before broker responds (latency vs efficiency)
-      fetch-max-wait: 25ms            # cap the wait so latency doesn’t spike
-      # Per-partition and total fetch caps (keep under broker limits)
-      max-partition-fetch-bytes: 1048576   # 4 MiB
-      fetch-max-bytes: 33554432
+      # Transactions / commits
+      isolation-level: read_committed
+      enable-auto-commit: false
+      # Batch sizing
+      max-poll-records: 120
+      max-poll-interval: 240000   # ms → 4 minutes
+      # Fetch tuning
+      fetch-min-bytes: 131072     # 128 KiB
+      fetch-max-wait: 25ms        # Spring supports "ms" suffix
+      max-partition-fetch-bytes: 1048576   # 1 MiB
+      fetch-max-bytes: 33554432   # 32 MiB
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
@@ -92,16 +101,37 @@ management:
       all: false
       hikaricp.connections: true
       hikaricp.connections.acquire: true
-      kafka.consumer.fetch.manager.records.lag: true
-      kafka.producer.topic.record.send: true
-      kafka.consumer.fetch.manager.records.consumed: true
-      kafka.consumer.fetch.manager.fetch.latency: true
-      kafka.consumer.io.time: true
       process.cpu.usage: true
       jvm.threads.live: true
       jvm.memory.used: true
       jvm.memory.max: true
       jvm.gc.pause: true
+
+      kafka.consumer.fetch.manager.records.lag: true
+      kafka.consumer.fetch.manager.records.consumed: true
+      kafka.consumer.fetch.manager.fetch.latency: true
+      kafka.consumer.io.time: true
+      # (Optional) useful consumer client meters
+      kafka.consumer.records.lag.max: true
+      kafka.consumer.fetch.latency.avg: true
+      kafka.consumer.fetch.latency.max: true
+
+        # ADD: Kafka *client* producer meters (names are Micrometer meter names)
+      kafka.producer.batch.size.avg: true
+      kafka.producer.batch.size.max: true
+      kafka.producer.request.latency.avg: true
+      kafka.producer.topic.record.send: true
+      kafka.producer.request.latency.max: true
+      kafka.producer.compression.rate.avg: true
+      kafka.producer.record.send.total: true
+      kafka.producer.record.error.total: true
+      kafka.producer.record.retry.total: true
+      kafka.producer.outgoing.byte.total: true
+      kafka.producer.io.wait.time.total: true
+      kafka.producer.bufferpool.wait.ratio: true
+      kafka.producer.bufferpool.wait.time.total: true
+
+
       # binders
 
       # your custom meters (base names)

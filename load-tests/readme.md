@@ -35,3 +35,15 @@ VUS=40 DURATION=10m k6 run load-tests/baseline-smoke-test.js
 VUS=3 DURATION=2m k6 run load-tests/baseline-smoke-test.js
 
 ```
+
+## Constant RPS quick commands
+
+From the project root, you can run constant-RPS scenarios like this:
+
+```bash
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=10 PRE_VUS=40 MAX_VUS=160 k6 run load-tests/baseline-smoke-test.js 
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=20 PRE_VUS=40 MAX_VUS=160 DURATION=20m k6 run load-tests/baseline-smoke-test.js 
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=40 PRE_VUS=40 MAX_VUS=160 k6 run load-tests/baseline-smoke-test.js 
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=60 PRE_VUS=40 MAX_VUS=160 k6 run load-tests/baseline-smoke-test.js 
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=80 PRE_VUS=40 MAX_VUS=160 DURATION=100m k6 run load-tests/baseline-smoke-test.js 
+```

@@ -8,9 +8,7 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Component
 
-@Component
 class KafkaTxExecutor(
-    @Qualifier("businessEventKafkaTemplate")
     private val kafkaTemplate: KafkaTemplate<String, EventEnvelope<*>>
 ) {
     fun <R> run(

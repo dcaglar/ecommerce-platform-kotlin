@@ -25,9 +25,7 @@ import java.util.concurrent.TimeoutException
  * trace information to the MDC before logging.
  */
 
-@Component
 class PaymentEventPublisher(
-    @Qualifier("businessEventKafkaTemplate")
     private val kafkaTemplate: KafkaTemplate<String, EventEnvelope<*>>,
     private val meterRegistry: MeterRegistry
 ) : EventPublisherPort {
@@ -35,46 +33,7 @@ class PaymentEventPublisher(
 
 
 
-    override fun <T> publish(
-        preSetEventIdFromCaller: UUID?,
-        aggregateId: String,
-        eventMetaData: EventMetadata<T>,
-        data: T,
-        traceId: String?,
-        parentEventId: UUID?
-    ): EventEnvelope<T> {
-        val envelope = buildEnvelope(
-            preSetEventIdFromCaller, aggregateId, eventMetaData, data, traceId, parentEventId
-        )
-        LogContext.with(envelope) {
-            logger.debug(
-                "Publishing event type={} id={} parentId={} traceId={} agg={}",
-                envelope.eventType,
-                envelope.eventId,
-                envelope.parentEventId,
-                envelope.traceId,
-                envelope.aggregateId
-            )
-            val record = buildRecord(eventMetaData, envelope)
-            val future = kafkaTemplate.send(record)
-            future.whenComplete { _, ex ->
-                if (ex == null) {
-                    logger.debug(
-                        "📨 Event published to traceid logcontext.traceid=${LogContext.getTraceId()} traceIdFromEnvelope=${envelope.traceId},parentEventId=${envelope.parentEventId}"
-                    )
-                } else {
-                    logger.error(
-                        "❌ Failed to publish eventId={} to topic={}: {}",
-                        envelope.eventId,
-                        eventMetaData.topic,
-                        ex.message,
-                        ex
-                    )
-                }
-            }
-        }
-        return envelope
-    }
+
     override fun <T> publishSync(
         preSetEventIdFromCaller: UUID?,
         aggregateId: String,
