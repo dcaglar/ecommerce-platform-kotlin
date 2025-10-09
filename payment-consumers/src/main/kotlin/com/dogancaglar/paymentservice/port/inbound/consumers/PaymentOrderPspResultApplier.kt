@@ -12,12 +12,13 @@ import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
 
 @Component
 class PaymentOrderPspResultApplier(
-    private val kafkaTx: KafkaTxExecutor ,
+    @param:Qualifier("syncPaymentTx") private val kafkaTx: KafkaTxExecutor,
     private val processPspResult: ProcessPspResultUseCase, // keep your existing service
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)

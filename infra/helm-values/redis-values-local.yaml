@@ -14,10 +14,10 @@ master:
   resources:
     requests:
       cpu: "200m"
-      memory: "128Mi"
+      memory: "64Mi"
     limits:
       cpu: "1000m"
-      memory: "512Mi"   # keep this if 1Gi isn't possible today
+      memory: "128Mi"   # keep this if 1Gi isn't possible today
   # Probes: give Redis time when busy
   startupProbe:
     enabled: true

@@ -8,10 +8,10 @@ app:
   # TopicAdminConfig reads these
   kafka:
     specs:
-      payment_order_created_topic:            { partitions: 8, replicas: 1, createDlq: true }
+      payment_order_created_topic:            { partitions: 48, replicas: 1, createDlq: true }
       payment_order_psp_call_requested_topic: { partitions: 48, replicas: 1, createDlq: true }
       payment_status_check_scheduler_topic:   { partitions: 1, replicas: 1, createDlq: true }
-      payment_order_succeeded_topic:          { partitions: 8, replicas: 1, createDlq: true }
+      payment_order_succeeded_topic:          { partitions: 48, replicas: 1, createDlq: true }
       payment_order_psp_result_updated_topic: {partitions: 48, replicas: 1, createDlq: true}
   # manual datasource configs for web ourboxdispatcher and parttionen maintencance job
   datasource:

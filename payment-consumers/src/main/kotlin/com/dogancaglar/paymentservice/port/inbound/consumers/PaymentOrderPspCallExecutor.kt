@@ -22,6 +22,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
 import java.util.concurrent.TimeUnit
@@ -30,8 +31,8 @@ import java.util.concurrent.TimeUnit
 class PaymentOrderPspCallExecutor(
     private val pspClient: PaymentGatewayPort,
     private val meterRegistry: MeterRegistry,
-    private val kafkaTx: KafkaTxExecutor,
-    private val publisher: EventPublisherPort,
+    @param:Qualifier("syncPaymentTx") private val kafkaTx: KafkaTxExecutor,
+    @param:Qualifier("syncPaymentEventPublisher") private val publisher: EventPublisherPort,
     private val paymentOrderRepository: PaymentOrderRepository //read only
 ) {
 

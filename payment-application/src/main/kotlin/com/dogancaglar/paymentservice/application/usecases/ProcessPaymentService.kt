@@ -15,6 +15,7 @@ import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPor
 import com.dogancaglar.paymentservice.ports.outbound.PspResultCachePort
 import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
@@ -25,7 +26,7 @@ import kotlin.math.pow
 import kotlin.random.Random
 
 open class ProcessPaymentService(
-    private val eventPublisher: EventPublisherPort,
+    @param:Qualifier("syncPaymentEventPublisher") private val eventPublisher: EventPublisherPort,
     private val retryQueuePort: RetryQueuePort<PaymentOrderPspCallRequested>,
     private val pspResultCache: PspResultCachePort,
     private val paymentOrderModificationPort: PaymentOrderModificationPort,

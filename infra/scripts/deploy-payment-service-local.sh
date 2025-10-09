@@ -8,7 +8,7 @@ INGRESS_VALUES="$REPO_ROOT/infra/helm-values/ingress-values.yaml"
 ENDPOINTS_JSON="$REPO_ROOT/infra/endpoints.json"
 
 # 1) Ensure we don't have two ingress controllers
-if minikube addons list | grep -qE '^- +ingress +enabled'; then
+if minikube addons list  | grep -qE '^- +ingress +enabled'; then
   echo "⚠️  Disabling minikube ingress addon to avoid duplicate controllers..."
   minikube addons disable ingress >/dev/null || true
 fi
@@ -43,7 +43,7 @@ else
     -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}')"
   BASE_URL="http://${MINI_IP}:${NODE_PORT}"
   echo "ℹ️  No EXTERNAL-IP yet (LB pending). Falling back to NodePort: $BASE_URL"
-  echo "   Tip: start 'minikube tunnel' for a LoadBalancer IP and rerun the script."
+  echo "   Tip: start 'sudo -E minikube -p newprofile tunnel' for a LoadBalancer IP and rerun the script."
 fi
 
 # 4) Render chart values (inject INGRESS_HOST) and deploy app

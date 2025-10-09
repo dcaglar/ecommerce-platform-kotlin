@@ -10,6 +10,7 @@ filebeatConfig:
         ignore_older: 24h
         paths:
           - /var/log/containers/*payment-service*.log
+          - /var/log/containers/*payment-consumers*.log
           - /var/log/containers/*payment-db*.log
         prospector.scanner.symlinks: true
         parsers:

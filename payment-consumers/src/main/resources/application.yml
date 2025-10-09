@@ -57,4 +57,7 @@ management:
       kafka.consumer.fetch.manager.records.consumed: true
       kafka.consumer.fetch.manager.fetch.latency: true
       kafka.consumer.io.time: true
-spring.jackson.time-zone: UTC
+spring:
+  application:
+    name: payment-consumers
+  jackson.time-zone: UTC
