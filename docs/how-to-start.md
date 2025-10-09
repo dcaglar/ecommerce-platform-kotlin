@@ -51,7 +51,7 @@ infra/scripts/deploy-kafka-exporter-local.sh
 - What: Deploys the payment-service chart and sets up ingress. Writes infra/endpoints.json.
 - Tip: For a LoadBalancer IP, run in a separate terminal:
 ```bash
-minikube -p newprofile tunnel
+sudo -E minikube -p newprofile tunnel
 ```
 - Then run:
 ```bash
@@ -224,7 +224,7 @@ Name hints vs. your list
 Troubleshooting quick tips
 - If payment-service Ingress says pending, run:
 ```bash
-minikube -p newprofile tunnel
+sudo -E minikube -p newprofile tunnel
 ```
 - If Grafana/Prometheus aren’t reachable, run port-forwarding and open the UIs:
 ```bash

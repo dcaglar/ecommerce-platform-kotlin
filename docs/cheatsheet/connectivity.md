@@ -15,7 +15,7 @@ kubectl -n payment get endpoints payment-db-postgresql
 ```
 - If using LoadBalancer, ensure tunnel is running; otherwise port-forward:
 ```bash
-minikube -p newprofile tunnel
+sudo -E minikube -p newprofile tunnel
 # or
 infra/scripts/port-forwarding.sh
 ```
@@ -105,7 +105,7 @@ Ingress and service access
 - Ensure endpoints.json exists: it’s written by deploy-payment-service-local.sh
 - If EXTERNAL-IP is pending, run:
 ```bash
-minikube -p newprofile tunnel
+sudo -E minikube -p newprofile tunnel
 ```
 - Without tunnel, use NodePort (the script falls back automatically) or set PF_INGRESS=true and run port-forwarding:
 ```bash
