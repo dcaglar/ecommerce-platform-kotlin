@@ -62,6 +62,7 @@ flowchart LR
         J["Redis Adapters<br/>ID Gen • Retry ZSet"]:::adapter
         K1["Kafka Consumer<br/>PaymentOrderEnqueuer"]:::adapter
         K2["Kafka Consumer<br/>PaymentOrderPspCallExecutor"]:::adapter
+        K3["Kafka Consumer<br/>PaymentOrderPspResultApplier"]:::adapter
         N["PSP Client (Mock)"]:::adapter
     end
 
@@ -96,10 +97,12 @@ N -->|charge|K2
 B -. metrics/logs .-> PROM
 K1 -. metrics/logs .-> PROM
 K2 -. metrics/logs .-> PROM
+    K3 -. metrics/logs .-> PROM
 D -. metrics/logs .-> PROM
 B -. logs .-> ELK
 K1 -. logs .-> ELK
 K2 -. logs .-> ELK
+    K3 -. logs .-> ELK
 ```
 
 ---
@@ -133,7 +136,8 @@ Quick start: **[docs/how-to-start.md](./docs/how-to-start.md)**.
 - **OutboxDispatcherJob** reliably publishes `payment_order_created` to Kafka.
 - `payment-consumers`:
     - **PaymentOrderEnqueuer**: consumes `payment_order_created`, prepares/validates work.
-    - **PaymentOrderPspCallExecutor**: performs bounded-latency PSP calls and emits follow-up events.
+    - **PaymentOrderPspCallExecutor**: performs bounded-latency PSP calls; emits `payment_order_psp_result_updated` events with mapped PSP status, error info, and latency.
+    - **PaymentOrderPspResultApplier**: applies PSP results transactionally (SUCCESS / RETRYABLE / STATUS_CHECK / FINAL_FAILURE), updates DB state, and triggers retries or status-check scheduling.
     - **RetryDispatcherScheduler**: uses Redis ZSet for backoff & re-enqueue.
 - Status checks for long-tail confirmations.
 - End-to-end traceability via **EventEnvelope** (`eventId`, `traceId`, `parentEventId`, `paymentOrderId`).
@@ -196,7 +200,7 @@ Quick start: **[docs/how-to-start.md](./docs/how-to-start.md)**.
 | `payment-application`    | ✅ Active   | Use-cases, schedulers, orchestration            |
 | `payment-infrastructure` | ✅ Active   | Auto-config + adapters (JPA, Redis, Kafka, PSP) |
 | `payment-service`        | ✅ Active   | API + Outbox dispatcher                         |
-| `payment-consumers`      | ✅ Active   | Async executors (Enqueuer, PSP Call, Retry)     |
+| `payment-consumers`      | ✅ Active   | Async executors (Enqueuer, PSP Call, PSP Result Applier, Retry)     |
 | `common`                 | ✅ Active   | Shared contracts, envelope, logging             |
 | `order-service`          | 🕒 Planned | Emits order-created                             |
 | `wallet-service`         | 🕒 Planned | Updates balances                                |
