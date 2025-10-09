@@ -26,7 +26,7 @@ MINI_IP="$(minikube ip)"
 INGRESS_HOST="payment.${MINI_IP}.nip.io"
 
 # Prefer LoadBalancer EXTERNAL-IP (requires: `minikube tunnel` running)
-echo "⏳ Waiting for LoadBalancer EXTERNAL-IP (run 'minikube tunnel' in another terminal)..."
+echo "⏳ Waiting for LoadBalancer EXTERNAL-IP (run ' sudo -E minikube -p newprofile tunnel' in another terminal)..."
 EXT_IP=""
 for _ in {1..60}; do   # 120s total (60 * 2s)
   EXT_IP="$(kubectl -n ingress-nginx get svc ingress-nginx-controller \
@@ -78,6 +78,6 @@ echo "   endpoints.json → $ENDPOINTS_JSON"
 # if curl -fsS --max-time 5 -H "Host: $INGRESS_HOST" "$BASE_URL/actuator/health" >/dev/null; then
 #   echo "✅ Health OK"
 # else
-#   echo "❌ Health check failed. Check 'minikube tunnel', Ingress rules, or service endpoints." >&2
+#   echo "❌ Health check failed. Check ' sudo -E minikube -p newprofile tunnel', Ingress rules, or service endpoints." >&2
 #   exit 1
 # fi
