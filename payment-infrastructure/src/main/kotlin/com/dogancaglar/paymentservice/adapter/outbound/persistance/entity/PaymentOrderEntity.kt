@@ -1,7 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.outbound.persistance.entity
 
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import java.math.BigDecimal
 import java.time.LocalDateTime
 
 class PaymentOrderEntity(
@@ -10,7 +9,7 @@ class PaymentOrderEntity(
     val paymentId: Long,
     val publicPaymentId: String,
     val sellerId: String,
-    val amountValue: BigDecimal,
+    val amountValue: Long,
     val amountCurrency: String,
     val status: PaymentOrderStatus,
     val createdAt: LocalDateTime,

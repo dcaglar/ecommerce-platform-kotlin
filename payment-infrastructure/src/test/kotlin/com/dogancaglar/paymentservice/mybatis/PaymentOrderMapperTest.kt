@@ -23,7 +23,6 @@ import org.springframework.test.context.TestPropertySource
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
-import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @MybatisTest
@@ -81,7 +80,7 @@ class PaymentOrderMapperTest {
             paymentId = paymentId,
             publicPaymentId = "PAY-200",
             sellerId = sellerId,
-            amount = Amount(currency = "USD", value = BigDecimal.valueOf(20200)),
+            amount = Amount(value = 2020000L, currency = "USD"), // $20,200.00
             createdAt = now.minusDays(1)
         )
         paymentOrderMapper.insertAllIgnore(listOf(PaymentOrderEntityMapper.toEntity(init)))
@@ -112,7 +111,7 @@ class PaymentOrderMapperTest {
             paymentId = paymentId,
             publicPaymentId = "PAY-300",
             sellerId = sellerId,
-            amount = Amount(currency = "USD", value = BigDecimal.valueOf(30300)),
+            amount = Amount(value = 3030000L, currency = "USD"), // $30,300.00
             createdAt = now.minusDays(1)
         )
         paymentOrderMapper.insertAllIgnore(listOf(PaymentOrderEntityMapper.toEntity(init)))

@@ -9,7 +9,6 @@ import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.slf4j.MDC
-import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.*
 
@@ -30,7 +29,7 @@ class DomainEventFactoryTest {
                     paymentId = "p-123",
                     publicPaymentId = "payment-123",
                     sellerId = "seller-1",
-                    amountValue = BigDecimal("250.00"),
+                    amountValue = 25000L, // $250.00
                     currency = "EUR",
                     status = "CREATED",
                     createdAt = LocalDateTime.now(),
@@ -62,7 +61,7 @@ class DomainEventFactoryTest {
                     paymentId = "p-1",
                     publicPaymentId = "payment-1",
                     sellerId = "s-1",
-                    amountValue = BigDecimal.TEN,
+                    amountValue = 1000L, // $10.00
                     currency = "EUR",
                     status = "CREATED",
                     createdAt = LocalDateTime.now(),
@@ -89,7 +88,7 @@ class DomainEventFactoryTest {
                     paymentId = "p-1",
                     publicPaymentId = "payment-1",
                     sellerId = "s-1",
-                    amountValue = BigDecimal.TEN,
+                    amountValue = 1000L, // $10.00
                     currency = "EUR",
                     status = "CREATED",
                     createdAt = LocalDateTime.now(),
@@ -107,7 +106,7 @@ class DomainEventFactoryTest {
                     paymentId = "p-2",
                     publicPaymentId = "payment-1",
                     sellerId = "s-1",
-                    amountValue = BigDecimal.TEN,
+                    amountValue = 1000L, // $10.00
                     currency = "EUR",
                     status = "CREATED",
                     createdAt = LocalDateTime.now(),
@@ -137,7 +136,7 @@ class DomainEventFactoryTest {
                 paymentId = "p-123",
                 publicPaymentId = "payment-123",
                 sellerId = "seller-1",
-                amountValue = BigDecimal("250.00"),
+                amountValue = 25000L, // $250.00
                 currency = "EUR",
                 status = "CREATED",
                 createdAt = LocalDateTime.now(),
@@ -174,7 +173,7 @@ class DomainEventFactoryTest {
                 paymentId = "p-123",
                 publicPaymentId = "payment-123",
                 sellerId = "seller-1",
-                amountValue = BigDecimal("250.00"),
+                amountValue = 25000L, // $250.00
                 currency = "EUR",
                 status = "CREATED",
                 createdAt = LocalDateTime.now(),

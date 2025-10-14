@@ -3,7 +3,6 @@ package com.dogancaglar.paymentservice.domain.event
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
-import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDateTime
 
@@ -14,7 +13,7 @@ data class PaymentOrderPspCallRequested @JsonCreator constructor(
     @JsonProperty("paymentId") override val paymentId: String,
     @JsonProperty("publicPaymentId") override val publicPaymentId: String,
     @JsonProperty("sellerId") override val sellerId: String,
-    @JsonProperty("amountValue") override val amountValue: BigDecimal,
+    @JsonProperty("amountValue") override val amountValue: Long,
     @JsonProperty("currency") override val currency: String,
     @JsonProperty("status") override val status: String,
     @JsonProperty("createdAt") override val createdAt: LocalDateTime = LocalDateTime.now(),
