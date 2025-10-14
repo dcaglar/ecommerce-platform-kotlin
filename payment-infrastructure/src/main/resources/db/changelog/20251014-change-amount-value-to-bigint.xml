@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="change-amount-value-to-bigint-payment-orders" author="dogancaglar">
+        <comment>
+            Change amount_value from DECIMAL(19,2) to BIGINT to store amounts in smallest currency unit (cents).
+            This avoids floating-point precision issues and rounding errors.
+            Example: $20.00 was stored as 20.00, now stored as 2000 cents.
+
+            Migration strategy:
+            1. Multiply existing decimal values by 100 to convert to cents
+            2. Change column type to BIGINT
+
+            Note: This assumes all existing amounts are in 2-decimal currencies (USD, EUR, GBP).
+        </comment>
+
+        <!-- Convert existing decimal values to cents (multiply by 100) -->
+        <sql>
+            UPDATE payment_orders
+            SET amount_value = amount_value * 100
+        </sql>
+
+        <!-- Change column type from DECIMAL to BIGINT -->
+        <modifyDataType
+            tableName="payment_orders"
+            columnName="amount_value"
+            newDataType="BIGINT"/>
+
+        <rollback>
+            <!-- Change back to DECIMAL -->
+            <modifyDataType
+                tableName="payment_orders"
+                columnName="amount_value"
+                newDataType="DECIMAL(19,2)"/>
+            <!-- Divide by 100 to convert back to decimal -->
+            <sql>
+                UPDATE payment_orders
+                SET amount_value = amount_value / 100.0
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="change-amount-value-to-bigint-payments" author="dogancaglar">
+        <comment>
+            Change amount_value from DECIMAL(19,2) to BIGINT in payments table.
+        </comment>
+
+        <!-- Convert existing decimal values to cents (multiply by 100) -->
+        <sql>
+            UPDATE payments
+            SET amount_value = amount_value * 100
+        </sql>
+
+        <!-- Change column type from DECIMAL to BIGINT -->
+        <modifyDataType
+            tableName="payments"
+            columnName="amount_value"
+            newDataType="BIGINT"/>
+
+        <rollback>
+            <!-- Change back to DECIMAL -->
+            <modifyDataType
+                tableName="payments"
+                columnName="amount_value"
+                newDataType="DECIMAL(19,2)"/>
+            <!-- Divide by 100 to convert back to decimal -->
+            <sql>
+                UPDATE payments
+                SET amount_value = amount_value / 100.0
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

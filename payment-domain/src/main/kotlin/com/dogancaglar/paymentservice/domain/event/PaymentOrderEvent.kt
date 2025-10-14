@@ -1,6 +1,5 @@
 package com.dogancaglar.paymentservice.domain.event
 
-import java.math.BigDecimal
 import java.time.LocalDateTime
 
 interface PaymentOrderEvent {
@@ -9,7 +8,7 @@ interface PaymentOrderEvent {
     val paymentId: String
     val publicPaymentId: String
     val sellerId: String
-    val amountValue: BigDecimal
+    val amountValue: Long
     val currency: String
     val status: String
     val createdAt: LocalDateTime

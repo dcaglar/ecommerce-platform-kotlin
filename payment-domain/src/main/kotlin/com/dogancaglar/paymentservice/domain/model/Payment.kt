@@ -3,7 +3,6 @@ package com.dogancaglar.paymentservice.domain.model
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import java.math.BigDecimal
 import java.time.LocalDateTime
 
 class Payment private constructor(
@@ -22,7 +21,7 @@ class Payment private constructor(
         private var publicPaymentId: String = ""
         private var buyerId: BuyerId = BuyerId("")
         private var orderId: OrderId = OrderId("")
-        private var totalAmount: Amount = Amount(BigDecimal.ZERO, "USD") // Default value
+        private var totalAmount: Amount = Amount(0L, "USD") // Default value
         private var status: PaymentStatus = PaymentStatus.INITIATED
         private var createdAt: LocalDateTime = LocalDateTime.now()
         private var paymentOrders: List<PaymentOrder> = listOf()

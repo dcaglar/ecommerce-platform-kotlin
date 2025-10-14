@@ -31,8 +31,8 @@ object PaymentOrderEntityMapper {
             publicPaymentId = entity.publicPaymentId,
             sellerId = com.dogancaglar.paymentservice.domain.model.vo.SellerId(entity.sellerId),
             amount = com.dogancaglar.paymentservice.domain.model.Amount(
-                currency = entity.amountCurrency,
-                value = entity.amountValue
+                value = entity.amountValue,
+                currency = entity.amountCurrency
             ),
             status = entity.status,
             createdAt = entity.createdAt,

@@ -1,16 +1,21 @@
 package com.dogancaglar.port.out.web.dto
 
 
-import jakarta.validation.constraints.DecimalMin
-import jakarta.validation.constraints.Digits
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotNull
-import java.math.BigDecimal
 
+/**
+ * Amount DTO using smallest currency unit (cents, pence, etc.)
+ *
+ * Examples:
+ * - $0.99 USD = AmountDto(value = 99, currency = USD)
+ * - $20.00 USD = AmountDto(value = 2000, currency = USD)
+ * - €15.50 EUR = AmountDto(value = 1550, currency = EUR)
+ */
 data class AmountDto(
     @field:NotNull
-    @field:DecimalMin(value = "0.01", message = "Amount must be greater than zero")
-    @field:Digits(integer = 10, fraction = 2, message = "Açmount must have up to 2 decimal places")
-    val value: BigDecimal,
+    @field:Min(value = 1, message = "Amount must be greater than zero")
+    val value: Long,
 
     @field:NotNull
     val currency: CurrencyEnum
