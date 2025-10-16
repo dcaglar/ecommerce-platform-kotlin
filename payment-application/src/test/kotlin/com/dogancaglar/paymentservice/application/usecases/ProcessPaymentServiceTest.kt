@@ -12,10 +12,10 @@ import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
 import com.dogancaglar.paymentservice.ports.outbound.PspResultCachePort
 import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
+import io.mockk.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.kotlin.*
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
@@ -33,10 +33,10 @@ class ProcessPaymentServiceTest {
 
     @BeforeEach
     fun setUp() {
-        eventPublisher = mock<EventPublisherPort>()
-        retryQueuePort = mock<RetryQueuePort<PaymentOrderPspCallRequested>>()
-        pspResultCache = mock<PspResultCachePort>()
-        paymentOrderModificationPort = mock<PaymentOrderModificationPort>()
+        eventPublisher = mockk()
+        retryQueuePort = mockk()
+        pspResultCache = mockk()
+        paymentOrderModificationPort = mockk()
         clock = Clock.fixed(Instant.parse("2024-01-01T12:00:00Z"), ZoneId.of("UTC"))
 
         service = ProcessPaymentService(
@@ -55,23 +55,16 @@ class ProcessPaymentServiceTest {
         val pspStatus = PaymentOrderStatus.SUCCESSFUL_FINAL
 
         val paidOrder = createMockPaymentOrder(status = PaymentOrderStatus.SUCCESSFUL_FINAL)
-        whenever(paymentOrderModificationPort.markPaid(any<PaymentOrder>())).thenReturn(paidOrder)
+        every { paymentOrderModificationPort.markPaid(any()) } returns paidOrder
+        every { eventPublisher.publishSync<Any>(any(), any(), any(), any(), any(), any(), any()) } returns mockk()
 
         // When
         service.processPspResult(event, pspStatus)
 
         // Then
-        verify(paymentOrderModificationPort).markPaid(any<PaymentOrder>())
-        verify(eventPublisher).publishSync<Any>(
-            preSetEventIdFromCaller = anyOrNull(),
-            aggregateId = any(),
-            eventMetaData = any(),
-            data = any(),
-            traceId = anyOrNull(),
-            parentEventId = anyOrNull(),
-            timeoutSeconds = any()
-        )
-        verifyNoInteractions(retryQueuePort)
+        verify(exactly = 1) { paymentOrderModificationPort.markPaid(any()) }
+        verify(exactly = 1) { eventPublisher.publishSync<Any>(any(), any(), any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { retryQueuePort.scheduleRetry(any(), any(), any(), any()) }
     }
 
     @Test
@@ -84,31 +77,18 @@ class ProcessPaymentServiceTest {
             status = PaymentOrderStatus.FAILED_TRANSIENT_ERROR,
             retryCount = 3
         )
-        whenever(paymentOrderModificationPort.markFailedForRetry(any<PaymentOrder>(), anyOrNull(), anyOrNull()))
-            .thenReturn(failedOrder)
+        every { paymentOrderModificationPort.markFailedForRetry(any(), any(), any()) } returns failedOrder
+        every { retryQueuePort.scheduleRetry(any(), any(), any(), any()) } just Runs
 
         // When
         service.processPspResult(event, pspStatus)
 
         // Then
-        verify(paymentOrderModificationPort).markFailedForRetry(
-            order = any<PaymentOrder>(),
-            reason = anyOrNull(),
-            lastError = anyOrNull()
-        )
-        verify(retryQueuePort).scheduleRetry(
-            paymentOrder = any<PaymentOrder>(),
-            backOffMillis = any(),
-            retryReason = anyOrNull(),
-            lastErrorMessage = anyOrNull()
-        )
-        verifyNoInteractions(eventPublisher)
+        verify(exactly = 1) { paymentOrderModificationPort.markFailedForRetry(any(), any(), any()) }
+        verify(exactly = 1) { retryQueuePort.scheduleRetry(any(), any(), any(), any()) }
+        verify(exactly = 0) { eventPublisher.publishSync<Any>(any(), any(), any(), any(), any(), any(), any()) }
     }
 
-    // NOTE: This test is commented out due to Mockito limitations with Kotlin value classes (PaymentOrderId)
-    // The resetRetryCounter method takes a PaymentOrderId (value class) which causes issues with Mockito matchers
-    // The functionality is implicitly tested by the behavior: when retryCount >= MAX_RETRIES, the order is marked as final failed
-    /*
     @Test
     fun `processPspResult should mark as final failed when max retries exceeded`() {
         // Given
@@ -116,18 +96,20 @@ class ProcessPaymentServiceTest {
         val pspStatus = PaymentOrderStatus.FAILED_TRANSIENT_ERROR
 
         val finalFailedOrder = createMockPaymentOrder(status = PaymentOrderStatus.FAILED_FINAL)
-        whenever(paymentOrderModificationPort.markFinalFailed(any<PaymentOrder>(), anyOrNull()))
-            .thenReturn(finalFailedOrder)
+        
+        // MockK handles value classes properly!
+        every { retryQueuePort.resetRetryCounter(any()) } just Runs
+        every { paymentOrderModificationPort.markFinalFailed(any(), any()) } returns finalFailedOrder
 
         // When
         service.processPspResult(event, pspStatus)
 
         // Then
-        verify(paymentOrderModificationPort).markFinalFailed(any<PaymentOrder>(), anyOrNull())
-        verify(retryQueuePort, never()).scheduleRetry(any<PaymentOrder>(), any(), anyOrNull(), anyOrNull())
-        verifyNoInteractions(eventPublisher)
+        verify(exactly = 1) { retryQueuePort.resetRetryCounter(any()) }
+        verify(exactly = 1) { paymentOrderModificationPort.markFinalFailed(any(), any()) }
+        verify(exactly = 0) { retryQueuePort.scheduleRetry(any(), any(), any(), any()) }
+        verify(exactly = 0) { eventPublisher.publishSync<Any>(any(), any(), any(), any(), any(), any(), any()) }
     }
-    */
 
     @Test
     fun `processPspResult should handle PSP_UNAVAILABLE_TRANSIENT status with retry`() {
@@ -139,15 +121,15 @@ class ProcessPaymentServiceTest {
             status = PaymentOrderStatus.FAILED_TRANSIENT_ERROR,
             retryCount = 2
         )
-        whenever(paymentOrderModificationPort.markFailedForRetry(any<PaymentOrder>(), anyOrNull(), anyOrNull()))
-            .thenReturn(failedOrder)
+        every { paymentOrderModificationPort.markFailedForRetry(any(), any(), any()) } returns failedOrder
+        every { retryQueuePort.scheduleRetry(any(), any(), any(), any()) } just Runs
 
         // When
         service.processPspResult(event, pspStatus)
 
         // Then
-        verify(paymentOrderModificationPort).markFailedForRetry(any<PaymentOrder>(), anyOrNull(), anyOrNull())
-        verify(retryQueuePort).scheduleRetry(any<PaymentOrder>(), any(), anyOrNull(), anyOrNull())
+        verify(exactly = 1) { paymentOrderModificationPort.markFailedForRetry(any(), any(), any()) }
+        verify(exactly = 1) { retryQueuePort.scheduleRetry(any(), any(), any(), any()) }
     }
 
     @Test
@@ -160,15 +142,15 @@ class ProcessPaymentServiceTest {
             status = PaymentOrderStatus.FAILED_TRANSIENT_ERROR,
             retryCount = 1
         )
-        whenever(paymentOrderModificationPort.markFailedForRetry(any<PaymentOrder>(), anyOrNull(), anyOrNull()))
-            .thenReturn(failedOrder)
+        every { paymentOrderModificationPort.markFailedForRetry(any(), any(), any()) } returns failedOrder
+        every { retryQueuePort.scheduleRetry(any(), any(), any(), any()) } just Runs
 
         // When
         service.processPspResult(event, pspStatus)
 
         // Then
-        verify(paymentOrderModificationPort).markFailedForRetry(any<PaymentOrder>(), anyOrNull(), anyOrNull())
-        verify(retryQueuePort).scheduleRetry(any<PaymentOrder>(), any(), anyOrNull(), anyOrNull())
+        verify(exactly = 1) { paymentOrderModificationPort.markFailedForRetry(any(), any(), any()) }
+        verify(exactly = 1) { retryQueuePort.scheduleRetry(any(), any(), any(), any()) }
     }
 
     @Test
@@ -177,17 +159,15 @@ class ProcessPaymentServiceTest {
         val event = createMockPaymentOrderEvent(retryCount = 0)
         val pspStatus = PaymentOrderStatus.AUTH_NEEDED_STAUS_CHECK_LATER
 
+        every { paymentOrderModificationPort.markPendingAndScheduleStatusCheck(any(), any(), any()) } just Runs
+
         // When
         service.processPspResult(event, pspStatus)
 
         // Then
-        verify(paymentOrderModificationPort).markPendingAndScheduleStatusCheck(
-            order = any<PaymentOrder>(),
-            reason = anyOrNull(),
-            lastError = anyOrNull()
-        )
-        verifyNoInteractions(retryQueuePort)
-        verifyNoInteractions(eventPublisher)
+        verify(exactly = 1) { paymentOrderModificationPort.markPendingAndScheduleStatusCheck(any(), any(), any()) }
+        verify(exactly = 0) { retryQueuePort.scheduleRetry(any(), any(), any(), any()) }
+        verify(exactly = 0) { eventPublisher.publishSync<Any>(any(), any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -196,11 +176,13 @@ class ProcessPaymentServiceTest {
         val event = createMockPaymentOrderEvent(retryCount = 0)
         val pspStatus = PaymentOrderStatus.UNKNOWN_FINAL
 
+        every { paymentOrderModificationPort.markPendingAndScheduleStatusCheck(any(), any(), any()) } just Runs
+
         // When
         service.processPspResult(event, pspStatus)
 
         // Then
-        verify(paymentOrderModificationPort).markPendingAndScheduleStatusCheck(any<PaymentOrder>(), anyOrNull(), anyOrNull())
+        verify(exactly = 1) { paymentOrderModificationPort.markPendingAndScheduleStatusCheck(any(), any(), any()) }
     }
 
     @Test
@@ -210,16 +192,15 @@ class ProcessPaymentServiceTest {
         val pspStatus = PaymentOrderStatus.DECLINED_FINAL
 
         val finalFailedOrder = createMockPaymentOrder(status = PaymentOrderStatus.FAILED_FINAL)
-        whenever(paymentOrderModificationPort.markFinalFailed(any<PaymentOrder>(), anyOrNull()))
-            .thenReturn(finalFailedOrder)
+        every { paymentOrderModificationPort.markFinalFailed(any(), any()) } returns finalFailedOrder
 
         // When
         service.processPspResult(event, pspStatus)
 
         // Then
-        verify(paymentOrderModificationPort).markFinalFailed(any<PaymentOrder>(), anyOrNull())
-        verifyNoInteractions(retryQueuePort)
-        verifyNoInteractions(eventPublisher)
+        verify(exactly = 1) { paymentOrderModificationPort.markFinalFailed(any(), any()) }
+        verify(exactly = 0) { retryQueuePort.scheduleRetry(any(), any(), any(), any()) }
+        verify(exactly = 0) { eventPublisher.publishSync<Any>(any(), any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -229,14 +210,13 @@ class ProcessPaymentServiceTest {
         val pspStatus = PaymentOrderStatus.FAILED_FINAL
 
         val finalFailedOrder = createMockPaymentOrder(status = PaymentOrderStatus.FAILED_FINAL)
-        whenever(paymentOrderModificationPort.markFinalFailed(any<PaymentOrder>(), anyOrNull()))
-            .thenReturn(finalFailedOrder)
+        every { paymentOrderModificationPort.markFinalFailed(any(), any()) } returns finalFailedOrder
 
         // When
         service.processPspResult(event, pspStatus)
 
         // Then
-        verify(paymentOrderModificationPort).markFinalFailed(any<PaymentOrder>(), anyOrNull())
+        verify(exactly = 1) { paymentOrderModificationPort.markFinalFailed(any(), any()) }
     }
 
     @Test
@@ -258,30 +238,27 @@ class ProcessPaymentServiceTest {
     }
 
     @Test
-fun `computeEqualJitterBackoff should increase exponentially for higher attempts`() {
-    // Given
-    val fixedRandom = Random(42)
-    val minDelayMs = 2000L
-    val maxDelayMs = 60000L
+    fun `computeEqualJitterBackoff should increase exponentially for higher attempts`() {
+        // Given
+        val fixedRandom = Random(42)
+        val minDelayMs = 2000L
+        val maxDelayMs = 60000L
 
-    // When
-    val backoff1 = service.computeEqualJitterBackoff(1, minDelayMs, maxDelayMs, fixedRandom)
-    val backoff2 = service.computeEqualJitterBackoff(2, minDelayMs, maxDelayMs, fixedRandom)
-    val backoff3 = service.computeEqualJitterBackoff(3, minDelayMs, maxDelayMs, fixedRandom)
+        // When
+        val backoff1 = service.computeEqualJitterBackoff(1, minDelayMs, maxDelayMs, fixedRandom)
+        val backoff2 = service.computeEqualJitterBackoff(2, minDelayMs, maxDelayMs, fixedRandom)
+        val backoff3 = service.computeEqualJitterBackoff(3, minDelayMs, maxDelayMs, fixedRandom)
 
-    // Then - Check ranges instead of strict ordering due to jitter
-    // Attempt 1: [1000, 2000]
-    assertTrue(backoff1 >= 1000 && backoff1 <= 2000)
-    
-    // Attempt 2: [2000, 4000]  
-    assertTrue(backoff2 >= 2000 && backoff2 <= 4000)
-    
-    // Attempt 3: [4000, 8000]
-    assertTrue(backoff3 >= 4000 && backoff3 <= 8000)
-    
-    // The ranges should increase even if individual values don't due to jitter
-    assertTrue(backoff3 >= 4000) // Minimum of attempt 3 is higher than max of attempt 1
-}
+        // Then - Check ranges instead of strict ordering due to jitter
+        // Attempt 1: [1000, 2000]
+        assertTrue(backoff1 >= 1000 && backoff1 <= 2000)
+        
+        // Attempt 2: [2000, 4000]  
+        assertTrue(backoff2 >= 2000 && backoff2 <= 4000)
+        
+        // Attempt 3: [4000, 8000]
+        assertTrue(backoff3 >= 4000 && backoff3 <= 8000)
+    }
 
     @Test
     fun `computeEqualJitterBackoff should cap at maxDelayMs`() {

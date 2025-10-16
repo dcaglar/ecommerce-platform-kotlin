@@ -20,7 +20,7 @@ import org.springframework.test.context.ContextConfiguration
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.TestPropertySource
-import org.springframework.test.context.bean.override.mockito.MockitoBean
+import com.ninjasquad.springmockk.MockkBean
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
@@ -68,10 +68,10 @@ class OutboxEventMapperTest {
     @Autowired
     lateinit var outboxEventMapper: OutboxEventMapper
 
-    @MockitoBean
+    @MockkBean
     lateinit var createPaymentService: CreatePaymentUseCase
 
-    @MockitoBean
+    @MockkBean
     lateinit var processPaymentService: ProcessPaymentService
 
 

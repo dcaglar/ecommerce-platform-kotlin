@@ -8,10 +8,10 @@ import com.dogancaglar.paymentservice.ports.outbound.OutboxEventPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
 import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
+import io.mockk.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.kotlin.*
 import paymentservice.port.outbound.IdGeneratorPort
 import java.time.Clock
 import java.time.Instant
@@ -30,11 +30,11 @@ class CreatePaymentServiceTest {
 
     @BeforeEach
     fun setUp() {
-        idGeneratorPort = mock<IdGeneratorPort>()
-        paymentRepository = mock<PaymentRepository>()
-        paymentOrderRepository = mock<PaymentOrderRepository>()
-        outboxEventPort = mock<OutboxEventPort>()
-        serializationPort = mock<SerializationPort>()
+        idGeneratorPort = mockk()
+        paymentRepository = mockk()
+        paymentOrderRepository = mockk()
+        outboxEventPort = mockk()
+        serializationPort = mockk()
         clock = Clock.fixed(Instant.parse("2024-01-01T12:00:00Z"), ZoneId.of("UTC"))
 
         service = CreatePaymentService(
@@ -54,12 +54,12 @@ class CreatePaymentServiceTest {
         val paymentOrderId1 = 456L
         val paymentOrderId2 = 789L
 
-        whenever(idGeneratorPort.nextId(IdNamespaces.PAYMENT)).thenReturn(paymentId)
-        whenever(idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER))
-            .thenReturn(paymentOrderId1)
-            .thenReturn(paymentOrderId2)
-
-        whenever(serializationPort.toJson(any<Any>())).thenReturn("""{"eventType":"test"}""")
+        every { idGeneratorPort.nextId(IdNamespaces.PAYMENT) } returns paymentId
+        every { idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER) } returnsMany listOf(paymentOrderId1, paymentOrderId2)
+        every { serializationPort.toJson<Any>(any()) } returns """{"eventType":"test"}"""
+        every { paymentRepository.save(any()) } returns Unit
+        every { paymentOrderRepository.insertAll(any()) } returns Unit
+        every { outboxEventPort.saveAll(any()) } returns emptyList()
 
         val command = CreatePaymentCommand(
             orderId = OrderId("order-123"),
@@ -82,21 +82,26 @@ class CreatePaymentServiceTest {
         assertEquals(PaymentOrderId(paymentOrderId2), result.paymentOrders[1].paymentOrderId)
 
         // Verify interactions
-        verify(paymentRepository).save(any())
-        verify(paymentOrderRepository).insertAll(argThat { list ->
-            list.size == 2 &&
-                    list[0].paymentOrderId.value == paymentOrderId1 &&
-                    list[1].paymentOrderId.value == paymentOrderId2
-        })
-        verify(outboxEventPort).saveAll(argThat { events -> events.size == 2 })
+        verify(exactly = 1) { paymentRepository.save(any()) }
+        verify(exactly = 1) {
+            paymentOrderRepository.insertAll(match { list ->
+                list.size == 2 &&
+                        list[0].paymentOrderId.value == paymentOrderId1 &&
+                        list[1].paymentOrderId.value == paymentOrderId2
+            })
+        }
+        verify(exactly = 1) { outboxEventPort.saveAll(match { it.size == 2 }) }
     }
 
     @Test
     fun `create should generate correct number of payment order IDs based on payment lines`() {
         // Given
-        whenever(idGeneratorPort.nextId(IdNamespaces.PAYMENT)).thenReturn(100L)
-        whenever(idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER)).thenReturn(200L, 201L, 202L)
-        whenever(serializationPort.toJson(any<Any>())).thenReturn("""{"eventType":"test"}""")
+        every { idGeneratorPort.nextId(IdNamespaces.PAYMENT) } returns 100L
+        every { idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER) } returnsMany listOf(200L, 201L, 202L)
+        every { serializationPort.toJson<Any>(any()) } returns """{"eventType":"test"}"""
+        every { paymentRepository.save(any()) } returns Unit
+        every { paymentOrderRepository.insertAll(any()) } returns Unit
+        every { outboxEventPort.saveAll(any()) } returns emptyList()
 
         val command = CreatePaymentCommand(
             orderId = OrderId("order-1"),
@@ -114,16 +119,19 @@ class CreatePaymentServiceTest {
 
         // Then
         assertEquals(3, result.paymentOrders.size)
-        verify(idGeneratorPort, times(1)).nextId(IdNamespaces.PAYMENT)
-        verify(idGeneratorPort, times(3)).nextId(IdNamespaces.PAYMENT_ORDER)
+        verify(exactly = 1) { idGeneratorPort.nextId(IdNamespaces.PAYMENT) }
+        verify(exactly = 3) { idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER) }
     }
 
     @Test
     fun `create should create outbox events for each payment order`() {
         // Given
-        whenever(idGeneratorPort.nextId(IdNamespaces.PAYMENT)).thenReturn(100L)
-        whenever(idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER)).thenReturn(200L, 201L)
-        whenever(serializationPort.toJson(any<Any>())).thenReturn("""{"test":"data"}""")
+        every { idGeneratorPort.nextId(IdNamespaces.PAYMENT) } returns 100L
+        every { idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER) } returnsMany listOf(200L, 201L)
+        every { serializationPort.toJson<Any>(any()) } returns """{"test":"data"}"""
+        every { paymentRepository.save(any()) } returns Unit
+        every { paymentOrderRepository.insertAll(any()) } returns Unit
+        every { outboxEventPort.saveAll(any()) } returns emptyList()
 
         val command = CreatePaymentCommand(
             orderId = OrderId("order-1"),
@@ -139,7 +147,7 @@ class CreatePaymentServiceTest {
         service.create(command)
 
         // Then
-        verify(outboxEventPort).saveAll(argThat { events -> events.size == 2 })
+        verify(exactly = 1) { outboxEventPort.saveAll(match { it.size == 2 }) }
     }
 
     @Test
@@ -157,9 +165,12 @@ class CreatePaymentServiceTest {
             clock = fixedClock
         )
 
-        whenever(idGeneratorPort.nextId(IdNamespaces.PAYMENT)).thenReturn(100L)
-        whenever(idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER)).thenReturn(200L)
-        whenever(serializationPort.toJson(any<Any>())).thenReturn("{}")
+        every { idGeneratorPort.nextId(IdNamespaces.PAYMENT) } returns 100L
+        every { idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER) } returns 200L
+        every { serializationPort.toJson<Any>(any()) } returns "{}"
+        every { paymentRepository.save(any()) } returns Unit
+        every { paymentOrderRepository.insertAll(any()) } returns Unit
+        every { outboxEventPort.saveAll(any()) } returns emptyList()
 
         val command = CreatePaymentCommand(
             orderId = OrderId("order-1"),

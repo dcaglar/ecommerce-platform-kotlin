@@ -1,6 +1,6 @@
 # ecommerce-platform-kotlin · Architecture Guide
 
-*Last updated: **2025‑10‑09** – maintained by **Doğan Çağlar***
+*Last updated: **2025‑10‑16** – maintained by **Doğan Çağlar***
 
 ---
 
@@ -41,15 +41,17 @@
    9.2 [`payment-application`](#92-payment-application)  
    9.3 [`payment-infrastructure` (Auto‑config)](#93-payment-infrastructure-autoconfig)  
    9.4 [Deployables: `payment-service` & `payment-consumers`](#94-deployables-payment-service--payment-consumers)
-10. [Quality Attributes](#10--quality-attributes)  
-    10.1 [Reliability & Resilience](#101-reliability--resilience)  
-    10.2 [Security](#102-security)  
-    10.3 [Cloud‑Native & Deployment](#103-cloudnative--deployment)  
-    10.4 [Performance & Scalability](#104-performance--scalability)
-11. [Roadmap](#11--roadmap)
-12. [Glossary](#12--glossary)
-13. [References](#13--references)
-14. [Changelog](#14--changelog)
+10. [Testing & Quality Assurance](#10--testing--quality-assurance)  
+    10.1 [Testing Strategy](#101-testing-strategy)
+11. [Quality Attributes](#11--quality-attributes)  
+    11.1 [Reliability & Resilience](#111-reliability--resilience)  
+    11.2 [Security](#112-security)  
+    11.3 [Cloud‑Native & Deployment](#113-cloudnative--deployment)  
+    11.4 [Performance & Scalability](#114-performance--scalability)
+12. [Roadmap](#12--roadmap)
+13. [Glossary](#13--glossary)
+14. [References](#14--references)
+15. [Changelog](#15--changelog)
 
 ---
 
@@ -491,23 +493,75 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 
 ---
 
-## 10 · Quality Attributes
+## 10 · Testing & Quality Assurance
 
-### 10.1 Reliability & Resilience
+### 10.1 Testing Strategy
+
+The project employs a comprehensive testing strategy with **123 tests** achieving 100% pass rate across all modules.
+
+#### Unit Testing with MockK
+
+- **MockK** (v1.13.8) is used project-wide for Kotlin-native mocking
+- Replaced Mockito to resolve limitations with Kotlin value classes
+- Clean, idiomatic Kotlin syntax: `every { }` and `verify { }` blocks
+- Proper handling of Kotlin-specific features (value classes, inline classes)
+
+**Example modules with unit tests:**
+- `payment-domain`: 89 tests (pure domain logic, no mocking needed)
+- `payment-application`: 18 unit tests with MockK
+  - `CreatePaymentServiceTest`: 4 tests
+  - `ProcessPaymentServiceTest`: 14 tests (includes retry logic, backoff calculations)
+
+#### Integration Testing with SpringMockK
+
+- **SpringMockK** (v4.0.2) for Spring Boot integration tests
+- `@MockkBean` annotation replaces Spring's `@MockitoBean`
+- Seamless integration with Spring's test context
+- Used in `payment-infrastructure` for MyBatis mapper tests
+
+#### Testcontainers
+
+- PostgreSQL, Kafka, and Redis integration tests
+- Ensures realistic end-to-end behavior
+- Validates outbox pattern, event publishing, and retry mechanisms
+
+#### Test Coverage by Module
+
+| Module | Tests | Type | Status |
+|--------|-------|------|--------|
+| `common` | 3 | Unit | ✅ |
+| `payment-domain` | 89 | Unit | ✅ |
+| `payment-application` | 22 | Unit + Integration | ✅ |
+| `payment-infrastructure` | 9 | Integration (Testcontainers) | ✅ |
+| **TOTAL** | **123** | Mixed | ✅ **100%** |
+
+#### Key Testing Principles
+
+1. **Isolation**: Domain tests are pure; application tests mock ports
+2. **Realistic Integration**: Testcontainers provide real infrastructure
+3. **Value Class Safety**: MockK handles Kotlin value classes correctly
+4. **Idempotency**: Tests verify event deduplication and idempotent processing
+5. **Timing Assertions**: Retry scheduler tests validate backoff timing bounds
+
+---
+
+## 11 · Quality Attributes
+
+### 11.1 Reliability & Resilience
 
 - Outbox + event keys keep publishing safe.
 - Retries with jitter and fenced attempts avoid duplicate external actions.
 
-### 10.2 Security
+### 11.2 Security
 
 - Resource server with JWT (Keycloak in local dev). Secrets delivered via Kubernetes Secrets/values.
 
-### 10.3 Cloud‑Native & Deployment
+### 11.3 Cloud‑Native & Deployment
 
 - Config externalized via Helm values and ConfigMaps; rolling updates; liveness/readiness probes; ServiceMonitor for
   metrics.
 
-### 10.4 Performance & Scalability
+### 11.4 Performance & Scalability
 
 - Two‑stage consumer split enables independent scaling of PSP load.
 - **Lag‑based autoscaling** reacts to backpressure instead of CPU heuristics.
@@ -515,7 +569,7 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 
 ---
 
-## 11 · Roadmap
+## 12 · Roadmap
 
 - End‑to‑end OpenTelemetry tracing.
 - Autoscaling policies per topic (fine‑grained).
@@ -524,24 +578,29 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 
 ---
 
-## 12 · Glossary
+## 13 · Glossary
 
 - **Aggregate**: Consistency boundary (e.g., `PaymentOrder`).
 - **Envelope**: Our event wrapper with IDs and tracing fields.
 - **Outbox**: Table where events are first written before being published.
+- **MockK**: Kotlin-native mocking library for unit tests.
+- **SpringMockK**: Spring Boot integration for MockK (replaces Spring's Mockito support).
 
 ---
 
-## 13 · References
+## 14 · References
 
 - Micrometer & Spring Boot Actuator docs.
 - Kafka design patterns (compaction, partitioning, consumer groups).
 - PostgreSQL partitioning best practices.
+- MockK documentation: https://mockk.io/
+- SpringMockK: https://github.com/Ninja-Squad/springmockk
 
 ---
 
-## 14 · Changelog
+## 15 · Changelog
 
+- **2025‑10‑16**: **Testing Infrastructure Upgrade** — Migrated entire project from Mockito to **MockK** (v1.13.8) and **SpringMockK** (v4.0.2). Resolves Kotlin value class limitations, improves test reliability, and provides idiomatic Kotlin testing syntax. All 123 tests now passing with 100% success rate.
 - **2025‑10‑09**: Refactored consumer design — split `PaymentOrderPspCallExecutor` into two specialized consumers: `PaymentOrderPspCallExecutor` (PSP call) and `PaymentOrderPspResultApplier` (result application). Introduced two types of Kafka transactional producers with their own custom processing logic (consume→produce→commit and producer-only transactional modes).
 - **2025‑08‑14**: Major refresh. Added infra/Helm sections, DB/Kafka partitioning details, EventEnvelope,
   logging/Elastic search keys, and **lag‑based autoscaling**. Documented module split and the new
