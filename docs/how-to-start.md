@@ -214,6 +214,7 @@ mvn test -Dtest="*IntegrationTest" -DfailIfNoTests=false
 - **Unit Tests** (`*Test.kt`): Use mocks only, no external dependencies, run with `mvn test`
 - **Integration Tests** (`*IntegrationTest.kt`): Use real external dependencies via TestContainers, run with `mvn verify`
 - **No Hanging Tests**: All MockK syntax issues resolved for reliable test execution
+- **Type Inference Fixed**: Resolved MockK type inference issues in `OutboxDispatcherJobTest.kt` with explicit type hints and Jackson JSR310 module configuration
 
 ## 3️⃣ Run Load Tests
 
