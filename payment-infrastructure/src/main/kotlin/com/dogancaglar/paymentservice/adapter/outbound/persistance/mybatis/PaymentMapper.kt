@@ -13,4 +13,5 @@ interface PaymentMapper {
     fun findById(id: Long): PaymentEntity?
     fun update(payment: PaymentEntity): Int
     fun deleteById(id: Long): Int
+    fun deleteAll(): Int
 }

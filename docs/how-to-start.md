@@ -181,26 +181,39 @@ curl -i -X POST http://127.0.0.1/payments \
 
 ## 2️⃣ Run Unit & Integration Tests
 
-- Why: Verify the codebase with 123 tests using MockK and Testcontainers.
+- Why: Verify the codebase with 297 tests using MockK and Testcontainers.
 - What: Tests cover domain logic, application services, and infrastructure adapters.
 
 ```bash
-# Run all tests across all modules
+# Run all unit tests across all modules (uses Maven Surefire)
 mvn clean test
+
+# Run integration tests (uses Maven Failsafe)
+mvn clean verify
 
 # Run tests for specific modules
 mvn clean test -pl payment-application,payment-infrastructure,payment-domain,common
 
 # Run specific test classes
 mvn test -Dtest=CreatePaymentServiceTest,ProcessPaymentServiceTest
+
+# Run only integration tests
+mvn test -Dtest="*IntegrationTest" -DfailIfNoTests=false
 ```
 
 **Test Coverage:**
-- `common`: 3 tests
-- `payment-domain`: 89 tests (pure domain logic)
+- `common`: 3 tests (unit tests)
+- `payment-domain`: 89 tests (pure domain logic, unit tests)
 - `payment-application`: 22 tests (MockK unit tests)
-- `payment-infrastructure`: 9 tests (SpringMockK + Testcontainers)
-- **Total: 123 tests** with 100% pass rate ✅
+- `payment-infrastructure`: 178 tests (172 unit tests + 6 integration tests)
+- `payment-service`: 5 tests (unit tests)
+- `payment-consumers`: 0 tests (no test files)
+- **Total: 297 tests** with 100% pass rate ✅
+
+**Test Organization:**
+- **Unit Tests** (`*Test.kt`): Use mocks only, no external dependencies, run with `mvn test`
+- **Integration Tests** (`*IntegrationTest.kt`): Use real external dependencies via TestContainers, run with `mvn verify`
+- **No Hanging Tests**: All MockK syntax issues resolved for reliable test execution
 
 ## 3️⃣ Run Load Tests
 

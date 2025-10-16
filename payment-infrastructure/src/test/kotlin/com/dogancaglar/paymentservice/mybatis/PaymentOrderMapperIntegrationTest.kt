@@ -31,14 +31,14 @@ import java.time.LocalDateTime
 @Testcontainers
 @TestPropertySource(properties = ["spring.liquibase.enabled=false"])
 @MapperScan("com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis")
-class PaymentOrderMapperTest {
+class PaymentOrderMapperIntegrationTest {
 
     companion object {
         @BeforeAll
         @JvmStatic
         fun initSchema() {
             val ddl =
-                PaymentOrderMapperTest::class.java.classLoader.getResource("schema-test.sql")!!.readText()
+                PaymentOrderMapperIntegrationTest::class.java.classLoader.getResource("schema-test.sql")!!.readText()
             postgres.createConnection("").use { c -> c.createStatement().execute(ddl) }
         }
 

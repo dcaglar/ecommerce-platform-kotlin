@@ -31,6 +31,7 @@ interface PaymentOrderMapper {
 
     fun updateReturningIdempotent(paymentOrder: PaymentOrderEntity): PaymentOrderEntity?
 
-
+    fun deleteAll(): Int
+    fun countAll(): Int
 }
 

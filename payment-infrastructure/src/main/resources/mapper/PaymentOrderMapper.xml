@@ -54,6 +54,14 @@
         SELECT MAX(payment_order_id) FROM payment_orders
     </select>
 
+    <delete id="deleteAll">
+        DELETE FROM payment_orders
+    </delete>
+
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM payment_orders
+    </select>
+
 
     <insert id="insertAllIgnore" parameterType="java.util.List">
         INSERT INTO payment_orders (

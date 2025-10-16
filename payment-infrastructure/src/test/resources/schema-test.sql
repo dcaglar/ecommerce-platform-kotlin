@@ -22,8 +22,24 @@ CREATE INDEX IF NOT EXISTS idx_outbox_status_claimed_at ON outbox_event (status,
 
 -- Drop table
 
-DROP TABLE IF EXISTS  payment_orders;
+DROP TABLE IF EXISTS payments;
 
+CREATE TABLE payments (
+	id BIGSERIAL PRIMARY KEY,
+	payment_id BIGINT NOT NULL,
+	public_payment_id VARCHAR(255) NOT NULL UNIQUE,
+	buyer_id VARCHAR(255) NOT NULL,
+	order_id VARCHAR(255) NOT NULL,
+	amount_value BIGINT NOT NULL,
+	amount_currency VARCHAR(3) NOT NULL,
+	status VARCHAR(50) NOT NULL,
+	created_at TIMESTAMP NOT NULL,
+	updated_at TIMESTAMP NULL,
+	retry_count INT NULL,
+	retry_reason VARCHAR(255) NULL,
+	last_error_message VARCHAR(255) NULL
+);
+DROP TABLE IF EXISTS  payment_orders;
 CREATE TABLE payment_orders (
 	payment_order_id int8 NOT NULL,
 	public_payment_order_id varchar(255) NOT NULL,
