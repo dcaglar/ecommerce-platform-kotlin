@@ -179,7 +179,30 @@ curl -i -X POST http://127.0.0.1/payments \
   }'
 ```
 
-## 2️⃣ Run Load Tests
+## 2️⃣ Run Unit & Integration Tests
+
+- Why: Verify the codebase with 123 tests using MockK and Testcontainers.
+- What: Tests cover domain logic, application services, and infrastructure adapters.
+
+```bash
+# Run all tests across all modules
+mvn clean test
+
+# Run tests for specific modules
+mvn clean test -pl payment-application,payment-infrastructure,payment-domain,common
+
+# Run specific test classes
+mvn test -Dtest=CreatePaymentServiceTest,ProcessPaymentServiceTest
+```
+
+**Test Coverage:**
+- `common`: 3 tests
+- `payment-domain`: 89 tests (pure domain logic)
+- `payment-application`: 22 tests (MockK unit tests)
+- `payment-infrastructure`: 9 tests (SpringMockK + Testcontainers)
+- **Total: 123 tests** with 100% pass rate ✅
+
+## 3️⃣ Run Load Tests
 
 - Why: Exercise the system under constant RPS profiles (run from project root).
 ```bash

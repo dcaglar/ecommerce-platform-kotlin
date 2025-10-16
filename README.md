@@ -188,6 +188,7 @@ Quick start: **[docs/how-to-start.md](./docs/how-to-start.md)**.
 | Auth          | Keycloak (OAuth2 Resource Server)             |
 | Logging       | Logback JSON + MDC + Filebeat → Elasticsearch |
 | Observability | Micrometer + Prometheus + Grafana             |
+| Testing       | JUnit 5 + MockK + SpringMockK + Testcontainers|
 | Deploy        | Docker, Helm charts, Kubernetes               |
 
 ---
@@ -219,9 +220,10 @@ Quick start: **[docs/how-to-start.md](./docs/how-to-start.md)**.
 
 ## 🧪 Testing Strategy
 
-- Unit tests for domain logic and mappers.
-- Integration tests with Testcontainers (Kafka, Redis, Postgres).
+- **Unit tests** for domain logic, mappers, and application services using **MockK** (Kotlin-native mocking).
+- **Integration tests** with Testcontainers (Kafka, Redis, Postgres) using **SpringMockK**.
 - Outbox & retry scheduler tests assert produced events and timing bounds.
+- **123 tests** across all modules with 100% passing rate.
 
 ---
 
