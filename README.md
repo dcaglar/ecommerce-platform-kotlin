@@ -226,6 +226,7 @@ Quick start: **[docs/how-to-start.md](./docs/how-to-start.md)**.
 - Outbox & retry scheduler tests assert produced events and timing bounds.
 - **297 tests** across all modules with 100% passing rate.
 - **No hanging tests**: All MockK syntax issues resolved for reliable test execution.
+- **Type inference issues resolved**: Fixed MockK type inference problems in `OutboxDispatcherJobTest.kt` with explicit type hints and proper Jackson configuration.
 
 ---
 

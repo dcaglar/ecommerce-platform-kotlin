@@ -16,6 +16,14 @@
     <dependencies>
         <dependency>
             <groupId>com.dogancaglar</groupId>
+            <artifactId>common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.dogancaglar</groupId>
+            <artifactId>payment-domain</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.dogancaglar</groupId>
             <artifactId>payment-infrastructure</artifactId>
         </dependency>
         <dependency>
@@ -40,6 +48,23 @@
             <artifactId>logstash-logback-encoder</artifactId>
         </dependency>
         <!-- Removed direct infra dependencies (kafka, redis) as they are provided by payment-infrastructure -->
+        
+        <!-- Test dependencies -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.mockk</groupId>
+            <artifactId>mockk-jvm</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
