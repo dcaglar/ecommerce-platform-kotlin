@@ -26,17 +26,20 @@
     <insert id="insert"
             parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentEntity">
         INSERT INTO payments (
-        payment_id, public_payment_id, order_id, buyer_id, amount_value, amount_currency, status, created_at,
-        updated_at, retry_count, retry_reason, last_error_message
+        payment_id, public_payment_id, buyer_id, order_id, amount_value, amount_currency, status, created_at
         ) VALUES (
-        #{paymentId}, #{publicPaymentId}, #{orderId}, #{buyerId}, #{amountValue}, #{amountCurrency},
-        #{status}, #{createdAt}, #{updatedAt}, #{retryCount}, #{retryReason}, #{lastErrorMessage}
+        #{paymentId}, #{publicPaymentId}, #{buyerId}, #{orderId}, #{amountValue}, #{amountCurrency},
+        #{status}, #{createdAt}
         )
     </insert>
 
     <select id="findById" resultMap="PaymentResultMap">
         SELECT * FROM payments WHERE payment_id = #{id}
     </select>
+
+    <delete id="deleteAll">
+        DELETE FROM payments
+    </delete>
 
     <update id="update"
             parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentEntity">

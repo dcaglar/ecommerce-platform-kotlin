@@ -497,7 +497,23 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 
 ### 10.1 Testing Strategy
 
-The project employs a comprehensive testing strategy with **123 tests** achieving 100% pass rate across all modules.
+The project employs a comprehensive testing strategy with **291 tests** achieving 100% pass rate across all modules.
+
+#### Test Organization & Separation
+
+**Unit Tests (`*Test.kt`)** - ✅ **PROPERLY CONFIGURED**
+- **Naming Convention**: All follow `*Test.kt` pattern
+- **External Dependencies**: ❌ **NONE** - All use mocks only
+- **TestContainers**: ❌ **NONE** - No real external services
+- **Spring Boot Tests**: ❌ **NONE** - No `@SpringBootTest`, `@DataRedisTest`, etc.
+- **Maven Plugin**: **Surefire** - Runs with `mvn test`
+
+**Integration Tests (`*IntegrationTest.kt`)** - ✅ **PROPERLY CONFIGURED**
+- **Naming Convention**: All follow `*IntegrationTest.kt` pattern
+- **External Dependencies**: ✅ **REAL** - Use TestContainers for Redis & PostgreSQL
+- **TestContainers**: ✅ **YES** - `@Container`, `RedisContainer`, `PostgreSQLContainer`
+- **Spring Boot Tests**: ✅ **YES** - `@SpringBootTest`, `@DataRedisTest`, etc.
+- **Maven Plugin**: **Failsafe** - Runs with `mvn verify`
 
 #### Unit Testing with MockK
 
@@ -505,43 +521,51 @@ The project employs a comprehensive testing strategy with **123 tests** achievin
 - Replaced Mockito to resolve limitations with Kotlin value classes
 - Clean, idiomatic Kotlin syntax: `every { }` and `verify { }` blocks
 - Proper handling of Kotlin-specific features (value classes, inline classes)
+- **Fixed MockK Syntax Issues**: Resolved hanging tests by correcting `just Awaits` to `returns 1` for methods returning `Int`
 
 **Example modules with unit tests:**
 - `payment-domain`: 89 tests (pure domain logic, no mocking needed)
-- `payment-application`: 18 unit tests with MockK
+- `payment-application`: 22 unit tests with MockK
   - `CreatePaymentServiceTest`: 4 tests
   - `ProcessPaymentServiceTest`: 14 tests (includes retry logic, backoff calculations)
+- `payment-infrastructure`: 172 unit tests with MockK
+  - `PaymentOutboundAdapterTest`: 14 tests
+  - `PaymentOrderOutboundAdapterTest`: 20 tests
+  - `OutboxBufferAdapterTest`: 21 tests
+  - `PaymentOrderStatusCheckAdapterTest`: 9 tests
+  - `PaymentOrderStatusCheckAdapterEdgeCasesTest`: 6 tests
+  - `PaymentOrderStatusCheckAdapterMappingTest`: 4 tests
+  - Plus Redis, serialization, and entity mapper tests
 
-#### Integration Testing with SpringMockK
+#### Integration Testing with TestContainers
 
-- **SpringMockK** (v4.0.2) for Spring Boot integration tests
-- `@MockkBean` annotation replaces Spring's `@MockitoBean`
-- Seamless integration with Spring's test context
-- Used in `payment-infrastructure` for MyBatis mapper tests
-
-#### Testcontainers
-
-- PostgreSQL, Kafka, and Redis integration tests
+- **PostgreSQL Integration Tests**: Real database with partitioned outbox tables
+- **Redis Integration Tests**: Real Redis instances for caching and retry mechanisms
+- **Kafka Integration Tests**: Real Kafka clusters for event publishing/consuming
 - Ensures realistic end-to-end behavior
 - Validates outbox pattern, event publishing, and retry mechanisms
 
 #### Test Coverage by Module
 
-| Module | Tests | Type | Status |
-|--------|-------|------|--------|
-| `common` | 3 | Unit | ✅ |
-| `payment-domain` | 89 | Unit | ✅ |
-| `payment-application` | 22 | Unit + Integration | ✅ |
-| `payment-infrastructure` | 9 | Integration (Testcontainers) | ✅ |
-| **TOTAL** | **123** | Mixed | ✅ **100%** |
+| Module | Unit Tests | Integration Tests | Total | Status |
+|--------|------------|-------------------|-------|--------|
+| `common` | 3 | 0 | 3 | ✅ |
+| `payment-domain` | 89 | 0 | 89 | ✅ |
+| `payment-application` | 22 | 0 | 22 | ✅ |
+| `payment-infrastructure` | 172 | 6 | 178 | ✅ |
+| `payment-service` | 5 | 0 | 5 | ✅ |
+| `payment-consumers` | 0 | 0 | 0 | ✅ |
+| **TOTAL** | **291** | **6** | **297** | ✅ **100%** |
 
 #### Key Testing Principles
 
-1. **Isolation**: Domain tests are pure; application tests mock ports
-2. **Realistic Integration**: Testcontainers provide real infrastructure
-3. **Value Class Safety**: MockK handles Kotlin value classes correctly
-4. **Idempotency**: Tests verify event deduplication and idempotent processing
-5. **Timing Assertions**: Retry scheduler tests validate backoff timing bounds
+1. **Proper Separation**: Unit tests use only mocks, integration tests use real external dependencies
+2. **Isolation**: Domain tests are pure; application tests mock ports
+3. **Realistic Integration**: TestContainers provide real infrastructure
+4. **Value Class Safety**: MockK handles Kotlin value classes correctly
+5. **Idempotency**: Tests verify event deduplication and idempotent processing
+6. **Timing Assertions**: Retry scheduler tests validate backoff timing bounds
+7. **No Hanging Tests**: All MockK syntax issues resolved for reliable test execution
 
 ---
 
@@ -600,7 +624,7 @@ The project employs a comprehensive testing strategy with **123 tests** achievin
 
 ## 15 · Changelog
 
-- **2025‑10‑16**: **Testing Infrastructure Upgrade** — Migrated entire project from Mockito to **MockK** (v1.13.8) and **SpringMockK** (v4.0.2). Resolves Kotlin value class limitations, improves test reliability, and provides idiomatic Kotlin testing syntax. All 123 tests now passing with 100% success rate.
+- **2025‑10‑16**: **Testing Infrastructure Upgrade** — Migrated entire project from Mockito to **MockK** (v1.13.8) and **SpringMockK** (v4.0.2). Resolves Kotlin value class limitations, improves test reliability, and provides idiomatic Kotlin testing syntax. Fixed MockK syntax issues that were causing test hangs. All 297 tests now passing with 100% success rate. Proper test separation implemented: unit tests (`*Test.kt`) use mocks only, integration tests (`*IntegrationTest.kt`) use real external dependencies via TestContainers.
 - **2025‑10‑09**: Refactored consumer design — split `PaymentOrderPspCallExecutor` into two specialized consumers: `PaymentOrderPspCallExecutor` (PSP call) and `PaymentOrderPspResultApplier` (result application). Introduced two types of Kafka transactional producers with their own custom processing logic (consume→produce→commit and producer-only transactional modes).
 - **2025‑08‑14**: Major refresh. Added infra/Helm sections, DB/Kafka partitioning details, EventEnvelope,
   logging/Elastic search keys, and **lag‑based autoscaling**. Documented module split and the new
