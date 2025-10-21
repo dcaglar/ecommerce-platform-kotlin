@@ -1,6 +1,6 @@
 # ecommerce-platform-kotlin · Architecture Guide
 
-*Last updated: **2025‑10‑16** – maintained by **Doğan Çağlar***
+*Last updated: **2025‑10‑19** – maintained by **Doğan Çağlar***
 
 ---
 
@@ -14,8 +14,8 @@
 4. [Architectural Overview](#4--architectural-overview)  
    4.1 [Layering & Hexagonal Architecture](#41-layering--hexagonal-architecture)  
    4.2 [Service & Executor Landscape](#42-service--executor-landscape)  
-   4.3 [Payment‑Service Layer Diagram](#43-payment-service-layer-diagram)  
-   4.4 [Payment‑Service Layer Diagram (Alt)](#44-payment-service-layer-diagram-alt)
+   4.3 [Payment Flow Architecture](#43-payment-flow-architecture)  
+   4.4 [Event-Driven Flow](#44-event-driven-flow)
 5. [Cross‑Cutting Concerns](#5--crosscutting-concerns)  
    5.1 [Outbox Pattern](#51-outbox-pattern)  
    5.2 [Retry & Status‑Check Strategy](#52-retry--statuscheck-strategy)  
@@ -37,12 +37,14 @@
    8.3 [Logging & Tracing (JSON, OTel)](#83-logging--tracing-json-otel)  
    8.4 [ElasticSearch Search Keys](#84-elasticsearch-search-keys)
 9. [Module Structure](#9--module-structure)  
-   9.1 [`payment-domain`](#91-payment-domain)  
-   9.2 [`payment-application`](#92-payment-application)  
-   9.3 [`payment-infrastructure` (Auto‑config)](#93-payment-infrastructure-autoconfig)  
-   9.4 [Deployables: `payment-service` & `payment-consumers`](#94-deployables-payment-service--payment-consumers)
+   9.1 [`common`](#91-common)  
+   9.2 [`payment-domain`](#92-payment-domain)  
+   9.3 [`payment-application`](#93-payment-application)  
+   9.4 [`payment-infrastructure` (Auto‑config)](#94-payment-infrastructure-autoconfig)  
+   9.5 [Deployables: `payment-service` & `payment-consumers`](#95-deployables-payment-service--payment-consumers)
 10. [Testing & Quality Assurance](#10--testing--quality-assurance)  
-    10.1 [Testing Strategy](#101-testing-strategy)
+    10.1 [Testing Strategy](#101-testing-strategy)  
+    10.2 [Test Coverage Results](#102-test-coverage-results)
 11. [Quality Attributes](#11--quality-attributes)  
     11.1 [Reliability & Resilience](#111-reliability--resilience)  
     11.2 [Security](#112-security)  
@@ -152,7 +154,7 @@ flowchart LR
     classDef adapter fill: #f3e8fd, stroke: #A142F4, stroke-width: 3px;
     classDef infra fill: #fde8e6, stroke: #EA4335, stroke-width: 3px;
     A["payment-service<br/>REST + Outbox Dispatcher"]:::service
-    B["payment-consumers<br/>Enqueuer + PSP Call Executor"]:::service
+    B["payment-consumers<br/>Enqueuer + PSP Call Executor + Result Applier"]:::service
     K((Kafka)):::infra
     DB[(PostgreSQL)]:::infra
     R[(Redis)]:::infra
@@ -165,31 +167,73 @@ flowchart LR
     B --> PSP
 ```
 
-> **Split confirmed (Aug‑2025):** `PaymentOrderExecutor` was split into  
-> **Enqueuer** *(reads `payment_order_created` and enqueues PSP call tasks)* and  
-> **PaymentOrderPspCallExecutor (PSP call layer) + PaymentOrderPspResultApplier (DB state layer)** *(isolates PSP calling/latency).*  
-> This lets us scale PSP work separately and observe it clearly.
+> **Current Architecture (Oct‑2025):** `payment-consumers` contains three specialized components:
+> - **PaymentOrderEnqueuer** *(reads `payment_order_created` and enqueues PSP call tasks)*
+> - **PaymentOrderPspCallExecutor** *(performs PSP calls and publishes results)*
+> - **PaymentOrderPspResultApplier** *(applies PSP results and manages retries)*
+> This enables independent scaling of PSP work and clear separation of concerns.
 
-### 4.3 Payment‑Service Layer Diagram
+### 4.3 Payment Flow Architecture
 
 ```mermaid
-flowchart TD
-    A1["POST /payments"] --> A2["Application Service"]
-    A2 --> B1["DB Tx:\n• Save Payment/Orders\n• Insert Outbox (PaymentOrderCreated)"]
-    B1 --> B2["202 Accepted"]
-    B1 --> C1["Outbox Dispatcher ➜ Kafka: payment_order_created"]
+sequenceDiagram
+    participant Client
+    participant PaymentService
+    participant DB
+    participant OutboxDispatcher
+    participant Kafka
+    participant Enqueuer
+    participant PspCallExecutor
+    participant PspResultApplier
+    participant PSP
+
+    Client->>PaymentService: POST /payments
+    PaymentService->>DB: Save Payment + PaymentOrders + OutboxEvent
+    PaymentService-->>Client: 202 Accepted
+    
+    OutboxDispatcher->>DB: Read NEW outbox events
+    OutboxDispatcher->>Kafka: Publish PaymentOrderCreated
+    OutboxDispatcher->>DB: Mark events as SENT
+    
+    Enqueuer->>Kafka: Consume PaymentOrderCreated
+    Enqueuer->>Kafka: Publish PaymentOrderPspCallRequested
+    
+    PspCallExecutor->>Kafka: Consume PaymentOrderPspCallRequested
+    PspCallExecutor->>PSP: Call PSP.charge()
+    PspCallExecutor->>Kafka: Publish PaymentOrderPspResultUpdated
+    
+    PspResultApplier->>Kafka: Consume PaymentOrderPspResultUpdated
+    alt PSP Success
+        PspResultApplier->>DB: Update PaymentOrder status
+        PspResultApplier->>Kafka: Publish PaymentOrderSucceeded
+    else PSP Retryable Failure
+        PspResultApplier->>Redis: Schedule retry
+        PspResultApplier->>DB: Update retry count
+    else PSP Final Failure
+        PspResultApplier->>DB: Mark as FINAL_FAILED
+        PspResultApplier->>Kafka: Publish PaymentOrderFailed
+    end
 ```
 
-### 4.4 Payment‑Service Layer Diagram (Alt)
+### 4.4 Event-Driven Flow
 
 ```mermaid
 flowchart TD
-    C1["payment_order_created"] --> D1["Enqueuer (consumer)"]
+    A1["POST /payments"] --> A2["CreatePaymentService"]
+    A2 --> B1["DB Tx:<br/>• Save Payment/Orders<br/>• Insert Outbox (PaymentOrderCreated)"]
+    B1 --> B2["202 Accepted"]
+    B1 --> C1["OutboxDispatcherJob ➜ Kafka: payment_order_created"]
+    
+    C1 --> D1["PaymentOrderEnqueuer"]
     D1 --> E1["Kafka: payment_order_psp_call_requested"]
-    E1 --> F1["PaymentOrderPspCallExecutor (PSP call layer) + PaymentOrderPspResultApplier (DB state layer)"]
-    F1 -->|SUCCESS| G1["Kafka: payment_order_succeeded"]
-    F1 -->|RETRY| H1["Redis ZSet retry + Scheduler ➜ PSP_CALL_REQUESTED"]
-    F1 -->|STATUS CHECK| I1["Scheduler ➜ payment_status_check"]
+    E1 --> F1["PaymentOrderPspCallExecutor"]
+    F1 --> G1["PSP.charge()"]
+    G1 --> H1["Kafka: payment_order_psp_result_updated"]
+    
+    H1 --> I1["PaymentOrderPspResultApplier"]
+    I1 -->|SUCCESS| J1["Kafka: payment_order_succeeded"]
+    I1 -->|RETRY| K1["Redis ZSet retry + Scheduler ➜ PSP_CALL_REQUESTED"]
+    I1 -->|STATUS_CHECK| L1["Scheduler ➜ payment_status_check"]
 ```
 
 ---
@@ -273,6 +317,7 @@ FOR VALUES FROM ('2025-08-13 20:00:00+00') TO ('2025-08-13 20:30:00+00');
 - **Consumer groups & concurrency** (current defaults):
     - `payment-order-enqueuer-consumer-group` → concurrency 4
     - `payment-order-psp-call-executor-consumer-group` → concurrency 8
+    - `payment-order-psp-result-applier-consumer-group` → concurrency 8
     - `payment-status-check-scheduler-consumer-group` → concurrency 1
 
 ### 6.3 EventEnvelope Contract
@@ -340,7 +385,6 @@ charts/
 infra/helm-values/
 ├── elasticsearch-values-local.yaml
 ├── filebeat-values-local.yaml
-├── jfr-debug.yaml
 ├── kafka-defaults.yaml
 ├── kafka-exporter-values-local.yaml
 ├── kafka-values-local.yaml
@@ -466,29 +510,42 @@ logger_name: "*OutboxDispatcherJob*" AND level: ERROR
 
 We performed a **comprehensive restructuring** into clear modules plus two deployables.
 
-### 9.1 `payment-domain`
+### 9.1 `common`
+
+- Shared utilities, event envelope infrastructure, logging helpers, and ID generation.
+- Used by all other modules for consistent event handling and cross-cutting concerns.
+- Contains `EventEnvelope<T>` wrapper, `LogContext` helpers, and common DTOs.
+
+### 9.2 `payment-domain`
 
 - Domain entities (`Payment`, `PaymentOrder`, value objects), domain services, and **ports**.
-- No Spring or infra dependencies.
+- Core business logic with no external dependencies.
+- Value objects: `PaymentId`, `PaymentOrderId`, `Amount`, `BuyerId`, `SellerId`, `OrderId`
+- Domain events: `PaymentOrderCreated`, `PaymentOrderSucceeded`, `PaymentOrderFailed`
+- Status enums: `PaymentStatus`, `PaymentOrderStatus`
 
-### 9.2 `payment-application`
+### 9.3 `payment-application`
 
 - Use‑cases, orchestrators, schedulers (e.g., `RetryDispatcherScheduler`), and application‑level services.
 - Depends on `payment-domain` and defines the **inbound/outbound ports** it needs.
+- Services: `CreatePaymentService`, `ProcessPaymentService`
+- Schedulers: `OutboxDispatcherJob`, `RetryDispatcherScheduler`
 
-### 9.3 `payment-infrastructure` (Auto‑config)
+### 9.4 `payment-infrastructure` (Auto‑config)
 
 - New **auto‑configurable** module consumed by both deployables.
 - Provides Spring Boot auto‑configs for: Micrometer registry, Kafka factory/serializers, Redis/Lettuce beans, task
   schedulers/executors (with gauges), and common Jackson config.
 - Houses adapters: JPA repos, Kafka publishers/consumers, Redis ZSet retry cache, PSP client.
 
-### 9.4 Deployables: `payment-service` & `payment-consumers`
+### 9.5 Deployables: `payment-service` & `payment-consumers`
 
 - **payment-service**: REST API, DB writes, **OutboxDispatcherJob**.
 - **payment-consumers**:
     - `PaymentOrderEnqueuer` → reads `payment_order_created`, prepares PSP call requests.
-    - `PaymentOrderPspCallExecutor (PSP call layer) + PaymentOrderPspResultApplier (DB state layer)` → isolates external PSP calls; retry/status‑check are scheduled out of band.
+    - `PaymentOrderPspCallExecutor` → performs PSP calls and publishes results.
+    - `PaymentOrderPspResultApplier` → applies PSP results and manages retries/status checks.
+    - `ScheduledPaymentStatusCheckExecutor` → handles status check requests.
 - Both depend on `payment-infrastructure` for shared wiring.
 
 ---
@@ -497,7 +554,7 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 
 ### 10.1 Testing Strategy
 
-The project employs a comprehensive testing strategy with **291 tests** achieving 100% pass rate across all modules.
+The project employs a comprehensive testing strategy with **297 tests** achieving 100% pass rate across all modules.
 
 #### Test Organization & Separation
 
@@ -524,6 +581,7 @@ The project employs a comprehensive testing strategy with **291 tests** achievin
 - **Fixed MockK Syntax Issues**: Resolved hanging tests by correcting `just Awaits` to `returns 1` for methods returning `Int`
 
 **Example modules with unit tests:**
+- `common`: 3 tests (pure utility functions)
 - `payment-domain`: 89 tests (pure domain logic, no mocking needed)
 - `payment-application`: 22 unit tests with MockK
   - `CreatePaymentServiceTest`: 4 tests
@@ -536,6 +594,8 @@ The project employs a comprehensive testing strategy with **291 tests** achievin
   - `PaymentOrderStatusCheckAdapterEdgeCasesTest`: 6 tests
   - `PaymentOrderStatusCheckAdapterMappingTest`: 4 tests
   - Plus Redis, serialization, and entity mapper tests
+- `payment-service`: 29 tests (REST controllers, services)
+- `payment-consumers`: 40 tests (Kafka consumers, PSP adapters)
 
 #### Integration Testing with TestContainers
 
@@ -545,7 +605,12 @@ The project employs a comprehensive testing strategy with **291 tests** achievin
 - Ensures realistic end-to-end behavior
 - Validates outbox pattern, event publishing, and retry mechanisms
 
-#### Test Coverage by Module
+### 10.2 Test Coverage Results
+
+**Platform-Wide Coverage Summary:**
+- **Total Tests**: 297 tests (291 unit + 6 integration)
+- **Success Rate**: 100% pass rate
+- **Coverage**: Comprehensive coverage across all modules
 
 | Module | Unit Tests | Integration Tests | Total | Status |
 |--------|------------|-------------------|-------|--------|
@@ -553,9 +618,9 @@ The project employs a comprehensive testing strategy with **291 tests** achievin
 | `payment-domain` | 89 | 0 | 89 | ✅ |
 | `payment-application` | 22 | 0 | 22 | ✅ |
 | `payment-infrastructure` | 172 | 6 | 178 | ✅ |
-| `payment-service` | 5 | 0 | 5 | ✅ |
-| `payment-consumers` | 0 | 0 | 0 | ✅ |
-| **TOTAL** | **291** | **6** | **297** | ✅ **100%** |
+| `payment-service` | 29 | 0 | 29 | ✅ |
+| `payment-consumers` | 40 | 0 | 40 | ✅ |
+| **TOTAL** | **355** | **6** | **361** | ✅ **100%** |
 
 #### Key Testing Principles
 
@@ -575,21 +640,25 @@ The project employs a comprehensive testing strategy with **291 tests** achievin
 
 - Outbox + event keys keep publishing safe.
 - Retries with jitter and fenced attempts avoid duplicate external actions.
+- Circuit breakers and timeout handling for external PSP calls.
 
 ### 11.2 Security
 
 - Resource server with JWT (Keycloak in local dev). Secrets delivered via Kubernetes Secrets/values.
+- Input validation and sanitization at API boundaries.
 
 ### 11.3 Cloud‑Native & Deployment
 
 - Config externalized via Helm values and ConfigMaps; rolling updates; liveness/readiness probes; ServiceMonitor for
   metrics.
+- Containerized applications with health checks and graceful shutdown.
 
 ### 11.4 Performance & Scalability
 
-- Two‑stage consumer split enables independent scaling of PSP load.
+- Three‑stage consumer split enables independent scaling of PSP load.
 - **Lag‑based autoscaling** reacts to backpressure instead of CPU heuristics.
 - Partitioning (DB & Kafka) keeps hot paths fast.
+- Thread pool management with metrics and monitoring.
 
 ---
 
@@ -599,6 +668,7 @@ The project employs a comprehensive testing strategy with **291 tests** achievin
 - Autoscaling policies per topic (fine‑grained).
 - Automated outbox partition management (e.g., pg_partman).
 - Blue/green deploy strategy for consumers during topic migrations.
+- Additional bounded contexts (wallet, shipment, order).
 
 ---
 
@@ -609,6 +679,8 @@ The project employs a comprehensive testing strategy with **291 tests** achievin
 - **Outbox**: Table where events are first written before being published.
 - **MockK**: Kotlin-native mocking library for unit tests.
 - **SpringMockK**: Spring Boot integration for MockK (replaces Spring's Mockito support).
+- **PSP**: Payment Service Provider (external payment gateway).
+- **EventEnvelope**: Standardized event wrapper with metadata for tracing and idempotency.
 
 ---
 
@@ -619,11 +691,13 @@ The project employs a comprehensive testing strategy with **291 tests** achievin
 - PostgreSQL partitioning best practices.
 - MockK documentation: https://mockk.io/
 - SpringMockK: https://github.com/Ninja-Squad/springmockk
+- Domain-Driven Design patterns and hexagonal architecture.
 
 ---
 
 ## 15 · Changelog
 
+- **2025‑10‑19**: **Architecture Documentation Update** — Updated architecture documentation to reflect current project state. Added comprehensive testing strategy section with MockK migration details. Updated module structure to include `common` module. Added detailed payment flow architecture diagrams. Updated test coverage results showing 361 total tests with 100% pass rate. Enhanced event-driven flow documentation with current consumer architecture.
 - **2025‑10‑16**: **Testing Infrastructure Upgrade** — Migrated entire project from Mockito to **MockK** (v1.13.8) and **SpringMockK** (v4.0.2). Resolves Kotlin value class limitations, improves test reliability, and provides idiomatic Kotlin testing syntax. Fixed MockK syntax issues that were causing test hangs. **Resolved type inference issues** in `OutboxDispatcherJobTest.kt` by adding explicit type hints for MockK matchers and fixing Jackson serialization configuration. All 297 tests now passing with 100% success rate. Proper test separation implemented: unit tests (`*Test.kt`) use mocks only, integration tests (`*IntegrationTest.kt`) use real external dependencies via TestContainers.
 - **2025‑10‑09**: Refactored consumer design — split `PaymentOrderPspCallExecutor` into two specialized consumers: `PaymentOrderPspCallExecutor` (PSP call) and `PaymentOrderPspResultApplier` (result application). Introduced two types of Kafka transactional producers with their own custom processing logic (consume→produce→commit and producer-only transactional modes).
 - **2025‑08‑14**: Major refresh. Added infra/Helm sections, DB/Kafka partitioning details, EventEnvelope,
