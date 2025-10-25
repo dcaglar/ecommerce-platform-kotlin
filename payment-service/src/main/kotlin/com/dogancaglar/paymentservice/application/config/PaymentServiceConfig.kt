@@ -16,8 +16,7 @@ import java.time.Clock
 @Configuration
 class PaymentServiceConfig {
 
-    @Bean
-    fun clock(): Clock = Clock.systemUTC()
+
 
     @Bean
     fun paymentOrderDomainEventMapper(clock: Clock): PaymentOrderDomainEventMapper =

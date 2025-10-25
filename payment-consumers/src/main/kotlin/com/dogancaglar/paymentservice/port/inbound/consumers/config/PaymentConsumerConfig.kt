@@ -34,6 +34,8 @@ class PaymentConsumerConfig {
         paymentRetryQueueAdapter: PaymentRetryQueueAdapter,
         pspResultRedisCacheAdapter: PspResultRedisCacheAdapter,
         clock: Clock,
+        paymentOrderFactory: PaymentOrderFactory,
+        paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
     ): ProcessPaymentService {
         return ProcessPaymentService(
             paymentOrderModificationPort = paymentOrderModificationPort,
@@ -41,8 +43,8 @@ class PaymentConsumerConfig {
             retryQueuePort = paymentRetryQueueAdapter,
             pspResultCache = pspResultRedisCacheAdapter,
             clock = clock,
-            paymentOrderFactory = paymentOrderFactory(),
-            paymentOrderDomainEventMapper = paymentOrderDomainEventMapper(clock)
+            paymentOrderFactory = paymentOrderFactory,
+            paymentOrderDomainEventMapper = paymentOrderDomainEventMapper
         )
     }
 
