@@ -52,15 +52,15 @@ class PaymentServiceTest {
             )
         )
         
-        val expectedPayment = Payment.createNew(
-            paymentId = PaymentId(123L),
-            publicPaymentId = "payment-123",
-            orderId = OrderId("order-123"),
-            buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
-            paymentOrders = listOf()
-        )
+        val expectedPayment = Payment.builder()
+            .paymentId(PaymentId(123L))
+            .publicPaymentId("payment-123")
+            .orderId(OrderId("order-123"))
+            .buyerId(BuyerId("buyer-456"))
+            .totalAmount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .paymentOrders(listOf())
+            .buildNew()
         
         every { createPaymentUseCase.create(any()) } returns expectedPayment
 
@@ -147,15 +147,15 @@ class PaymentServiceTest {
             )
         )
         
-        val expectedPayment = Payment.createNew(
-            paymentId = PaymentId(456L),
-            publicPaymentId = "payment-456",
-            orderId = OrderId("order-123"),
-            buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount(5000L, "EUR"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
-            paymentOrders = listOf()
-        )
+        val expectedPayment = Payment.builder()
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("payment-456")
+            .orderId(OrderId("order-123"))
+            .buyerId(BuyerId("buyer-456"))
+            .totalAmount(Amount(5000L, "EUR"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .paymentOrders(listOf())
+            .buildNew()
         
         every { createPaymentUseCase.create(any()) } returns expectedPayment
 
@@ -186,15 +186,15 @@ class PaymentServiceTest {
             )
         )
         
-        val expectedPayment = Payment.createNew(
-            paymentId = PaymentId(789L),
-            publicPaymentId = "payment-789",
-            orderId = OrderId("order-123"),
-            buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount(99999999L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
-            paymentOrders = listOf()
-        )
+        val expectedPayment = Payment.builder()
+            .paymentId(PaymentId(789L))
+            .publicPaymentId("payment-789")
+            .orderId(OrderId("order-123"))
+            .buyerId(BuyerId("buyer-456"))
+            .totalAmount(Amount(99999999L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .paymentOrders(listOf())
+            .buildNew()
         
         every { createPaymentUseCase.create(any()) } returns expectedPayment
 

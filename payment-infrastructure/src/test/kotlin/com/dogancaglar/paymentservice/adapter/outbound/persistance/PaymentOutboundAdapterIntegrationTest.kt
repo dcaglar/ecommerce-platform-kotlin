@@ -126,15 +126,15 @@ class PaymentOutboundAdapterSimpleIntegrationTest {
         id: Long = 1L,
         status: PaymentStatus = PaymentStatus.INITIATED
     ): Payment {
-        return Payment.reconstructFromPersistence(
-            paymentId = PaymentId(id),
-            publicPaymentId = "pay-$id",
-            buyerId = BuyerId("buyer-$id"),
-            orderId = OrderId("order-$id"),
-            totalAmount = Amount(10000L, "USD"),
-            status = status,
-            createdAt = LocalDateTime.now(),
-            paymentOrders = emptyList()
-        )
+        return Payment.Builder()
+            .paymentId(PaymentId(id))
+            .publicPaymentId("pay-$id")
+            .buyerId(BuyerId("buyer-$id"))
+            .orderId(OrderId("order-$id"))
+            .totalAmount(Amount(10000L, "USD"))
+            .status(status)
+            .createdAt(LocalDateTime.now())
+            .paymentOrders(emptyList())
+            .build()
     }
 }

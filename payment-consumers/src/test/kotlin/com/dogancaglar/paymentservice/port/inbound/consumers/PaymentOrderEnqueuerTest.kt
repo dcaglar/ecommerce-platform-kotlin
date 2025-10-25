@@ -40,7 +40,8 @@ class PaymentOrderEnqueuerTest {
 
         enqueuer = PaymentOrderEnqueuer(
             kafkaTx = kafkaTxExecutor,
-            publisher = eventPublisherPort
+            publisher = eventPublisherPort,
+            paymentOrderDomainEventMapper = PaymentOrderDomainEventMapper(clock)
         )
     }
 

@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.persistance
 
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.OutboxEventEntity
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.OutboxEventMapper
-import com.dogancaglar.paymentservice.domain.events.OutboxEvent
+import com.dogancaglar.paymentservice.domain.event.OutboxEvent
 import io.mockk.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -49,8 +49,8 @@ class OutboxBufferAdapterTest {
         assertEquals(2, result.size)
         assertEquals(1L, result[0].oeid)
         assertEquals(2L, result[1].oeid)
-        assertEquals(status, result[0].status)
-        assertEquals(status, result[1].status)
+        assertEquals(status, result[0].status.toString())
+        assertEquals(status, result[1].status.toString())
         verify(exactly = 1) { outboxEventMapper.findByStatus(status) }
     }
 
@@ -169,7 +169,7 @@ class OutboxBufferAdapterTest {
                     entity.eventType == event.eventType &&
                     entity.aggregateId == event.aggregateId &&
                     entity.payload == event.payload &&
-                    entity.status == event.status
+                    entity.status == event.status.toString()
                 }
             )
         }
@@ -230,7 +230,7 @@ class OutboxBufferAdapterTest {
     @Test
     fun `updateAll should handle single event`() {
         // Given
-        val event = createTestOutboxEvent(999L, status = "FAILED")
+        val event = createTestOutboxEvent(999L, status = "SENT")
         every { outboxEventMapper.batchUpdate(any()) } returns 1
 
         // When
@@ -242,7 +242,7 @@ class OutboxBufferAdapterTest {
                 match { entities -> 
                     entities.size == 1 && 
                     entities[0].oeid == 999L && 
-                    entities[0].status == "FAILED"
+                    entities[0].status == "SENT"
                 }
             )
         }
@@ -331,7 +331,7 @@ class OutboxBufferAdapterTest {
                     entity.eventType == event.eventType &&
                     entity.aggregateId == event.aggregateId &&
                     entity.payload == event.payload &&
-                    entity.status == event.status &&
+                    entity.status == event.status.toString() &&
                     entity.createdAt == event.createdAt
                 }
             )
@@ -354,7 +354,7 @@ class OutboxBufferAdapterTest {
         assertEquals(entity.eventType, domainObject.eventType)
         assertEquals(entity.aggregateId, domainObject.aggregateId)
         assertEquals(entity.payload, domainObject.payload)
-        assertEquals(entity.status, domainObject.status)
+        assertEquals(entity.status, domainObject.status.toString())
         assertEquals(entity.createdAt, domainObject.createdAt)
     }
 
@@ -369,7 +369,7 @@ class OutboxBufferAdapterTest {
             eventType = "test_event",
             aggregateId = "test_aggregate",
             payload = specialPayload,
-            status = "PENDING",
+            status = "PROCESSING",
             createdAt = LocalDateTime.now()
         )
         every { outboxEventMapper.insertOutboxEvent(any()) } returns 1
@@ -394,7 +394,7 @@ class OutboxBufferAdapterTest {
             eventType = "test_event",
             aggregateId = "aggregate-测试-123",
             payload = unicodePayload,
-            status = "PENDING",
+            status = "PROCESSING",
             createdAt = LocalDateTime.now()
         )
         every { outboxEventMapper.insertOutboxEvent(any()) } returns 1
@@ -438,7 +438,7 @@ class OutboxBufferAdapterTest {
             createTestOutboxEvent(1L, status = "NEW"),
             createTestOutboxEvent(2L, status = "PROCESSING"),
             createTestOutboxEvent(3L, status = "SENT"),
-            createTestOutboxEvent(4L, status = "FAILED")
+            createTestOutboxEvent(4L, status = "SENT")
         )
         every { outboxEventMapper.batchUpdate(any()) } returns 1
 
@@ -453,7 +453,7 @@ class OutboxBufferAdapterTest {
                     entities[0].status == "NEW" &&
                     entities[1].status == "PROCESSING" &&
                     entities[2].status == "SENT" &&
-                    entities[3].status == "FAILED"
+                    entities[3].status == "SENT"
                 }
             )
         }
@@ -465,13 +465,14 @@ class OutboxBufferAdapterTest {
         oeid: Long,
         status: String = "NEW"
     ): OutboxEvent {
-        return OutboxEvent.createNew(
+        return OutboxEvent.restore(
             oeid = oeid,
             eventType = "payment_order_created",
             aggregateId = "agg-$oeid",
             payload = """{"paymentOrderId": "$oeid", "amount": 10000}""",
+            status = status,
             createdAt = LocalDateTime.now()
-        ).also { it.status = status }
+        )
     }
 
     private fun createTestOutboxEventWithAllFields(): OutboxEvent {

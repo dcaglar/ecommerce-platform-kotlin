@@ -33,7 +33,8 @@ class PaymentOrderPspCallExecutor(
     private val meterRegistry: MeterRegistry,
     @param:Qualifier("syncPaymentTx") private val kafkaTx: KafkaTxExecutor,
     @param:Qualifier("syncPaymentEventPublisher") private val publisher: EventPublisherPort,
-    private val paymentOrderRepository: PaymentOrderRepository //read only
+    private val paymentOrderRepository: PaymentOrderRepository, //read only
+    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -90,7 +91,7 @@ class PaymentOrderPspCallExecutor(
                 return@with
             }
             // Build domain snapshot (no DB load)
-            val orderForPsp: PaymentOrder = PaymentOrderDomainEventMapper.fromEvent(work)
+            val orderForPsp: PaymentOrder = paymentOrderDomainEventMapper.fromEvent(work)
 
             // Call PSP (adapter handles timeouts/interrupts)
             var mappedStatus: PaymentOrderStatus? = null

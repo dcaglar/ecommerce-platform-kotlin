@@ -6,6 +6,7 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
+import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
@@ -68,7 +69,8 @@ class PaymentRetryQueueAdapterIntegrationTest {
             return PaymentRetryQueueAdapter(
                 cache,
                 SimpleMeterRegistry(),
-                objectMapper
+                objectMapper,
+                PaymentOrderDomainEventMapper()
             )
         }
     }
@@ -107,18 +109,20 @@ class PaymentRetryQueueAdapterIntegrationTest {
         retryCount: Int = 0,
         status: PaymentOrderStatus = PaymentOrderStatus.INITIATED_PENDING
     ): PaymentOrder {
-        return PaymentOrder(
-            paymentOrderId = PaymentOrderId(id),
-            publicPaymentOrderId = "po-$id",
-            paymentId = PaymentId(999L),
-            publicPaymentId = "pay-999",
-            sellerId = SellerId("111"),
-            amount = Amount(10000L, "USD"), // 100.00 in cents
-            status = status,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now(),
-            retryCount = retryCount
-        )
+        return PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(id))
+            .publicPaymentOrderId("po-$id")
+            .paymentId(PaymentId(999L))
+            .publicPaymentId("pay-999")
+            .sellerId(SellerId("111"))
+            .amount(Amount(10000L, "USD")) // 100.00 in cents
+            .status(status)
+            .createdAt(LocalDateTime.now())
+            .updatedAt(LocalDateTime.now())
+            .retryCount(retryCount)
+            .retryReason(null)
+            .lastErrorMessage(null)
+            .buildFromPersistence()
     }
 
     // ==================== End-to-End Retry Flow ====================

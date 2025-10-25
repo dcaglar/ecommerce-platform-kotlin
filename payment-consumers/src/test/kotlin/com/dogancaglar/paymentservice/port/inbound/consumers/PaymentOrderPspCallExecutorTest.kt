@@ -51,7 +51,8 @@ class PaymentOrderPspCallExecutorTest {
             meterRegistry = meterRegistry,
             kafkaTx = kafkaTxExecutor,
             publisher = eventPublisherPort,
-            paymentOrderRepository = paymentOrderRepository
+            paymentOrderRepository = paymentOrderRepository,
+            paymentOrderDomainEventMapper = PaymentOrderDomainEventMapper(clock)
         )
     }
 
@@ -59,17 +60,17 @@ class PaymentOrderPspCallExecutorTest {
     fun `should process payment order successfully`() {
         // Given
         val paymentOrderId = PaymentOrderId(123L)
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = paymentOrderId,
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(paymentOrderId)
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .buildNew()
         
-        val pspCallRequested = PaymentOrderDomainEventMapper.toPaymentOrderPspCallRequested(
+        val pspCallRequested = PaymentOrderDomainEventMapper(clock).toPaymentOrderPspCallRequested(
             order = paymentOrder,
             attempt = 0
         )
@@ -116,17 +117,17 @@ class PaymentOrderPspCallExecutorTest {
     fun `should handle PSP failure`() {
         // Given
         val paymentOrderId = PaymentOrderId(123L)
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = paymentOrderId,
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(paymentOrderId)
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .buildNew()
         
-        val pspCallRequested = PaymentOrderDomainEventMapper.toPaymentOrderPspCallRequested(
+        val pspCallRequested = PaymentOrderDomainEventMapper(clock).toPaymentOrderPspCallRequested(
             order = paymentOrder,
             attempt = 0
         )
@@ -173,16 +174,16 @@ class PaymentOrderPspCallExecutorTest {
     fun `should drop PSP call when payment order not found`() {
         // Given
         val paymentOrderId = PaymentOrderId(123L)
-        val pspCallRequested = PaymentOrderDomainEventMapper.toPaymentOrderPspCallRequested(
-            order = PaymentOrder.createNew(
-                paymentOrderId = paymentOrderId,
-                publicPaymentOrderId = "public-123",
-                paymentId = PaymentId(456L),
-                publicPaymentId = "public-payment-123",
-                sellerId = SellerId("seller-123"),
-                amount = Amount(10000L, "USD"),
-                createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-            ),
+        val pspCallRequested = PaymentOrderDomainEventMapper(clock).toPaymentOrderPspCallRequested(
+            order = PaymentOrder.builder()
+                .paymentOrderId(paymentOrderId)
+                .publicPaymentOrderId("public-123")
+                .paymentId(PaymentId(456L))
+                .publicPaymentId("public-payment-123")
+                .sellerId(SellerId("seller-123"))
+                .amount(Amount(10000L, "USD"))
+                .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+                .buildNew(),
             attempt = 0
         )
         
@@ -225,22 +226,22 @@ class PaymentOrderPspCallExecutorTest {
     fun `should drop PSP call when payment order is in terminal status`() {
         // Given
         val paymentOrderId = PaymentOrderId(123L)
-        val paymentOrder = PaymentOrder.reconstructFromPersistence(
-            paymentOrderId = paymentOrderId,
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            status = PaymentOrderStatus.SUCCESSFUL_FINAL, // Terminal status
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
-            updatedAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
-            retryCount = 0,
-            retryReason = null,
-            lastErrorMessage = null
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(paymentOrderId)
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .status(PaymentOrderStatus.SUCCESSFUL_FINAL) // Terminal status
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .updatedAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .retryCount(0)
+            .retryReason(null)
+            .lastErrorMessage(null)
+            .buildFromPersistence()
         
-        val pspCallRequested = PaymentOrderDomainEventMapper.toPaymentOrderPspCallRequested(
+        val pspCallRequested = PaymentOrderDomainEventMapper(clock).toPaymentOrderPspCallRequested(
             order = paymentOrder,
             attempt = 0
         )
@@ -284,22 +285,22 @@ class PaymentOrderPspCallExecutorTest {
     fun `should drop PSP call when retry count is stale`() {
         // Given
         val paymentOrderId = PaymentOrderId(123L)
-        val paymentOrder = PaymentOrder.reconstructFromPersistence(
-            paymentOrderId = paymentOrderId,
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            status = PaymentOrderStatus.PENDING_STATUS_CHECK_LATER,
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
-            updatedAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
-            retryCount = 2, // Higher retry count in DB
-            retryReason = null,
-            lastErrorMessage = null
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(paymentOrderId)
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .status(PaymentOrderStatus.PENDING_STATUS_CHECK_LATER)
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .updatedAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .retryCount(2) // Higher retry count in DB
+            .retryReason(null)
+            .lastErrorMessage(null)
+            .buildFromPersistence()
         
-        val pspCallRequested = PaymentOrderDomainEventMapper.toPaymentOrderPspCallRequested(
+        val pspCallRequested = PaymentOrderDomainEventMapper(clock).toPaymentOrderPspCallRequested(
             order = paymentOrder,
             attempt = 1 // Lower attempt in event
         )
@@ -343,17 +344,17 @@ class PaymentOrderPspCallExecutorTest {
     fun `should handle PSP timeout`() {
         // Given
         val paymentOrderId = PaymentOrderId(123L)
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = paymentOrderId,
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(paymentOrderId)
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .buildNew()
         
-        val pspCallRequested = PaymentOrderDomainEventMapper.toPaymentOrderPspCallRequested(
+        val pspCallRequested = PaymentOrderDomainEventMapper(clock).toPaymentOrderPspCallRequested(
             order = paymentOrder,
             attempt = 0
         )
@@ -398,17 +399,17 @@ class PaymentOrderPspCallExecutorTest {
     fun `should handle PSP transient error`() {
         // Given
         val paymentOrderId = PaymentOrderId(123L)
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = paymentOrderId,
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(paymentOrderId)
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .buildNew()
         
-        val pspCallRequested = PaymentOrderDomainEventMapper.toPaymentOrderPspCallRequested(
+        val pspCallRequested = PaymentOrderDomainEventMapper(clock).toPaymentOrderPspCallRequested(
             order = paymentOrder,
             attempt = 0
         )
@@ -453,17 +454,17 @@ class PaymentOrderPspCallExecutorTest {
     fun `should handle PSP processing status`() {
         // Given
         val paymentOrderId = PaymentOrderId(123L)
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = paymentOrderId,
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(paymentOrderId)
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .buildNew()
         
-        val pspCallRequested = PaymentOrderDomainEventMapper.toPaymentOrderPspCallRequested(
+        val pspCallRequested = PaymentOrderDomainEventMapper(clock).toPaymentOrderPspCallRequested(
             order = paymentOrder,
             attempt = 0
         )

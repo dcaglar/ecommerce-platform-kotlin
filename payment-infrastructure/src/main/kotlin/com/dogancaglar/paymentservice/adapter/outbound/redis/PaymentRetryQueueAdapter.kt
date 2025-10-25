@@ -23,7 +23,8 @@ import java.util.*
 class PaymentRetryQueueAdapter(
     private val paymentRetryRedisCache: PaymentRetryRedisCache,
     meterRegistry: MeterRegistry,
-    @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper
+    @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper,
+    val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
 ) : RetryQueuePort<PaymentOrderPspCallRequested> {
 
     init {
@@ -45,7 +46,7 @@ class PaymentRetryQueueAdapter(
             val retryAt = System.currentTimeMillis() + backOffMillis
 
             // Build PSP_CALL_REQUESTED with DB-owned attempt
-            val pspCallRequested = PaymentOrderDomainEventMapper.toPaymentOrderPspCallRequested(
+            val pspCallRequested = paymentOrderDomainEventMapper.toPaymentOrderPspCallRequested(
                 order = paymentOrder,
                 attempt = paymentOrder.retryCount
             )

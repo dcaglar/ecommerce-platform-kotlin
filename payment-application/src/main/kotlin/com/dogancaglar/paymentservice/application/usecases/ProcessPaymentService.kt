@@ -1,8 +1,8 @@
 package com.dogancaglar.paymentservice.application.usecases
 
 import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderEvent
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderEvent
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
@@ -26,24 +26,23 @@ import kotlin.math.pow
 import kotlin.random.Random
 
 open class ProcessPaymentService(
-    @param:Qualifier("syncPaymentEventPublisher") private val eventPublisher: EventPublisherPort,
+    @param:Qualifier("syncPaymentEventPublisher")
+    private val eventPublisher: EventPublisherPort,
     private val retryQueuePort: RetryQueuePort<PaymentOrderPspCallRequested>,
     private val pspResultCache: PspResultCachePort,
     private val paymentOrderModificationPort: PaymentOrderModificationPort,
-    private val clock: Clock,
+    private val paymentOrderFactory: PaymentOrderFactory,
+    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
+    private val clock: Clock
 ) : ProcessPspResultUseCase {
 
-    private val paymentOrderFactory: PaymentOrderFactory = PaymentOrderFactory()
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    companion object const
+    companion object {
+        const val MAX_RETRIES = 5
+    }
 
-    val MAX_RETRIES: Int = 5
-
-    override fun processPspResult(
-        event: PaymentOrderEvent,
-        pspStatus: PaymentOrderStatus
-    ) {
+    override fun processPspResult(event: PaymentOrderEvent, pspStatus: PaymentOrderStatus) {
         val totalStart = System.currentTimeMillis()
         val order = paymentOrderFactory.fromEvent(event)
 
@@ -53,7 +52,7 @@ open class ProcessPaymentService(
                     val dbStart = System.currentTimeMillis()
                     handleSuccessfulPayment(order)
                     logger.info(
-                        "TIMING:  processPspResult {} (DB/write+publish) took {} ms for {}",
+                        "TIMING: processPspResult {} (DB/write+publish) took {} ms for {}",
                         pspStatus.name, (System.currentTimeMillis() - dbStart), order.paymentOrderId
                     )
                 }
@@ -62,7 +61,7 @@ open class ProcessPaymentService(
                     val dbStart = System.currentTimeMillis()
                     handleRetryEvent(order = order, reason = pspStatus.name, lastError = null)
                     logger.info(
-                        "TIMING:  processPspResult {} (DB/write+schedule-retry) took {} ms for {}",
+                        "TIMING: processPspResult {} (DB/write+schedule-retry) took {} ms for {}",
                         pspStatus.name, (System.currentTimeMillis() - dbStart), order.paymentOrderId
                     )
                 }
@@ -71,7 +70,7 @@ open class ProcessPaymentService(
                     val dbStart = System.currentTimeMillis()
                     handlePaymentStatusCheckEvent(order, reason = pspStatus.name, lastError = null)
                     logger.info(
-                        "TIMING:  processPspResult {} (DB/write+STATUSDB/write) took {} ms for {}",
+                        "TIMING: processPspResult {} (DB/write+STATUSCHECK/write) took {} ms for {}",
                         pspStatus.name, (System.currentTimeMillis() - dbStart), order.paymentOrderId
                     )
                 }
@@ -89,7 +88,7 @@ open class ProcessPaymentService(
     }
 
     private fun handleRetryEvent(order: PaymentOrder, reason: String?, lastError: String?) {
-        val retriesSoFar = order.retryCount        // from the event; attempt i (0 for initial)
+        val retriesSoFar = order.retryCount
 
         if (retriesSoFar >= MAX_RETRIES) {
             retryQueuePort.resetRetryCounter(order.paymentOrderId)
@@ -97,13 +96,12 @@ open class ProcessPaymentService(
             return
         }
 
-        // Persist the failure → this increments to retriesSoFar + 1
         val persisted = paymentOrderModificationPort.markFailedForRetry(order, reason, lastError)
-
-        val nextAttempt = persisted.retryCount     // == retriesSoFar + 1
+        val nextAttempt = persisted.retryCount
         val backoffMs = computeEqualJitterBackoff(nextAttempt)
 
         logRetrySchedule(persisted, nextAttempt, System.currentTimeMillis() + backoffMs, reason, lastError)
+
         retryQueuePort.scheduleRetry(
             paymentOrder = persisted,
             retryReason = reason,
@@ -113,16 +111,17 @@ open class ProcessPaymentService(
     }
 
     private fun handlePaymentStatusCheckEvent(order: PaymentOrder, reason: String?, lastError: String?) {
-        // markPendingAndScheduleStatusCheck already checks terminal/non-terminal internally
         paymentOrderModificationPort.markPendingAndScheduleStatusCheck(order, reason, lastError)
     }
 
     private fun handleSuccessfulPayment(order: PaymentOrder) {
-        val persisted = paymentOrderModificationPort.markPaid(order)   // ← persisted
+        val persisted = paymentOrderModificationPort.markPaid(order)
+        val succeededEvent = paymentOrderDomainEventMapper.toPaymentOrderSucceeded(persisted)
+
         eventPublisher.publishSync(
             eventMetaData = EventMetadatas.PaymentOrderSucceededMetadata,
             aggregateId = persisted.publicPaymentOrderId,
-            data = PaymentOrderDomainEventMapper.toPaymentOrderSuccededEvent(persisted),
+            data = succeededEvent,
             parentEventId = LogContext.getEventId(),
             traceId = LogContext.getTraceId()
         )
@@ -139,6 +138,7 @@ open class ProcessPaymentService(
         val formattedLocal = scheduledLocal.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))
         val scheduledUtc = LocalDateTime.ofInstant(Instant.ofEpochMilli(scheduledAt), ZoneId.of("UTC"))
         val formattedUtc = scheduledUtc.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))
+
         logger.info(
             "Scheduling retry for paymentOrderId={} [attempt {}/{}] due at {} (local, {}) / {} (UTC). reason='{}', lastError='{}'",
             order.publicPaymentOrderId, nextRetryCount, MAX_RETRIES,
@@ -147,10 +147,7 @@ open class ProcessPaymentService(
         )
     }
 
-    private fun handleNonRetryableFailEvent(
-        order: PaymentOrder,
-        reason: String? = null
-    ): PaymentOrder {
+    private fun handleNonRetryableFailEvent(order: PaymentOrder, reason: String? = null): PaymentOrder {
         val updated = paymentOrderModificationPort.markFinalFailed(order, reason)
         logger.info(
             "PaymentOrder {} marked FINAL_FAILED. Reason='{}'",

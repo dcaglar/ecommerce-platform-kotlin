@@ -10,22 +10,23 @@ import java.time.LocalDateTime
 class PaymentOrderTest {
 
     @Test
-    fun `createNew should create PaymentOrder with INITIATED_PENDING status`() {
+    fun `PaymentOrder builder should create PaymentOrder with INITIATED_PENDING status`() {
         val now = LocalDateTime.now()
         val paymentOrderId = PaymentOrderId(1L)
         val paymentId = PaymentId(100L)
         val sellerId = SellerId("seller-123")
         val amount = Amount(100000L, "USD") // $1000.00 = 100000 cents
 
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = paymentOrderId,
-            publicPaymentOrderId = "paymentorder-1",
-            paymentId = paymentId,
-            publicPaymentId = "payment-100",
-            sellerId = sellerId,
-            amount = amount,
-            createdAt = now
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(paymentOrderId)
+            .publicPaymentOrderId("paymentorder-1")
+            .paymentId(paymentId)
+            .publicPaymentId("payment-100")
+            .sellerId(sellerId)
+            .amount(amount)
+            .createdAt(now)
+            .updatedAt(now)
+            .buildNew()
 
         assertEquals(paymentOrderId, paymentOrder.paymentOrderId)
         assertEquals("paymentorder-1", paymentOrder.publicPaymentOrderId)
@@ -42,7 +43,7 @@ class PaymentOrderTest {
     }
 
     @Test
-    fun `reconstructFromPersistence should recreate PaymentOrder with all fields`() {
+    fun `PaymentOrder builder should recreate PaymentOrder with all fields from persistence`() {
         val now = LocalDateTime.now()
         val updatedAt = now.plusHours(1)
         val paymentOrderId = PaymentOrderId(1L)
@@ -50,20 +51,20 @@ class PaymentOrderTest {
         val sellerId = SellerId("seller-123")
         val amount = Amount(100000L, "USD") // $1000.00 = 100000 cents
 
-        val paymentOrder = PaymentOrder.reconstructFromPersistence(
-            paymentOrderId = paymentOrderId,
-            publicPaymentOrderId = "paymentorder-1",
-            paymentId = paymentId,
-            publicPaymentId = "payment-100",
-            sellerId = sellerId,
-            amount = amount,
-            status = PaymentOrderStatus.FAILED_TRANSIENT_ERROR,
-            createdAt = now,
-            updatedAt = updatedAt,
-            retryCount = 3,
-            retryReason = "PSP timeout",
-            lastErrorMessage = "Connection timeout"
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(paymentOrderId)
+            .publicPaymentOrderId("paymentorder-1")
+            .paymentId(paymentId)
+            .publicPaymentId("payment-100")
+            .sellerId(sellerId)
+            .amount(amount)
+            .status(PaymentOrderStatus.FAILED_TRANSIENT_ERROR)
+            .createdAt(now)
+            .updatedAt(updatedAt)
+            .retryCount(3)
+            .retryReason("PSP timeout")
+            .lastErrorMessage("Connection timeout")
+            .buildFromPersistence()
 
         assertEquals(paymentOrderId, paymentOrder.paymentOrderId)
         assertEquals(PaymentOrderStatus.FAILED_TRANSIENT_ERROR, paymentOrder.status)
@@ -75,7 +76,7 @@ class PaymentOrderTest {
     }
 
     @Test
-    fun `markAsFailed should change status to FAILED_TRANSIENT_ERROR`() {
+    fun `markAsFailed should change PaymentOrder status to FAILED_TRANSIENT_ERROR`() {
         val paymentOrder = createTestPaymentOrder(status = PaymentOrderStatus.INITIATED_PENDING)
 
         val updated = paymentOrder.markAsFailed()
@@ -86,7 +87,7 @@ class PaymentOrderTest {
     }
 
     @Test
-    fun `markAsPaid should change status to SUCCESSFUL_FINAL`() {
+    fun `markAsPaid should change PaymentOrder status to SUCCESSFUL_FINAL`() {
         val paymentOrder = createTestPaymentOrder(status = PaymentOrderStatus.INITIATED_PENDING)
 
         val updated = paymentOrder.markAsPaid()
@@ -95,7 +96,7 @@ class PaymentOrderTest {
     }
 
     @Test
-    fun `markAsPending should change status to PENDING_STATUS_CHECK_LATER`() {
+    fun `markAsPending should change PaymentOrder status to PENDING_STATUS_CHECK_LATER`() {
         val paymentOrder = createTestPaymentOrder(status = PaymentOrderStatus.INITIATED_PENDING)
 
         val updated = paymentOrder.markAsPending()
@@ -104,7 +105,7 @@ class PaymentOrderTest {
     }
 
     @Test
-    fun `markAsFinalizedFailed should change status to FAILED_FINAL`() {
+    fun `markAsFinalizedFailed should change PaymentOrder status to FAILED_FINAL`() {
         val paymentOrder = createTestPaymentOrder(status = PaymentOrderStatus.INITIATED_PENDING)
 
         val updated = paymentOrder.markAsFinalizedFailed()
@@ -230,19 +231,19 @@ class PaymentOrderTest {
         retryReason: String? = null,
         lastErrorMessage: String? = null
     ): PaymentOrder {
-        return PaymentOrder(
-            paymentOrderId = paymentOrderId,
-            publicPaymentOrderId = publicPaymentOrderId,
-            paymentId = paymentId,
-            publicPaymentId = publicPaymentId,
-            sellerId = sellerId,
-            amount = amount,
-            status = status,
-            createdAt = createdAt,
-            updatedAt = updatedAt,
-            retryCount = retryCount,
-            retryReason = retryReason,
-            lastErrorMessage = lastErrorMessage
-        )
+        return PaymentOrder.builder()
+            .paymentOrderId(paymentOrderId)
+            .publicPaymentOrderId(publicPaymentOrderId)
+            .paymentId(paymentId)
+            .publicPaymentId(publicPaymentId)
+            .sellerId(sellerId)
+            .amount(amount)
+            .status(status)
+            .createdAt(createdAt)
+            .updatedAt(updatedAt)
+            .retryCount(retryCount)
+            .retryReason(retryReason)
+            .lastErrorMessage(lastErrorMessage)
+            .buildFromPersistence()
     }
 }

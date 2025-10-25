@@ -120,17 +120,27 @@ function jwtExpSeconds(token) {
   } catch (_) { return 0; }
 }
 function randomId(prefix) { return `${prefix}-${Math.floor(Math.random() * 1e12)}`; }
-function randomAmount(min, max) { return parseFloat((Math.random() * (max - min) + min).toFixed(2)); }
+function randomAmountCents(minEuros, maxEuros) {
+  // produce integer cents, e.g. 49.99 → 4999
+  const euros = Math.random() * (maxEuros - minEuros) + minEuros;
+  return Math.round(euros * 100);
+}
+
 function buildPaymentPayload() {
-  const paymentOrders = Array.from({ length: 2 }, () => ({
+  // generate 2–3 random seller payment lines
+  const numOrders = Math.floor(Math.random() * 2) + 2; // 2 or 3
+  const paymentOrders = Array.from({ length: numOrders }, () => ({
     sellerId: randomId('SELLER'),
-    amount: { value: randomAmount(10, 200), currency: 'EUR' },
+    amount: { value: randomAmountCents(10, 200), currency: 'EUR' },
   }));
-  const total = paymentOrders.reduce((s, po) => s + po.amount.value, 0);
+
+  // total in cents
+  const totalCents = paymentOrders.reduce((sum, po) => sum + po.amount.value, 0);
+
   return JSON.stringify({
     orderId: randomId('ORDER'),
     buyerId: randomId('BUYER'),
-    totalAmount: { value: parseFloat(total.toFixed(2)), currency: 'EUR' },
+    totalAmount: { value: totalCents, currency: 'EUR' },
     paymentOrders,
   });
 }

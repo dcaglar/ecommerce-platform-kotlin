@@ -16,37 +16,6 @@ class Payment private constructor(
     val paymentOrders: List<PaymentOrder>
 ) {
 
-    class Builder {
-        private var paymentId: PaymentId = PaymentId(0)
-        private var publicPaymentId: String = ""
-        private var buyerId: BuyerId = BuyerId("")
-        private var orderId: OrderId = OrderId("")
-        private var totalAmount: Amount = Amount(0L, "USD") // Default value
-        private var status: PaymentStatus = PaymentStatus.INITIATED
-        private var createdAt: LocalDateTime = LocalDateTime.now()
-        private var paymentOrders: List<PaymentOrder> = listOf()
-
-        fun paymentId(paymentId: PaymentId) = apply { this.paymentId = paymentId }
-        fun publicPaymentId(publicPaymentId: String) = apply { this.publicPaymentId = publicPaymentId }
-        fun buyerId(buyerId: BuyerId) = apply { this.buyerId = buyerId }
-        fun orderId(orderId: OrderId) = apply { this.orderId = orderId }
-        fun totalAmount(totalAmount: Amount) = apply { this.totalAmount = totalAmount }
-        fun status(status: PaymentStatus) = apply { this.status = status }
-        fun createdAt(createdAt: LocalDateTime) = apply { this.createdAt = createdAt }
-        fun paymentOrders(paymentOrders: List<PaymentOrder>) = apply { this.paymentOrders = paymentOrders }
-
-        fun build(): Payment = Payment(
-            paymentId = paymentId,
-            publicPaymentId = publicPaymentId,
-            buyerId = buyerId,
-            orderId = orderId,
-            totalAmount = totalAmount,
-            status = status,
-            createdAt = createdAt,
-            paymentOrders = paymentOrders
-        )
-    }
-
     fun markAsPaid() = copy(status = PaymentStatus.SUCCESS)
     fun markAsFailed() = copy(status = PaymentStatus.FAILED)
 
@@ -68,44 +37,50 @@ class Payment private constructor(
         .build()
 
     companion object {
-        fun createNew(
+        fun builder(): Builder = Builder()
+    }
 
-            paymentId: PaymentId,
-            publicPaymentId: String,
-            buyerId: BuyerId,
-            orderId: OrderId,
-            totalAmount: Amount,
-            createdAt: LocalDateTime,
-            paymentOrders: List<PaymentOrder>
-        ): Payment = Builder()
-            .paymentId(paymentId)
-            .publicPaymentId(publicPaymentId)
-            .buyerId(buyerId)
-            .orderId(orderId)
-            .totalAmount(totalAmount)
-            .status(PaymentStatus.INITIATED)
-            .createdAt(createdAt)
-            .paymentOrders(paymentOrders)
-            .build()
+    class Builder {
+        private var paymentId: PaymentId? = null
+        private var publicPaymentId: String? = null
+        private var buyerId: BuyerId? = null
+        private var orderId: OrderId? = null
+        private var totalAmount: Amount? = null
+        private var status: PaymentStatus = PaymentStatus.INITIATED
+        private var createdAt: LocalDateTime = LocalDateTime.now()
+        private var paymentOrders: List<PaymentOrder> = listOf()
 
-        fun reconstructFromPersistence(
-            paymentId: PaymentId,
-            publicPaymentId: String,
-            buyerId: BuyerId,
-            orderId: OrderId,
-            totalAmount: Amount,
-            status: PaymentStatus,
-            createdAt: LocalDateTime,
-            paymentOrders: List<PaymentOrder>
-        ): Payment = Payment.Builder()
-            .paymentId(paymentId)
-            .publicPaymentId(publicPaymentId)
-            .buyerId(buyerId)
-            .orderId(orderId)
-            .totalAmount(totalAmount)
-            .status(status)
-            .createdAt(createdAt)
-            .paymentOrders(paymentOrders)
-            .build()
+        fun paymentId(value: PaymentId) = apply { this.paymentId = value }
+        fun publicPaymentId(value: String) = apply { this.publicPaymentId = value }
+        fun buyerId(value: BuyerId) = apply { this.buyerId = value }
+        fun orderId(value: OrderId) = apply { this.orderId = value }
+        fun totalAmount(value: Amount) = apply { this.totalAmount = value }
+        fun status(value: PaymentStatus) = apply { this.status = value }
+        fun createdAt(value: LocalDateTime) = apply { this.createdAt = value }
+        fun paymentOrders(value: List<PaymentOrder>) = apply { this.paymentOrders = value }
+
+        fun buildNew(): Payment = Payment(
+            paymentId = requireNotNull(paymentId),
+            publicPaymentId = requireNotNull(publicPaymentId),
+            buyerId = requireNotNull(buyerId),
+            orderId = requireNotNull(orderId),
+            totalAmount = requireNotNull(totalAmount),
+            status = PaymentStatus.INITIATED,
+            createdAt = createdAt,
+            paymentOrders = paymentOrders
+        )
+
+        fun buildFromPersistence(): Payment = Payment(
+            paymentId = requireNotNull(paymentId),
+            publicPaymentId = requireNotNull(publicPaymentId),
+            buyerId = requireNotNull(buyerId),
+            orderId = requireNotNull(orderId),
+            totalAmount = requireNotNull(totalAmount),
+            status = status,
+            createdAt = createdAt,
+            paymentOrders = paymentOrders
+        )
+
+        fun build(): Payment = buildFromPersistence()
     }
 }

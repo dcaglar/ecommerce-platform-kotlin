@@ -1,8 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.outbound.persistance.entity
 
-import java.sql.Timestamp
 import java.time.LocalDateTime
-import java.time.ZoneOffset.UTC
 
 class OutboxEventEntity(
     val oeid: Long,
@@ -12,57 +10,6 @@ class OutboxEventEntity(
     var status: String = "NEW",
     val createdAt: LocalDateTime
 ) {
-    constructor(
-        oeid: Long,
-        eventType: String,
-        aggregateId: String,
-        payload: String,
-        status: String,
-        createdAt: Timestamp
-    ) : this(
-        oeid,
-        eventType,
-        aggregateId,
-        payload,
-        status,
-        createdAt.toInstant().atOffset(UTC).toLocalDateTime()
-    )
-
-
-    /*
-     constructor(
-        eventId: UUID?,
-        eventType: String,
-        aggregateId: String,
-        payload: String,
-        status: String,
-        createdAt: java.sql.Timestamp
-    ) : this(
-        eventId,
-        eventType,
-        aggregateId,
-        payload,
-        status,
-        createdAt.toInstant().atOffset(UTC).toLocalDateTime()
-    )
-
-    constructor(
-        eventId: String?,
-        eventType: String,
-        aggregateId: String,
-        payload: String,
-        status: String,
-        createdAt: java.sql.Timestamp
-    ) : this(
-        eventId?.let { UUID.fromString(it) },
-        eventType,
-        aggregateId,
-        payload,
-        status,
-        createdAt.toInstant().atOffset(UTC).toLocalDateTime()
-    )
-     */
-
     fun markAsSent() {
         this.status = "SENT"
     }

@@ -6,6 +6,7 @@ import com.dogancaglar.paymentservice.adapter.outbound.redis.PaymentRetryQueueAd
 import com.dogancaglar.paymentservice.adapter.outbound.redis.PspResultRedisCacheAdapter
 import com.dogancaglar.paymentservice.application.usecases.ProcessPaymentService
 import com.dogancaglar.paymentservice.domain.util.PaymentFactory
+import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderFactory
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
 import org.springframework.beans.factory.annotation.Qualifier
@@ -14,7 +15,16 @@ import org.springframework.context.annotation.Configuration
 import java.time.Clock
 
 @Configuration
-class PaymentProcessorServiceConfig {
+class PaymentConsumerConfig {
+
+
+    @Bean
+    fun paymentOrderDomainEventMapper(clock: Clock): PaymentOrderDomainEventMapper =
+        PaymentOrderDomainEventMapper(clock)
+
+    @Bean
+    fun paymentOrderFactory(): PaymentOrderFactory =
+        PaymentOrderFactory()
 
 
     @Bean
@@ -24,13 +34,17 @@ class PaymentProcessorServiceConfig {
         paymentRetryQueueAdapter: PaymentRetryQueueAdapter,
         pspResultRedisCacheAdapter: PspResultRedisCacheAdapter,
         clock: Clock,
+        paymentOrderFactory: PaymentOrderFactory,
+        paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
     ): ProcessPaymentService {
         return ProcessPaymentService(
             paymentOrderModificationPort = paymentOrderModificationPort,
             eventPublisher = syncPaymentEventPublisher,
             retryQueuePort = paymentRetryQueueAdapter,
             pspResultCache = pspResultRedisCacheAdapter,
-            clock = clock
+            clock = clock,
+            paymentOrderFactory = paymentOrderFactory,
+            paymentOrderDomainEventMapper = paymentOrderDomainEventMapper
         )
     }
 

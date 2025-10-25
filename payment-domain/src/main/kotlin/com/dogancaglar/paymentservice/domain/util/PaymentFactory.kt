@@ -1,6 +1,5 @@
 package com.dogancaglar.paymentservice.domain.util
 
-
 import com.dogancaglar.paymentservice.domain.commands.CreatePaymentCommand
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
@@ -13,33 +12,34 @@ class PaymentFactory(
     private val clock: Clock
 ) {
 
-
     fun createPayment(
         cmd: CreatePaymentCommand,
         paymentId: PaymentId,
-        paymentOrderIdList: List<PaymentOrderId>
+        paymentOrderIds: List<PaymentOrderId>
     ): Payment {
         val now = LocalDateTime.now(clock)
         val publicPaymentId = "payment-${paymentId.value}"
-        val orders = cmd.paymentLines.zip(paymentOrderIdList).map { (line, paymentOrderId) ->
-            PaymentOrder.createNew(
-                paymentOrderId = paymentOrderId,
-                publicPaymentOrderId = "paymentorder-${paymentOrderId.value}",
-                paymentId = paymentId,
-                publicPaymentId = publicPaymentId,
-                sellerId = line.sellerId,
-                amount = line.amount,
-                createdAt = now
-            )
+
+        val orders = cmd.paymentLines.zip(paymentOrderIds).map { (line, orderId) ->
+            PaymentOrder.builder()
+                .paymentOrderId(orderId)
+                .publicPaymentOrderId("paymentorder-${orderId.value}")
+                .paymentId(paymentId)
+                .publicPaymentId(publicPaymentId)
+                .sellerId(line.sellerId)
+                .amount(line.amount)
+                .createdAt(now)
+                .buildNew()
         }
-        return Payment.createNew(
-            paymentId = paymentId,
-            publicPaymentId = publicPaymentId,
-            orderId = cmd.orderId,
-            buyerId = cmd.buyerId,
-            totalAmount = cmd.totalAmount,
-            paymentOrders = orders,
-            createdAt = now
-        )
+
+        return Payment.builder()
+            .paymentId(paymentId)
+            .publicPaymentId(publicPaymentId)
+            .buyerId(cmd.buyerId)
+            .orderId(cmd.orderId)
+            .totalAmount(cmd.totalAmount)
+            .createdAt(now)
+            .paymentOrders(orders)
+            .buildNew()
     }
 }
