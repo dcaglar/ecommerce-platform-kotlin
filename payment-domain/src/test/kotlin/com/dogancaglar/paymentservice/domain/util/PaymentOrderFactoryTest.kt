@@ -70,10 +70,10 @@ class PaymentOrderFactoryTest {
 
         val paymentOrder = factory.fromEvent(event)
 
-        assertEquals(3, paymentOrder.retryCount)
-        assertEquals("PSP timeout", paymentOrder.retryReason)
-        assertEquals("Connection timeout occurred", paymentOrder.lastErrorMessage)
-        assertEquals(PaymentOrderStatus.FAILED_TRANSIENT_ERROR, paymentOrder.status)
+        assertEquals(3, paymentOrder.retryCount) // Factory preserves retry count from event
+        assertEquals("PSP timeout", paymentOrder.retryReason) // Factory preserves retry reason
+        assertEquals("Connection timeout occurred", paymentOrder.lastErrorMessage) // Factory preserves error message
+        assertEquals(PaymentOrderStatus.FAILED_TRANSIENT_ERROR, paymentOrder.status) // Factory preserves status from event
     }
 
     @Test
@@ -109,7 +109,7 @@ class PaymentOrderFactoryTest {
             assertEquals(
                 expectedStatus,
                 paymentOrder.status,
-                "Expected status $expectedStatus for event status $eventStatus"
+                "Factory should preserve status from event $eventStatus"
             )
         }
     }

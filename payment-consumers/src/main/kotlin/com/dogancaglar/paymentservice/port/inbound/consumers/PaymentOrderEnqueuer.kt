@@ -23,7 +23,8 @@ import org.springframework.stereotype.Component
 @Component
 class PaymentOrderEnqueuer(
     @param:Qualifier("syncPaymentTx") private val kafkaTx: KafkaTxExecutor,
-    @param:Qualifier("syncPaymentEventPublisher") private val publisher: EventPublisherPort
+    @param:Qualifier("syncPaymentEventPublisher") private val publisher: EventPublisherPort,
+    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val factory = PaymentOrderFactory()
@@ -52,7 +53,7 @@ class PaymentOrderEnqueuer(
                 return@with
             }
 
-            val work = PaymentOrderDomainEventMapper.toPaymentOrderPspCallRequested(order, attempt = 0)
+            val work = paymentOrderDomainEventMapper.toPaymentOrderPspCallRequested(order, attempt = 0)
             val outEnv = DomainEventEnvelopeFactory.envelopeFor(
                 data = work,
                 eventMetaData = EventMetadatas.PaymentOrderPspCallRequestedMetadata,

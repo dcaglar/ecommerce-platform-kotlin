@@ -3,7 +3,11 @@ package com.dogancaglar.paymentservice.application.usecases
 import com.dogancaglar.paymentservice.application.constants.IdNamespaces
 import com.dogancaglar.paymentservice.domain.commands.CreatePaymentCommand
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.*
+import com.dogancaglar.paymentservice.domain.util.PaymentFactory
+import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.domain.util.PaymentOrderFactory
 import com.dogancaglar.paymentservice.ports.outbound.OutboxEventPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
@@ -37,13 +41,19 @@ class CreatePaymentServiceTest {
         serializationPort = mockk()
         clock = Clock.fixed(Instant.parse("2024-01-01T12:00:00Z"), ZoneId.of("UTC"))
 
+        // 🆕 add these
+        val paymentOrderDomainEventMapper = PaymentOrderDomainEventMapper(clock)
+        val paymentFactory = PaymentFactory(clock)
+
         service = CreatePaymentService(
             idGeneratorPort = idGeneratorPort,
             paymentRepository = paymentRepository,
             paymentOrderRepository = paymentOrderRepository,
             outboxEventPort = outboxEventPort,
             serializationPort = serializationPort,
-            clock = clock
+            clock = clock,
+            paymentOrderDomainEventMapper = paymentOrderDomainEventMapper,
+            paymentFactory = paymentFactory
         )
     }
 
@@ -56,10 +66,10 @@ class CreatePaymentServiceTest {
 
         every { idGeneratorPort.nextId(IdNamespaces.PAYMENT) } returns paymentId
         every { idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER) } returnsMany listOf(paymentOrderId1, paymentOrderId2)
-        every { serializationPort.toJson<Any>(any()) } returns """{"eventType":"test"}"""
-        every { paymentRepository.save(any()) } returns Unit
-        every { paymentOrderRepository.insertAll(any()) } returns Unit
-        every { outboxEventPort.saveAll(any()) } returns emptyList()
+        every { serializationPort.toJson<Any>(match { it is com.dogancaglar.common.event.EventEnvelope<*> }) } returns """{"eventType":"test"}"""
+        every { paymentRepository.save(match { it is com.dogancaglar.paymentservice.domain.model.Payment }) } returns Unit
+        every { paymentOrderRepository.insertAll(match { it is List<*> && it.size == 2 }) } returns Unit
+        every { outboxEventPort.saveAll(match { it is List<*> && it.size == 2 }) } returns emptyList()
 
         val command = CreatePaymentCommand(
             orderId = OrderId("order-123"),
@@ -82,7 +92,17 @@ class CreatePaymentServiceTest {
         assertEquals(PaymentOrderId(paymentOrderId2), result.paymentOrders[1].paymentOrderId)
 
         // Verify interactions
-        verify(exactly = 1) { paymentRepository.save(any()) }
+        verify(exactly = 1) { 
+            paymentRepository.save(match { payment ->
+                payment.paymentId == PaymentId(paymentId) &&
+                payment.publicPaymentId == "payment-$paymentId" &&
+                payment.buyerId == BuyerId("buyer-456") &&
+                payment.orderId == OrderId("order-123") &&
+                payment.totalAmount == Amount(200000L, "USD") &&
+                payment.status == PaymentStatus.INITIATED &&
+                payment.paymentOrders.size == 2
+            })
+        }
         verify(exactly = 1) {
             paymentOrderRepository.insertAll(match { list ->
                 list.size == 2 &&
@@ -98,10 +118,10 @@ class CreatePaymentServiceTest {
         // Given
         every { idGeneratorPort.nextId(IdNamespaces.PAYMENT) } returns 100L
         every { idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER) } returnsMany listOf(200L, 201L, 202L)
-        every { serializationPort.toJson<Any>(any()) } returns """{"eventType":"test"}"""
-        every { paymentRepository.save(any()) } returns Unit
-        every { paymentOrderRepository.insertAll(any()) } returns Unit
-        every { outboxEventPort.saveAll(any()) } returns emptyList()
+        every { serializationPort.toJson<Any>(match { it is com.dogancaglar.common.event.EventEnvelope<*> }) } returns """{"eventType":"test"}"""
+        every { paymentRepository.save(match { it is com.dogancaglar.paymentservice.domain.model.Payment }) } returns Unit
+        every { paymentOrderRepository.insertAll(match { it is List<*> && it.size == 3 }) } returns Unit
+        every { outboxEventPort.saveAll(match { it is List<*> && it.size == 3 }) } returns emptyList()
 
         val command = CreatePaymentCommand(
             orderId = OrderId("order-1"),
@@ -128,10 +148,10 @@ class CreatePaymentServiceTest {
         // Given
         every { idGeneratorPort.nextId(IdNamespaces.PAYMENT) } returns 100L
         every { idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER) } returnsMany listOf(200L, 201L)
-        every { serializationPort.toJson<Any>(any()) } returns """{"test":"data"}"""
-        every { paymentRepository.save(any()) } returns Unit
-        every { paymentOrderRepository.insertAll(any()) } returns Unit
-        every { outboxEventPort.saveAll(any()) } returns emptyList()
+        every { serializationPort.toJson<Any>(match { it is com.dogancaglar.common.event.EventEnvelope<*> }) } returns """{"test":"data"}"""
+        every { paymentRepository.save(match { it is com.dogancaglar.paymentservice.domain.model.Payment }) } returns Unit
+        every { paymentOrderRepository.insertAll(match { it is List<*> && it.size == 2 }) } returns Unit
+        every { outboxEventPort.saveAll(match { it is List<*> && it.size == 2 }) } returns emptyList()
 
         val command = CreatePaymentCommand(
             orderId = OrderId("order-1"),
@@ -149,12 +169,16 @@ class CreatePaymentServiceTest {
         // Then
         verify(exactly = 1) { outboxEventPort.saveAll(match { it.size == 2 }) }
     }
-
     @Test
     fun `create should use clock for timestamps`() {
         // Given
         val fixedInstant = Instant.parse("2024-06-15T10:30:00Z")
         val fixedClock = Clock.fixed(fixedInstant, ZoneId.of("UTC"))
+
+        // NEW deps that the service now requires
+        val paymentOrderFactory = PaymentOrderFactory()
+        val paymentOrderDomainEventMapper = PaymentOrderDomainEventMapper(fixedClock)
+        val paymentFactory = PaymentFactory(fixedClock)
 
         val serviceWithFixedClock = CreatePaymentService(
             idGeneratorPort = idGeneratorPort,
@@ -162,15 +186,17 @@ class CreatePaymentServiceTest {
             paymentOrderRepository = paymentOrderRepository,
             outboxEventPort = outboxEventPort,
             serializationPort = serializationPort,
-            clock = fixedClock
+            clock = fixedClock,
+            paymentOrderDomainEventMapper = paymentOrderDomainEventMapper,
+            paymentFactory = paymentFactory
         )
 
         every { idGeneratorPort.nextId(IdNamespaces.PAYMENT) } returns 100L
         every { idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER) } returns 200L
-        every { serializationPort.toJson<Any>(any()) } returns "{}"
-        every { paymentRepository.save(any()) } returns Unit
-        every { paymentOrderRepository.insertAll(any()) } returns Unit
-        every { outboxEventPort.saveAll(any()) } returns emptyList()
+        every { serializationPort.toJson<Any>(match { it is com.dogancaglar.common.event.EventEnvelope<*> }) } returns "{}"
+        every { paymentRepository.save(match { it is com.dogancaglar.paymentservice.domain.model.Payment }) } returns Unit
+        every { paymentOrderRepository.insertAll(match { it is List<*> && it.size == 1 }) } returns Unit
+        every { outboxEventPort.saveAll(match { it is List<*> && it.size == 1 }) } returns emptyList()
 
         val command = CreatePaymentCommand(
             orderId = OrderId("order-1"),

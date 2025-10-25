@@ -380,20 +380,20 @@ class PaymentOrderOutboundAdapterTest {
     @Test
     fun `should handle null values in optional fields`() {
         // Given
-        val paymentOrder = PaymentOrder.reconstructFromPersistence(
-            paymentOrderId = PaymentOrderId(1L),
-            publicPaymentOrderId = "test_order_1",
-            paymentId = PaymentId(1L),
-            publicPaymentId = "payment-1",
-            sellerId = SellerId("seller_1"),
-            amount = Amount(10000L, "USD"),
-            status = PaymentOrderStatus.INITIATED_PENDING,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now(),
-            retryCount = 0,
-            retryReason = null,
-            lastErrorMessage = null
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(1L))
+            .publicPaymentOrderId("test_order_1")
+            .paymentId(PaymentId(1L))
+            .publicPaymentId("payment-1")
+            .sellerId(SellerId("seller_1"))
+            .amount(Amount(10000L, "USD"))
+            .status(PaymentOrderStatus.INITIATED_PENDING)
+            .createdAt(LocalDateTime.now())
+            .updatedAt(LocalDateTime.now())
+            .retryCount(0)
+            .retryReason(null)
+            .lastErrorMessage(null)
+            .buildFromPersistence()
         every { paymentOrderMapper.updateReturningIdempotent(any()) } returns null
         every { paymentOrderMapper.findByPaymentOrderId(any()) } returns emptyList()
 
@@ -418,35 +418,37 @@ class PaymentOrderOutboundAdapterTest {
         retryCount: Int = 0,
         status: PaymentOrderStatus = PaymentOrderStatus.INITIATED_PENDING
     ): PaymentOrder {
-        return PaymentOrder(
-            paymentOrderId = PaymentOrderId(id),
-            publicPaymentOrderId = "po-$id",
-            paymentId = PaymentId(999L),
-            publicPaymentId = "pay-999",
-            sellerId = SellerId("111"),
-            amount = Amount(10000L, "USD"),
-            status = status,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now(),
-            retryCount = retryCount
-        )
+        return PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(id))
+            .publicPaymentOrderId("po-$id")
+            .paymentId(PaymentId(999L))
+            .publicPaymentId("pay-999")
+            .sellerId(SellerId("111"))
+            .amount(Amount(10000L, "USD"))
+            .status(status)
+            .createdAt(LocalDateTime.now())
+            .updatedAt(LocalDateTime.now())
+            .retryCount(retryCount)
+            .retryReason(null)
+            .lastErrorMessage(null)
+            .buildFromPersistence()
     }
 
     private fun createTestPaymentOrderWithAllFields(): PaymentOrder {
-        return PaymentOrder(
-            paymentOrderId = PaymentOrderId(456L),
-            publicPaymentOrderId = "po-456",
-            paymentId = PaymentId(888L),
-            publicPaymentId = "pay-888",
-            sellerId = SellerId("seller-456"),
-            amount = Amount(25000L, "EUR"),
-            status = PaymentOrderStatus.FAILED_TRANSIENT_ERROR,
-            createdAt = LocalDateTime.of(2023, 6, 15, 10, 30),
-            updatedAt = LocalDateTime.of(2023, 6, 15, 10, 35),
-            retryCount = 2,
-            retryReason = "PSP_TIMEOUT",
-            lastErrorMessage = "Connection timeout after 30 seconds"
-        )
+        return PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(456L))
+            .publicPaymentOrderId("po-456")
+            .paymentId(PaymentId(888L))
+            .publicPaymentId("pay-888")
+            .sellerId(SellerId("seller-456"))
+            .amount(Amount(25000L, "EUR"))
+            .status(PaymentOrderStatus.FAILED_TRANSIENT_ERROR)
+            .createdAt(LocalDateTime.of(2023, 6, 15, 10, 30))
+            .updatedAt(LocalDateTime.of(2023, 6, 15, 10, 35))
+            .retryCount(2)
+            .retryReason("PSP_TIMEOUT")
+            .lastErrorMessage("Connection timeout after 30 seconds")
+            .buildFromPersistence()
     }
 
     private fun createTestPaymentOrderEntity(

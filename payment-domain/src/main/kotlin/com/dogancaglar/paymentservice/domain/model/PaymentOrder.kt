@@ -1,16 +1,15 @@
 package com.dogancaglar.paymentservice.domain.model
 
-
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import java.time.LocalDateTime
 
-class PaymentOrder constructor(
+class PaymentOrder private constructor(
     val paymentOrderId: PaymentOrderId,
-    val publicPaymentOrderId: String, // Keep as String for display purposes
+    val publicPaymentOrderId: String,
     val paymentId: PaymentId,
-    val publicPaymentId: String, // Keep as String for display purposes
+    val publicPaymentId: String,
     val sellerId: SellerId,
     val amount: Amount,
     val status: PaymentOrderStatus,
@@ -31,73 +30,79 @@ class PaymentOrder constructor(
     fun withUpdatedAt(now: LocalDateTime) = copy(updatedAt = now)
 
     fun isTerminal(): Boolean =
-        this.status == PaymentOrderStatus.SUCCESSFUL_FINAL || this.status == PaymentOrderStatus.FAILED_FINAL
+        status == PaymentOrderStatus.SUCCESSFUL_FINAL || status == PaymentOrderStatus.FAILED_FINAL
 
-    // ⚠️ We reimplement 'copy' ourselves because it's no longer a data class
     private fun copy(
         status: PaymentOrderStatus = this.status,
         retryCount: Int = this.retryCount,
         retryReason: String? = this.retryReason,
         lastErrorMessage: String? = this.lastErrorMessage,
         updatedAt: LocalDateTime = this.updatedAt
-    ): PaymentOrder = PaymentOrder(
-        paymentOrderId = this.paymentOrderId,
-        publicPaymentOrderId = this.publicPaymentOrderId,
-        paymentId = this.paymentId,
-        publicPaymentId = this.publicPaymentId,
-        sellerId = this.sellerId,
-        amount = this.amount,
-        status = status,
-        createdAt = this.createdAt,
-        updatedAt = updatedAt,
-        retryCount = retryCount,
-        retryReason = retryReason,
-        lastErrorMessage = lastErrorMessage
+    ) = PaymentOrder(
+        paymentOrderId,
+        publicPaymentOrderId,
+        paymentId,
+        publicPaymentId,
+        sellerId,
+        amount,
+        status,
+        createdAt,
+        updatedAt,
+        retryCount,
+        retryReason,
+        lastErrorMessage
     )
 
     companion object {
-        fun createNew(
-            paymentOrderId: PaymentOrderId,
-            publicPaymentOrderId: String,
-            paymentId: PaymentId,
-            publicPaymentId: String,
-            sellerId: SellerId,
-            amount: Amount,
-            createdAt: LocalDateTime,
-        ): PaymentOrder {
-            return PaymentOrder(
-                paymentOrderId = paymentOrderId,
-                publicPaymentOrderId = publicPaymentOrderId, // Keep as String
-                paymentId = paymentId,
-                publicPaymentId = publicPaymentId, // Keep as String
-                sellerId = sellerId,
-                amount = amount,
-                status = PaymentOrderStatus.INITIATED_PENDING,
-                createdAt = createdAt,
-                updatedAt = createdAt
-            )
-        }
+        fun builder(): Builder = Builder()
+    }
 
-        fun reconstructFromPersistence(
-            paymentOrderId: PaymentOrderId,
-            publicPaymentOrderId: String,
-            paymentId: PaymentId,
-            publicPaymentId: String,
-            sellerId: SellerId,
-            amount: Amount,
-            status: PaymentOrderStatus,
-            createdAt: LocalDateTime,
-            updatedAt: LocalDateTime,
-            retryCount: Int,
-            retryReason: String?,
-            lastErrorMessage: String?
-        ): PaymentOrder = PaymentOrder(
-            paymentOrderId = paymentOrderId,
-            publicPaymentOrderId = publicPaymentOrderId, // Keep as String
-            paymentId = paymentId,
-            publicPaymentId = publicPaymentId, // Keep as String
-            sellerId = sellerId,
-            amount = amount,
+    class Builder {
+        private var paymentOrderId: PaymentOrderId? = null
+        private var publicPaymentOrderId: String? = null
+        private var paymentId: PaymentId? = null
+        private var publicPaymentId: String? = null
+        private var sellerId: SellerId? = null
+        private var amount: Amount? = null
+        private var status: PaymentOrderStatus = PaymentOrderStatus.INITIATED_PENDING
+        private var createdAt: LocalDateTime = LocalDateTime.now()
+        private var updatedAt: LocalDateTime = createdAt
+        private var retryCount: Int = 0
+        private var retryReason: String? = null
+        private var lastErrorMessage: String? = null
+
+        fun paymentOrderId(v: PaymentOrderId) = apply { paymentOrderId = v }
+        fun publicPaymentOrderId(v: String) = apply { publicPaymentOrderId = v }
+        fun paymentId(v: PaymentId) = apply { paymentId = v }
+        fun publicPaymentId(v: String) = apply { publicPaymentId = v }
+        fun sellerId(v: SellerId) = apply { sellerId = v }
+        fun amount(v: Amount) = apply { amount = v }
+        fun status(v: PaymentOrderStatus) = apply { status = v }
+        fun createdAt(v: LocalDateTime) = apply { createdAt = v }
+        fun updatedAt(v: LocalDateTime) = apply { updatedAt = v }
+        fun retryCount(v: Int) = apply { retryCount = v }
+        fun retryReason(v: String?) = apply { retryReason = v }
+        fun lastErrorMessage(v: String?) = apply { lastErrorMessage = v }
+
+        fun buildNew(): PaymentOrder = PaymentOrder(
+            paymentOrderId = requireNotNull(paymentOrderId),
+            publicPaymentOrderId = requireNotNull(publicPaymentOrderId),
+            paymentId = requireNotNull(paymentId),
+            publicPaymentId = requireNotNull(publicPaymentId),
+            sellerId = requireNotNull(sellerId),
+            amount = requireNotNull(amount),
+            status = PaymentOrderStatus.INITIATED_PENDING,
+            createdAt = createdAt,
+            updatedAt = updatedAt
+        )
+
+        fun buildFromPersistence(): PaymentOrder = PaymentOrder(
+            paymentOrderId = requireNotNull(paymentOrderId),
+            publicPaymentOrderId = requireNotNull(publicPaymentOrderId),
+            paymentId = requireNotNull(paymentId),
+            publicPaymentId = requireNotNull(publicPaymentId),
+            sellerId = requireNotNull(sellerId),
+            amount = requireNotNull(amount),
             status = status,
             createdAt = createdAt,
             updatedAt = updatedAt,
@@ -106,34 +111,4 @@ class PaymentOrder constructor(
             lastErrorMessage = lastErrorMessage
         )
     }
-
-    fun reconstructFromEvent(
-        paymentOrderId: PaymentOrderId,
-        publicPaymentOrderId: String,
-        paymentId: PaymentId,
-        publicPaymentId: String,
-        sellerId: String,
-        amount: Amount,
-        status: PaymentOrderStatus,
-        createdAt: LocalDateTime,
-        updatedAt: LocalDateTime,
-        retryCount: Int = 0,
-        retryReason: String? = null,
-        lastErrorMessage: String? = null
-    ): PaymentOrder = PaymentOrder(
-        paymentOrderId = paymentOrderId,
-        publicPaymentOrderId = publicPaymentOrderId, // Keep as String
-        paymentId = paymentId,
-        publicPaymentId = publicPaymentId, // Keep as String
-        sellerId = SellerId(sellerId),
-        amount = amount,
-        status = status,
-        createdAt = createdAt,
-        updatedAt = updatedAt,
-        retryCount = retryCount,
-        retryReason = retryReason,
-        lastErrorMessage = lastErrorMessage
-    )
-
-
 }

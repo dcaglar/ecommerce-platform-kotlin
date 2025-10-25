@@ -66,15 +66,15 @@ class PaymentGatewayAdapterTest {
     @Test
     fun `should process successful payment charge`() {
         // Given
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = PaymentOrderId(123L),
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(123L))
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .buildNew()
 
         val scenarioConfig = createScenarioConfig(
             successful = 100,
@@ -99,15 +99,15 @@ class PaymentGatewayAdapterTest {
     @Test
     fun `should handle failed payment charge`() {
         // Given
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = PaymentOrderId(123L),
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(123L))
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .buildNew()
 
         val scenarioConfig = createScenarioConfig(
             successful = 0,
@@ -131,15 +131,15 @@ class PaymentGatewayAdapterTest {
     @Test
     fun `should handle declined payment charge`() {
         // Given
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = PaymentOrderId(123L),
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(123L))
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .buildNew()
 
         val scenarioConfig = createScenarioConfig(
             successful = 0,
@@ -163,15 +163,15 @@ class PaymentGatewayAdapterTest {
     @Test
     fun `should handle pending payment charge`() {
         // Given
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = PaymentOrderId(123L),
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(123L))
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .buildNew()
 
         val scenarioConfig = createScenarioConfig(
             successful = 0,
@@ -196,15 +196,15 @@ class PaymentGatewayAdapterTest {
     @Test
     fun `should handle timeout exception`() {
         // Given
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = PaymentOrderId(123L),
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(123L))
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .buildNew()
 
         val scenarioConfig = createScenarioConfig()
         val future = mockk<Future<PaymentOrderStatus>>()
@@ -227,15 +227,15 @@ class PaymentGatewayAdapterTest {
     @Test
     fun `should handle interrupted exception`() {
         // Given
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = PaymentOrderId(123L),
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(123L))
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .buildNew()
 
         val scenarioConfig = createScenarioConfig()
         val future = mockk<Future<PaymentOrderStatus>>()
@@ -258,15 +258,15 @@ class PaymentGatewayAdapterTest {
     @Test
     fun `should handle cancellation exception`() {
         // Given
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = PaymentOrderId(123L),
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(123L))
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .buildNew()
 
         val scenarioConfig = createScenarioConfig()
         val future = mockk<Future<PaymentOrderStatus>>()
@@ -287,15 +287,15 @@ class PaymentGatewayAdapterTest {
     @Test
     fun `should handle execution exception with interrupted cause`() {
         // Given
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = PaymentOrderId(123L),
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(123L))
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .buildNew()
 
         val scenarioConfig = createScenarioConfig()
         val future = mockk<Future<PaymentOrderStatus>>()
@@ -317,15 +317,15 @@ class PaymentGatewayAdapterTest {
     @Test
     fun `should handle execution exception with other cause`() {
         // Given
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = PaymentOrderId(123L),
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(123L))
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .buildNew()
 
         val scenarioConfig = createScenarioConfig()
         val future = mockk<Future<PaymentOrderStatus>>()
@@ -346,15 +346,15 @@ class PaymentGatewayAdapterTest {
     @Test
     fun `should handle rejected execution exception`() {
         // Given
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = PaymentOrderId(123L),
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(123L))
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .buildNew()
 
         val scenarioConfig = createScenarioConfig()
 
@@ -372,15 +372,15 @@ class PaymentGatewayAdapterTest {
     @Test
     fun `should process charge retry successfully`() {
         // Given
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = PaymentOrderId(123L),
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123"),
-            amount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(123L))
+            .publicPaymentOrderId("public-123")
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("public-payment-123")
+            .sellerId(SellerId("seller-123"))
+            .amount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .buildNew()
 
         val scenarioConfig = createScenarioConfig(
             successful = 100,

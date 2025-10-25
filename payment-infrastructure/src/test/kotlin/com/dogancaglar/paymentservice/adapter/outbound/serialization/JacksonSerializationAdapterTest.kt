@@ -101,20 +101,20 @@ class JacksonSerializationAdapterTest {
     fun `toJson should handle special characters in strings`() {
         // Given
         val specialChars = "Test with special chars: \"quotes\", 'apostrophes', \n newlines, \t tabs, \\ backslashes, / slashes"
-        val paymentOrder = PaymentOrder.reconstructFromPersistence(
-            paymentOrderId = PaymentOrderId(1L),
-            publicPaymentOrderId = specialChars,
-            paymentId = PaymentId(1L),
-            publicPaymentId = "payment-1",
-            sellerId = SellerId("seller_1"),
-            amount = Amount(10000L, "USD"),
-            status = PaymentOrderStatus.INITIATED_PENDING,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now(),
-            retryCount = 0,
-            retryReason = "Error: \"Connection failed\" with 'timeout'",
-            lastErrorMessage = null
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(1L))
+            .publicPaymentOrderId(specialChars)
+            .paymentId(PaymentId(1L))
+            .publicPaymentId("payment-1")
+            .sellerId(SellerId("seller_1"))
+            .amount(Amount(10000L, "USD"))
+            .status(PaymentOrderStatus.INITIATED_PENDING)
+            .createdAt(LocalDateTime.now())
+            .updatedAt(LocalDateTime.now())
+            .retryCount(0)
+            .retryReason("Error: \"Connection failed\" with 'timeout'")
+            .lastErrorMessage(null)
+            .buildFromPersistence()
 
         // When
         val json = adapter.toJson(paymentOrder)
@@ -131,20 +131,20 @@ class JacksonSerializationAdapterTest {
     fun `toJson should handle unicode characters`() {
         // Given
         val unicodeText = "Test with unicode: 中文, العربية, русский, 🚀 emoji, € currency"
-        val paymentOrder = PaymentOrder.reconstructFromPersistence(
-            paymentOrderId = PaymentOrderId(1L),
-            publicPaymentOrderId = unicodeText,
-            paymentId = PaymentId(1L),
-            publicPaymentId = "payment-1",
-            sellerId = SellerId("seller-测试-123"),
-            amount = Amount(10000L, "USD"),
-            status = PaymentOrderStatus.INITIATED_PENDING,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now(),
-            retryCount = 0,
-            retryReason = null,
-            lastErrorMessage = null
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(1L))
+            .publicPaymentOrderId(unicodeText)
+            .paymentId(PaymentId(1L))
+            .publicPaymentId("payment-1")
+            .sellerId(SellerId("seller-测试-123"))
+            .amount(Amount(10000L, "USD"))
+            .status(PaymentOrderStatus.INITIATED_PENDING)
+            .createdAt(LocalDateTime.now())
+            .updatedAt(LocalDateTime.now())
+            .retryCount(0)
+            .retryReason(null)
+            .lastErrorMessage(null)
+            .buildFromPersistence()
 
         // When
         val json = adapter.toJson(paymentOrder)
@@ -160,20 +160,20 @@ class JacksonSerializationAdapterTest {
     @Test
     fun `toJson should handle empty strings`() {
         // Given
-        val paymentOrder = PaymentOrder.reconstructFromPersistence(
-            paymentOrderId = PaymentOrderId(1L),
-            publicPaymentOrderId = "",
-            paymentId = PaymentId(1L),
-            publicPaymentId = "payment-1",
-            sellerId = SellerId("seller_1"),
-            amount = Amount(10000L, "USD"),
-            status = PaymentOrderStatus.INITIATED_PENDING,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now(),
-            retryCount = 0,
-            retryReason = "",
-            lastErrorMessage = null
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(1L))
+            .publicPaymentOrderId("")
+            .paymentId(PaymentId(1L))
+            .publicPaymentId("payment-1")
+            .sellerId(SellerId("seller_1"))
+            .amount(Amount(10000L, "USD"))
+            .status(PaymentOrderStatus.INITIATED_PENDING)
+            .createdAt(LocalDateTime.now())
+            .updatedAt(LocalDateTime.now())
+            .retryCount(0)
+            .retryReason("")
+            .lastErrorMessage(null)
+            .buildFromPersistence()
 
         // When
         val json = adapter.toJson(paymentOrder)
@@ -190,20 +190,20 @@ class JacksonSerializationAdapterTest {
     fun `toJson should serialize LocalDateTime correctly`() {
         // Given
         val fixedTime = LocalDateTime.of(2023, 12, 25, 14, 30, 45, 123_456_789)
-        val paymentOrder = PaymentOrder.reconstructFromPersistence(
-            paymentOrderId = PaymentOrderId(1L),
-            publicPaymentOrderId = "test_order_1",
-            paymentId = PaymentId(1L),
-            publicPaymentId = "payment-1",
-            sellerId = SellerId("seller_1"),
-            amount = Amount(10000L, "USD"),
-            status = PaymentOrderStatus.INITIATED_PENDING,
-            createdAt = fixedTime,
-            updatedAt = fixedTime,
-            retryCount = 0,
-            retryReason = null,
-            lastErrorMessage = null
-        )
+        val paymentOrder = PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(1L))
+            .publicPaymentOrderId("test_order_1")
+            .paymentId(PaymentId(1L))
+            .publicPaymentId("payment-1")
+            .sellerId(SellerId("seller_1"))
+            .amount(Amount(10000L, "USD"))
+            .status(PaymentOrderStatus.INITIATED_PENDING)
+            .createdAt(fixedTime)
+            .updatedAt(fixedTime)
+            .retryCount(0)
+            .retryReason(null)
+            .lastErrorMessage(null)
+            .buildFromPersistence()
 
         // When
         val json = adapter.toJson(paymentOrder)
@@ -334,52 +334,54 @@ class JacksonSerializationAdapterTest {
         retryCount: Int = 0,
         status: PaymentOrderStatus = PaymentOrderStatus.INITIATED_PENDING
     ): PaymentOrder {
-        return PaymentOrder(
-            paymentOrderId = PaymentOrderId(id),
-            publicPaymentOrderId = "po-$id",
-            paymentId = PaymentId(999L),
-            publicPaymentId = "pay-999",
-            sellerId = SellerId("111"),
-            amount = Amount(10000L, "USD"),
-            status = status,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now(),
-            retryCount = retryCount
-        )
+        return PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(id))
+            .publicPaymentOrderId("po-$id")
+            .paymentId(PaymentId(999L))
+            .publicPaymentId("pay-999")
+            .sellerId(SellerId("111"))
+            .amount(Amount(10000L, "USD"))
+            .status(status)
+            .createdAt(LocalDateTime.now())
+            .updatedAt(LocalDateTime.now())
+            .retryCount(retryCount)
+            .retryReason(null)
+            .lastErrorMessage(null)
+            .buildFromPersistence()
     }
 
     private fun createTestPaymentOrderWithNestedData(): PaymentOrder {
-        return PaymentOrder(
-            paymentOrderId = PaymentOrderId(456L),
-            publicPaymentOrderId = "po-456",
-            paymentId = PaymentId(888L),
-            publicPaymentId = "pay-888",
-            sellerId = SellerId("seller-456"),
-            amount = Amount(25000L, "EUR"),
-            status = PaymentOrderStatus.FAILED_TRANSIENT_ERROR,
-            createdAt = LocalDateTime.of(2023, 6, 15, 10, 30),
-            updatedAt = LocalDateTime.of(2023, 6, 15, 10, 35),
-            retryCount = 2,
-            retryReason = "PSP_TIMEOUT",
-            lastErrorMessage = "Connection timeout after 30 seconds"
-        )
+        return PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(456L))
+            .publicPaymentOrderId("po-456")
+            .paymentId(PaymentId(888L))
+            .publicPaymentId("pay-888")
+            .sellerId(SellerId("seller-456"))
+            .amount(Amount(25000L, "EUR"))
+            .status(PaymentOrderStatus.FAILED_TRANSIENT_ERROR)
+            .createdAt(LocalDateTime.of(2023, 6, 15, 10, 30))
+            .updatedAt(LocalDateTime.of(2023, 6, 15, 10, 35))
+            .retryCount(2)
+            .retryReason("PSP_TIMEOUT")
+            .lastErrorMessage("Connection timeout after 30 seconds")
+            .buildFromPersistence()
     }
 
     private fun createTestPaymentOrderWithNulls(): PaymentOrder {
-        return PaymentOrder(
-            paymentOrderId = PaymentOrderId(789L),
-            publicPaymentOrderId = "po-789",
-            paymentId = PaymentId(777L),
-            publicPaymentId = "pay-777",
-            sellerId = SellerId("seller-789"),
-            amount = Amount(5000L, "GBP"),
-            status = PaymentOrderStatus.SUCCESSFUL_FINAL,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now(),
-            retryCount = 0,
-            retryReason = null,
-            lastErrorMessage = null
-        )
+        return PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(789L))
+            .publicPaymentOrderId("po-789")
+            .paymentId(PaymentId(777L))
+            .publicPaymentId("pay-777")
+            .sellerId(SellerId("seller-789"))
+            .amount(Amount(5000L, "GBP"))
+            .status(PaymentOrderStatus.SUCCESSFUL_FINAL)
+            .createdAt(LocalDateTime.now())
+            .updatedAt(LocalDateTime.now())
+            .retryCount(0)
+            .retryReason(null)
+            .lastErrorMessage(null)
+            .buildFromPersistence()
     }
 
     private fun createCircularReferenceObject(): Any {

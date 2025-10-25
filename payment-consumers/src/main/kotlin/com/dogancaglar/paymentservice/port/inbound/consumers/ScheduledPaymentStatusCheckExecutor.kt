@@ -31,7 +31,8 @@ import java.util.concurrent.TimeoutException
 class ScheduledPaymentStatusCheckExecutor(
     val paymentGatewayPort: PaymentGatewayPort,
     private val processPspResultUseCase: ProcessPspResultUseCase,
-    @Qualifier("paymentStatusPspPool") private val externalPspExecutorPoolConig: ThreadPoolTaskExecutor
+    @Qualifier("paymentStatusPspPool") private val externalPspExecutorPoolConig: ThreadPoolTaskExecutor,
+    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -48,7 +49,7 @@ class ScheduledPaymentStatusCheckExecutor(
     fun handle(record: ConsumerRecord<String, EventEnvelope<PaymentOrderStatusCheckRequested>>) {
         val envelope = record.value()
         val paymentOrderStatusCheckRequested = envelope.data
-        val order = PaymentOrderDomainEventMapper.fromEvent(paymentOrderStatusCheckRequested)
+        val order = paymentOrderDomainEventMapper.fromEvent(paymentOrderStatusCheckRequested)
         logger.info("▶️ [Handle Start] Processing PaymentOrderStatusCheckRequested")
         try {
             val response = safePspCall(order)

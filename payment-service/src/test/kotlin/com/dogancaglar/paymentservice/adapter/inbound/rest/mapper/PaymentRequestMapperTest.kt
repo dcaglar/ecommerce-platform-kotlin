@@ -84,15 +84,15 @@ class PaymentRequestMapperTest {
     @Test
     fun `should map Payment to PaymentResponseDTO correctly`() {
         // Given
-        val payment = Payment.createNew(
-            paymentId = PaymentId(123L),
-            publicPaymentId = "payment-123",
-            orderId = OrderId("order-123"),
-            buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount(10000L, "USD"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
-            paymentOrders = listOf()
-        )
+        val payment = Payment.builder()
+            .paymentId(PaymentId(123L))
+            .publicPaymentId("payment-123")
+            .orderId(OrderId("order-123"))
+            .buyerId(BuyerId("buyer-456"))
+            .totalAmount(Amount(10000L, "USD"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .paymentOrders(listOf())
+            .buildNew()
 
         // When
         val response = PaymentRequestMapper.toResponse(payment)
@@ -111,15 +111,15 @@ class PaymentRequestMapperTest {
     @Test
     fun `should map Payment with different status correctly`() {
         // Given
-        val payment = Payment.createNew(
-            paymentId = PaymentId(456L),
-            publicPaymentId = "payment-456",
-            orderId = OrderId("order-456"),
-            buyerId = BuyerId("buyer-789"),
-            totalAmount = Amount(5000L, "EUR"),
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
-            paymentOrders = listOf()
-        )
+        val payment = Payment.builder()
+            .paymentId(PaymentId(456L))
+            .publicPaymentId("payment-456")
+            .orderId(OrderId("order-456"))
+            .buyerId(BuyerId("buyer-789"))
+            .totalAmount(Amount(5000L, "EUR"))
+            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
+            .paymentOrders(listOf())
+            .buildNew()
 
         // When
         val response = PaymentRequestMapper.toResponse(payment)

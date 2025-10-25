@@ -1,9 +1,8 @@
 package com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis
 
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.OutboxEventEntity
-import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentEntity
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentOrderEntity
-import com.dogancaglar.paymentservice.domain.events.OutboxEvent
+import com.dogancaglar.paymentservice.domain.event.OutboxEvent
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
@@ -180,16 +179,16 @@ class EntityMapperTest {
     @Test
     fun `PaymentEntityMapper should handle special characters in IDs`() {
         // Given
-        val payment = Payment.reconstructFromPersistence(
-            paymentId = PaymentId(123L),
-            publicPaymentId = "pay-123-test_@#$%",
-            buyerId = BuyerId("buyer-456-special!@#"),
-            orderId = OrderId("order-789-unicode-测试"),
-            totalAmount = Amount(10000L, "USD"),
-            status = PaymentStatus.INITIATED,
-            createdAt = LocalDateTime.now(),
-            paymentOrders = emptyList()
-        )
+        val payment = Payment.Builder()
+            .paymentId(PaymentId(123L))
+            .publicPaymentId("pay-123-test_@#$%")
+            .buyerId(BuyerId("buyer-456-special!@#"))
+            .orderId(OrderId("order-789-unicode-测试"))
+            .totalAmount(Amount(10000L, "USD"))
+            .status(PaymentStatus.INITIATED)
+            .createdAt(LocalDateTime.now())
+            .paymentOrders(emptyList())
+            .build()
 
         // When
         val entity = PaymentEntityMapper.toEntity(payment)
@@ -215,7 +214,7 @@ class EntityMapperTest {
         assertEquals(outboxEvent.eventType, entity.eventType)
         assertEquals(outboxEvent.aggregateId, entity.aggregateId)
         assertEquals(outboxEvent.payload, entity.payload)
-        assertEquals(outboxEvent.status, entity.status)
+        assertEquals(outboxEvent.status.toString(), entity.status)
         assertEquals(outboxEvent.createdAt, entity.createdAt)
     }
 
@@ -232,7 +231,7 @@ class EntityMapperTest {
         assertEquals(entity.eventType, domain.eventType)
         assertEquals(entity.aggregateId, domain.aggregateId)
         assertEquals(entity.payload, domain.payload)
-        assertEquals(entity.status, domain.status)
+        assertEquals(entity.status, domain.status.toString())
         assertEquals(entity.createdAt, domain.createdAt)
     }
 
@@ -257,7 +256,7 @@ class EntityMapperTest {
     @Test
     fun `OutboxEventEntityMapper should handle different statuses`() {
         // Given
-        val statuses = listOf("NEW", "PROCESSING", "SENT", "FAILED")
+        val statuses = listOf("NEW", "PROCESSING", "SENT")
 
         // When/Then
         statuses.forEach { status ->
@@ -359,35 +358,37 @@ class EntityMapperTest {
         retryCount: Int = 0,
         status: PaymentOrderStatus = PaymentOrderStatus.INITIATED_PENDING
     ): PaymentOrder {
-        return PaymentOrder(
-            paymentOrderId = PaymentOrderId(id),
-            publicPaymentOrderId = "po-$id",
-            paymentId = PaymentId(999L),
-            publicPaymentId = "pay-999",
-            sellerId = SellerId("111"),
-            amount = Amount(10000L, "USD"),
-            status = status,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now(),
-            retryCount = retryCount
-        )
+        return PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(id))
+            .publicPaymentOrderId("po-$id")
+            .paymentId(PaymentId(999L))
+            .publicPaymentId("pay-999")
+            .sellerId(SellerId("111"))
+            .amount(Amount(10000L, "USD"))
+            .status(status)
+            .createdAt(LocalDateTime.now())
+            .updatedAt(LocalDateTime.now())
+            .retryCount(retryCount)
+            .retryReason(null)
+            .lastErrorMessage(null)
+            .buildFromPersistence()
     }
 
     private fun createTestPaymentOrderWithAllFields(): PaymentOrder {
-        return PaymentOrder(
-            paymentOrderId = PaymentOrderId(456L),
-            publicPaymentOrderId = "po-456",
-            paymentId = PaymentId(888L),
-            publicPaymentId = "pay-888",
-            sellerId = SellerId("seller-456"),
-            amount = Amount(25000L, "EUR"),
-            status = PaymentOrderStatus.FAILED_TRANSIENT_ERROR,
-            createdAt = LocalDateTime.of(2023, 6, 15, 10, 30),
-            updatedAt = LocalDateTime.of(2023, 6, 15, 10, 35),
-            retryCount = 2,
-            retryReason = "PSP_TIMEOUT",
-            lastErrorMessage = "Connection timeout after 30 seconds"
-        )
+        return PaymentOrder.builder()
+            .paymentOrderId(PaymentOrderId(456L))
+            .publicPaymentOrderId("po-456")
+            .paymentId(PaymentId(888L))
+            .publicPaymentId("pay-888")
+            .sellerId(SellerId("seller-456"))
+            .amount(Amount(25000L, "EUR"))
+            .status(PaymentOrderStatus.FAILED_TRANSIENT_ERROR)
+            .createdAt(LocalDateTime.of(2023, 6, 15, 10, 30))
+            .updatedAt(LocalDateTime.of(2023, 6, 15, 10, 35))
+            .retryCount(2)
+            .retryReason("PSP_TIMEOUT")
+            .lastErrorMessage("Connection timeout after 30 seconds")
+            .buildFromPersistence()
     }
 
     private fun createTestPaymentOrderEntity(): PaymentOrderEntity {
@@ -410,29 +411,30 @@ class EntityMapperTest {
         id: Long = 123L,
         status: PaymentStatus = PaymentStatus.INITIATED
     ): Payment {
-        return Payment.reconstructFromPersistence(
-            paymentId = PaymentId(id),
-            publicPaymentId = "pay-$id",
-            buyerId = BuyerId("buyer-$id"),
-            orderId = OrderId("order-$id"),
-            totalAmount = Amount(10000L, "USD"),
-            status = status,
-            createdAt = LocalDateTime.now(),
-            paymentOrders = emptyList()
-        )
+        return Payment.Builder()
+            .paymentId(PaymentId(id))
+            .publicPaymentId("pay-$id")
+            .buyerId(BuyerId("buyer-$id"))
+            .orderId(OrderId("order-$id"))
+            .totalAmount(Amount(10000L, "USD"))
+            .status(status)
+            .createdAt(LocalDateTime.now())
+            .paymentOrders(emptyList())
+            .build()
     }
 
     private fun createTestOutboxEvent(
         oeid: Long = 123L,
         status: String = "NEW"
     ): OutboxEvent {
-        return OutboxEvent.createNew(
+        return OutboxEvent.restore(
             oeid = oeid,
             eventType = "payment_order_created",
             aggregateId = "agg-$oeid",
             payload = """{"paymentOrderId": "$oeid", "amount": 10000}""",
+            status = status,
             createdAt = LocalDateTime.now()
-        ).also { it.status = status }
+        )
     }
 
     private fun createTestOutboxEventWithAllFields(): OutboxEvent {
@@ -464,20 +466,20 @@ class EntityMapperTest {
         retryReason: String? = this.retryReason,
         lastErrorMessage: String? = this.lastErrorMessage
     ): PaymentOrder {
-        return PaymentOrder(
-            paymentOrderId = paymentOrderId,
-            publicPaymentOrderId = this.publicPaymentOrderId,
-            paymentId = this.paymentId,
-            publicPaymentId = this.publicPaymentId,
-            sellerId = this.sellerId,
-            amount = this.amount,
-            status = this.status,
-            createdAt = this.createdAt,
-            updatedAt = this.updatedAt,
-            retryCount = retryCount,
-            retryReason = retryReason,
-            lastErrorMessage = lastErrorMessage
-        )
+        return PaymentOrder.builder()
+            .paymentOrderId(paymentOrderId)
+            .publicPaymentOrderId(this.publicPaymentOrderId)
+            .paymentId(this.paymentId)
+            .publicPaymentId(this.publicPaymentId)
+            .sellerId(this.sellerId)
+            .amount(this.amount)
+            .status(this.status)
+            .createdAt(this.createdAt)
+            .updatedAt(this.updatedAt)
+            .retryCount(retryCount)
+            .retryReason(retryReason)
+            .lastErrorMessage(lastErrorMessage)
+            .buildFromPersistence()
     }
 
     private fun Payment.copy(
@@ -485,21 +487,21 @@ class EntityMapperTest {
         status: PaymentStatus = this.status,
         totalAmount: Amount = this.totalAmount
     ): Payment {
-        return Payment.reconstructFromPersistence(
-            paymentId = paymentId,
-            publicPaymentId = this.publicPaymentId,
-            buyerId = this.buyerId,
-            orderId = this.orderId,
-            totalAmount = totalAmount,
-            status = status,
-            createdAt = this.createdAt,
-            paymentOrders = emptyList()
-        )
+        return Payment.Builder()
+            .paymentId(paymentId)
+            .publicPaymentId(this.publicPaymentId)
+            .buyerId(this.buyerId)
+            .orderId(this.orderId)
+            .totalAmount(totalAmount)
+            .status(status)
+            .createdAt(this.createdAt)
+            .paymentOrders(emptyList())
+            .build()
     }
 
     private fun OutboxEvent.copy(
         oeid: Long = this.oeid,
-        status: String = this.status,
+        status: String = this.status.toString(),
         payload: String = this.payload,
         aggregateId: String = this.aggregateId
     ): OutboxEvent {

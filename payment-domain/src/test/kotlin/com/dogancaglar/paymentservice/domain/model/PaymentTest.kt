@@ -8,7 +8,7 @@ import java.time.LocalDateTime
 class PaymentTest {
 
     @Test
-    fun `createNew should create Payment with INITIATED status`() {
+    fun `Payment builder should create Payment with INITIATED status and payment orders`() {
         val paymentId = PaymentId(1L)
         val buyerId = BuyerId("buyer-123")
         val orderId = OrderId("order-456")
@@ -19,15 +19,15 @@ class PaymentTest {
             createTestPaymentOrder(paymentOrderId = PaymentOrderId(2L))
         )
 
-        val payment = Payment.createNew(
-            paymentId = paymentId,
-            publicPaymentId = "payment-1",
-            buyerId = buyerId,
-            orderId = orderId,
-            totalAmount = totalAmount,
-            createdAt = now,
-            paymentOrders = paymentOrders
-        )
+        val payment = Payment.Builder()
+            .paymentId(paymentId)
+            .publicPaymentId("payment-1")
+            .buyerId(buyerId)
+            .orderId(orderId)
+            .totalAmount(totalAmount)
+            .createdAt(now)
+            .paymentOrders(paymentOrders)
+            .build()
 
         assertEquals(paymentId, payment.paymentId)
         assertEquals("payment-1", payment.publicPaymentId)
@@ -41,23 +41,23 @@ class PaymentTest {
     }
 
     @Test
-    fun `createNew should create Payment with empty paymentOrders list`() {
-        val payment = Payment.createNew(
-            paymentId = PaymentId(1L),
-            publicPaymentId = "payment-1",
-            buyerId = BuyerId("buyer-123"),
-            orderId = OrderId("order-456"),
-            totalAmount = Amount(200000L, "USD"), // $2000.00 = 200000 cents
-            createdAt = LocalDateTime.now(),
-            paymentOrders = emptyList()
-        )
+    fun `Payment builder should create Payment with empty paymentOrders list`() {
+        val payment = Payment.Builder()
+            .paymentId(PaymentId(1L))
+            .publicPaymentId("payment-1")
+            .buyerId(BuyerId("buyer-123"))
+            .orderId(OrderId("order-456"))
+            .totalAmount(Amount(200000L, "USD")) // $2000.00 = 200000 cents
+            .createdAt(LocalDateTime.now())
+            .paymentOrders(emptyList())
+            .build()
 
         assertEquals(PaymentStatus.INITIATED, payment.status)
         assertTrue(payment.paymentOrders.isEmpty())
     }
 
     @Test
-    fun `reconstructFromPersistence should recreate Payment with all fields`() {
+    fun `Payment builder should recreate Payment with all fields from persistence`() {
         val paymentId = PaymentId(1L)
         val buyerId = BuyerId("buyer-123")
         val orderId = OrderId("order-456")
@@ -67,16 +67,16 @@ class PaymentTest {
             createTestPaymentOrder(paymentOrderId = PaymentOrderId(1L))
         )
 
-        val payment = Payment.reconstructFromPersistence(
-            paymentId = paymentId,
-            publicPaymentId = "payment-1",
-            buyerId = buyerId,
-            orderId = orderId,
-            totalAmount = totalAmount,
-            status = PaymentStatus.SUCCESS,
-            createdAt = now,
-            paymentOrders = paymentOrders
-        )
+        val payment = Payment.Builder()
+            .paymentId(paymentId)
+            .publicPaymentId("payment-1")
+            .buyerId(buyerId)
+            .orderId(orderId)
+            .totalAmount(totalAmount)
+            .status(PaymentStatus.SUCCESS)
+            .createdAt(now)
+            .paymentOrders(paymentOrders)
+            .build()
 
         assertEquals(paymentId, payment.paymentId)
         assertEquals("payment-1", payment.publicPaymentId)
@@ -178,18 +178,7 @@ class PaymentTest {
         assertEquals(paymentOrders, payment.paymentOrders)
     }
 
-    @Test
-    fun `Builder should have default values`() {
-        val payment = Payment.Builder().build()
 
-        assertEquals(PaymentId(0), payment.paymentId)
-        assertEquals("", payment.publicPaymentId)
-        assertEquals(BuyerId(""), payment.buyerId)
-        assertEquals(OrderId(""), payment.orderId)
-        assertEquals(Amount(0L, "USD"), payment.totalAmount)
-        assertEquals(PaymentStatus.INITIATED, payment.status)
-        assertTrue(payment.paymentOrders.isEmpty())
-    }
 
     @Test
     fun `copy should preserve immutability when changing status`() {
@@ -241,14 +230,14 @@ class PaymentTest {
         sellerId: SellerId = SellerId("seller-123"),
         amount: Amount = Amount(100000L, "USD") // $1000.00 = 100000 cents
     ): PaymentOrder {
-        return PaymentOrder.createNew(
-            paymentOrderId = paymentOrderId,
-            publicPaymentOrderId = "paymentorder-${paymentOrderId.value}",
-            paymentId = paymentId,
-            publicPaymentId = "payment-${paymentId.value}",
-            sellerId = sellerId,
-            amount = amount,
-            createdAt = LocalDateTime.now()
-        )
+        return PaymentOrder.builder()
+            .paymentOrderId(paymentOrderId)
+            .publicPaymentOrderId("paymentorder-${paymentOrderId.value}")
+            .paymentId(paymentId)
+            .publicPaymentId("payment-${paymentId.value}")
+            .sellerId(sellerId)
+            .amount(amount)
+            .createdAt(LocalDateTime.now())
+            .buildNew()
     }
 }

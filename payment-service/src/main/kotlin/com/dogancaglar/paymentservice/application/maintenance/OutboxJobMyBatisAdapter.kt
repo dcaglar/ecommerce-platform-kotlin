@@ -1,8 +1,7 @@
 package com.dogancaglar.paymentservice.application.maintenance
 
-import com.dogancaglar.paymentservice.domain.events.OutboxEvent
+import com.dogancaglar.paymentservice.domain.event.OutboxEvent
 import com.dogancaglar.paymentservice.ports.outbound.OutboxEventPort
-import org.apache.kafka.common.protocol.types.Field
 import org.mybatis.spring.SqlSessionTemplate
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Repository
