@@ -704,3 +704,71 @@ The project employs a comprehensive testing strategy with **297 tests** achievin
   logging/Elastic search keys, and **lag‑based autoscaling**. Documented module split and the new
   `payment-infrastructure` auto‑config module.
 - **2025‑06‑21**: Previous revision.
+
+
+/*
+If you remember our discussioon i decided to iintroduce a double ledger entry.
+our new kafka queue payment_order_ledger_queue and  payment_order_ledger_appended will be partitioned by a merchantid 
+As first i will seperate payment-processing flow from ledger generation.So in the enmd of the flow.Currently I do have
+PaymentOrderPspResultApplier , and this will publish an event(currently we publish payment_order_succeeded and paymant_order_failed represent final transition) to a new queue (for_example payment_order_ledger_queue) 
+And from there i will havae new consumer maybe called PaymentOrderLedgerConsumer which will simply create a 
+ 1-create a journalentries append-only,
+ 2-create postings in posting table.
+ 3-publish a ledger_event_written event to payment_order_ledger_appended queue
+
+All this three will be transactional which means we will only commit offset when  we succesfully published and commit offset, otherwise it wont do anything
+and then we will have another consumer which will be called as AccountBalanceConsumer.
+AccountBalanceConsumer will be a batch consumer will simmply update an account_balance where we do persist the snapshots of accounts, and also we will do store buffered balances in an in memory map.
+
+So my Core  Entities will be.
+
+enum class NormalBalance{
+DEBIT,
+CREDIT
+}
+enum class AccountCategory{
+ASSET,
+EXPENSE,
+LIABILITY,
+EQUITY,
+REVENUE
+}
+enum class AccountType(val normalBalance: NormalBalance, val category: AccountCategory) {
+// Assets
+CASH(NormalBalance.DEBIT, AccountCategory.ASSET),
+PSP_RECEIVABLES(NormalBalance.DEBIT, AccountCategory.ASSET),
+SHOPPER_RECEIVABLES(NormalBalance.DEBIT, AccountCategory.ASSET),
+AUTH_RECEIVABLE(NormalBalance.DEBIT, AccountCategory.ASSET),
+ACQUIRER_ACCOUNT(NormalBalance.DEBIT, AccountCategory.ASSET),
+
+    // Liabilities
+    AUTH_LIABILITY(NormalBalance.CREDIT, AccountCategory.LIABILITY),
+    MERCHANT_ACCOUNT(NormalBalance.CREDIT, AccountCategory.LIABILITY),
+
+    // Revenue
+    PROCESSING_FEES(NormalBalance.CREDIT, AccountCategory.REVENUE),
+
+    // Expenses
+    INTERCHANGE_FEES(NormalBalance.DEBIT, AccountCategory.EXPENSE),
+    SCHEME_FEES(NormalBalance.DEBIT, AccountCategory.EXPENSE),
+    BANK_FEES(NormalBalance.DEBIT, AccountCategory.EXPENSE)
+}
+
+data class Account(val accountCode: String,val accountType: AccountType) {
+}
+
+and 
+
+enum class JournalType {
+AUTH_HOLD,
+CAPTURE,
+SETTLEMENT,
+PAYOUT,
+REFUND,
+FEE,
+ADJUSTMENT
+}
+
+
+
+*/
