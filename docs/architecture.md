@@ -16,6 +16,7 @@
    4.2 [Service & Executor Landscape](#42-service--executor-landscape)  
    4.3 [Payment Flow Architecture](#43-payment-flow-architecture)  
    4.4 [Event-Driven Flow](#44-event-driven-flow)
+   4.5 [Ledger Recording Architecture](#45-ledger-recording-architecture)
 5. [Cross‑Cutting Concerns](#5--crosscutting-concerns)  
    5.1 [Outbox Pattern](#51-outbox-pattern)  
    5.2 [Retry & Status‑Check Strategy](#52-retry--statuscheck-strategy)  
@@ -171,7 +172,7 @@ flowchart LR
 > - **PaymentOrderEnqueuer** *(reads `payment_order_created` and enqueues PSP call tasks)*
 > - **PaymentOrderPspCallExecutor** *(performs PSP calls and publishes results)*
 > - **PaymentOrderPspResultApplier** *(applies PSP results and manages retries)*
-> This enables independent scaling of PSP work and clear separation of concerns.
+    > This enables independent scaling of PSP work and clear separation of concerns.
 
 ### 4.3 Payment Flow Architecture
 
@@ -235,6 +236,66 @@ flowchart TD
     I1 -->|RETRY| K1["Redis ZSet retry + Scheduler ➜ PSP_CALL_REQUESTED"]
     I1 -->|STATUS_CHECK| L1["Scheduler ➜ payment_status_check"]
 ```
+### 4.5 Ledger Recording Architecture
+
+#### Purpose
+
+Adds a complete **double‑entry accounting subsystem** for reliable financial recordkeeping. Every `PaymentOrderSucceeded` or `PaymentOrderFailed` event triggers a new flow that writes balanced journal entries into a ledger table and publishes a confirmation event `LedgerEntriesRecorded`.
+
+#### Sequence Flow
+
+```mermaid
+sequenceDiagram
+    participant Kafka
+    participant Dispatcher as LedgerRecordingRequestDispatcher
+    participant Command as LedgerRecordingCommand
+    participant Consumer as LedgerRecordingConsumer
+    participant Service as RecordLedgerEntriesService
+    participant LedgerDB as Ledger Table
+
+    Kafka->>Dispatcher: Consume PaymentOrderSucceeded/Failed
+    Dispatcher->>Kafka: Publish LedgerRecordingCommand
+    Kafka->>Consumer: Consume LedgerRecordingCommand
+    Consumer->>Service: recordLedgerEntries()
+    Service->>LedgerDB: Append JournalEntries
+    Service->>Kafka: Publish LedgerEntriesRecorded
+```
+
+#### Components
+
+- **LedgerRecordingRequestDispatcher**: Kafka consumer for `payment_order_succeeded` and `payment_order_failed`. Delegates to `RequestLedgerRecordingService`.
+- **RequestLedgerRecordingService**: Transforms `PaymentOrderEvent` → `LedgerRecordingCommand` with trace and parent event propagation.
+- **LedgerRecordingConsumer**: Listens on `ledger-record-request-queue`, invokes `RecordLedgerEntriesService`.
+- **RecordLedgerEntriesService**: Creates balanced `JournalEntry` objects via `JournalEntryFactory`, persists via `LedgerEntryPort`, emits `LedgerEntriesRecorded`.
+
+#### Domain Types
+
+| Type                               | Role                                                                                |
+| ---------------------------------- | ----------------------------------------------------------------------------------- |
+| `LedgerRecordingCommand`           | Command issued per PaymentOrder after success/failure                               |
+| `LedgerEntriesRecorded`            | Event confirming persisted journal entries                                          |
+| `JournalEntry`                     | Balanced accounting record containing multiple postings                             |
+| `Posting.Debit` / `Posting.Credit` | Represent atomic movements per account                                              |
+| `AccountType`                      | Defines normal balance side and grouping (e.g., PSP\_RECEIVABLE, MERCHANT\_ACCOUNT) |
+
+#### Example Journal Flow (SUCCESSFUL\_FINAL)
+
+| Step       | Debit                                              | Credit                              |
+| ---------- | -------------------------------------------------- | ----------------------------------- |
+| AUTH\_HOLD | AUTH\_RECEIVABLE                                   | AUTH\_LIABILITY                     |
+| CAPTURE    | AUTH\_LIABILITY, PSP\_RECEIVABLE                   | AUTH\_RECEIVABLE, MERCHANT\_ACCOUNT |
+| SETTLEMENT | SCHEME\_FEES, INTERCHANGE\_FEES, ACQUIRER\_ACCOUNT | PSP\_RECEIVABLE                     |
+| PSP\_FEE   | MERCHANT\_ACCOUNT                                  | PROCESSING\_FEE\_REVENUE            |
+| PAYOUT     | MERCHANT\_ACCOUNT                                  | ACQUIRER\_ACCOUNT                   |
+
+#### Traceability & Observability
+
+- All ledger flows reuse `traceId` and `parentEventId` from `PaymentOrder` context.
+- `LedgerEntriesRecorded` events maintain lineage to their original `PaymentOrderEvent`.
+- Logs include: `traceId`, `eventId`, `parentEventId`, `aggregateId`, `ledgerBatchId`.
+- Each ledger batch is identified by `ledger-batch-<ULID>` for auditability.
+
+---
 
 ---
 
@@ -584,16 +645,16 @@ The project employs a comprehensive testing strategy with **297 tests** achievin
 - `common`: 3 tests (pure utility functions)
 - `payment-domain`: 89 tests (pure domain logic, no mocking needed)
 - `payment-application`: 22 unit tests with MockK
-  - `CreatePaymentServiceTest`: 4 tests
-  - `ProcessPaymentServiceTest`: 14 tests (includes retry logic, backoff calculations)
+    - `CreatePaymentServiceTest`: 4 tests
+    - `ProcessPaymentServiceTest`: 14 tests (includes retry logic, backoff calculations)
 - `payment-infrastructure`: 172 unit tests with MockK
-  - `PaymentOutboundAdapterTest`: 14 tests
-  - `PaymentOrderOutboundAdapterTest`: 20 tests
-  - `OutboxBufferAdapterTest`: 21 tests
-  - `PaymentOrderStatusCheckAdapterTest`: 9 tests
-  - `PaymentOrderStatusCheckAdapterEdgeCasesTest`: 6 tests
-  - `PaymentOrderStatusCheckAdapterMappingTest`: 4 tests
-  - Plus Redis, serialization, and entity mapper tests
+    - `PaymentOutboundAdapterTest`: 14 tests
+    - `PaymentOrderOutboundAdapterTest`: 20 tests
+    - `OutboxBufferAdapterTest`: 21 tests
+    - `PaymentOrderStatusCheckAdapterTest`: 9 tests
+    - `PaymentOrderStatusCheckAdapterEdgeCasesTest`: 6 tests
+    - `PaymentOrderStatusCheckAdapterMappingTest`: 4 tests
+    - Plus Redis, serialization, and entity mapper tests
 - `payment-service`: 29 tests (REST controllers, services)
 - `payment-consumers`: 40 tests (Kafka consumers, PSP adapters)
 
@@ -696,7 +757,7 @@ The project employs a comprehensive testing strategy with **297 tests** achievin
 ---
 
 ## 15 · Changelog
-
+- **2025‑10‑27**: **Ledger Recording Subsystem Added** — Introduced `LedgerRecordingCommand`, `LedgerEntriesRecorded`, `LedgerRecordingRequestDispatcher`, `LedgerRecordingConsumer`, and `RecordLedgerEntriesService`. Added domain model for `JournalEntry`, `Posting`, and `Account`. Updated testing strategy to validate ledger entry persistence and event publication. Maintains trace propagation with `traceId` and `parentEventId`.
 - **2025‑10‑19**: **Architecture Documentation Update** — Updated architecture documentation to reflect current project state. Added comprehensive testing strategy section with MockK migration details. Updated module structure to include `common` module. Added detailed payment flow architecture diagrams. Updated test coverage results showing 361 total tests with 100% pass rate. Enhanced event-driven flow documentation with current consumer architecture.
 - **2025‑10‑16**: **Testing Infrastructure Upgrade** — Migrated entire project from Mockito to **MockK** (v1.13.8) and **SpringMockK** (v4.0.2). Resolves Kotlin value class limitations, improves test reliability, and provides idiomatic Kotlin testing syntax. Fixed MockK syntax issues that were causing test hangs. **Resolved type inference issues** in `OutboxDispatcherJobTest.kt` by adding explicit type hints for MockK matchers and fixing Jackson serialization configuration. All 297 tests now passing with 100% success rate. Proper test separation implemented: unit tests (`*Test.kt`) use mocks only, integration tests (`*IntegrationTest.kt`) use real external dependencies via TestContainers.
 - **2025‑10‑09**: Refactored consumer design — split `PaymentOrderPspCallExecutor` into two specialized consumers: `PaymentOrderPspCallExecutor` (PSP call) and `PaymentOrderPspResultApplier` (result application). Introduced two types of Kafka transactional producers with their own custom processing logic (consume→produce→commit and producer-only transactional modes).
@@ -704,98 +765,3 @@ The project employs a comprehensive testing strategy with **297 tests** achievin
   logging/Elastic search keys, and **lag‑based autoscaling**. Documented module split and the new
   `payment-infrastructure` auto‑config module.
 - **2025‑06‑21**: Previous revision.
-
-
-/*
-1-for payment flow in PaymentOrderPspResultApplier we will simpl
-If you remember our discussioon i decided to iintroduce a double ledger entry.
-our new kafka queue  payment_order_ledger_queue and  payment_order_ledger_appended will be partitioned by a merchantid 
-As first i will seperate payment-processing flow from ledger generation.So in the enmd of the flow.Currently I do have
-PaymentOrderPspResultApplier , and this will publish an event(currently we publish payment_order_succeeded and paymant_order_failed represent final transition) to a new queue (for_example payment_order_ledger_queue) 
-And from there i will havae new consumer maybe called PaymentOrderLedgerConsumer which will simply create a 
- 1-create a journalentries append-only,
- 2-create postings in posting table.
- 3-publish a ledger_event_written event to payment_order_ledger_appended queue
-
-All this three will be transactional which means we will only commit offset when  we succesfully published and commit offset, otherwise it wont do anything
-and then we will have another consumer which will be called as AccountBalanceConsumer.
-AccountBalanceConsumer will be a batch consumer will simmply update an account_balance where we do persist the snapshots of accounts, and also we will do store buffered balances in an in memory map.
-
-So my Core  Entities will be.
-
-enum class NormalBalance{
-DEBIT,
-CREDIT
-}
-enum class AccountCategory{
-ASSET,
-EXPENSE,
-LIABILITY,
-EQUITY,
-REVENUE
-}
-enum class AccountType(val normalBalance: NormalBalance, val category: AccountCategory) {
-// Assets
-CASH(NormalBalance.DEBIT, AccountCategory.ASSET),
-PSP_RECEIVABLES(NormalBalance.DEBIT, AccountCategory.ASSET),
-SHOPPER_RECEIVABLES(NormalBalance.DEBIT, AccountCategory.ASSET),
-AUTH_RECEIVABLE(NormalBalance.DEBIT, AccountCategory.ASSET),
-ACQUIRER_ACCOUNT(NormalBalance.DEBIT, AccountCategory.ASSET),
-
-    // Liabilities
-    AUTH_LIABILITY(NormalBalance.CREDIT, AccountCategory.LIABILITY),
-    MERCHANT_ACCOUNT(NormalBalance.CREDIT, AccountCategory.LIABILITY),
-
-    // Revenue
-    PROCESSING_FEES(NormalBalance.CREDIT, AccountCategory.REVENUE),
-
-    // Expenses
-    INTERCHANGE_FEES(NormalBalance.DEBIT, AccountCategory.EXPENSE),
-    SCHEME_FEES(NormalBalance.DEBIT, AccountCategory.EXPENSE),
-    BANK_FEES(NormalBalance.DEBIT, AccountCategory.EXPENSE)
-}
-
-data class Account(val accountCode: String,val accountType: AccountType) {
-}
-
-and 
-
-enum class JournalType {
-AUTH_HOLD,
-CAPTURE,
-SETTLEMENT,
-PAYOUT,
-REFUND,
-FEE,
-ADJUSTMENT
-}
-
-
-
-*/
-
-
-ayer
-Component
-Role
-Emits / Uses
-Payment domain
-PaymentOrderPspResultApplier
-Publishes PaymentOrderSucceeded / PaymentOrderFailed
-—
-Consumer A
-🟢 LedgerRecordingDispatcher
-Bridges payment domain → ledger domain
-Publishes LedgerRecordingRequested
-Use case A
-RequestLedgerRecordingService
-Implements RequestLedgerRecordingUseCase
-Publishes LedgerRecordingRequested
-Consumer B
-🟣 LedgerRecordingConsumer
-Executes ledger logic (recording entries)
-Publishes LedgerEntriesRecorded
-Use case B
-RecordLedgerEntriesService
-Implements RecordLedgerEntriesUseCase
-Persists ledger entries
