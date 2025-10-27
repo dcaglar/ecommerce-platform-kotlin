@@ -707,8 +707,9 @@ The project employs a comprehensive testing strategy with **297 tests** achievin
 
 
 /*
+1-for payment flow in PaymentOrderPspResultApplier we will simpl
 If you remember our discussioon i decided to iintroduce a double ledger entry.
-our new kafka queue payment_order_ledger_queue and  payment_order_ledger_appended will be partitioned by a merchantid 
+our new kafka queue  payment_order_ledger_queue and  payment_order_ledger_appended will be partitioned by a merchantid 
 As first i will seperate payment-processing flow from ledger generation.So in the enmd of the flow.Currently I do have
 PaymentOrderPspResultApplier , and this will publish an event(currently we publish payment_order_succeeded and paymant_order_failed represent final transition) to a new queue (for_example payment_order_ledger_queue) 
 And from there i will havae new consumer maybe called PaymentOrderLedgerConsumer which will simply create a 
@@ -772,3 +773,29 @@ ADJUSTMENT
 
 
 */
+
+
+ayer
+Component
+Role
+Emits / Uses
+Payment domain
+PaymentOrderPspResultApplier
+Publishes PaymentOrderSucceeded / PaymentOrderFailed
+—
+Consumer A
+🟢 LedgerRecordingDispatcher
+Bridges payment domain → ledger domain
+Publishes LedgerRecordingRequested
+Use case A
+RequestLedgerRecordingService
+Implements RequestLedgerRecordingUseCase
+Publishes LedgerRecordingRequested
+Consumer B
+🟣 LedgerRecordingConsumer
+Executes ledger logic (recording entries)
+Publishes LedgerEntriesRecorded
+Use case B
+RecordLedgerEntriesService
+Implements RecordLedgerEntriesUseCase
+Persists ledger entries

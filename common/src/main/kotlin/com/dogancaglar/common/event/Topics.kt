@@ -7,6 +7,11 @@ object EVENT_TYPE {
     const val PAYMENT_ORDER_PSP_CALL_REQUESTED = "payment_order_psp_call_requested"
     const val PAYMENT_ORDER_PSP_RESULT_UPDATED = "payment_order_psp_result_updated"
 
+    // 🆕 new ones for the accounting flow
+    const val LEDGER_RECORDING_REQUESTED = "ledger_recording_requested"
+    const val LEDGER_ENTRIES_RECORDED = "ledger_entries_recorded"
+
+
 }
 
 
@@ -19,6 +24,9 @@ object Topics {
     const val PAYMENT_ORDER_PSP_CALL_REQUESTED = "payment_order_psp_call_requested_topic"
     const val PAYMENT_ORDER_PSP_RESULT_UPDATED = "payment_order_psp_result_updated_topic" // NEW
 
+    const val LEDGER_RECORD_REQUEST_QUEUE = "ledger_record_request_queue_topic"
+    const val LEDGER_ENTRIES_RECORDED = "ledger_entries_recorded_topic"
+
     fun dlqOf(topic: String) = "$topic.DLQ"
 
     val ALL = listOf(
@@ -26,7 +34,9 @@ object Topics {
         PAYMENT_STATUS_CHECK,
         PAYMENT_ORDER_SUCCEEDED,
         PAYMENT_ORDER_PSP_CALL_REQUESTED,
-        PAYMENT_ORDER_PSP_RESULT_UPDATED
+        PAYMENT_ORDER_PSP_RESULT_UPDATED,
+        LEDGER_RECORD_REQUEST_QUEUE,
+        LEDGER_ENTRIES_RECORDED
     )
 }
 
@@ -36,6 +46,8 @@ object CONSUMER_GROUPS {
     const val PAYMENT_STATUS_CHECK_SCHEDULER = "payment-status-check-scheduler-consumer-group"
     const val PAYMENT_ORDER_SUCCEEDED = "payment-order-succeeded-consumer-group"
     const val PAYMENT_ORDER_PSP_RESULT_UPDATED = "payment-order-psp-result-updated-consumer-group"
-
+    const val LEDGER_RECORDING_REQUEST_DISPATCHER = "ledger-recording-request-dispatcher-consumer-group"
+    const val LEDGER_RECORDING_CONSUMER = "ledger-recoding-consumer-group"
+    const val ACCOUNT_BALANCE_CONSUMER = "account-balance-consumer-group"
 
 }

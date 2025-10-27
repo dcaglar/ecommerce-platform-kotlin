@@ -5,6 +5,7 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
 import com.dogancaglar.common.event.Topics
 import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
+import com.dogancaglar.paymentservice.domain.commands.LedgerRecordingCommand
 import com.fasterxml.jackson.core.type.TypeReference
 
 object EventMetadatas {
@@ -38,6 +39,22 @@ object EventMetadatas {
         override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderSucceeded>>() {}
     }
 
+    object LedgerRecordingCommandMetadata : EventMetadata<LedgerRecordingCommand> {
+        override val topic = Topics.LEDGER_RECORD_REQUEST_QUEUE
+        override val eventType = EVENT_TYPE.LEDGER_RECORDING_REQUESTED
+        override val clazz = LedgerRecordingCommand::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<LedgerRecordingCommand>>() {}
+    }
+
+    object LedgerEntriesRecordedMetadata : EventMetadata<LedgerEntriesRecorded> {
+        override val topic = Topics.LEDGER_ENTRIES_RECORDED
+        override val eventType = EVENT_TYPE.LEDGER_ENTRIES_RECORDED
+        override val clazz = LedgerEntriesRecorded::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<LedgerEntriesRecorded>>() {}
+    }
+
+
+
     object PaymentOrderStatusCheckScheduledMetadata : EventMetadata<PaymentOrderStatusCheckRequested> {
         override val topic = Topics.PAYMENT_STATUS_CHECK
         override val eventType = EVENT_TYPE.PAYMENT_ORDER_STATUS_CHECK_REQUESTED
@@ -51,7 +68,10 @@ object EventMetadatas {
         PaymentOrderPspCallRequestedMetadata,
         PaymentOrderSucceededMetadata,
         PaymentOrderStatusCheckScheduledMetadata,
-        PaymentOrderPspResultUpdatedMetadata
+        PaymentOrderPspResultUpdatedMetadata,
+        PaymentOrderPspCallRequestedMetadata,
+        LedgerRecordingCommandMetadata,
+        LedgerEntriesRecordedMetadata
     )
 
 }

@@ -1,7 +1,6 @@
 package com.dogancaglar.paymentservice.domain.model.ledger
 
 import com.dogancaglar.paymentservice.domain.model.Amount
-import java.util.UUID
 
 object JournalEntryFactory {
 
@@ -68,4 +67,36 @@ object JournalEntryFactory {
                 Posting.Credit(acquirerAccount, payoutAmount)
             )
         )
+
+    fun fullFlow(paymentOrderId: String, amount: Amount,merchantAccount: Account,acquirerAccount: Account): List<JournalEntry> {
+        val pspFee = Amount(200, amount.currency) // temporary static fee
+
+        // 1️⃣ Authorization + capture flow (kept separate for future partial-capture support)
+        val authEntry = authHold(paymentOrderId, amount)
+        val captureEntry = capture(paymentOrderId, amount, merchantAccount)
+
+        // 2️⃣ Settlement from acquirer
+        val settlementEntry = settlement(
+            paymentOrderId,
+            amount,
+            Amount(0, amount.currency), // interchange
+            Amount(0, amount.currency), // scheme
+            acquirerAccount
+        )
+
+        // 3️⃣ Fee recognition and payout
+        val feeEntry = feeRegistered(paymentOrderId, pspFee, merchantAccount)
+        val payoutEntry = payout(
+            paymentOrderId,
+            Amount(amount.value - pspFee.value, amount.currency),
+            merchantAccount,
+            acquirerAccount
+        )
+
+        return listOf(authEntry, captureEntry, settlementEntry, feeEntry, payoutEntry)
+    }
+    fun failedPayment(paymentOrderId: String, amount: Amount): List<JournalEntry> {
+        // optionally, reversal logic or no-op for final failure
+        return emptyList()
+    }
 }
