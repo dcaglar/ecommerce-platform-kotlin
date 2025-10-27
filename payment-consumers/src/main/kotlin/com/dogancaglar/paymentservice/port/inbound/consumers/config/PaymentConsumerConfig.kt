@@ -32,7 +32,6 @@ class PaymentConsumerConfig {
         paymentOrderModificationPort: PaymentOrderModificationPort,
         @Qualifier("syncPaymentEventPublisher") syncPaymentEventPublisher: PaymentEventPublisher,
         paymentRetryQueueAdapter: PaymentRetryQueueAdapter,
-        pspResultRedisCacheAdapter: PspResultRedisCacheAdapter,
         clock: Clock,
         paymentOrderFactory: PaymentOrderFactory,
         paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
@@ -41,7 +40,6 @@ class PaymentConsumerConfig {
             paymentOrderModificationPort = paymentOrderModificationPort,
             eventPublisher = syncPaymentEventPublisher,
             retryQueuePort = paymentRetryQueueAdapter,
-            pspResultCache = pspResultRedisCacheAdapter,
             clock = clock,
             paymentOrderFactory = paymentOrderFactory,
             paymentOrderDomainEventMapper = paymentOrderDomainEventMapper

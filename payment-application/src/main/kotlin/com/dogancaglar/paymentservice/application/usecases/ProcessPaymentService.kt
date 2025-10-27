@@ -12,7 +12,6 @@ import com.dogancaglar.paymentservice.domain.util.PaymentOrderFactory
 import com.dogancaglar.paymentservice.ports.inbound.ProcessPspResultUseCase
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
-import com.dogancaglar.paymentservice.ports.outbound.PspResultCachePort
 import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
@@ -29,7 +28,6 @@ open class ProcessPaymentService(
     @param:Qualifier("syncPaymentEventPublisher")
     private val eventPublisher: EventPublisherPort,
     private val retryQueuePort: RetryQueuePort<PaymentOrderPspCallRequested>,
-    private val pspResultCache: PspResultCachePort,
     private val paymentOrderModificationPort: PaymentOrderModificationPort,
     private val paymentOrderFactory: PaymentOrderFactory,
     private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
@@ -127,6 +125,19 @@ open class ProcessPaymentService(
         )
     }
 
+    private fun handleNonRetryableFailEvent(order: PaymentOrder,reason: String?=null) {
+        val updated = paymentOrderModificationPort.markFinalFailed(order, reason)
+        val paymentOrderFailed = paymentOrderDomainEventMapper.toPaymentOrderFailed(updated)
+
+        eventPublisher.publishSync(
+            eventMetaData = EventMetadatas.PaymentOrderFailedMetadata,
+            aggregateId = updated.publicPaymentOrderId,
+            data = paymentOrderFailed,
+            parentEventId = LogContext.getEventId(),
+            traceId = LogContext.getTraceId()
+        )
+    }
+
     private fun logRetrySchedule(
         order: PaymentOrder,
         nextRetryCount: Int,
@@ -147,14 +158,6 @@ open class ProcessPaymentService(
         )
     }
 
-    private fun handleNonRetryableFailEvent(order: PaymentOrder, reason: String? = null): PaymentOrder {
-        val updated = paymentOrderModificationPort.markFinalFailed(order, reason)
-        logger.info(
-            "PaymentOrder {} marked FINAL_FAILED. Reason='{}'",
-            updated.publicPaymentOrderId, (reason ?: updated.retryReason ?: "N/A")
-        )
-        return updated
-    }
 
     fun mapEventToDomain(event: PaymentOrderEvent): PaymentOrder =
         paymentOrderFactory.fromEvent(event)
