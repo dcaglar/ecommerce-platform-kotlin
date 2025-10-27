@@ -33,10 +33,17 @@ object EventMetadatas {
     }
 
     object PaymentOrderSucceededMetadata : EventMetadata<PaymentOrderSucceeded> {
-        override val topic = Topics.PAYMENT_ORDER_SUCCEEDED
+        override val topic = Topics.PAYMENT_ORDER_FINALIZED
         override val eventType = EVENT_TYPE.PAYMENT_ORDER_SUCCEDED
         override val clazz = PaymentOrderSucceeded::class.java
         override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderSucceeded>>() {}
+    }
+
+    object PaymentOrderFailedMetadata : EventMetadata<PaymentOrderFailed> {
+        override val topic = Topics.PAYMENT_ORDER_FINALIZED
+        override val eventType = EVENT_TYPE.PAYMENT_ORDER_FAILED
+        override val clazz = PaymentOrderFailed::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderFailed>>() {}
     }
 
     object LedgerRecordingCommandMetadata : EventMetadata<LedgerRecordingCommand> {
@@ -67,9 +74,9 @@ object EventMetadatas {
         PaymentOrderCreatedMetadata,
         PaymentOrderPspCallRequestedMetadata,
         PaymentOrderSucceededMetadata,
+        PaymentOrderFailedMetadata,
         PaymentOrderStatusCheckScheduledMetadata,
         PaymentOrderPspResultUpdatedMetadata,
-        PaymentOrderPspCallRequestedMetadata,
         LedgerRecordingCommandMetadata,
         LedgerEntriesRecordedMetadata
     )

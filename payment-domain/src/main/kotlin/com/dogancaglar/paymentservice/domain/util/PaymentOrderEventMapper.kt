@@ -60,6 +60,17 @@ class PaymentOrderDomainEventMapper(
             currency = order.amount.currency
         )
 
+    fun toPaymentOrderFailed(order: PaymentOrder): PaymentOrderFailed =
+        PaymentOrderFailed(
+            paymentOrderId = order.paymentOrderId.value.toString(),
+            publicPaymentOrderId = order.publicPaymentOrderId,
+            paymentId = order.paymentId.value.toString(),
+            publicPaymentId = order.publicPaymentId,
+            sellerId = order.sellerId.value,
+            amountValue = order.amount.value,
+            currency = order.amount.currency
+        )
+
     /** 🔹 Domain → Event: schedule PSP status check */
     fun toPaymentOrderStatusCheckRequested(order: PaymentOrder): PaymentOrderStatusCheckRequested =
         PaymentOrderStatusCheckRequested(

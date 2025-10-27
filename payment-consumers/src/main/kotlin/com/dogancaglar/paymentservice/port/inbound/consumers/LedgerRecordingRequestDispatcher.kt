@@ -15,26 +15,26 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
-
 @Component
 class LedgerRecordingRequestDispatcher(
     @param:Qualifier("syncPaymentTx") private val kafkaTx: KafkaTxExecutor,
     @param:Qualifier("syncPaymentEventPublisher") private val publisher: EventPublisherPort,
-    private val requestLedgerRecordingUseCase: RequestLedgerRecordingUseCase, // keep your existing service
+    private val requestLedgerRecordingUseCase: RequestLedgerRecordingUseCase
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @KafkaListener(
-        topics = [Topics.PAYMENT_ORDER_SUCCEEDED],
-        containerFactory = "${Topics.PAYMENT_ORDER_SUCCEEDED}-factory",
+        topics = [Topics.PAYMENT_ORDER_FINALIZED],
+        containerFactory = "${Topics.PAYMENT_ORDER_FINALIZED}-factory",
         groupId = CONSUMER_GROUPS.LEDGER_RECORDING_REQUEST_DISPATCHER
     )
-    fun onPaymentOrderEvent(
+    fun onPaymentOrderFinalized(
         record: ConsumerRecord<String, EventEnvelope<PaymentOrderEvent>>,
         consumer: org.apache.kafka.clients.consumer.Consumer<*, *>
     ) {
         val env = record.value()
         val event = env.data
+
         val tp = TopicPartition(record.topic(), record.partition())
         val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
         val groupMeta = consumer.groupMetadata()
@@ -42,12 +42,11 @@ class LedgerRecordingRequestDispatcher(
         LogContext.with(env) {
             kafkaTx.run(offsets, groupMeta) {
                 logger.info(
-                    "🟢 Dispatching ledger recording request for paymentOrderId={} status={}",
-                    event.publicPaymentOrderId, event.status
+                    "🟢 Received finalized PaymentOrder (status={}) → dispatching LedgerRecordingCommand for agg={} traceId={}",
+                    event.status, env.aggregateId, env.traceId
                 )
                 requestLedgerRecordingUseCase.requestLedgerRecording(event)
             }
         }
-
     }
 }
