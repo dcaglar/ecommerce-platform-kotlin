@@ -1,3 +1,5 @@
+package com.dogancaglar.paymentservice.application.usecases
+
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.paymentservice.application.model.LedgerEntry
 import com.dogancaglar.paymentservice.domain.commands.LedgerRecordingCommand
