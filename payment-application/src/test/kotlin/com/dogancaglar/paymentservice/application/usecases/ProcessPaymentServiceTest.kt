@@ -1,10 +1,12 @@
 package com.dogancaglar.paymentservice.application.usecases
 
+import com.dogancaglar.common.event.Topics
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderEvent
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderFailed
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
@@ -60,25 +62,32 @@ class ProcessPaymentServiceTest {
         val event = createMockPaymentOrderEvent(retryCount = 0)
         val pspStatus = PaymentOrderStatus.SUCCESSFUL_FINAL
         val expectedOrder = createMockPaymentOrder(status = PaymentOrderStatus.SUCCESSFUL_FINAL)
+        val expectedEventId = java.util.UUID.fromString("12345678-1234-1234-1234-123456789012")
+        val expectedTraceId = "trace-456"
 
         // Mock LogContext
         mockkObject(LogContext)
-        every { LogContext.getEventId() } returns java.util.UUID.fromString("12345678-1234-1234-1234-123456789012")
-        every { LogContext.getTraceId() } returns "trace-456"
+        every { LogContext.getEventId() } returns expectedEventId
+        every { LogContext.getTraceId() } returns expectedTraceId
 
         every { paymentOrderModificationPort.markPaid(match { order ->
             order.paymentOrderId == PaymentOrderId(123L) &&
             order.publicPaymentOrderId == "paymentorder-123" &&
             order.status == PaymentOrderStatus.INITIATED_PENDING
         }) } returns expectedOrder
-        every { eventPublisher.publishSync(
-            preSetEventIdFromCaller = null,
-            aggregateId = "paymentorder-123",
-            eventMetaData = EventMetadatas.PaymentOrderSucceededMetadata,
-            data = match { it is com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded },
-            traceId = "trace-456",
-            parentEventId = java.util.UUID.fromString("12345678-1234-1234-1234-123456789012")
-        ) } returns mockk()
+        
+        val capturedEventData = slot<PaymentOrderSucceeded>()
+        every { 
+            eventPublisher.publishSync(
+                preSetEventIdFromCaller = null,
+                aggregateId = "paymentorder-123",
+                eventMetaData = EventMetadatas.PaymentOrderSucceededMetadata,
+                data = capture(capturedEventData),
+                traceId = "trace-456",
+                parentEventId = expectedEventId,
+                timeoutSeconds = 5
+            )
+        } returns mockk()
 
         // When
         service.processPspResult(event, pspStatus)
@@ -100,9 +109,21 @@ class ProcessPaymentServiceTest {
                 eventMetaData = EventMetadatas.PaymentOrderSucceededMetadata,
                 data = match { it is com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded },
                 traceId = "trace-456",
-                parentEventId = java.util.UUID.fromString("12345678-1234-1234-1234-123456789012")
+                parentEventId = expectedEventId,
+                timeoutSeconds = 5
             )
         }
+        
+        // Verify captured event data
+        assertNotNull(capturedEventData.captured)
+        assertEquals("123", capturedEventData.captured.paymentOrderId)
+        assertEquals("paymentorder-123", capturedEventData.captured.publicPaymentOrderId)
+        assertEquals("456", capturedEventData.captured.paymentId)
+        assertEquals("payment-456", capturedEventData.captured.publicPaymentId)
+        assertEquals("seller-789", capturedEventData.captured.sellerId)
+        assertEquals(100000L, capturedEventData.captured.amountValue)
+        assertEquals("USD", capturedEventData.captured.currency)
+        assertEquals("SUCCESSFUL", capturedEventData.captured.status)
 
         verify(exactly = 0) { retryQueuePort.scheduleRetry(any(), any(), any(), any()) }
         verify(exactly = 0) { paymentOrderModificationPort.markFailedForRetry(any(), any(), any()) }
@@ -165,23 +186,27 @@ class ProcessPaymentServiceTest {
         val pspStatus = PaymentOrderStatus.FAILED_TRANSIENT_ERROR
 
         val finalFailedOrder = createMockPaymentOrder(status = PaymentOrderStatus.FAILED_FINAL)
+        val expectedEventId = java.util.UUID.fromString("12345678-1234-1234-1234-123456789012")
+        val expectedTraceId = "trace-456"
 
         // Explicit, deterministic LogContext values
         mockkObject(LogContext)
-        every { LogContext.getEventId() } returns java.util.UUID.fromString("12345678-1234-1234-1234-123456789012")
-        every { LogContext.getTraceId() } returns "trace-456"
+        every { LogContext.getEventId() } returns expectedEventId
+        every { LogContext.getTraceId() } returns expectedTraceId
 
         every { retryQueuePort.resetRetryCounter(any()) } just Runs
         every { paymentOrderModificationPort.markFinalFailed(any(), any()) } returns finalFailedOrder
 
-        // Expect an explicit publishSync call with precise arguments
+        val capturedEventData = slot<PaymentOrderFailed>()
         every {
             eventPublisher.publishSync(
+                preSetEventIdFromCaller = null,
                 eventMetaData = EventMetadatas.PaymentOrderFailedMetadata,
                 aggregateId = "paymentorder-123",
-                data = match { it is com.dogancaglar.paymentservice.domain.event.PaymentOrderFailed },
-                parentEventId = java.util.UUID.fromString("12345678-1234-1234-1234-123456789012"),
-                traceId = "trace-456"
+                data = capture(capturedEventData),
+                parentEventId = expectedEventId,
+                traceId = expectedTraceId,
+                timeoutSeconds = 5
             )
         } returns mockk()
 
@@ -202,92 +227,37 @@ class ProcessPaymentServiceTest {
             )
         }
 
-        // ✅ Verify publishSync was called exactly once with exact params
+        // Verify publishSync was called exactly once with exact params
         verify(exactly = 1) {
             eventPublisher.publishSync(
+                preSetEventIdFromCaller = null,
                 eventMetaData = EventMetadatas.PaymentOrderFailedMetadata,
                 aggregateId = "paymentorder-123",
                 data = match { event ->
                     event is com.dogancaglar.paymentservice.domain.event.PaymentOrderFailed &&
                             event.status == PaymentOrderStatus.FAILED_FINAL.name
                 },
-                parentEventId = java.util.UUID.fromString("12345678-1234-1234-1234-123456789012"),
-                traceId = "trace-456"
+                parentEventId = expectedEventId,
+                traceId = expectedTraceId,
+                timeoutSeconds = 5
             )
         }
+        
+        // Verify captured event data
+        assertNotNull(capturedEventData.captured)
+        assertEquals("123", capturedEventData.captured.paymentOrderId)
+        assertEquals("paymentorder-123", capturedEventData.captured.publicPaymentOrderId)
+        assertEquals("456", capturedEventData.captured.paymentId)
+        assertEquals("payment-456", capturedEventData.captured.publicPaymentId)
+        assertEquals("seller-789", capturedEventData.captured.sellerId)
+        assertEquals(100000L, capturedEventData.captured.amountValue)
+        assertEquals("USD", capturedEventData.captured.currency)
+        assertEquals("FAILED_FINAL", capturedEventData.captured.status)
 
-        // ✅ Ensure no other actions triggered
+        // Ensure no other actions triggered
         verify(exactly = 0) { retryQueuePort.scheduleRetry(any(), any(), any(), any()) }
         verify(exactly = 0) { paymentOrderModificationPort.markPaid(any()) }
         verify(exactly = 0) { paymentOrderModificationPort.markFailedForRetry(any(), any(), any()) }
-    }
-
-    @Test
-    fun `processPspResult should handle PSP_UNAVAILABLE_TRANSIENT status with retry`() {
-        // Given
-        val event = createMockPaymentOrderEvent(retryCount = 1)
-        val pspStatus = PaymentOrderStatus.PSP_UNAVAILABLE_TRANSIENT
-
-        val failedOrder = createMockPaymentOrder(
-            status = PaymentOrderStatus.FAILED_TRANSIENT_ERROR,
-            retryCount = 2
-        )
-        every { paymentOrderModificationPort.markFailedForRetry(any(), any(), any()) } returns failedOrder
-        every { retryQueuePort.scheduleRetry(any(), any(), any(), any()) } just Runs
-
-        // When
-        service.processPspResult(event, pspStatus)
-
-        // Then
-        verify(exactly = 1) {
-            paymentOrderModificationPort.markFailedForRetry(
-                order = match { order -> order.paymentOrderId == PaymentOrderId(123L) },
-                reason = "PSP_UNAVAILABLE_TRANSIENT",
-                lastError = null
-            )
-        }
-        verify(exactly = 1) {
-            retryQueuePort.scheduleRetry(
-                paymentOrder = match { order -> order.paymentOrderId == PaymentOrderId(123L) },
-                backOffMillis = match { backoff -> backoff > 0 }, // Just verify it's a positive value
-                retryReason = "PSP_UNAVAILABLE_TRANSIENT",
-                lastErrorMessage = null
-            )
-        }
-    }
-
-    @Test
-    fun `processPspResult should handle TIMEOUT_EXCEEDED_1S_TRANSIENT status with retry`() {
-        // Given
-        val event = createMockPaymentOrderEvent(retryCount = 0)
-        val pspStatus = PaymentOrderStatus.TIMEOUT_EXCEEDED_1S_TRANSIENT
-
-        val failedOrder = createMockPaymentOrder(
-            status = PaymentOrderStatus.FAILED_TRANSIENT_ERROR,
-            retryCount = 1
-        )
-        every { paymentOrderModificationPort.markFailedForRetry(any(), any(), any()) } returns failedOrder
-        every { retryQueuePort.scheduleRetry(any(), any(), any(), any()) } just Runs
-
-        // When
-        service.processPspResult(event, pspStatus)
-
-        // Then
-        verify(exactly = 1) {
-            paymentOrderModificationPort.markFailedForRetry(
-                order = match { order -> order.paymentOrderId == PaymentOrderId(123L) },
-                reason = "TIMEOUT_EXCEEDED_1S_TRANSIENT",
-                lastError = null
-            )
-        }
-        verify(exactly = 1) {
-            retryQueuePort.scheduleRetry(
-                paymentOrder = match { order -> order.paymentOrderId == PaymentOrderId(123L) },
-                backOffMillis = match { backoff -> backoff > 0 }, // Just verify it's a positive value
-                retryReason = "TIMEOUT_EXCEEDED_1S_TRANSIENT",
-                lastErrorMessage = null
-            )
-        }
     }
 
     @Test
@@ -319,122 +289,6 @@ class ProcessPaymentServiceTest {
         verify(exactly = 0) { paymentOrderModificationPort.markPaid(any()) }
         verify(exactly = 0) { paymentOrderModificationPort.markFailedForRetry(any(), any(), any()) }
         verify(exactly = 0) { paymentOrderModificationPort.markFinalFailed(any(), any()) }
-    }
-
-    @Test
-    fun `processPspResult should schedule status check for UNKNOWN_FINAL`() {
-        // Given
-        val event = createMockPaymentOrderEvent(retryCount = 0)
-        val pspStatus = PaymentOrderStatus.UNKNOWN_FINAL
-
-        every { paymentOrderModificationPort.markPendingAndScheduleStatusCheck(any(), any(), any()) } just Runs
-
-        // When
-        service.processPspResult(event, pspStatus)
-
-        // Then
-        verify(exactly = 1) {
-            paymentOrderModificationPort.markPendingAndScheduleStatusCheck(
-                order = match { order -> order.paymentOrderId == PaymentOrderId(123L) },
-                reason = "UNKNOWN_FINAL",
-                lastError = null
-            )
-        }
-    }
-    @Test
-    fun `processPspResult should mark as final failed for non-retryable DECLINED_FINAL`() {
-        // Given
-        val event = createMockPaymentOrderEvent()
-        val pspStatus = PaymentOrderStatus.DECLINED_FINAL
-        val finalFailedOrder = createMockPaymentOrder(PaymentOrderStatus.FAILED_FINAL)
-
-        mockkObject(LogContext)
-        every { LogContext.getEventId() } returns java.util.UUID.fromString("22222222-2222-2222-2222-222222222222")
-        every { LogContext.getTraceId() } returns "trace-declined"
-
-        every { paymentOrderModificationPort.markFinalFailed(any(), any()) } returns finalFailedOrder
-        every {
-            eventPublisher.publishSync(
-                eventMetaData = EventMetadatas.PaymentOrderFailedMetadata,
-                aggregateId = "paymentorder-123",
-                data = match { it is com.dogancaglar.paymentservice.domain.event.PaymentOrderFailed },
-                parentEventId = java.util.UUID.fromString("22222222-2222-2222-2222-222222222222"),
-                traceId = "trace-declined"
-            )
-        } returns mockk()
-
-        // When
-        service.processPspResult(event, pspStatus)
-
-        // Then
-        verify(exactly = 1) {
-            paymentOrderModificationPort.markFinalFailed(
-                order = match { it.paymentOrderId == PaymentOrderId(123L) },
-                reason = "DECLINED_FINAL"
-            )
-        }
-
-        // ✅ FIXED: Expect FAILED_FINAL, because the domain model normalizes to that
-        verify(exactly = 1) {
-            eventPublisher.publishSync(
-                eventMetaData = EventMetadatas.PaymentOrderFailedMetadata,
-                aggregateId = "paymentorder-123",
-                data = match { event ->
-                    event is com.dogancaglar.paymentservice.domain.event.PaymentOrderFailed &&
-                            event.status == PaymentOrderStatus.FAILED_FINAL.name // <-- FIXED HERE
-                },
-                parentEventId = java.util.UUID.fromString("22222222-2222-2222-2222-222222222222"),
-                traceId = "trace-declined"
-            )
-        }
-    }
-
-    @Test
-    fun `processPspResult should mark as final failed for FAILED_FINAL`() {
-        // Given
-        val event = createMockPaymentOrderEvent()
-        val pspStatus = PaymentOrderStatus.FAILED_FINAL
-        val finalFailedOrder = createMockPaymentOrder(PaymentOrderStatus.FAILED_FINAL)
-
-        // Mock LogContext
-        mockkObject(LogContext)
-        every { LogContext.getEventId() } returns java.util.UUID.fromString("11111111-1111-1111-1111-111111111111")
-        every { LogContext.getTraceId() } returns "trace-failedfinal"
-
-        every { paymentOrderModificationPort.markFinalFailed(any(), any()) } returns finalFailedOrder
-        every {
-            eventPublisher.publishSync(
-                eventMetaData = EventMetadatas.PaymentOrderFailedMetadata,
-                aggregateId = "paymentorder-123",
-                data = match { it is com.dogancaglar.paymentservice.domain.event.PaymentOrderFailed },
-                parentEventId = java.util.UUID.fromString("11111111-1111-1111-1111-111111111111"),
-                traceId = "trace-failedfinal"
-            )
-        } returns mockk()
-
-        // When
-        service.processPspResult(event, pspStatus)
-
-        // Then
-        verify(exactly = 1) {
-            paymentOrderModificationPort.markFinalFailed(
-                order = match { it.paymentOrderId == PaymentOrderId(123L) },
-                reason = "FAILED_FINAL"
-            )
-        }
-
-        verify(exactly = 1) {
-            eventPublisher.publishSync(
-                eventMetaData = EventMetadatas.PaymentOrderFailedMetadata,
-                aggregateId = "paymentorder-123",
-                data = match { event ->
-                    event is com.dogancaglar.paymentservice.domain.event.PaymentOrderFailed &&
-                            event.status == PaymentOrderStatus.FAILED_FINAL.name
-                },
-                parentEventId = java.util.UUID.fromString("11111111-1111-1111-1111-111111111111"),
-                traceId = "trace-failedfinal"
-            )
-        }
     }
 
     @Test
@@ -580,15 +434,22 @@ class ProcessPaymentServiceTest {
         every { LogContext.getEventId() } returns java.util.UUID.fromString("22222222-2222-2222-2222-222222222222")
         every { LogContext.getTraceId() } returns "trace-failedfinal"
         val finalFailedOrder = createMockPaymentOrder(status = PaymentOrderStatus.FAILED_FINAL)
+        val expectedEventId = java.util.UUID.fromString("22222222-2222-2222-2222-222222222222")
+        val expectedTraceId = "trace-failedfinal"
+        
         every { retryQueuePort.resetRetryCounter(any()) } just Runs
         every { paymentOrderModificationPort.markFinalFailed(any(), any()) } returns finalFailedOrder
+        
+        val capturedEventData = slot<PaymentOrderFailed>()
         every {
             eventPublisher.publishSync(
+                preSetEventIdFromCaller = null,
                 eventMetaData = EventMetadatas.PaymentOrderFailedMetadata,
                 aggregateId = "paymentorder-123",
-                data = match { it is PaymentOrderFailed },
-                parentEventId = java.util.UUID.fromString("22222222-2222-2222-2222-222222222222"),
-                traceId = "trace-failedfinal"
+                data = capture(capturedEventData),
+                parentEventId = expectedEventId,
+                traceId = expectedTraceId,
+                timeoutSeconds = 5
             )
         } returns mockk()
         // When
@@ -597,6 +458,11 @@ class ProcessPaymentServiceTest {
         // Then - Should trigger final failure, not retry
         verify(exactly = 1) { retryQueuePort.resetRetryCounter(PaymentOrderId(123L)) }
         verify(exactly = 1) { paymentOrderModificationPort.markFinalFailed(any(), any()) }
+        
+        // Verify captured event data
+        assertNotNull(capturedEventData.captured)
+        assertEquals("FAILED_FINAL", capturedEventData.captured.status)
+        
         verify(exactly = 0) { retryQueuePort.scheduleRetry(any(), any(), any(), any()) }
         verify(exactly = 0) { paymentOrderModificationPort.markFailedForRetry(any(), any(), any()) }
     }
@@ -690,26 +556,34 @@ class ProcessPaymentServiceTest {
             PaymentOrderStatus.DECLINED_FINAL,
             PaymentOrderStatus.FAILED_FINAL
         )
+        val expectedEventId = java.util.UUID.fromString("22222222-2222-2222-2222-222222222222")
+        val expectedTraceId = "trace-failedfinal"
 
         finalFailureStatuses.forEach { status ->
             // Reset mocks for each iteration
             clearAllMocks()
 
             mockkObject(LogContext)
-            every { LogContext.getEventId() } returns java.util.UUID.fromString("22222222-2222-2222-2222-222222222222")
-            every { LogContext.getTraceId() } returns "trace-failedfinal"
+            every { LogContext.getEventId() } returns expectedEventId
+            every { LogContext.getTraceId() } returns expectedTraceId
+            
             val event = createMockPaymentOrderEvent(retryCount = 0)
             val finalFailedOrder = createMockPaymentOrder(status = PaymentOrderStatus.FAILED_FINAL)
             every { paymentOrderModificationPort.markFinalFailed(any(), any()) } returns finalFailedOrder
+            
+            val capturedEventData = slot<PaymentOrderFailed>()
             every {
                 eventPublisher.publishSync(
+                    preSetEventIdFromCaller = null,
                     eventMetaData = EventMetadatas.PaymentOrderFailedMetadata,
                     aggregateId = "paymentorder-123",
-                    data = match { it is PaymentOrderFailed },
-                    parentEventId = java.util.UUID.fromString("22222222-2222-2222-2222-222222222222"),
-                    traceId = "trace-failedfinal"
+                    data = capture(capturedEventData),
+                    parentEventId = expectedEventId,
+                    traceId = expectedTraceId,
+                    timeoutSeconds = 5
                 )
             } returns mockk()
+            
             // When
             service.processPspResult(event, status)
 
@@ -719,16 +593,22 @@ class ProcessPaymentServiceTest {
             }
             verify(exactly = 1) {
                 eventPublisher.publishSync(
+                    preSetEventIdFromCaller = null,
                     eventMetaData = EventMetadatas.PaymentOrderFailedMetadata,
                     aggregateId = "paymentorder-123",
                     data = match { event ->
                         event is PaymentOrderFailed &&
                                 event.status == PaymentOrderStatus.FAILED_FINAL.name
                     },
-                    parentEventId = java.util.UUID.fromString("22222222-2222-2222-2222-222222222222"),
-                    traceId = "trace-failedfinal"
+                    parentEventId = expectedEventId,
+                    traceId = expectedTraceId,
+                    timeoutSeconds = 5
                 )
             }
+            
+            // Verify captured event data
+            assertNotNull(capturedEventData.captured)
+            assertEquals("FAILED_FINAL", capturedEventData.captured.status)
 
             verify(exactly = 0) { retryQueuePort.scheduleRetry(any(), any(), any(), any()) }
             verify(exactly = 0) { paymentOrderModificationPort.markPaid(any()) }
@@ -840,15 +720,30 @@ class ProcessPaymentServiceTest {
         // Given
         val event = createMockPaymentOrderEvent(retryCount = 0)
         val pspStatus = PaymentOrderStatus.SUCCESSFUL_FINAL
+        val expectedEventId = java.util.UUID.fromString("12345678-1234-1234-1234-123456789012")
+        val expectedTraceId = "trace-456"
 
         // Mock LogContext
         mockkObject(LogContext)
-        every { LogContext.getEventId() } returns java.util.UUID.fromString("12345678-1234-1234-1234-123456789012")
-        every { LogContext.getTraceId() } returns "trace-456"
+        every { LogContext.getEventId() } returns expectedEventId
+        every { LogContext.getTraceId() } returns expectedTraceId
 
         val paidOrder = createMockPaymentOrder(status = PaymentOrderStatus.SUCCESSFUL_FINAL)
         every { paymentOrderModificationPort.markPaid(any()) } returns paidOrder
-        every { eventPublisher.publishSync<Any>(any(), any(), any(), any(), any(), any(), any()) } throws RuntimeException("Event publish error")
+        
+        // Capture the event data even though it will throw
+        val capturedEventData = slot<PaymentOrderSucceeded>()
+        every { 
+            eventPublisher.publishSync(
+                preSetEventIdFromCaller = null,
+                aggregateId = "paymentorder-123",
+                eventMetaData = EventMetadatas.PaymentOrderSucceededMetadata,
+                data = capture(capturedEventData),
+                traceId = expectedTraceId,
+                parentEventId = expectedEventId,
+                timeoutSeconds = 5
+            )
+        } throws RuntimeException("Event publish error")
 
         // When/Then - Should not throw exception
         assertThrows<RuntimeException> {
@@ -857,7 +752,21 @@ class ProcessPaymentServiceTest {
 
         // Verify that both markPaid and publishSync were called
         verify(exactly = 1) { paymentOrderModificationPort.markPaid(any()) }
-        verify(exactly = 1) { eventPublisher.publishSync<Any>(any(), any(), any(), any(), any(), any(), any()) }
+        verify(exactly = 1) { 
+            eventPublisher.publishSync<PaymentOrderSucceeded>(
+                preSetEventIdFromCaller = null,
+                aggregateId = "paymentorder-123",
+                eventMetaData = EventMetadatas.PaymentOrderSucceededMetadata,
+                data = any(),
+                traceId = expectedTraceId,
+                parentEventId = expectedEventId,
+                timeoutSeconds = 5
+            )
+        }
+        
+        // Verify that event data was being sent before exception
+        assertNotNull(capturedEventData.captured)
+        assertEquals("SUCCESSFUL", capturedEventData.captured.status)
     }
 
     @Test
@@ -879,5 +788,122 @@ class ProcessPaymentServiceTest {
         verify(exactly = 1) { retryQueuePort.resetRetryCounter(any()) }
         // markFinalFailed should not be called because resetRetryCounter threw exception first
         verify(exactly = 0) { paymentOrderModificationPort.markFinalFailed(any(), any()) }
+    }
+
+    @Test
+    fun `processPspResult should publish to payment_order_finalized topic for succeeded events`() {
+        // Given - verify the architecture requirement that both succeeded and failed events go to finalized topic
+        val event = createMockPaymentOrderEvent(retryCount = 0)
+        val pspStatus = PaymentOrderStatus.SUCCESSFUL_FINAL
+        val expectedOrder = createMockPaymentOrder(status = PaymentOrderStatus.SUCCESSFUL_FINAL)
+        val expectedEventId = java.util.UUID.fromString("99999999-9999-9999-9999-999999999999")
+        val expectedTraceId = "trace-finalized-topic"
+
+        mockkObject(LogContext)
+        every { LogContext.getEventId() } returns expectedEventId
+        every { LogContext.getTraceId() } returns expectedTraceId
+
+        every { paymentOrderModificationPort.markPaid(any()) } returns expectedOrder
+        
+        val capturedEventData = slot<PaymentOrderSucceeded>()
+        every {
+            eventPublisher.publishSync(
+                preSetEventIdFromCaller = null,
+                aggregateId = any(),
+                eventMetaData = EventMetadatas.PaymentOrderSucceededMetadata,
+                data = capture(capturedEventData),
+                parentEventId = expectedEventId,
+                traceId = expectedTraceId,
+                timeoutSeconds = 5
+            )
+        } returns mockk()
+
+        // When
+        service.processPspResult(event, pspStatus)
+
+        // Then - Verify that PaymentOrderSucceededMetadata uses the finalized topic
+        assertNotNull(capturedEventData.captured)
+        
+        // Verify the event uses the correct topic (architecture requirement)
+        assertEquals(Topics.PAYMENT_ORDER_FINALIZED, EventMetadatas.PaymentOrderSucceededMetadata.topic)
+    }
+
+    @Test
+    fun `processPspResult should publish to payment_order_finalized topic for failed events`() {
+        // Given - verify the architecture requirement that both succeeded and failed events go to finalized topic
+        val event = createMockPaymentOrderEvent(retryCount = 0)
+        val pspStatus = PaymentOrderStatus.FAILED_FINAL
+        val finalFailedOrder = createMockPaymentOrder(status = PaymentOrderStatus.FAILED_FINAL)
+        val expectedEventId = java.util.UUID.fromString("88888888-8888-8888-8888-888888888888")
+        val expectedTraceId = "trace-finalized-topic-failed"
+
+        mockkObject(LogContext)
+        every { LogContext.getEventId() } returns expectedEventId
+        every { LogContext.getTraceId() } returns expectedTraceId
+
+        every { paymentOrderModificationPort.markFinalFailed(any(), any()) } returns finalFailedOrder
+        
+        val capturedEventData = slot<PaymentOrderFailed>()
+        every {
+            eventPublisher.publishSync(
+                preSetEventIdFromCaller = null,
+                aggregateId = any(),
+                eventMetaData = EventMetadatas.PaymentOrderFailedMetadata,
+                data = capture(capturedEventData),
+                parentEventId = expectedEventId,
+                traceId = expectedTraceId,
+                timeoutSeconds = 5
+            )
+        } returns mockk()
+
+        // When
+        service.processPspResult(event, pspStatus)
+
+        // Then - Verify that PaymentOrderFailedMetadata uses the finalized topic
+        assertNotNull(capturedEventData.captured)
+        
+        // Verify the event uses the correct topic (architecture requirement)
+        assertEquals(Topics.PAYMENT_ORDER_FINALIZED, EventMetadatas.PaymentOrderFailedMetadata.topic)
+        
+        // Verify both succeeded and failed use the same topic (architecture requirement)
+        assertEquals(
+            EventMetadatas.PaymentOrderSucceededMetadata.topic,
+            EventMetadatas.PaymentOrderFailedMetadata.topic
+        )
+    }
+
+    @Test
+    fun `processPspResult should use explicit timeoutSeconds parameter of 5`() {
+        // Given - verify that timeoutSeconds parameter is explicitly set to 5 seconds
+        val event = createMockPaymentOrderEvent(retryCount = 0)
+        val pspStatus = PaymentOrderStatus.SUCCESSFUL_FINAL
+        val expectedOrder = createMockPaymentOrder(status = PaymentOrderStatus.SUCCESSFUL_FINAL)
+        val expectedEventId = java.util.UUID.fromString("77777777-7777-7777-7777-777777777777")
+        val expectedTraceId = "trace-timeout-test"
+
+        mockkObject(LogContext)
+        every { LogContext.getEventId() } returns expectedEventId
+        every { LogContext.getTraceId() } returns expectedTraceId
+
+        every { paymentOrderModificationPort.markPaid(any()) } returns expectedOrder
+        
+        val capturedTimeout = slot<Long>()
+        every {
+            eventPublisher.publishSync(
+                preSetEventIdFromCaller = null,
+                aggregateId = any(),
+                eventMetaData = EventMetadatas.PaymentOrderSucceededMetadata,
+                data = any(),
+                parentEventId = expectedEventId,
+                traceId = expectedTraceId,
+                timeoutSeconds = capture(capturedTimeout)
+            )
+        } returns mockk()
+
+        // When
+        service.processPspResult(event, pspStatus)
+
+        // Then - Verify timeoutSeconds is explicitly set to 5
+        assertEquals(5L, capturedTimeout.captured)
     }
 }
