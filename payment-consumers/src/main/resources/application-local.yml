@@ -12,7 +12,6 @@ app:
         group-id: payment-order-enqueuer-consumer-group
         class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderEnqueuer
         concurrency: 8
-
       - id: payment-order-psp-call-executor
         topic: payment_order_psp_call_requested_topic
         group-id: payment-order-psp-call-executor-consumer-group
@@ -30,6 +29,20 @@ app:
         group-id: payment-status-check-scheduler-consumer-group
         class-name: com.dogancaglar.paymentservice.port.inbound.consumers.ScheduledPaymentStatusCheckExecutor
         concurrency: 1
+
+      - id: ledger-recording-request-dispatcher
+        topic: payment_order_finalized_topic
+        group-id: ledger-recording-request-dispatcher-consumer-group
+        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.LedgerRecordingRequestDispatcher
+        concurrency: 4
+
+      - id: ledger-recording-consumer
+        topic: ledger_record_request_queue_topic
+        group-id: ledger-recording-consumer-group
+        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.LedgerRecordingConsumer
+        concurrency: 4
+
+
 server:
   port: 8080
   tomcat:

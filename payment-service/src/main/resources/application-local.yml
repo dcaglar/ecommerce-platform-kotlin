@@ -13,6 +13,10 @@ app:
       payment_status_check_scheduler_topic:   { partitions: 1, replicas: 1, createDlq: true }
       payment_order_succeeded_topic:          { partitions: 48, replicas: 1, createDlq: true }
       payment_order_psp_result_updated_topic: {partitions: 48, replicas: 1, createDlq: true}
+      payment_order_finalized_topic:          {partitions: 48, replicas: 1, createDlq: true}
+      #ledger related topic
+      ledger_record_request_queue_topic:      { partitions: 24, replicas: 1, createDlq: true }
+      ledger_entries_recorded_topic:          { partitions: 24, replicas: 1, createDlq: true }
   # manual datasource configs for web ourboxdispatcher and parttionen maintencance job
   datasource:
     web:

@@ -300,16 +300,18 @@ sequenceDiagram
 
 **LedgerRecordingConsumer** → **RecordLedgerEntriesService**:
 - Executes within `KafkaTxExecutor` transactional boundary for offset + event commit
+- **Batch Processing**: All journal entries for a payment order are processed atomically via `postLedgerEntriesAtomic()`
 - Database-level idempotency via `ON CONFLICT` in `journal_entries` table
 - When `insertJournalEntry()` returns `0` (duplicate detected):
-  - **All postings are skipped** - prevents duplicate accounting entries
-  - Returns `0L` as `ledgerEntryId` (no DB-generated ID)
+  - **All remaining entries in the batch are skipped** - return statement stops batch processing
+  - No postings are inserted for the duplicate entry
   - No exception thrown - graceful no-op
 - **First execution** (`insertJournalEntry` returns `1`):
-  - All postings inserted successfully
-  - Returns assigned `ledgerEntryId`
+  - Entry and all postings inserted successfully
+  - Processing continues with next entry in batch
 - **Consequences of replays**:
   - Duplicate journal entries silently ignored (idempotent)
+  - Entire batch processing stops on first duplicate detection
   - `LedgerEntriesRecorded` event will contain `0L` IDs for duplicates
   - External systems can detect replays via event deduplication logic
 
@@ -324,27 +326,29 @@ sequenceDiagram
 2. **Repeated failures**: If publish consistently fails, event will retry indefinitely until fixed or DLQ configured
 
 **LedgerRecordingConsumer Failure Scenarios**:
-1. **Persistence exception** (`appendLedgerEntry` throws):
+1. **Persistence exception** (`postLedgerEntriesAtomic` throws during processing):
    - Exception propagates before `LedgerEntriesRecorded` event publishing
    - `KafkaTxExecutor` aborts transaction: Consumer offset not committed
    - `LedgerRecordingCommand` will be retried
-   - No ledger entries persisted, no event published
-   - **On retry**: Idempotency protects against double-posting
-2. **Partial persistence failure** (entry N fails, entries 0..N-1 persisted):
-   - Exception propagates to consumer, transaction aborts
-   - **State**: First N entries already in DB (cannot be rolled back)
+   - **State**: Entries processed before exception may already be in DB (within transaction timeout boundary)
+   - No event published
+   - **On retry**: Idempotency protects against double-posting for successfully inserted entries
+2. **Duplicate entry detected during batch** (entry N is duplicate):
+   - `insertJournalEntry()` returns `0` for entry N
+   - **Processing stops immediately** - `return` statement exits batch processing
+   - Remaining entries (N+1..M) are not processed
    - **On retry**: 
-     - Entries 0..N-1: `ON CONFLICT` detects duplicates, returns `0L`, skips postings
-     - Entries N..M: Fresh inserts succeed
-   - Event contains mix of `0L` (duplicates) and new IDs (successful)
+     - Entries 0..N-1: Already persisted, `ON CONFLICT` detects duplicates, skips
+     - Entries N..M: Fresh attempts to insert
+     - Same behavior: stops on first duplicate
 3. **Publish exception** (after successful persistence of all entries):
    - Exception propagates to `KafkaTxExecutor`, transaction aborts
    - Kafka offset not committed - command retried
    - **Critical**: All ledger entries already persisted from first attempt
-   - **On retry**: `ON CONFLICT` prevents duplicate entries, all return `0L`
+   - **On retry**: `ON CONFLICT` prevents duplicate entries, processing stops on first duplicate
    - Event only published after successful persistence (will succeed on retry)
 4. **Status handling**:
-   - `SUCCESSFUL_FINAL`: Creates 5 journal entries (fullFlow)
+   - `SUCCESSFUL_FINAL`: Creates 5 journal entries (fullFlow) processed as batch
    - `FAILED_FINAL`/`FAILED`: Returns empty list, no persistence (early return)
    - Unknown status: Early return, no processing (idempotent no-op)
 
@@ -352,12 +356,15 @@ sequenceDiagram
 - **Kafka Transaction Boundary**: Each consumer invocation is wrapped in `KafkaTxExecutor`
   - Commit: Offset + all published events (atomic)
   - Abort: Offset not committed, all published events not visible
-- **Journal Entry Persistence**: Each entry is inserted independently (no DB transaction wrapping all 5 entries)
-  - Rationale: Individual entry failures should not prevent partial success
-- **Partial Failure Behavior**: If entry N fails, entries 0 to N-1 are already persisted
-  - Cannot be rolled back (outside Kafka tx, independent inserts)
-  - On retry: Duplicate entries return `0L`, only new entries get IDs
-- **Event Consistency**: `LedgerEntriesRecorded` only published after all entries persisted
+- **Journal Entry Persistence**: Entries processed sequentially within `postLedgerEntriesAtomic()` with `@Transactional`
+  - Transaction wrapping controlled by Spring `@Transactional` on adapter
+  - **Duplicate Detection Behavior**: When duplicate is detected, processing stops for entire batch
+  - Rationale: Batch integrity maintained - either all entries succeed or processing stops on duplicate
+- **Batch Failure Behavior**: If duplicate detected at entry N, entries 0 to N-1 were already persisted
+  - Cannot be rolled back (already committed)
+  - On retry: Duplicate entries detected, processing stops at first duplicate
+  - Remaining entries from original batch are not processed
+- **Event Consistency**: `LedgerEntriesRecorded` only published after batch processing completes (success or duplicate detection)
 
 #### Traceability & Observability
 
@@ -704,9 +711,11 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 - Houses adapters: JPA repos, Kafka publishers/consumers, Redis ZSet retry cache, PSP client, **MyBatis ledger mappers**.
 - **Ledger Persistence**: MyBatis-based adapters for double-entry accounting
     - `LedgerMapper`: Interface for journal entries and postings CRUD operations
-    - `LedgerEntryAdapter`: Implements `LedgerEntryPort` to persist ledger entries via MyBatis
+    - `LedgerEntryTxAdapter` (in `payment-consumers`): Implements `LedgerEntryPort` with batch processing
     - Database tables: `journal_entries` (transaction metadata) and `postings` (debit/credit entries)
     - Uses `ON CONFLICT` for idempotent inserts (duplicate journal entry detection)
+    - **Batch Processing**: `postLedgerEntriesAtomic()` processes all entries for a payment order atomically
+    - **Duplicate Handling**: When duplicate detected, batch processing stops immediately (no remaining entries processed)
 
 ### 9.5 Deployables: `payment-service` & `payment-consumers`
 
@@ -716,6 +725,9 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
     - `PaymentOrderPspCallExecutor` → performs PSP calls and publishes results.
     - `PaymentOrderPspResultApplier` → applies PSP results and manages retries/status checks.
     - `ScheduledPaymentStatusCheckExecutor` → handles status check requests.
+    - `LedgerRecordingRequestDispatcher` → consumes finalized payment orders, publishes ledger recording commands.
+    - `LedgerRecordingConsumer` → consumes ledger commands, persists entries via `LedgerEntryTxAdapter`.
+    - `LedgerEntryTxAdapter` → implements `LedgerEntryPort` for batch journal entry persistence.
 - Both depend on `payment-infrastructure` for shared wiring.
 
 ---
@@ -928,6 +940,13 @@ verify(exactly = 1) {
 
 ## 15 · Changelog
 
+- **2025-10-28**: **Ledger Batch Processing Implementation**
+    - **Refactored Ledger Entry Processing**: Changed from individual `appendLedgerEntry()` calls to batch `postLedgerEntriesAtomic()` method
+    - **Behavior Change**: When duplicate journal entry detected, batch processing stops immediately (remaining entries skipped)
+    - **New Component**: `LedgerEntryTxAdapter` in `payment-consumers` module implements `LedgerEntryPort` with batch processing
+    - **Testing**: Created comprehensive `LedgerEntryTxAdapterTest` with 11 tests covering batch operations, duplicate handling, and exception scenarios
+    - **Updated Tests**: Refactored `RecordLedgerEntriesServiceLedgerContentTest` to use batch method
+    - **Removed**: Old `LedgerEntryAdapterTest` from `payment-infrastructure` module
 - **2025-10-28**: **Ledger Infrastructure & Testing Improvements**
     - **Database Tables**: Created `journal_entries` and `postings` tables for double-entry accounting via Liquibase
     - **MyBatis Mapper**: Implemented `LedgerMapper` interface and XML mapper for journal entry persistence with `ON CONFLICT` idempotency

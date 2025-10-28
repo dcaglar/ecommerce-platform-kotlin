@@ -6,10 +6,13 @@ import com.dogancaglar.common.event.Topics
 import com.dogancaglar.common.logging.GenericLogFields
 import com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaSerializer
 import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
+import com.dogancaglar.paymentservice.domain.commands.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderEvent
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspResultUpdated
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -213,6 +216,7 @@ class KafkaTypedConsumerFactoryConfig(
         )
     }
 
+
     @Bean("${Topics.PAYMENT_ORDER_PSP_CALL_REQUESTED}-factory")
     fun paymentOrderPspCallRequestedFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
@@ -255,6 +259,32 @@ class KafkaTypedConsumerFactoryConfig(
         )
     }
 
+
+
+    @Bean("${Topics.LEDGER_RECORD_REQUEST_QUEUE}-factory")
+    fun ledgerRecordingCommandFactory(
+        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
+        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<LedgerRecordingCommand>> {
+        val cfg = cfgFor(
+            Topics.LEDGER_RECORD_REQUEST_QUEUE,
+            "${Topics.LEDGER_RECORD_REQUEST_QUEUE}-factory"
+        )
+
+        return createTypedFactory(
+            clientId = cfg.id,
+            concurrency = cfg.concurrency,
+            interceptor = interceptor,
+            consumerFactory = customFactory,
+            errorHandler = errorHandler,
+            ackMode = ContainerProperties.AckMode.MANUAL,
+            expectedEventType = EventMetadatas.LedgerRecordingCommandMetadata.eventType,
+            ackDiscarded = true
+        )
+    }
+
     @Bean("${Topics.PAYMENT_STATUS_CHECK}-factory")
     fun paymentStatusCheckExecutorFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
@@ -275,6 +305,45 @@ class KafkaTypedConsumerFactoryConfig(
             ackMode = ContainerProperties.AckMode.MANUAL,
             expectedEventType = EventMetadatas.PaymentOrderStatusCheckScheduledMetadata.eventType,
         )
+    }
+
+    @Bean("${Topics.PAYMENT_ORDER_FINALIZED}-factory")
+    fun paymentOrderFinalizedFactory(
+        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
+        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderEvent>> {
+        val cfg = cfgFor(Topics.PAYMENT_ORDER_FINALIZED, "${Topics.PAYMENT_ORDER_FINALIZED}-factory")
+
+        val acceptedEventTypes = setOf(
+            EventMetadatas.PaymentOrderSucceededMetadata.eventType,
+            EventMetadatas.PaymentOrderFailedMetadata.eventType
+        )
+
+        // ✅ specify type parameter explicitly
+        val factory = createTypedFactory<PaymentOrderEvent>(
+            clientId = cfg.id,
+            concurrency = cfg.concurrency,
+            interceptor = interceptor,
+            consumerFactory = customFactory,
+            errorHandler = errorHandler,
+            ackMode = ContainerProperties.AckMode.MANUAL,
+            expectedEventType = null,
+            ackDiscarded = true
+        )
+
+        factory.setRecordFilterStrategy { rec ->
+            val serdeFailed = rec.headers().lastHeader(HDR_VALUE_BYTES) != null
+            if (serdeFailed) return@setRecordFilterStrategy false
+            val type = rec.value()?.eventType
+            val allowed = type in acceptedEventTypes
+            if (!allowed && logger.isDebugEnabled)
+                logger.debug("⏩ Skipping non-final eventType={} on topic={}", type, rec.topic())
+            !allowed
+        }
+
+        return factory
     }
 
     @Bean

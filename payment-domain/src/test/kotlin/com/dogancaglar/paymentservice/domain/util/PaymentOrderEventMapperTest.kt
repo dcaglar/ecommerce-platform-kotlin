@@ -112,7 +112,7 @@ class PaymentOrderDomainEventMapperTest {
     }
 
     @Test
-    fun `toPaymentOrderSuccededEvent should map all fields correctly`() {
+    fun `toPaymentOrderSucceeded should map all fields correctly`() {
         val event = mapper.toPaymentOrderSucceeded(testPaymentOrder)
 
         assertEquals(testPaymentOrder.paymentOrderId.value.toString(), event.paymentOrderId)
@@ -122,6 +122,43 @@ class PaymentOrderDomainEventMapperTest {
         assertEquals(testPaymentOrder.sellerId.value, event.sellerId)
         assertEquals(testPaymentOrder.amount.value, event.amountValue)
         assertEquals(testPaymentOrder.amount.currency, event.currency)
+        assertEquals(testPaymentOrder.status.name, event.status)
+        // Note: createdAt and updatedAt are set to current time in the event constructor, not from mapper
+        assertNotNull(event.createdAt)
+        assertNotNull(event.updatedAt)
+    }
+
+    @Test
+    fun `toPaymentOrderFailed should map all fields correctly`() {
+        val event = mapper.toPaymentOrderFailed(testPaymentOrder)
+
+        assertEquals(testPaymentOrder.paymentOrderId.value.toString(), event.paymentOrderId)
+        assertEquals(testPaymentOrder.publicPaymentOrderId, event.publicPaymentOrderId)
+        assertEquals(testPaymentOrder.paymentId.value.toString(), event.paymentId)
+        assertEquals(testPaymentOrder.publicPaymentId, event.publicPaymentId)
+        assertEquals(testPaymentOrder.sellerId.value, event.sellerId)
+        assertEquals(testPaymentOrder.amount.value, event.amountValue)
+        assertEquals(testPaymentOrder.amount.currency, event.currency)
+        assertEquals(testPaymentOrder.status.name, event.status)
+        // Note: createdAt and updatedAt are set to current time in the event constructor, not from mapper
+        assertNotNull(event.createdAt)
+        assertNotNull(event.updatedAt)
+    }
+
+    @Test
+    fun `toPaymentOrderSucceeded should include status from payment order`() {
+        val paymentOrderWithSuccessStatus = createTestPaymentOrder(status = PaymentOrderStatus.SUCCESSFUL_FINAL)
+        val event = mapper.toPaymentOrderSucceeded(paymentOrderWithSuccessStatus)
+        
+        assertEquals("SUCCESSFUL_FINAL", event.status)
+    }
+
+    @Test
+    fun `toPaymentOrderFailed should include status from payment order`() {
+        val paymentOrderWithFailedStatus = createTestPaymentOrder(status = PaymentOrderStatus.FAILED_FINAL)
+        val event = mapper.toPaymentOrderFailed(paymentOrderWithFailedStatus)
+        
+        assertEquals("FAILED_FINAL", event.status)
     }
 
     @Test
