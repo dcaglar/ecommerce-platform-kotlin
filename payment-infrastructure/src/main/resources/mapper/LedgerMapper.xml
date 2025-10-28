@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.LedgerMapper">
+
+    <resultMap id="JournalEntryResultMap"
+               type="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.JournalEntryEntity">
+        <id property="id" column="id"/>
+        <result property="txType" column="tx_type"/>
+        <result property="name" column="name"/>
+        <result property="referenceType" column="reference_type"/>
+        <result property="referenceId" column="reference_id"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <resultMap id="PostingResultMap"
+               type="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PostingEntity">
+        <id property="id" column="id"/>
+        <result property="journalId" column="journal_id"/>
+        <result property="accountCode" column="account_code"/>
+        <result property="accountType" column="account_type"/>
+        <result property="amount" column="amount"/>
+        <result property="direction" column="direction"/>
+        <result property="currency" column="currency"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insertJournalEntry" parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.JournalEntryEntity">
+        INSERT INTO journal_entries (id, tx_type, name, reference_type, reference_id, created_at)
+        VALUES (#{id}, #{txType}, #{name}, #{referenceType}, #{referenceId}, #{createdAt})
+        ON CONFLICT (id) DO NOTHING
+    </insert>
+
+    <insert id="insertPosting" parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PostingEntity">
+        INSERT INTO postings (journal_id, account_code, account_type, amount, direction, currency, created_at)
+        VALUES (#{journalId}, #{accountCode}, #{accountType}, #{amount}, #{direction}, #{currency}, #{createdAt})
+        ON CONFLICT (journal_id, account_code) DO NOTHING
+    </insert>
+
+    <select id="findByJournalId" resultMap="JournalEntryResultMap">
+        SELECT id, tx_type, name, reference_type, reference_id, created_at
+        FROM journal_entries
+        WHERE id = #{journalId}
+    </select>
+
+    <select id="findPostingsByJournalId" resultMap="PostingResultMap">
+        SELECT id, journal_id, account_code, account_type, amount, direction, currency, created_at
+        FROM postings
+        WHERE journal_id = #{journalId}
+    </select>
+</mapper>

@@ -8,7 +8,7 @@ import com.dogancaglar.paymentservice.domain.event.LedgerEntriesRecorded
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.ledger.Account
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
-import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntryFactory
+import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
 import com.dogancaglar.paymentservice.ports.inbound.RecordLedgerEntriesUseCase
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
@@ -20,6 +20,8 @@ open class RecordLedgerEntriesService(
     private val eventPublisherPort: EventPublisherPort,
     private val clock: Clock
 ) : RecordLedgerEntriesUseCase {
+    
+    private val ledgerEntryFactory = LedgerEntryFactory(clock)
 
     override fun recordLedgerEntries(event: LedgerRecordingCommand) {
         val createdAt = LocalDateTime.now(clock)
@@ -32,13 +34,13 @@ open class RecordLedgerEntriesService(
 
         // 1️⃣ Create journal entries
         val entries = when (event.status.uppercase()) {
-            "SUCCESSFUL_FINAL" -> JournalEntryFactory.fullFlow(
+            "SUCCESSFUL_FINAL" -> JournalEntry.fullFlow(
                 paymentOrderId = event.publicPaymentOrderId,
                 amount = amount,
                 merchantAccount = merchantAccount,
                 acquirerAccount = acquirerAccount
             )
-            "FAILED_FINAL", "FAILED" -> JournalEntryFactory.failedPayment(
+            "FAILED_FINAL", "FAILED" -> JournalEntry.failedPayment(
                 paymentOrderId = event.publicPaymentOrderId,
                 amount = amount
             )
@@ -51,11 +53,7 @@ open class RecordLedgerEntriesService(
         // 2️⃣ Persist all entries under one batch ID
         val ledgerBatchId = "ledger-batch-${UUID.randomUUID()}"
         val persistedIds = entries.map { entry ->
-            val ledgerEntry = LedgerEntry(
-                ledgerEntryId = 0L,
-                journalEntry = entry,
-                createdAt = createdAt
-            )
+            val ledgerEntry = ledgerEntryFactory.create(entry)
             ledgerWritePort.appendLedgerEntry(ledgerEntry)
             ledgerEntry.ledgerEntryId
         }

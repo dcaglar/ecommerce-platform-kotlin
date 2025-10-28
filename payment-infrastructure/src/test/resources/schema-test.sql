@@ -57,3 +57,34 @@ CREATE TABLE payment_orders (
 	CONSTRAINT payment_orders_pkey PRIMARY KEY (payment_order_id),
 	CONSTRAINT payment_orders_public_payment_order_id_key UNIQUE (public_payment_order_id)
 );
+
+-- ========== JOURNAL ENTRIES TABLE ==========
+DROP TABLE IF EXISTS postings;
+DROP TABLE IF EXISTS journal_entries;
+
+CREATE TABLE journal_entries (
+	id VARCHAR(128) PRIMARY KEY,
+	tx_type VARCHAR(32) NOT NULL,
+	name VARCHAR(128),
+	reference_type VARCHAR(64),
+	reference_id VARCHAR(64),
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ========== POSTINGS TABLE ==========
+CREATE TABLE postings (
+	id BIGSERIAL PRIMARY KEY,
+	journal_id VARCHAR(128) NOT NULL,
+	account_code VARCHAR(128) NOT NULL,
+	account_type VARCHAR(64) NOT NULL,
+	amount BIGINT NOT NULL,
+	direction VARCHAR(8) NOT NULL,
+	currency VARCHAR(3) NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	CONSTRAINT fk_postings_journal FOREIGN KEY (journal_id) REFERENCES journal_entries(id) ON DELETE CASCADE,
+	CONSTRAINT uq_postings_journal_account UNIQUE (journal_id, account_code)
+);
+
+-- Indexes for ledger tables
+CREATE INDEX IF NOT EXISTS idx_postings_journal_id ON postings (journal_id);
+CREATE INDEX IF NOT EXISTS idx_postings_account_code ON postings (account_code);
