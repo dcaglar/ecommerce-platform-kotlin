@@ -2,7 +2,6 @@ package com.dogancaglar.paymentservice.port.inbound.consumers.config
 
 
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.PaymentEventPublisher
-import com.dogancaglar.paymentservice.adapter.outbound.persistance.LedgerEntryAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.redis.PaymentRetryQueueAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.redis.PspResultRedisCacheAdapter
 import com.dogancaglar.paymentservice.application.usecases.ProcessPaymentService
@@ -11,7 +10,9 @@ import com.dogancaglar.paymentservice.application.usecases.RequestLedgerRecordin
 import com.dogancaglar.paymentservice.domain.util.PaymentFactory
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderFactory
+import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
+import com.dogancaglar.paymentservice.service.LedgerEntryTxAdapter
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -61,12 +62,12 @@ class PaymentConsumerConfig {
 
     @Bean
     fun recordLedgerEntriesService(
-        ledgerEntryAdapter: LedgerEntryAdapter,
+        @Qualifier("ledgerEntryTxAdapter") ledgerEntryTxAdapter: LedgerEntryPort,
         @Qualifier(
             "syncPaymentEventPublisher") syncPaymentEventPublisher: PaymentEventPublisher,
                                                 clock: Clock): RecordLedgerEntriesService{
 
-        return RecordLedgerEntriesService(ledgerEntryAdapter,syncPaymentEventPublisher,clock)
+        return RecordLedgerEntriesService(ledgerEntryTxAdapter,syncPaymentEventPublisher,clock)
     }
 
 

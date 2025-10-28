@@ -15,12 +15,13 @@ import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
 import java.time.Clock
 import java.time.LocalDateTime
 import java.util.UUID
+
 open class RecordLedgerEntriesService(
     private val ledgerWritePort: LedgerEntryPort,
     private val eventPublisherPort: EventPublisherPort,
     private val clock: Clock
 ) : RecordLedgerEntriesUseCase {
-    
+
     private val ledgerEntryFactory = LedgerEntryFactory(clock)
 
     override fun recordLedgerEntries(event: LedgerRecordingCommand) {
@@ -32,8 +33,7 @@ open class RecordLedgerEntriesService(
         val merchantAccount = Account(event.sellerId, AccountType.MERCHANT_ACCOUNT)
         val acquirerAccount = Account(event.sellerId, AccountType.ACQUIRER_ACCOUNT)
 
-        // 1️⃣ Create journal entries
-        val entries = when (event.status.uppercase()) {
+        val journalEntries = when (event.status.uppercase()) {
             "SUCCESSFUL_FINAL" -> JournalEntry.fullFlow(
                 paymentOrderId = event.publicPaymentOrderId,
                 amount = amount,
@@ -47,33 +47,29 @@ open class RecordLedgerEntriesService(
             else -> return
         }
 
-        // 👇 Skip persistence and publishing if there is nothing to record
-        if (entries.isEmpty()) return
+        if (journalEntries.isEmpty()) return
 
-        // 2️⃣ Persist all entries under one batch ID
-        val ledgerBatchId = "ledger-batch-${UUID.randomUUID()}"
-        val persistedIds = entries.map { entry ->
-            val ledgerEntry = ledgerEntryFactory.create(entry)
-            ledgerWritePort.appendLedgerEntry(ledgerEntry)
-            ledgerEntry.ledgerEntryId
-        }
+        // 1️⃣ Transform journals to LedgerEntry
+        val ledgerEntries = journalEntries.map { ledgerEntryFactory.create(it) }
 
-        // 3️⃣ Build domain event for downstream consumers
+        // 2️⃣ Persist atomically, this method below is transactional
+        ledgerWritePort.postLedgerEntriesAtomic(ledgerEntries)
+
+        // 3️⃣ Build and publish domain event
         val recordedEvent = LedgerEntriesRecorded(
-            ledgerBatchId = ledgerBatchId,
+            ledgerBatchId = "ledger-batch-${UUID.randomUUID()}",
             paymentOrderId = event.paymentOrderId,
             publicPaymentOrderId = event.publicPaymentOrderId,
             sellerId = event.sellerId,
             currency = event.currency,
             status = event.status,
             recordedAt = createdAt,
-            entryCount = entries.size,
-            ledgerEntryIds = persistedIds,
+            entryCount = ledgerEntries.size,
+            ledgerEntryIds = ledgerEntries.map { it.ledgerEntryId },
             traceId = traceId,
             parentEventId = parentEventId?.toString()
         )
 
-        // 4️⃣ Publish the confirmation event
         eventPublisherPort.publishSync(
             eventMetaData = EventMetadatas.LedgerEntriesRecordedMetadata,
             aggregateId = event.sellerId,
@@ -82,4 +78,7 @@ open class RecordLedgerEntriesService(
             traceId = traceId
         )
     }
+
+
+
 }

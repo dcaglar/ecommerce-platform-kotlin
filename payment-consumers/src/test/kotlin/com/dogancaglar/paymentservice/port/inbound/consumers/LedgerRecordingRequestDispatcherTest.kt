@@ -67,7 +67,8 @@ class LedgerRecordingRequestDispatcherTest {
             publicPaymentId = "public-payment-456",
             sellerId = SellerId("seller-789").value,
             amountValue = 10000L,
-            currency = "EUR"
+            currency = "EUR",
+            status = "SUCCESSFUL_FINAL"
         )
         
         val envelope = DomainEventEnvelopeFactory.envelopeFor(
@@ -145,7 +146,8 @@ class LedgerRecordingRequestDispatcherTest {
             publicPaymentId = "public-payment-789",
             sellerId = SellerId("seller-101").value,
             amountValue = 5000L,
-            currency = "USD"
+            currency = "USD",
+            status = "FAILED_FINAL"
         )
         
         val envelope = DomainEventEnvelopeFactory.envelopeFor(
@@ -218,7 +220,8 @@ class LedgerRecordingRequestDispatcherTest {
             publicPaymentId = "public-payment-101",
             sellerId = SellerId("seller-202").value,
             amountValue = 10000L,
-            currency = "EUR"
+            currency = "EUR",
+            status = "SUCCESSFUL_FINAL"
         )
         
         val envelope = DomainEventEnvelopeFactory.envelopeFor(

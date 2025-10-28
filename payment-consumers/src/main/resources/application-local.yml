@@ -31,13 +31,13 @@ app:
         concurrency: 1
 
       - id: ledger-recording-request-dispatcher
-        topic: ledger_record_request_queue_topic
+        topic: payment_order_finalized_topic
         group-id: ledger-recording-request-dispatcher-consumer-group
         class-name: com.dogancaglar.paymentservice.port.inbound.consumers.LedgerRecordingRequestDispatcher
         concurrency: 4
 
       - id: ledger-recording-consumer
-        topic: ledger_entries_recorded_topic
+        topic: ledger_record_request_queue_topic
         group-id: ledger-recording-consumer-group
         class-name: com.dogancaglar.paymentservice.port.inbound.consumers.LedgerRecordingConsumer
         concurrency: 4

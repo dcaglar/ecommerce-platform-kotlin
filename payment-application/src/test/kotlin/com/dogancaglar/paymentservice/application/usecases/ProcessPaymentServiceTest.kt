@@ -119,7 +119,7 @@ class ProcessPaymentServiceTest {
         assertEquals("seller-789", capturedEventData.captured.sellerId)
         assertEquals(100000L, capturedEventData.captured.amountValue)
         assertEquals("USD", capturedEventData.captured.currency)
-        assertEquals("SUCCESSFUL", capturedEventData.captured.status)
+        assertEquals("SUCCESSFUL_FINAL", capturedEventData.captured.status)
 
         verify(exactly = 0) { retryQueuePort.scheduleRetry(any(), any(), any(), any()) }
         verify(exactly = 0) { paymentOrderModificationPort.markFailedForRetry(any(), any(), any()) }
@@ -762,7 +762,7 @@ class ProcessPaymentServiceTest {
         
         // Verify that event data was being sent before exception
         assertNotNull(capturedEventData.captured)
-        assertEquals("SUCCESSFUL", capturedEventData.captured.status)
+        assertEquals("SUCCESSFUL_FINAL", capturedEventData.captured.status)
     }
 
     @Test
