@@ -288,12 +288,84 @@ sequenceDiagram
 | PSP\_FEE   | MERCHANT\_ACCOUNT                                  | PROCESSING\_FEE\_REVENUE            |
 | PAYOUT     | MERCHANT\_ACCOUNT                                  | ACQUIRER\_ACCOUNT                   |
 
+#### Idempotency & Replay Handling
+
+**LedgerRecordingRequestDispatcher** → **RequestLedgerRecordingService**:
+- Executes within `KafkaTxExecutor` transactional boundary
+- Atomicity: Offset commit + `LedgerRecordingCommand` publish are committed together
+- If `publishSync()` succeeds: Offset committed, no replay
+- If `publishSync()` fails: Offset not committed, retried by consumer
+- No explicit idempotency needed: Relies on downstream `RecordLedgerEntriesService` for DB-level deduplication
+- Replayed PaymentOrderFinalized events will generate new `LedgerRecordingCommand` messages (expected behavior)
+
+**LedgerRecordingConsumer** → **RecordLedgerEntriesService**:
+- Executes within `KafkaTxExecutor` transactional boundary for offset + event commit
+- Database-level idempotency via `ON CONFLICT` in `journal_entries` table
+- When `insertJournalEntry()` returns `0` (duplicate detected):
+  - **All postings are skipped** - prevents duplicate accounting entries
+  - Returns `0L` as `ledgerEntryId` (no DB-generated ID)
+  - No exception thrown - graceful no-op
+- **First execution** (`insertJournalEntry` returns `1`):
+  - All postings inserted successfully
+  - Returns assigned `ledgerEntryId`
+- **Consequences of replays**:
+  - Duplicate journal entries silently ignored (idempotent)
+  - `LedgerEntriesRecorded` event will contain `0L` IDs for duplicates
+  - External systems can detect replays via event deduplication logic
+
+#### Exception Handling & Failure Modes
+
+**LedgerRecordingRequestDispatcher Failure Scenarios**:
+1. **Publish exception**: If `RequestLedgerRecordingService.publishSync()` throws (Kafka unavailable, serialization error)
+   - Exception propagates up to `KafkaTxExecutor`
+   - **Kafka transaction aborts**: Consumer offset not committed, `LedgerRecordingCommand` not published
+   - Event will be retried automatically by Kafka consumer
+   - No state change in ledger system
+2. **Repeated failures**: If publish consistently fails, event will retry indefinitely until fixed or DLQ configured
+
+**LedgerRecordingConsumer Failure Scenarios**:
+1. **Persistence exception** (`appendLedgerEntry` throws):
+   - Exception propagates before `LedgerEntriesRecorded` event publishing
+   - `KafkaTxExecutor` aborts transaction: Consumer offset not committed
+   - `LedgerRecordingCommand` will be retried
+   - No ledger entries persisted, no event published
+   - **On retry**: Idempotency protects against double-posting
+2. **Partial persistence failure** (entry N fails, entries 0..N-1 persisted):
+   - Exception propagates to consumer, transaction aborts
+   - **State**: First N entries already in DB (cannot be rolled back)
+   - **On retry**: 
+     - Entries 0..N-1: `ON CONFLICT` detects duplicates, returns `0L`, skips postings
+     - Entries N..M: Fresh inserts succeed
+   - Event contains mix of `0L` (duplicates) and new IDs (successful)
+3. **Publish exception** (after successful persistence of all entries):
+   - Exception propagates to `KafkaTxExecutor`, transaction aborts
+   - Kafka offset not committed - command retried
+   - **Critical**: All ledger entries already persisted from first attempt
+   - **On retry**: `ON CONFLICT` prevents duplicate entries, all return `0L`
+   - Event only published after successful persistence (will succeed on retry)
+4. **Status handling**:
+   - `SUCCESSFUL_FINAL`: Creates 5 journal entries (fullFlow)
+   - `FAILED_FINAL`/`FAILED`: Returns empty list, no persistence (early return)
+   - Unknown status: Early return, no processing (idempotent no-op)
+
+**Transaction Boundaries & Consistency**:
+- **Kafka Transaction Boundary**: Each consumer invocation is wrapped in `KafkaTxExecutor`
+  - Commit: Offset + all published events (atomic)
+  - Abort: Offset not committed, all published events not visible
+- **Journal Entry Persistence**: Each entry is inserted independently (no DB transaction wrapping all 5 entries)
+  - Rationale: Individual entry failures should not prevent partial success
+- **Partial Failure Behavior**: If entry N fails, entries 0 to N-1 are already persisted
+  - Cannot be rolled back (outside Kafka tx, independent inserts)
+  - On retry: Duplicate entries return `0L`, only new entries get IDs
+- **Event Consistency**: `LedgerEntriesRecorded` only published after all entries persisted
+
 #### Traceability & Observability
 
 - All ledger flows reuse `traceId` and `parentEventId` from `PaymentOrder` context.
 - `LedgerEntriesRecorded` events maintain lineage to their original `PaymentOrderEvent`.
 - Logs include: `traceId`, `eventId`, `parentEventId`, `aggregateId`, `ledgerBatchId`.
-- Each ledger batch is identified by `ledger-batch-<ULID>` for auditability.
+- Each ledger batch is identified by `ledger-batch-<UUID>` for auditability.
+- Failed persistence attempts are logged with full context for debugging.
 
 ---
 
@@ -328,7 +400,39 @@ sequenceDiagram
 
 ## 6 · Data & Messaging Design
 
-### 6.1 PostgreSQL Outbox Partitioning
+### 6.1 PostgreSQL Database Structure
+
+#### Ledger Tables
+
+The ledger subsystem uses two tables for double-entry bookkeeping:
+
+**`journal_entries`** - Transaction metadata
+- `id` VARCHAR(128) PRIMARY KEY - Unique transaction identifier (e.g., "CAPTURE:paymentorder-123")
+- `tx_type` VARCHAR(32) NOT NULL - Transaction type (AUTH_HOLD, CAPTURE, SETTLEMENT, FEE, PAYOUT)
+- `name` VARCHAR(128) - Human-readable description
+- `reference_type` VARCHAR(64) - Optional reference type
+- `reference_id` VARCHAR(64) - Optional reference identifier
+- `created_at` TIMESTAMP - Creation timestamp
+
+**`postings`** - Debit/credit entries
+- `id` BIGSERIAL PRIMARY KEY - Auto-incrementing posting ID
+- `journal_id` VARCHAR(128) NOT NULL - FK to journal_entries
+- `account_code` VARCHAR(128) NOT NULL - Account identifier (e.g., "PSP.AUTH_RECEIVABLE")
+- `account_type` VARCHAR(64) NOT NULL - Account type enum
+- `amount` BIGINT NOT NULL - Amount in minor currency units
+- `direction` VARCHAR(8) NOT NULL - "DEBIT" or "CREDIT"
+- `currency` VARCHAR(3) NOT NULL - ISO currency code
+- `created_at` TIMESTAMP - Creation timestamp
+
+**Constraints & Indexes**:
+- Foreign key `fk_postings_journal` with `ON DELETE CASCADE`
+- Unique constraint on `journal_entries(id)` for idempotency
+- Unique constraint on `postings(journal_id, account_code)` to prevent duplicate postings
+- Indexes on `postings.journal_id` and `postings.account_code` for query performance
+
+**Idempotency**: Journal entries use `ON CONFLICT (id) DO NOTHING` to handle duplicate ledger recording requests gracefully.
+
+#### PostgreSQL Outbox Partitioning
 
 **Why**: very high write/scan volume; partition pruning keeps index/heap scans fast; cheap retention by dropping
 partitions.
@@ -597,7 +701,12 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 - New **auto‑configurable** module consumed by both deployables.
 - Provides Spring Boot auto‑configs for: Micrometer registry, Kafka factory/serializers, Redis/Lettuce beans, task
   schedulers/executors (with gauges), and common Jackson config.
-- Houses adapters: JPA repos, Kafka publishers/consumers, Redis ZSet retry cache, PSP client.
+- Houses adapters: JPA repos, Kafka publishers/consumers, Redis ZSet retry cache, PSP client, **MyBatis ledger mappers**.
+- **Ledger Persistence**: MyBatis-based adapters for double-entry accounting
+    - `LedgerMapper`: Interface for journal entries and postings CRUD operations
+    - `LedgerEntryAdapter`: Implements `LedgerEntryPort` to persist ledger entries via MyBatis
+    - Database tables: `journal_entries` (transaction metadata) and `postings` (debit/credit entries)
+    - Uses `ON CONFLICT` for idempotent inserts (duplicate journal entry detection)
 
 ### 9.5 Deployables: `payment-service` & `payment-consumers`
 
@@ -641,26 +750,84 @@ The project employs a comprehensive testing strategy with **297 tests** achievin
 - Proper handling of Kotlin-specific features (value classes, inline classes)
 - **Fixed MockK Syntax Issues**: Resolved hanging tests by correcting `just Awaits` to `returns 1` for methods returning `Int`
 
+#### Explicit Testing Pattern & Avoiding Self-Reinforcing Mocks
+
+All tests follow a strict pattern to ensure they verify **actual behavior**, not just mock configuration:
+
+**Pattern Applied**:
+1. **`every { }` blocks**: Use `any()` for parameters to stub behavior without restrictions
+2. **`verify { }` blocks**: Use explicit `match { }` to verify the actual parameters passed
+3. **Avoid Self-Reinforcing Mocks**: Never use the same explicit criteria in both `every` and `verify`
+
+**Example (Correct Pattern)**:
+```kotlin
+// ✅ CORRECT: Stub accepts any input, verify checks actual values
+every { eventPublisherPort.publishSync(any(), any(), any(), any(), any()) } returns mockk()
+service.processEvent(event)
+verify(exactly = 1) {
+    eventPublisherPort.publishSync(
+        eventMetaData = EventMetadatas.MyEventMetadata,
+        aggregateId = event.id,
+        data = match { it is MyEvent && it.amount == 10000L },
+        parentEventId = expectedEventId,
+        traceId = expectedTraceId
+    )
+}
+```
+
+**Anti-Pattern (Self-Reinforcing)**:
+```kotlin
+// ❌ WRONG: Same criteria in both stub and verify - test will always pass
+every { 
+    eventPublisherPort.publishSync(
+        eventMetaData = EventMetadatas.MyEventMetadata,
+        aggregateId = event.id,
+        data = match { it.amount == 10000L },
+        parentEventId = any(),
+        traceId = any()
+    )
+} returns mockk()
+verify(exactly = 1) {
+    eventPublisherPort.publishSync(
+        eventMetaData = EventMetadatas.MyEventMetadata,
+        aggregateId = event.id,
+        data = match { it.amount == 10000L }
+    )
+}
+```
+
+**Minimizing `capture()` Usage**: 
+- Use `capture()` **only** when you need to inspect data before an exception is thrown
+- For normal verification, prefer explicit `match {}` checks in `verify` blocks
+- This makes tests more explicit about what they're testing
+
 **Example modules with unit tests:**
 - `common`: 3 tests (pure utility functions)
 - `payment-domain`: 89 tests (pure domain logic, no mocking needed)
 - `payment-application`: 22 unit tests with MockK
     - `CreatePaymentServiceTest`: 4 tests
     - `ProcessPaymentServiceTest`: 14 tests (includes retry logic, backoff calculations)
-- `payment-infrastructure`: 172 unit tests with MockK
+    - `RequestLedgerRecordingServiceTest`: 4 tests (tests status-based routing with explicit parameter verification)
+    - `RecordLedgerEntriesServiceLedgerContentTest`: 5 tests (tests ledger entry persistence with detailed posting verification)
+- `payment-infrastructure`: 178 unit tests + 6 integration tests with MockK
     - `PaymentOutboundAdapterTest`: 14 tests
     - `PaymentOrderOutboundAdapterTest`: 20 tests
     - `OutboxBufferAdapterTest`: 21 tests
     - `PaymentOrderStatusCheckAdapterTest`: 9 tests
     - `PaymentOrderStatusCheckAdapterEdgeCasesTest`: 6 tests
     - `PaymentOrderStatusCheckAdapterMappingTest`: 4 tests
+    - `LedgerEntryAdapterTest`: 3 tests (tests ledger entry persistence with explicit posting verification)
+    - `LedgerMapperIntegrationTest`: 6 integration tests (Testcontainers PostgreSQL, tests actual DB persistence)
     - Plus Redis, serialization, and entity mapper tests
 - `payment-service`: 29 tests (REST controllers, services)
 - `payment-consumers`: 40 tests (Kafka consumers, PSP adapters)
 
 #### Integration Testing with TestContainers
 
-- **PostgreSQL Integration Tests**: Real database with partitioned outbox tables
+- **PostgreSQL Integration Tests**: Real database with partitioned outbox tables and ledger tables
+    - `LedgerMapperIntegrationTest`: Tests journal entries and postings persistence with Testcontainers PostgreSQL
+    - Validates MyBatis mapper queries (`LedgerMapper`), duplicate handling via `ON CONFLICT`, and foreign key constraints
+    - Verifies actual data is persisted correctly, not just return counts
 - **Redis Integration Tests**: Real Redis instances for caching and retry mechanisms
 - **Kafka Integration Tests**: Real Kafka clusters for event publishing/consuming
 - Ensures realistic end-to-end behavior
@@ -692,6 +859,9 @@ The project employs a comprehensive testing strategy with **297 tests** achievin
 5. **Idempotency**: Tests verify event deduplication and idempotent processing
 6. **Timing Assertions**: Retry scheduler tests validate backoff timing bounds
 7. **No Hanging Tests**: All MockK syntax issues resolved for reliable test execution
+8. **Explicit Verification**: Tests verify actual parameters passed to mocked methods, not just that methods were called
+9. **No Self-Reinforcing Mocks**: Stubs use `any()`, verifications use explicit criteria to catch real bugs
+10. **Capturing Only When Necessary**: `capture()` reserved for exception scenarios; normal verification uses explicit `match {}`
 
 ---
 
@@ -758,6 +928,24 @@ The project employs a comprehensive testing strategy with **297 tests** achievin
 
 ## 15 · Changelog
 
+- **2025-10-28**: **Ledger Infrastructure & Testing Improvements**
+    - **Database Tables**: Created `journal_entries` and `postings` tables for double-entry accounting via Liquibase
+    - **MyBatis Mapper**: Implemented `LedgerMapper` interface and XML mapper for journal entry persistence with `ON CONFLICT` idempotency
+    - **Adapter Implementation**: Created `LedgerEntryAdapter` implementing `LedgerEntryPort` with duplicate detection and posting skip logic
+    - **Integration Tests**: Added `LedgerMapperIntegrationTest` (6 tests) using Testcontainers to verify actual DB persistence
+    - **Factory-Enforced Object Creation**:
+        - Made `JournalEntry` constructor `internal` and moved factory methods to companion object
+        - Made `LedgerEntry` constructor `internal` and created dedicated `LedgerEntryFactory`
+        - Prevents unvalidated object creation, enforcing business invariants (balanced entries, valid postings)
+    - **Idempotency Design**: Database-level duplicate detection via `ON CONFLICT (id) DO NOTHING` prevents double-posting on replay
+    - **Exception Handling**: Documented failure modes and retry behavior for both `RequestLedgerRecordingService` and `RecordLedgerEntriesService`
+    - **Testing Refactoring**:
+        - Refactored `RequestLedgerRecordingServiceTest` to follow explicit testing pattern (4 focused tests)
+        - Refactored `RecordLedgerEntriesServiceLedgerContentTest` to verify all 5 ledger entries with detailed postings
+        - Removed redundant tests and self-reinforcing mock patterns throughout test suite
+        - Implemented strict pattern: `every` blocks use `any()`, `verify` blocks use explicit `match {}`
+        - Minimized `capture()` usage - only in exception tests where needed to inspect data before error
+        - Tests now explicitly verify each ledger entry's ID, txType, name, and all posting details (account types, amounts, directions)
 - **2025-10-27 (evening update)**: **Finalized Payment → Ledger Event Flow**
     - Introduced unified topic `payment_order_finalized_topic` consolidating `PaymentOrderSucceeded` and `PaymentOrderFailed` events.
     - Updated `EventMetadatas` to route both success and failure events to `PAYMENT_ORDER_FINALIZED`.

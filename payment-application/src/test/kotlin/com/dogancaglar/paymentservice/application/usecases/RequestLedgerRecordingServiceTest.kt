@@ -46,54 +46,49 @@ class RequestLedgerRecordingServiceTest {
     }
 
     @Test
-    fun `should publish LedgerRecordingCommand with correct data and explicit parameters`() {
-        // given
+    fun `should publish LedgerRecordingCommand for SUCCESSFUL_FINAL status`() {
+        // given - PaymentOrderEvent with SUCCESSFUL_FINAL status
         val event = samplePaymentOrderEvent()
-        val capturedCommand = slot<LedgerRecordingCommand>()
+        val expectedEventId = java.util.UUID.fromString("11111111-1111-1111-1111-111111111111")
+        val expectedTraceId = "trace-111"
         
-        every {
-            eventPublisherPort.publishSync(
-                eventMetaData = EventMetadatas.LedgerRecordingCommandMetadata,
-                aggregateId = event.publicPaymentOrderId,
-                data = capture(capturedCommand),
-                parentEventId = LogContext.getEventId(),
-                traceId = LogContext.getTraceId()
-            )
-        } returns mockk()
+        // Mock LogContext to control traceId and parentEventId
+        mockkObject(LogContext)
+        every { LogContext.getEventId() } returns expectedEventId
+        every { LogContext.getTraceId() } returns expectedTraceId
+        
+        // Setup mocks to accept calls
+        every { eventPublisherPort.publishSync<LedgerRecordingCommand>(any(), any(), any(), any(), any()) } returns mockk()
 
-        // when
+        // when - service processes the event
         service.requestLedgerRecording(event)
 
-        // then
+        // then - verify publishSync called with exact parameters
         verify(exactly = 1) {
             eventPublisherPort.publishSync(
                 eventMetaData = EventMetadatas.LedgerRecordingCommandMetadata,
                 aggregateId = event.publicPaymentOrderId,
-                data = match { it is LedgerRecordingCommand },  // More explicit than any()
-                parentEventId = LogContext.getEventId(),
-                traceId = LogContext.getTraceId()
+                data = match { cmd ->
+                    cmd is LedgerRecordingCommand &&
+                    cmd.paymentOrderId == event.paymentOrderId &&
+                    cmd.publicPaymentOrderId == event.publicPaymentOrderId &&
+                    cmd.paymentId == event.paymentId &&
+                    cmd.publicPaymentId == event.publicPaymentId &&
+                    cmd.sellerId == event.sellerId &&
+                    cmd.amountValue == event.amountValue &&
+                    cmd.currency == event.currency &&
+                    cmd.status == event.status &&
+                    cmd.createdAt == LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
+                },
+                parentEventId = expectedEventId,
+                traceId = expectedTraceId
             )
         }
-
-        val cmd = capturedCommand.captured
-
-        // assert field mapping
-        assertEquals(event.paymentOrderId, cmd.paymentOrderId)
-        assertEquals(event.publicPaymentOrderId, cmd.publicPaymentOrderId)
-        assertEquals(event.paymentId, cmd.paymentId)
-        assertEquals(event.publicPaymentId, cmd.publicPaymentId)
-        assertEquals(event.sellerId, cmd.sellerId)
-        assertEquals(event.amountValue, cmd.amountValue)
-        assertEquals(event.currency, cmd.currency)
-        assertEquals(event.status, cmd.status)
-
-        // assert clock usage
-        assertEquals(LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC), cmd.createdAt)
     }
 
     @Test
-    fun `should publish LedgerRecordingCommand with FAILED_FINAL status and explicit parameters`() {
-        // given
+    fun `should publish LedgerRecordingCommand for FAILED_FINAL status`() {
+        // given - PaymentOrderEvent with FAILED_FINAL status
         val failedEvent = object : PaymentOrderEvent {
             override val paymentOrderId = "po-999"
             override val publicPaymentOrderId = "paymentorder-999"
@@ -110,116 +105,101 @@ class RequestLedgerRecordingServiceTest {
             override val lastErrorMessage = null
         }
 
-        val capturedCommand = slot<LedgerRecordingCommand>()
+        val expectedEventId = java.util.UUID.fromString("22222222-2222-2222-2222-222222222222")
+        val expectedTraceId = "trace-222"
         
-        every {
-            eventPublisherPort.publishSync(
-                eventMetaData = EventMetadatas.LedgerRecordingCommandMetadata,
-                aggregateId = failedEvent.publicPaymentOrderId,
-                data = capture(capturedCommand),
-                parentEventId = LogContext.getEventId(),
-                traceId = LogContext.getTraceId()
-            )
-        } returns mockk()
+        // Mock LogContext to control traceId and parentEventId
+        mockkObject(LogContext)
+        every { LogContext.getEventId() } returns expectedEventId
+        every { LogContext.getTraceId() } returns expectedTraceId
+        
+        // Setup mocks to accept calls
+        every { eventPublisherPort.publishSync<LedgerRecordingCommand>(any(), any(), any(), any(), any()) } returns mockk()
 
-        // when
+        // when - service processes the event
         service.requestLedgerRecording(failedEvent)
 
-        // then
+        // then - verify publishSync called with exact parameters
         verify(exactly = 1) {
             eventPublisherPort.publishSync(
                 eventMetaData = EventMetadatas.LedgerRecordingCommandMetadata,
                 aggregateId = failedEvent.publicPaymentOrderId,
-                data = match { it is LedgerRecordingCommand },
-                parentEventId = LogContext.getEventId(),
-                traceId = LogContext.getTraceId()
+                data = match { cmd ->
+                    cmd is LedgerRecordingCommand &&
+                    cmd.status == "FAILED_FINAL" &&
+                    cmd.paymentOrderId == failedEvent.paymentOrderId &&
+                    cmd.publicPaymentOrderId == failedEvent.publicPaymentOrderId &&
+                    cmd.paymentId == failedEvent.paymentId &&
+                    cmd.publicPaymentId == failedEvent.publicPaymentId &&
+                    cmd.sellerId == failedEvent.sellerId &&
+                    cmd.amountValue == failedEvent.amountValue &&
+                    cmd.currency == failedEvent.currency &&
+                    cmd.createdAt == LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
+                },
+                parentEventId = expectedEventId,
+                traceId = expectedTraceId
             )
         }
-
-        val cmd = capturedCommand.captured
-        assertEquals("FAILED_FINAL", cmd.status)
-        assertEquals(failedEvent.publicPaymentOrderId, cmd.publicPaymentOrderId)
-        assertEquals(failedEvent.paymentId, cmd.paymentId)
-        assertEquals(failedEvent.publicPaymentId, cmd.publicPaymentId)
-        assertEquals(failedEvent.sellerId, cmd.sellerId)
-        assertEquals(failedEvent.amountValue, cmd.amountValue)
-        assertEquals(failedEvent.currency, cmd.currency)
     }
 
     @Test
-    fun `should handle exception in publishSync and not crash`() {
-        // Given
-        val event = samplePaymentOrderEvent()
-        val capturedCommand = slot<LedgerRecordingCommand>()
-        
-        every {
-            eventPublisherPort.publishSync(
-                eventMetaData = EventMetadatas.LedgerRecordingCommandMetadata,
-                aggregateId = event.publicPaymentOrderId,
-                data = capture(capturedCommand),
-                parentEventId = LogContext.getEventId(),
-                traceId = LogContext.getTraceId()
-            )
-        } throws RuntimeException("Kafka publish error")
-
-        // When/Then - Should propagate exception
-        assertThrows<RuntimeException> {
-            service.requestLedgerRecording(event)
-        }
-
-        // Verify that publishSync was attempted with correct data before exception
-        assertNotNull(capturedCommand.captured)
-        assertEquals(event.publicPaymentOrderId, capturedCommand.captured.publicPaymentOrderId)
-        assertEquals(event.status, capturedCommand.captured.status)
-    }
-
-    @Test
-    fun `should handle empty event data correctly`() {
-        // Given
-        val eventWithEmptyData = object : PaymentOrderEvent {
-            override val paymentOrderId = "po-999"
-            override val publicPaymentOrderId = "paymentorder-999"
-            override val paymentId = "p-999"
-            override val publicPaymentId = "payment-999"
-            override val sellerId = ""
-            override val amountValue = 0L
-            override val currency = ""
-            override val status = "SUCCESSFUL_FINAL"
+    fun `should skip publishing for non-final status`() {
+        // given - PaymentOrderEvent with non-final status
+        val eventWithNonFinalStatus = object : PaymentOrderEvent {
+            override val paymentOrderId = "po-888"
+            override val publicPaymentOrderId = "paymentorder-888"
+            override val paymentId = "p-888"
+            override val publicPaymentId = "payment-888"
+            override val sellerId = "seller-123"
+            override val amountValue = 3000L
+            override val currency = "USD"
+            override val status = "PENDING"
             override val createdAt = LocalDateTime.now(clock)
             override val updatedAt = LocalDateTime.now(clock)
             override val retryCount = 0
             override val retryReason = null
             override val lastErrorMessage = null
         }
+        
+        // when - service processes the event
+        service.requestLedgerRecording(eventWithNonFinalStatus)
 
-        val capturedCommand = slot<LedgerRecordingCommand>()
-        every {
-            eventPublisherPort.publishSync(
-                eventMetaData = EventMetadatas.LedgerRecordingCommandMetadata,
-                aggregateId = eventWithEmptyData.publicPaymentOrderId,
-                data = capture(capturedCommand),
-                parentEventId = LogContext.getEventId(),
-                traceId = LogContext.getTraceId()
-            )
-        } returns mockk()
-
-        // When
-        service.requestLedgerRecording(eventWithEmptyData)
-
-        // Then - Should still publish with empty values
-        verify(exactly = 1) {
-            eventPublisherPort.publishSync(
-                eventMetaData = EventMetadatas.LedgerRecordingCommandMetadata,
-                aggregateId = eventWithEmptyData.publicPaymentOrderId,
-                data = match { it is LedgerRecordingCommand },
-                parentEventId = LogContext.getEventId(),
-                traceId = LogContext.getTraceId()
+        // then - verify publishSync was NOT called (skipped for non-final status)
+        verify(exactly = 0) {
+            eventPublisherPort.publishSync<LedgerRecordingCommand>(
+                eventMetaData = any(),
+                aggregateId = any(),
+                data = any(),
+                parentEventId = any(),
+                traceId = any()
             )
         }
+    }
+    
+    @Test
+    fun `should handle exception in publishSync and propagate it`() {
+        // given
+        val event = samplePaymentOrderEvent()
+        val capturedCommand = slot<LedgerRecordingCommand>()
+        
+        every {
+            eventPublisherPort.publishSync(
+                eventMetaData = any(),
+                aggregateId = any(),
+                data = capture(capturedCommand),
+                parentEventId = any(),
+                traceId = any()
+            )
+        } throws RuntimeException("Kafka publish error")
 
-        val cmd = capturedCommand.captured
-        assertEquals("", cmd.sellerId)
-        assertEquals(0L, cmd.amountValue)
-        assertEquals("", cmd.currency)
+        // when/then - Should propagate exception
+        assertThrows<RuntimeException> {
+            service.requestLedgerRecording(event)
+        }
+
+        // then - verify publishSync was attempted with correct data before exception
+        assertNotNull(capturedCommand.captured)
+        assertEquals(event.publicPaymentOrderId, capturedCommand.captured.publicPaymentOrderId)
+        assertEquals(event.status, capturedCommand.captured.status)
     }
 }

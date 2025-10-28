@@ -17,6 +17,11 @@ open class RequestLedgerRecordingService(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     override fun requestLedgerRecording(event: PaymentOrderEvent) {
+        if (!event.status.equals("SUCCESSFUL_FINAL", ignoreCase = true) &&
+            !event.status.equals("FAILED_FINAL", ignoreCase = true)) {
+            logger.info("⏩ Skipping ledger recording for non-final status={}", event.status)
+            return
+        }
         val requested = LedgerRecordingCommand(
             paymentOrderId = event.paymentOrderId,
             publicPaymentOrderId = event.publicPaymentOrderId,

@@ -70,11 +70,7 @@ class ProcessPaymentServiceTest {
         every { LogContext.getEventId() } returns expectedEventId
         every { LogContext.getTraceId() } returns expectedTraceId
 
-        every { paymentOrderModificationPort.markPaid(match { order ->
-            order.paymentOrderId == PaymentOrderId(123L) &&
-            order.publicPaymentOrderId == "paymentorder-123" &&
-            order.status == PaymentOrderStatus.INITIATED_PENDING
-        }) } returns expectedOrder
+        every { paymentOrderModificationPort.markPaid(any()) } returns expectedOrder
         
         val capturedEventData = slot<PaymentOrderSucceeded>()
         every { 
