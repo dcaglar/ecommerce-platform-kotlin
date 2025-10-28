@@ -7,7 +7,6 @@ import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.domain.commands.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.ports.inbound.RecordLedgerEntriesUseCase
-import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
@@ -19,7 +18,6 @@ import org.springframework.stereotype.Component
 @Component
 class LedgerRecordingConsumer(
     @param:Qualifier("syncPaymentTx") private val kafkaTx: KafkaTxExecutor,
-    @param:Qualifier("syncPaymentEventPublisher") private val publisher: EventPublisherPort,
     private val recordLedgerEntriesUseCase: RecordLedgerEntriesUseCase
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -43,10 +41,16 @@ class LedgerRecordingConsumer(
         LogContext.with(env) {
             kafkaTx.run(offsets, groupMeta) {
                 logger.info(
-                    "🟢 Processing LedgerRecordingCommand for paymentOrderId={} status={} traceId={}",
+                    "🧾 Recording ledger entries for paymentOrderId={} status={} traceId={}",
                     command.publicPaymentOrderId, command.status, env.traceId
                 )
+
                 recordLedgerEntriesUseCase.recordLedgerEntries(command)
+
+                logger.info(
+                    "✅ Ledger recording complete and event published for paymentOrderId={}",
+                    command.publicPaymentOrderId
+                )
             }
         }
     }

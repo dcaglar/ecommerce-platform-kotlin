@@ -198,7 +198,7 @@ class RecordLedgerEntriesServiceLedgerContentTest {
         verify(exactly = 1) {
             eventPublisherPort.publishSync(
                 eventMetaData = EventMetadatas.LedgerEntriesRecordedMetadata,
-                aggregateId = command.publicPaymentOrderId,
+                aggregateId = command.sellerId,
                 data = match { event ->
                     event is LedgerEntriesRecorded &&
                     event.ledgerBatchId.startsWith("ledger-batch-") &&
@@ -317,4 +317,39 @@ class RecordLedgerEntriesServiceLedgerContentTest {
         assertEquals(command.publicPaymentOrderId, capturedEvent.captured.publicPaymentOrderId)
     }
 
+    @Test
+    fun `should verify explicit parameters for ledger entries recording`() {
+        // Given - Verify all entries are persisted correctly
+        val command = sampleCommand("SUCCESSFUL_FINAL")
+        val capturedEntries = mutableListOf<LedgerEntry>()
+        
+        every { ledgerWritePort.appendLedgerEntry(capture(capturedEntries)) } returns Unit
+        // Service uses default parameter values (preSetEventIdFromCaller, timeoutSeconds)
+        every {
+            eventPublisherPort.publishSync(
+                eventMetaData = EventMetadatas.LedgerEntriesRecordedMetadata,
+                aggregateId = command.sellerId,
+                data = any(),
+                parentEventId = any(),
+                traceId = any()
+            )
+        } returns mockk()
+
+        // When
+        service.recordLedgerEntries(command)
+
+        // Then - Verify it was called
+        verify(exactly = 1) {
+            eventPublisherPort.publishSync(
+                eventMetaData = EventMetadatas.LedgerEntriesRecordedMetadata,
+                aggregateId = command.sellerId,
+                data = match { it is LedgerEntriesRecorded },
+                parentEventId = any(),
+                traceId = any()
+            )
+        }
+        
+        // Verify entries were persisted correctly
+        assertEquals(5, capturedEntries.size) // fullFlow creates 5 entries
+    }
 }

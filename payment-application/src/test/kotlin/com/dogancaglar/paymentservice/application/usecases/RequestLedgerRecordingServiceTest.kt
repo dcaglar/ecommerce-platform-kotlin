@@ -67,7 +67,7 @@ class RequestLedgerRecordingServiceTest {
         verify(exactly = 1) {
             eventPublisherPort.publishSync(
                 eventMetaData = EventMetadatas.LedgerRecordingCommandMetadata,
-                aggregateId = event.publicPaymentOrderId,
+                aggregateId = event.sellerId,
                 data = match { cmd ->
                     cmd is LedgerRecordingCommand &&
                     cmd.paymentOrderId == event.paymentOrderId &&
@@ -123,7 +123,7 @@ class RequestLedgerRecordingServiceTest {
         verify(exactly = 1) {
             eventPublisherPort.publishSync(
                 eventMetaData = EventMetadatas.LedgerRecordingCommandMetadata,
-                aggregateId = failedEvent.publicPaymentOrderId,
+                aggregateId = failedEvent.sellerId,
                 data = match { cmd ->
                     cmd is LedgerRecordingCommand &&
                     cmd.status == "FAILED_FINAL" &&

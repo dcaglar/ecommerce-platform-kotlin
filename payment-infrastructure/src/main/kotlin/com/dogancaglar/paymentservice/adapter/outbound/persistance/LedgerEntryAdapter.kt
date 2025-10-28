@@ -7,8 +7,9 @@ import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.slf4j.LoggerFactory
+import org.springframework.stereotype.Repository
 
-@Service
+@Repository
 class LedgerEntryAdapter(
     private val ledgerMapper: LedgerMapper
 ) : LedgerEntryPort {

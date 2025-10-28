@@ -36,7 +36,7 @@ open class RequestLedgerRecordingService(
 
         eventPublisherPort.publishSync(
             eventMetaData = EventMetadatas.LedgerRecordingCommandMetadata,
-            aggregateId = requested.publicPaymentOrderId,
+            aggregateId = requested.sellerId,
             data = requested,
             parentEventId = LogContext.getEventId(),
             traceId = LogContext.getTraceId()

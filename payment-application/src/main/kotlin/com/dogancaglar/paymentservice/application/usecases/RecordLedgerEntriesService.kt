@@ -76,7 +76,7 @@ open class RecordLedgerEntriesService(
         // 4️⃣ Publish the confirmation event
         eventPublisherPort.publishSync(
             eventMetaData = EventMetadatas.LedgerEntriesRecordedMetadata,
-            aggregateId = event.publicPaymentOrderId,
+            aggregateId = event.sellerId,
             data = recordedEvent,
             parentEventId = parentEventId,
             traceId = traceId
