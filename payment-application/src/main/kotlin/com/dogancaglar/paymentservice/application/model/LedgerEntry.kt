@@ -9,7 +9,7 @@ import java.time.LocalDateTime
  * ⚠️ Use LedgerEntryFactory to create instances. The companion.create() method is only
  * for factory usage within this module and should not be called directly by application code.
  */
-class LedgerEntry internal constructor(
+class  LedgerEntry private constructor (
     val ledgerEntryId: Long,
     val journalEntry: JournalEntry,
     val createdAt: LocalDateTime
