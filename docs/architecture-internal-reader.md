@@ -11,17 +11,14 @@
    2.1 [High‑Level Context Diagram](#21-highlevel-context-diagram)  
    2.2 [Bounded Context Map](#22-bounded-context-map)
    2.3 [Payment Bounded Context Domain Model](#23-payment-bounded-context-domain-model)  
-   2.4 [Aggregate Boundaries & Consistency](#24-aggregate-boundaries--consistency)  
-   2.5 [Event-Driven Context Integration](#25-event-driven-context-integration)
+   2.4 [Aggregate Boundaries & Consistency](#24-aggregate-boundaries--consistency)
 3. [Core Design Principles](#3--core-design-principles)
 4. [Architectural Overview](#4--architectural-overview)  
    4.1 [Layering & Hexagonal Architecture](#41-layering--hexagonal-architecture)  
    4.2 [Service & Executor Landscape](#42-service--executor-landscape)  
    4.3 [Payment Flow Architecture](#43-payment-flow-architecture)  
    4.4 [Complete System Flow Architecture Diagram](#44-complete-system-flow-architecture-diagram)
-   4.5 [Kafka Topic Flow & Partition Strategy](#45-kafka-topic-flow--partition-strategy)
-   4.6 [Component Interaction & Flow Separation](#46-component-interaction--flow-separation)
-   4.7 [Ledger Recording Architecture](#47-ledger-recording-architecture)
+   4.5 [Ledger Recording Architecture](#45-ledger-recording-architecture)
 5. [Cross‑Cutting Concerns](#5--crosscutting-concerns)  
    5.1 [Outbox Pattern](#51-outbox-pattern)  
    5.2 [Retry & Status‑Check Strategy](#52-retry--statuscheck-strategy)  
@@ -104,97 +101,51 @@ end
 
 ### 2.2 Bounded Context Map
 
-#### Context Relationships
-
-```mermaid
-%%{init:{'theme':'default','flowchart':{'nodeSpacing':60,'rankSpacing':70}}}%%
-flowchart TB
-    classDef core fill:#4CAF50,stroke:#2E7D32,stroke-width:3px;
-    classDef support fill:#FFC107,stroke:#F57C00,stroke-width:2px;
-    classDef downstream fill:#2196F3,stroke:#1565C0,stroke-width:2px;
-    classDef planned fill:#E0E0E0,stroke:#9E9E9E,stroke-width:2px,stroke-dasharray: 5 5;
-
-    subgraph Core_Domains["🎯 Core Domains"]
-        Payment[["💳 Payment Context<br/>🟢 Core Domain<br/>✅ Implemented"]]:::core
-    end
-
-    subgraph Supporting_Domains["⚙️ Supporting Domains"]
-        Ledger[["🧾 Ledger Subdomain<br/>🟡 Supporting Domain<br/>✅ Implemented<br/>(within Payment BC)"]]
-    end
-
-    subgraph Downstream_Domains["📦 Downstream Domains"]
-        Wallet[["💰 Wallet Context<br/>🔵 Downstream<br/>⏸️ Planned"]]
-        Shipment[["🚚 Shipment Context<br/>🔵 Downstream<br/>⏸️ Planned"]]
-        Order[["📋 Order Context<br/>🔵 Downstream<br/>⏸️ Planned"]]
-    end
-
-    subgraph Generic_Domains["🔧 Generic/Utility Domains"]
-        Support[["🎧 Support Context<br/>🔧 Generic<br/>⏸️ Planned"]]
-        Analytics[["📊 Analytics Context<br/>🔧 Generic<br/>⏸️ Planned"]]
-    end
-
-    Payment -->|"Owns<br/>Contains"| Ledger
-    Payment -->|"Publishes Events<br/>💰 PaymentOrderSucceeded<br/>💰 PaymentOrderFailed<br/>📨 Event-Driven (U/D)"| Wallet
-    Payment -->|"Publishes Events<br/>📦 PaymentOrderFinalized<br/>📨 Event-Driven (U/D)"| Shipment
-    Payment -->|"Publishes Events<br/>📧 PaymentResult events<br/>📨 Event-Driven (U/D)"| Support
-    Payment -->|"Publishes Events<br/>📊 Streams all events<br/>📨 Event-Driven (U/D)"| Analytics
-    Payment -.->|"Planned:<br/>Receives<br/>📋 OrderCreated<br/>📨 Conformist"| Order
-
-    style Payment fill:#C8E6C9,stroke:#388E3C,stroke-width:4px
-    style Ledger fill:#FFF9C4,stroke:#F57F17,stroke-width:2px
-    style Wallet fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
-    style Shipment fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
-    style Order fill:#E0E0E0,stroke:#9E9E9E,stroke-width:2px
-    style Support fill:#FFF3E0,stroke:#E65100,stroke-width:2px
-    style Analytics fill:#FFF3E0,stroke:#E65100,stroke-width:2px
-```
-
-**Relationship Types:**
-- **U/D (Upstream/Downstream)**: Payment publishes events; downstream contexts consume independently
-- **Event-Driven**: Asynchronous integration via Kafka topics
-- **Contains**: Ledger is a subdomain within Payment bounded context
-- **Conformist** *(Planned)*: Payment may conform to Order context's contract for order information
-
-#### Context Mapping with Integration Patterns
+This diagram shows the Payment Bounded Context and its relationships with downstream contexts, including internal aggregates and integration patterns.
 
 ```mermaid
 %%{init:{'theme':'default','flowchart':{'nodeSpacing':50,'rankSpacing':60}}}%%
-flowchart LR
+flowchart TB
     classDef payment fill:#4CAF50,stroke:#2E7D32,stroke-width:3px;
     classDef downstream fill:#2196F3,stroke:#1565C0,stroke-width:2px;
     classDef infrastructure fill:#9E9E9E,stroke:#616161,stroke-width:2px;
+    classDef planned fill:#E0E0E0,stroke:#9E9E9E,stroke-width:2px,stroke-dasharray: 5 5;
 
-    subgraph Payment_BC["💳 Payment Bounded Context"]
-        Payment_Agg["Payment<br/>(Coordination Aggregate)<br/>• Container for payment request<br/>• Tracks overall completion<br/>• Emits PaymentCompleted for<br/>  downstream domains"]
-        PaymentOrder_Agg["PaymentOrder<br/>(Processing Aggregate)<br/>• Each processed independently<br/>• Separate PSP calls per order<br/>• Individual event emission"]
-        Ledger_Subdomain["Ledger Subdomain<br/>• JournalEntry<br/>• Posting<br/>• Account"]
+    subgraph Payment_BC["Payment Bounded Context - Core Domain"]
+        Payment_Agg["Payment<br/>Coordination Aggregate<br/>Multi-seller checkout container"]
+        PaymentOrder_Agg["PaymentOrder<br/>Processing Aggregate<br/>Independent PSP processing per seller"]
+        Ledger_Subdomain["Ledger Subdomain<br/>Double-entry accounting<br/>JournalEntry + Postings"]
     end
 
-    subgraph Integration["🔌 Integration Layer"]
-        KAFKA[("📬 Kafka<br/>Event Bus")]
-        Topics["Topics:<br/>• payment_order_finalized<br/>• ledger_entries_recorded"]
+    subgraph Integration["Integration Layer - Kafka Event Bus"]
+        KAFKA[("Kafka Topics:<br/>payment_order_finalized<br/>ledger_entries_recorded")]
     end
 
-    subgraph Downstream_BCs["📦 Downstream Bounded Contexts"]
-        Wallet_BC[("💰 Wallet BC<br/>⏸️ Planned<br/>Consumer: WalletBalanceConsumer")]
-        Shipment_BC[("🚚 Shipment BC<br/>⏸️ Planned<br/>Consumer: OrderFulfillmentConsumer")]
-        Order_BC[("📋 Order BC<br/>⏸️ Planned<br/>Consumer: PaymentStatusConsumer")]
+    subgraph Downstream_BCs["Downstream Bounded Contexts"]
+        Shipment_BC[("Shipment BC<br/>Listens to PaymentOrderSucceeded<br/>Immediate shipment per seller")]:::downstream
+        Wallet_BC[("Wallet BC<br/>Planned")]:::planned
+        Order_BC[("Order BC<br/>Planned")]:::planned
     end
 
-    Payment_Agg -->|"1. Contains (1:N)<br/>Coordination container"| PaymentOrder_Agg
-    PaymentOrder_Agg -->|"2. Processing<br/>Independent PSP calls<br/>per PaymentOrder"| KAFKA
-    PaymentOrder_Agg -->|"3. Publishes<br/>PaymentOrderFinalized<br/>(per PaymentOrder)"| KAFKA
-    Payment_Agg -->|"4. When all complete:<br/>May publish PaymentCompleted<br/>(optional - overall status)"| KAFKA
-    Ledger_Subdomain -->|"5. Publishes<br/>LedgerEntriesRecorded"| KAFKA
+    Payment_Agg -->|"1:N Contains"| PaymentOrder_Agg
+    PaymentOrder_Agg -->|"Emits PaymentOrderSucceeded<br/>per seller immediately"| KAFKA
+    Payment_Agg -->|"Emits PaymentCompleted<br/>when all orders done (optional)"| KAFKA
+    Ledger_Subdomain -->|"Emits LedgerEntriesRecorded"| KAFKA
     
-    KAFKA -->|"Consumes PaymentOrderSucceeded<br/>(Per seller - immediate action)"| Shipment_BC
-    KAFKA -->|"Consumes PaymentCompleted<br/>(Optional - overall tracking)"| Wallet_BC
-    KAFKA -->|"Consumes PaymentCompleted<br/>or PaymentOrderSucceeded"| Order_BC
+    KAFKA -->|"Per seller - immediate action"| Shipment_BC
+    KAFKA -.->|"Planned"| Wallet_BC
+    KAFKA -.->|"Planned"| Order_BC
 
     style Payment_BC fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
     style Integration fill:#F5F5F5,stroke:#757575,stroke-width:2px
     style Downstream_BCs fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
 ```
+
+**Key Points:**
+- **Payment** is a coordination aggregate containing multiple **PaymentOrder** processing aggregates
+- **PaymentOrder** emits events immediately when its payment succeeds (per seller)
+- **Shipment** listens to individual `PaymentOrderSucceeded` events for immediate fulfillment
+- All integration is event-driven via Kafka (no direct dependencies)
 
 ### 2.3 Payment Bounded Context Domain Model
 
@@ -351,71 +302,6 @@ flowchart TB
 - **Consistency Boundaries**: Each aggregate maintains immediate consistency; eventual consistency between aggregates via events
 - **Transaction Scope**: Database transactions for initial Payment+PaymentOrders creation; Kafka transactions for PaymentOrder processing; separate DB transactions per PaymentOrder status updates; eventual Payment status update when all PaymentOrders complete
 
-### 2.5 Event-Driven Context Integration
-
-This diagram shows how bounded contexts integrate via domain events.
-
-```mermaid
-%%{init:{'theme':'default','flowchart':{'nodeSpacing':50,'rankSpacing':60}}}%%
-flowchart LR
-    classDef payment fill:#4CAF50,stroke:#2E7D32,stroke-width:3px;
-    classDef downstream fill:#2196F3,stroke:#1565C0,stroke-width:2px;
-    classDef kafka fill:#9C27B0,stroke:#6A1B9A,stroke-width:2px;
-    classDef planned fill:#E0E0E0,stroke:#9E9E9E,stroke-width:2px,stroke-dasharray: 5 5;
-
-    subgraph Payment_Context["💳 Payment Bounded Context"]
-        Payment_Service["payment-service<br/>(REST API)"]
-        Payment_Consumers["payment-consumers<br/>(Kafka Workers)"]
-        Payment_Events["Domain Events:<br/>• PaymentOrderCreated<br/>• PaymentOrderSucceeded (per seller)<br/>  → Shipment listens immediately<br/>• PaymentOrderFailed<br/>• PaymentCompleted (optional)<br/>• LedgerEntriesRecorded"]
-    end
-
-    subgraph Kafka_Event_Bus["📬 Kafka Event Bus"]
-        Topics["Topics:<br/>• payment_order_created_topic<br/>• payment_order_finalized_topic<br/>• ledger_entries_recorded_topic"]
-    end
-
-    subgraph Wallet_Context["💰 Wallet Bounded Context (Planned)"]
-        Wallet_Consumer["WalletBalanceConsumer<br/>(Planned)"]
-        Wallet_Actions["Actions:<br/>• Update wallet balance<br/>• Record transaction<br/>• Emit WalletUpdated"]
-    end
-
-    subgraph Shipment_Context["🚚 Shipment Bounded Context (Planned)"]
-        Shipment_Consumer["OrderFulfillmentConsumer<br/>(Planned)"]
-        Shipment_Actions["Actions:<br/>• Create shipment<br/>• Update order status<br/>• Emit ShipmentCreated"]
-    end
-
-    subgraph Order_Context["📋 Order Bounded Context (Planned)"]
-        Order_Publisher["Order Service<br/>(Planned)"]
-        Order_Events["Events:<br/>• OrderCreated<br/>• OrderUpdated"]
-        Order_Consumer["PaymentStatusConsumer<br/>(Planned)"]
-    end
-
-    Payment_Service -->|"Publishes"| Payment_Events
-    Payment_Events -->|"Via Outbox Pattern"| Topics
-    Payment_Consumers -->|"Publishes"| Topics
-
-    Topics -->|"Consumes<br/>PaymentOrderSucceeded<br/>(Per seller - immediate)"| Shipment_Consumer
-    Topics -->|"Consumes<br/>PaymentCompleted<br/>(Optional - overall status)"| Wallet_Consumer
-    Topics -->|"Consumes<br/>PaymentCompleted<br/>or PaymentOrderSucceeded"| Order_Consumer
-
-    Wallet_Consumer -.->|"Planned"| Wallet_Actions
-    Shipment_Consumer -.->|"Planned:<br/>Listen to PaymentOrderSucceeded<br/>(per seller) to immediately start<br/>shipment for that seller's products"| Shipment_Actions["Actions:<br/>• Immediate shipment initiation<br/>per seller when their PaymentOrder<br/>succeeds<br/>• Don't wait for other sellers"]
-    Order_Consumer -.->|"Planned:<br/>Track individual PaymentOrderSucceeded<br/>or overall PaymentCompleted"| Order_Actions["Actions:<br/>• Update order payment status<br/>per seller<br/>• Trigger fulfillment workflow"]
-
-    Order_Publisher -.->|"Planned:<br/>Publishes"| Topics
-    Topics -.->|"Planned:<br/>Consumes"| Payment_Consumers
-
-    style Payment_Context fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
-    style Kafka_Event_Bus fill:#E1BEE7,stroke:#7B1FA2,stroke-width:2px
-    style Wallet_Context fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
-    style Shipment_Context fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
-    style Order_Context fill:#E0E0E0,stroke:#9E9E9E,stroke-width:2px
-```
-
-**Integration Patterns:**
-- **Event-Driven Architecture**: Asynchronous event publishing via Kafka
-- **Publisher-Subscriber**: Payment context publishes; downstream contexts subscribe independently
-- **Eventual Consistency**: Each context maintains its own data; consistency achieved via events
-- **Loose Coupling**: Contexts communicate only via events, no direct dependencies
 
 ---
 
@@ -489,7 +375,7 @@ flowchart LR
 > - **Ledger Flow**: Consumer groups `ledger-*-consumer-group` (concurrency=4), topics `ledger_*_topic`
 > - **Benefits**: PSP processing never impacted by ledger bottlenecks; ledger recording never impacted by PSP latency; each flow scales independently based on its consumer lag
 
-### 4.3 Payment Flow Architecture
+### 4.3 Payment Flow Sequence Diagram
 
 ```mermaid
 sequenceDiagram
@@ -534,7 +420,7 @@ sequenceDiagram
     Note over Kafka: Both succeeded & failed events<br/>route to payment_order_finalized_topic
 ```
 
-### 4.4 Complete System Flow Architecture Diagram
+### 4.4 End to End Flow Architecture Diagram
 
 This diagram shows all three independent flows (PSP, Ledger, Balance) and their complete interaction patterns, partition keys, and scaling characteristics.
 
@@ -642,201 +528,7 @@ flowchart TB
 - **Idempotency**: DB-level constraints (`ON CONFLICT DO NOTHING`) and idempotent updates prevent duplicates
 - **Scaling**: Each flow scales independently based on its own consumer lag metrics
 
-### 4.6 Kafka Topic Flow & Partition Strategy
-
-This diagram visualizes the complete event flow through Kafka topics, showing partition keys, consumer groups, and flow separation.
-
-```mermaid
-%%{init:{'theme':'default','flowchart':{'nodeSpacing':50,'rankSpacing':60}}}%%
-flowchart LR
-    classDef topic fill:#f3e8fd,stroke:#A142F4,stroke-width:3px;
-    classDef consumer fill:#e6f5ea,stroke:#34A853,stroke-width:2px;
-    classDef db fill:#fef7e0,stroke:#FBBC05,stroke-width:2px;
-    classDef redis fill:#fff3e0,stroke:#FF9800,stroke-width:2px;
-    classDef psp fill:#fde8e6,stroke:#EA4335,stroke-width:2px;
-
-    subgraph API_LAYER["📥 API Layer"]
-        API["REST API<br/>payment-service"]
-        OUTBOX["OutboxDispatcherJob"]
-    end
-
-    subgraph PSP_TOPICS["📞 PSP Flow Topics<br/>(Partition Key: paymentOrderId)"]
-        T1["payment_order_created_topic<br/>📊 48 partitions<br/>👥 enqueuer-group (8)"]:::topic
-        T2["payment_order_psp_call_requested_topic<br/>📊 48 partitions<br/>👥 psp-call-executor-group (8)"]:::topic
-        T3["payment_order_psp_result_updated_topic<br/>📊 48 partitions<br/>👥 psp-result-applier-group (8)"]:::topic
-        T4["payment_order_finalized_topic<br/>📊 48 partitions<br/>✅ Unified Success/Failure<br/>👥 ledger-dispatch-group (4)"]:::topic
-    end
-
-    subgraph STATUS_TOPICS["⏱️ Status Check Topics"]
-        T5["payment_status_check_scheduler_topic<br/>📊 1 partition<br/>👥 status-check-group (1)"]:::topic
-    end
-
-    subgraph LEDGER_TOPICS["🧾 Ledger Flow Topics<br/>(Partition Key: sellerId)"]
-        T6["ledger_record_request_queue_topic<br/>📊 24 partitions<br/>👥 ledger-recording-group (4)"]:::topic
-        T7["ledger_entries_recorded_topic<br/>📊 24 partitions<br/>👥 balance-consumer-group (planned)"]:::topic
-    end
-
-    subgraph CONSUMERS["👷 Consumers (payment-consumers)"]
-        C1["PaymentOrderEnqueuer"]:::consumer
-        C2["PaymentOrderPspCallExecutor"]:::consumer
-        C3["PaymentOrderPspResultApplier"]:::consumer
-        C4["LedgerRecordingRequestDispatcher"]:::consumer
-        C5["LedgerRecordingConsumer"]:::consumer
-        C6["ScheduledPaymentStatusCheckExecutor"]:::consumer
-        C7["AccountBalanceConsumer<br/>(Planned)"]:::consumer
-    end
-
-    subgraph INFRA["🔧 Infrastructure"]
-        DB[(PostgreSQL<br/>• payment_orders<br/>• journal_entries<br/>• postings)]:::db
-        REDIS[(Redis<br/>• Retry ZSet)]:::redis
-        PSP_API["PSP Client<br/>(Mock)"]:::psp
-    end
-
-    API -->|"Atomic Write<br/>Payment + Outbox"| DB
-    API -->|"202 Accepted"| RESPONSE["👤 Client Response"]
-    OUTBOX -->|"Read NEW<br/>events"| DB
-    OUTBOX -->|"Publish"| T1
-
-    T1 -->|"Kafka Tx"| C1
-    C1 -->|"Publish<br/>🔑 paymentOrderId"| T2
-    T2 -->|"Kafka Tx"| C2
-    C2 -->|"PSP Call<br/>(500ms timeout)"| PSP_API
-    PSP_API -.->|"Response"| C2
-    C2 -->|"Publish<br/>🔑 paymentOrderId"| T3
-    T3 -->|"Kafka Tx<br/>+ DB Update"| C3
-    C3 -->|"Success/Failed<br/>🔑 paymentOrderId"| T4
-    C3 -->|"Retry?"| REDIS
-    C3 -->|"Status Check?"| T5
-
-    REDIS -->|"Due Items<br/>(Every 5s)"| SCHEDULER["RetryDispatcherScheduler"]
-    SCHEDULER -->|"Republish<br/>🔑 paymentOrderId<br/>(Same Partition)"| T2
-
-    T5 -->|"Kafka Tx"| C6
-    C6 -->|"Status Check"| PSP_API
-    C6 -->|"Update"| DB
-
-    T4 -->|"Kafka Tx<br/>🔑 Switch Key<br/>paymentOrderId → sellerId"| C4
-    C4 -->|"Transform & Publish<br/>🔑 sellerId"| T6
-    T6 -->|"Kafka Tx<br/>+ DB Batch Write"| C5
-    C5 -->|"ON CONFLICT<br/>Idempotent"| DB
-    C5 -->|"Publish<br/>🔑 sellerId"| T7
-
-    T7 -.->|"Planned:<br/>Kafka Tx"| C7
-    C7 -.->|"Aggregate<br/>Balances"| BALANCE_DB[(account_balances<br/>Planned)]:::db
-
-    style PSP_TOPICS fill:#fff9c4,stroke:#F57F17,stroke-width:3px
-    style LEDGER_TOPICS fill:#e8f5e9,stroke:#388E3C,stroke-width:3px
-    style STATUS_TOPICS fill:#f3e5f5,stroke:#7B1FA2,stroke-width:2px
-```
-
-### 4.6 Component Interaction & Flow Separation
-
-This diagram shows how components interact across different flows, highlighting transaction boundaries and exactly-once processing.
-
-```mermaid
-%%{init:{'theme':'default','flowchart':{'nodeSpacing':50,'rankSpacing':70}}}%%
-flowchart TD
-    classDef api fill:#e3f2fd,stroke:#1976D2,stroke-width:3px;
-    classDef consumer fill:#e6f5ea,stroke:#34A853,stroke-width:2px;
-    classDef service fill:#fff9c4,stroke:#F57F17,stroke-width:2px;
-    classDef db fill:#fef7e0,stroke:#FBBC05,stroke-width:2px;
-    classDef kafka fill:#f3e8fd,stroke:#A142F4,stroke-width:2px;
-    classDef redis fill:#fff3e0,stroke:#FF9800,stroke-width:2px;
-
-    subgraph WEB["🌐 Web Layer (payment-service)"]
-        CONTROLLER["PaymentController"]:::api
-        CREATE_SVC["CreatePaymentService"]:::service
-        OUTBOX_JOB["OutboxDispatcherJob"]:::service
-    end
-
-    subgraph PSP_CONSUMERS["📞 PSP Flow Consumers"]
-        ENQ["PaymentOrderEnqueuer<br/>KafkaTxExecutor"]:::consumer
-        EXEC["PaymentOrderPspCallExecutor<br/>KafkaTxExecutor<br/>+ Stale Event Filter"]:::consumer
-        APPLY["PaymentOrderPspResultApplier<br/>KafkaTxExecutor"]:::consumer
-        PROCESS_SVC["ProcessPaymentService<br/>updateReturningIdempotent"]:::service
-    end
-
-    subgraph LEDGER_CONSUMERS["🧾 Ledger Flow Consumers"]
-        DISPATCH["LedgerRecordingRequestDispatcher<br/>KafkaTxExecutor<br/>Key Switch: paymentOrderId → sellerId"]:::consumer
-        LEDGER_CONS["LedgerRecordingConsumer<br/>KafkaTxExecutor"]:::consumer
-        REQUEST_SVC["RequestLedgerRecordingService"]:::service
-        RECORD_SVC["RecordLedgerEntriesService<br/>ON CONFLICT DO NOTHING"]:::service
-    end
-
-    subgraph STATUS_CONSUMER["⏱️ Status Check Consumer"]
-        STATUS_EXEC["ScheduledPaymentStatusCheckExecutor<br/>KafkaTxExecutor"]:::consumer
-    end
-
-    subgraph RETRY["🔄 Retry Mechanism"]
-        RETRY_SCHED["RetryDispatcherScheduler<br/>(Every 5s)"]:::service
-    end
-
-    subgraph STORAGE["💾 Storage"]
-        PG[(PostgreSQL<br/>• payment_orders<br/>• outbox_event<br/>• journal_entries<br/>• postings)]:::db
-        REDIS_STORE[(Redis<br/>Retry ZSet)]:::redis
-    end
-
-    subgraph KAFKA_TOPICS["📬 Kafka Topics"]
-        K1[payment_order_created]:::kafka
-        K2[payment_order_psp_call_requested]:::kafka
-        K3[payment_order_psp_result_updated]:::kafka
-        K4[payment_order_finalized]:::kafka
-        K5[ledger_record_request_queue]:::kafka
-        K6[ledger_entries_recorded]:::kafka
-        K7[payment_status_check_scheduler]:::kafka
-    end
-
-    CONTROLLER -->|"1. POST /payments"| CREATE_SVC
-    CREATE_SVC -->|"2. Atomic DB Tx<br/>• Save Payment<br/>• Save Orders<br/>• Insert Outbox"| PG
-    CREATE_SVC -->|"3. 202 Accepted<br/>(No PSP call!)"| RESPONSE["👤 Client"]
-    
-    OUTBOX_JOB -->|"4. Poll NEW"| PG
-    OUTBOX_JOB -->|"5. Publish"| K1
-
-    K1 -->|"6. Kafka Tx"| ENQ
-    ENQ -->|"7. Publish<br/>(Atomic)"| K2
-
-    K2 -->|"8. Kafka Tx<br/>• Stale Check<br/>• Terminal Check"| EXEC
-    EXEC -->|"9. PSP Call<br/>(Async)"| PSP["PSP Client"]
-    EXEC -->|"10. Publish Result<br/>(Atomic)"| K3
-
-    K3 -->|"11. Kafka Tx"| APPLY
-    APPLY -->|"12. Process Result"| PROCESS_SVC
-    PROCESS_SVC -->|"13. Update DB<br/>updateReturningIdempotent<br/>(Idempotent)"| PG
-    PROCESS_SVC -->|"14. Retry?"| RETRY_SCHED
-    PROCESS_SVC -->|"15. Finalized<br/>(Success/Failed)"| K4
-
-    RETRY_SCHED -->|"16. Due Items"| REDIS_STORE
-    RETRY_SCHED -->|"17. Republish<br/>(Same Partition)"| K2
-
-    K4 -->|"18. Kafka Tx<br/>Key Switch!"| DISPATCH
-    DISPATCH -->|"19. Transform"| REQUEST_SVC
-    REQUEST_SVC -->|"20. Publish<br/>Key: sellerId<br/>(Atomic)"| K5
-
-    K5 -->|"21. Kafka Tx"| LEDGER_CONS
-    LEDGER_CONS -->|"22. Record Entries"| RECORD_SVC
-    RECORD_SVC -->|"23. Batch Write<br/>ON CONFLICT DO NOTHING<br/>(Idempotent)"| PG
-    RECORD_SVC -->|"24. Publish Recorded<br/>Key: sellerId<br/>(Atomic)"| K6
-
-    K7 -->|"Status Check"| STATUS_EXEC
-    STATUS_EXEC -->|"PSP Status"| PSP
-    STATUS_EXEC -->|"Update"| PG
-
-    style PSP_CONSUMERS fill:#fff9c4,stroke:#F57F17,stroke-width:3px
-    style LEDGER_CONSUMERS fill:#e8f5e9,stroke:#388E3C,stroke-width:3px
-    style STATUS_CONSUMER fill:#f3e5f5,stroke:#7B1FA2,stroke-width:2px
-```
-
-**Legend:**
-- 🔑 = Partition Key
-- 👥 = Consumer Group (concurrency)
-- 📊 = Number of Partitions
-- ✅ = Unified Topic
-- KafkaTxExecutor = Atomic offset commit + DB writes + event publish
-- updateReturningIdempotent = Idempotent DB update pattern
-- ON CONFLICT = Database-level duplicate prevention
-
-### 4.7 Ledger Recording Architecture
+### 4.5 Ledger Recording Architecture
 
 #### Purpose
 
@@ -851,7 +543,7 @@ Adds a complete **double‑entry accounting subsystem** for reliable financial r
 
 **Note:** Account balance aggregation from ledger entries is planned but not yet implemented (future: `AccountBalanceConsumer`).
 
-#### Sequence Flow
+#### Ledger Record Sequence Flow
 
 ```mermaid
 sequenceDiagram
