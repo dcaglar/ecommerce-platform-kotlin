@@ -1,6 +1,6 @@
 # ecommerce-platform-kotlin · Architecture Guide
 
-*Last updated: **2025‑10‑19** – maintained by **Doğan Çağlar***
+*Last updated: **2025‑01‑15** – maintained by **Doğan Çağlar***
 
 ---
 
@@ -240,7 +240,9 @@ flowchart TD
 
 #### Purpose
 
-Adds a complete **double‑entry accounting subsystem** for reliable financial recordkeeping. Every `PaymentOrderSucceeded` or `PaymentOrderFailed` event triggers a new flow that writes balanced journal entries into a ledger table and publishes a confirmation event `LedgerEntriesRecorded`.
+Adds a complete **double‑entry accounting subsystem** for reliable financial recordkeeping. Every `PaymentOrderFinalized` event (consolidating `PaymentOrderSucceeded` and `PaymentOrderFailed`) triggers a new flow that writes balanced journal entries into a ledger table and publishes a confirmation event `LedgerEntriesRecorded`.
+
+**Note:** Account balance aggregation from ledger entries is planned but not yet implemented (future: `AccountBalanceConsumer`).
 
 #### Sequence Flow
 
@@ -253,7 +255,7 @@ sequenceDiagram
     participant Service as RecordLedgerEntriesService
     participant LedgerDB as Ledger Table
 
-    Kafka->>Dispatcher: Consume PaymentOrderSucceeded/Failed
+    Kafka->>Dispatcher: Consume PaymentOrderFinalized
     Dispatcher->>Kafka: Publish LedgerRecordingCommand
     Kafka->>Consumer: Consume LedgerRecordingCommand
     Consumer->>Service: recordLedgerEntries()
@@ -263,7 +265,7 @@ sequenceDiagram
 
 #### Components
 
-- **LedgerRecordingRequestDispatcher**: Kafka consumer for `payment_order_succeeded` and `payment_order_failed`. Delegates to `RequestLedgerRecordingService`.
+- **LedgerRecordingRequestDispatcher**: Kafka consumer for `payment_order_finalized_topic` (unified topic). Delegates to `RequestLedgerRecordingService`.
 - **RequestLedgerRecordingService**: Transforms `PaymentOrderEvent` → `LedgerRecordingCommand` with trace and parent event propagation.
 - **LedgerRecordingConsumer**: Listens on `ledger-record-request-queue`, invokes `RecordLedgerEntriesService`.
 - **RecordLedgerEntriesService**: Creates balanced `JournalEntry` objects via `JournalEntryFactory`, persists via `LedgerEntryPort`, emits `LedgerEntriesRecorded`.
@@ -272,7 +274,7 @@ sequenceDiagram
 
 | Type                               | Role                                                                                |
 | ---------------------------------- | ----------------------------------------------------------------------------------- |
-| `LedgerRecordingCommand`           | Command issued per PaymentOrder after success/failure                               |
+| `LedgerRecordingCommand`           | Command issued per PaymentOrder after finalization (success or failure)             |
 | `LedgerEntriesRecorded`            | Event confirming persisted journal entries                                          |
 | `JournalEntry`                     | Balanced accounting record containing multiple postings                             |
 | `Posting.Debit` / `Posting.Credit` | Represent atomic movements per account                                              |
@@ -389,9 +391,69 @@ sequenceDiagram
 
 ### 5.2 Retry & Status‑Check Strategy
 
+#### Retry Scheduling with Redis ZSet
+
 - Retryable PSP results are **not** retried inline. We schedule retries in **Redis ZSet** with equal‑jitter backoff.
-- A **RetryDispatcherScheduler** polls due items and republishes `payment_order_psp_call_requested`.
+- A **RetryDispatcherScheduler** polls due items (every 5 seconds) and republishes `payment_order_psp_call_requested`.
 - Non‑retryable outcomes are marked final and emitted; status‑check path is scheduled separately.
+- Uses **atomic Redis operations** (ZPOPMIN) to prevent duplicate retry processing in multi-instance deployments.
+
+#### Exponential Backoff with Equal Jitter
+
+**Formula:**
+```
+delay = min(
+  random_between(
+    base_delay * 2^(attempt - 1) / 2,
+    base_delay * 2^(attempt - 1)
+  ),
+  max_delay
+)
+```
+
+Where:
+- `base_delay = 2,000ms` (2 seconds)
+- `max_delay = 60,000ms` (60 seconds)
+
+**Delay Examples:**
+| Attempt | Range (ms) | Example |
+|---------|-----------|---------|
+| 1 | 1,000 - 2,000 | ~1.5s |
+| 2 | 2,000 - 4,000 | ~3s |
+| 3 | 4,000 - 8,000 | ~6s |
+| 4 | 8,000 - 16,000 | ~12s |
+| 5 | 16,000 - 60,000 | ~30s (capped) |
+
+**Why Equal Jitter?**
+- Prevents thundering herd problems by randomizing retry timing
+- Ensures retries spread evenly across the exponential window
+- Reduces contention when multiple payment orders fail simultaneously
+
+#### Retry Limits & Dead Letter Queue
+
+- **MAX_RETRIES = 5**: After 5 failed attempts, payment order is marked `FINAL_FAILED` and routed to Dead Letter Queue
+- **Dead Letter Queues**: Every Kafka topic has a corresponding `.DLQ` (e.g., `payment_order_psp_call_requested_topic.DLQ`)
+- **DLQ Handling**: 
+  - Monitored via Grafana dashboards
+  - Alert threshold: > 100 messages in any DLQ over 5 minutes
+  - Manual replay possible after fixing root cause
+  - Daily reconciliation scripts verify DLQ contents
+
+#### Retry Flow
+
+1. **PSP Failure** → `PaymentOrderPspResultApplier` processes retryable status
+2. **Retry Scheduling** → Retry event scheduled in Redis ZSet with computed backoff
+3. **Dispatcher Poll** → `RetryDispatcherScheduler` polls due items every 5 seconds
+4. **Republish** → Events republished to original Kafka topic with same partition key
+5. **Max Attempts** → If `retryCount >= MAX_RETRIES`, mark final failed and send to DLQ
+
+#### Metrics
+
+- `redis_retry_zset_size` - Current size of retry queue
+- `redis_retry_batch_size` - Size of last processed batch
+- `redis_retry_events_total{result=processed|failed}` - Retry event counts
+- `redis_retry_dispatch_batch_seconds` - Batch processing duration
+- `redis_retry_dispatch_event_seconds` - Per-event processing duration
 
 ### 5.3 Idempotency
 
@@ -907,11 +969,25 @@ verify(exactly = 1) {
 
 ## 12 · Roadmap
 
-- End‑to‑end OpenTelemetry tracing.
-- Autoscaling policies per topic (fine‑grained).
-- Automated outbox partition management (e.g., pg_partman).
-- Blue/green deploy strategy for consumers during topic migrations.
-- Additional bounded contexts (wallet, shipment, order).
+### Short Term
+- Implement **AccountBalanceConsumer** to maintain balance projections from ledger entries
+- Add **AccountBalanceCache** in Redis for real-time balance lookups
+- Create **LedgerReconciliationJob** to verify journal integrity daily
+
+### Medium Term
+- Introduce **SettlementBatching** for merchant payouts
+- Integrate **external PSP connectors** (Adyen, Stripe) beyond the current simulator
+- Add real-time **webhooks** for merchants to receive payment status updates
+- Automated outbox partition management (e.g., pg_partman)
+
+### Long Term
+- End‑to‑end **OpenTelemetry tracing** (currently uses MDC for trace IDs)
+- Autoscaling policies per topic (fine‑grained)
+- Blue/green deploy strategy for consumers during topic migrations
+- Additional bounded contexts (wallet, shipment, order)
+- Multi-currency support with FX conversion
+- Fraud detection integration points
+- Refund workflows with full ledger recording
 
 ---
 
@@ -922,8 +998,14 @@ verify(exactly = 1) {
 - **Outbox**: Table where events are first written before being published.
 - **MockK**: Kotlin-native mocking library for unit tests.
 - **SpringMockK**: Spring Boot integration for MockK (replaces Spring's Mockito support).
-- **PSP**: Payment Service Provider (external payment gateway).
+- **PSP (Payment Service Provider)**: External payment gateway (simulated in this platform).
 - **EventEnvelope**: Standardized event wrapper with metadata for tracing and idempotency.
+- **DDD (Domain-Driven Design)**: Software development approach focusing on business domains.
+- **Exactly-Once Semantics**: Guarantee that events are processed exactly one time via Kafka transactions + idempotent handlers.
+- **Hexagonal Architecture**: Architectural pattern where domain code depends on ports (interfaces), adapters implement them.
+- **Double-Entry Accounting**: Bookkeeping method where every transaction affects two accounts (debit + credit balance).
+- **DLQ (Dead Letter Queue)**: Kafka topic for unrecoverable messages after max retries.
+- **Equal Jitter Backoff**: Exponential backoff strategy with randomization to prevent thundering herds.
 
 ---
 
@@ -940,6 +1022,16 @@ verify(exactly = 1) {
 
 ## 15 · Changelog
 
+- **2025-01-15**: **Architecture Documentation Enhancement**
+    - **Comprehensive Architecture Review**: Updated both `architecture.md` and `architecture-internal-reader.md` for consistency and completeness
+    - **Retry Strategy Documentation**: Added detailed exponential backoff formula with equal jitter, including delay examples for each attempt (1-5)
+    - **MAX_RETRIES Clarification**: Documented that MAX_RETRIES = 5 and explained DLQ routing after exhaustion
+    - **Dead Letter Queue Details**: Enhanced DLQ documentation with monitoring thresholds, alerting, and manual replay procedures
+    - **AccountBalanceConsumer Status**: Clearly marked as "Planned - Not Yet Implemented" to avoid confusion
+    - **Glossary Enhancement**: Added 8 new terms (PSP, DDD, Exactly-Once, Hexagonal Architecture, Double-Entry, DLQ, Equal Jitter Backoff)
+    - **Roadmap Reorganization**: Restructured into Short Term, Medium Term, and Long Term categories for better planning clarity
+    - **Ledger Recording Updates**: Corrected to reference unified `payment_order_finalized_topic` instead of separate succeeded/failed topics
+    - **Technical Accuracy**: All formulas, examples, and implementation details now match the codebase exactly
 - **2025-10-28**: **Ledger Batch Processing Implementation**
     - **Refactored Ledger Entry Processing**: Changed from individual `appendLedgerEntry()` calls to batch `postLedgerEntriesAtomic()` method
     - **Behavior Change**: When duplicate journal entry detected, batch processing stops immediately (remaining entries skipped)

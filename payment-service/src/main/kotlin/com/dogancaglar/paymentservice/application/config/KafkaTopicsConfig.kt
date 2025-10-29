@@ -16,7 +16,10 @@ data class TopicSpec(
 )
 
 @ConfigurationProperties("app.kafka")
-data class KafkaTopicSetProperties(
+data class
+
+
+KafkaTopicSetProperties(
     /** key MUST exactly match the base topic names in Topics.ALL */
     var specs: Map<String, TopicSpec> = emptyMap()
 )

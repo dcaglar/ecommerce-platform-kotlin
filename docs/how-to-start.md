@@ -201,15 +201,6 @@ mvn test -Dtest=CreatePaymentServiceTest,ProcessPaymentServiceTest
 mvn test -Dtest="*IntegrationTest" -DfailIfNoTests=false
 ```
 
-**Test Coverage:**
-- `common`: 3 tests (unit tests)
-- `payment-domain`: 89 tests (pure domain logic, unit tests)
-- `payment-application`: 22 tests (MockK unit tests)
-- `payment-infrastructure`: 178 tests (172 unit tests + 6 integration tests)
-- `payment-service`: 5 tests (unit tests)
-- `payment-consumers`: 0 tests (no test files)
-- **Total: 297 tests** with 100% pass rate ✅
-
 **Test Organization:**
 - **Unit Tests** (`*Test.kt`): Use mocks only, no external dependencies, run with `mvn test`
 - **Integration Tests** (`*IntegrationTest.kt`): Use real external dependencies via TestContainers, run with `mvn verify`
@@ -277,3 +268,23 @@ export KC_URL=http://127.0.0.1:8080
 kubectl get --raw "/apis/external.metrics.k8s.io/v1beta1/namespaces/payment/kafka_consumer_group_lag_worst2" | jq .
 ```
 - More: docs/troubleshooting/connectivity.md
+
+
+---
+
+## ✅ Summary
+
+You now have:
+
+- 🟢 A fully running stack: Keycloak, Postgres, Kafka, Redis, payment-service, and payment-consumers.
+- 📊 Monitoring (Prometheus + Grafana): [http://localhost:3000](http://localhost:3000)
+- 🔍 Observability (ELK): [http://localhost:5601](http://localhost:5601)
+- 🔐 Auth via Keycloak: [http://localhost:8080](http://localhost:8080)
+
+If everything’s green in Grafana and Kibana, your platform is ready for testing.
+
+For deep architecture or flow diagrams, see:
+- [`docs/architecture.md`](architecture-internal-reader.md)
+- [`README.md`](../README.md)
+
+---
