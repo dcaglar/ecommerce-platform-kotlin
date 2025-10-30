@@ -12,7 +12,6 @@ import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderFactory
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
-import com.dogancaglar.paymentservice.service.LedgerEntryTxAdapter
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -62,7 +61,7 @@ class PaymentConsumerConfig {
 
     @Bean
     fun recordLedgerEntriesService(
-        @Qualifier("ledgerEntryTxAdapter") ledgerEntryTxAdapter: LedgerEntryPort,
+        @Qualifier("ledgerEntryAdapter") ledgerEntryTxAdapter: LedgerEntryPort,
         @Qualifier(
             "syncPaymentEventPublisher") syncPaymentEventPublisher: PaymentEventPublisher,
                                                 clock: Clock): RecordLedgerEntriesService{

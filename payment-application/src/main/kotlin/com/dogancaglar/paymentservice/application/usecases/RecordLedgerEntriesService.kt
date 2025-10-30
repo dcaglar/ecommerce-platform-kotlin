@@ -52,8 +52,10 @@ open class RecordLedgerEntriesService(
         // 1️⃣ Transform journals to LedgerEntry
         val ledgerEntries = journalEntries.map { ledgerEntryFactory.create(it) }
 
-        // 2️⃣ Persist atomically, this method below is transactional
-        ledgerWritePort.postLedgerEntriesAtomic(ledgerEntries)
+        // 2️⃣ Persist each entry via outbound port
+        ledgerEntries.forEach { entry ->
+            ledgerWritePort.appendLedgerEntry(entry)
+        }
 
         // 3️⃣ Build and publish domain event
         val recordedEvent = LedgerEntriesRecorded(
