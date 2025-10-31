@@ -5,7 +5,7 @@ import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.Postin
 import com.dogancaglar.paymentservice.application.model.LedgerEntry
 import com.dogancaglar.paymentservice.domain.model.ledger.Posting
 
-object LedgerPersistenceMapper {
+  internal object LedgerPersistenceMapper {
 
     fun toJournalEntryEntity(entry: LedgerEntry): JournalEntryEntity =
         JournalEntryEntity(
@@ -23,7 +23,7 @@ object LedgerPersistenceMapper {
                 journalId = entry.journalEntry.id,
                 accountCode = posting.account.accountCode,
                 accountType = posting.account.type.name,
-                amount = posting.amount.value,
+                amount = posting.amount.quantity,
                 direction = when (posting) {
                     is Posting.Debit -> "DEBIT"
                     is Posting.Credit -> "CREDIT"

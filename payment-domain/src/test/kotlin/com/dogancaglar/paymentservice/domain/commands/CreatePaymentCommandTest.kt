@@ -50,18 +50,19 @@ class CreatePaymentCommandTest {
     }
 
     @Test
-    fun `should create command with zero amount`() {
-        val command = CreatePaymentCommand(
-            orderId = OrderId("order-123"),
-            buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount.of(0L, Currency("USD")),
-            paymentLines = listOf(
-                PaymentLine(SellerId("seller-1"), Amount.of(0L, Currency("USD")))
+    fun `should reject command with zero amount`() {
+        val exception = assertThrows<IllegalArgumentException> {
+            CreatePaymentCommand(
+                orderId = OrderId("order-123"),
+                buyerId = BuyerId("buyer-456"),
+                totalAmount = Amount.of(0L, Currency("USD")),
+                paymentLines = listOf(
+                    PaymentLine(SellerId("seller-1"), Amount.of(0L, Currency("USD")))
+                )
             )
-        )
+        }
 
-        assertEquals(Amount.of(0L, Currency("USD")), command.totalAmount)
-        assertEquals(Amount.of(0L, Currency("USD")), command.paymentLines[0].amount)
+        assertTrue(exception.message?.contains("must be greater than zero") == true)
     }
 
     @Test
@@ -173,7 +174,7 @@ class CreatePaymentCommandTest {
             )
         }
 
-        assertEquals("Total amount cannot be negative", exception.message)
+        assertTrue(exception.message?.contains("must be greater than zero") == true)
     }
 
     @Test
@@ -274,8 +275,8 @@ class CreatePaymentCommandTest {
             )
         )
 
-        assertEquals(largeAmount, command.totalAmount.value)
-        assertEquals(largeAmount, command.paymentLines[0].amount.value)
+        assertEquals(largeAmount, command.totalAmount.quantity)
+        assertEquals(largeAmount, command.paymentLines[0].amount.quantity)
     }
 
     @Test
@@ -325,8 +326,8 @@ class CreatePaymentCommandTest {
             )
         )
 
-        assertEquals(12345L, command.totalAmount.value)
-        assertEquals(12345L, command.paymentLines[0].amount.value)
+        assertEquals(12345L, command.totalAmount.quantity)
+        assertEquals(12345L, command.paymentLines[0].amount.quantity)
     }
 
     @Test
@@ -344,9 +345,9 @@ class CreatePaymentCommandTest {
         )
 
         assertEquals(4, command.paymentLines.size)
-        assertEquals(25000L, command.totalAmount.value)
+        assertEquals(25000L, command.totalAmount.quantity)
         
-        val sum = command.paymentLines.sumOf { it.amount.value }
+        val sum = command.paymentLines.sumOf { it.amount.quantity }
         assertEquals(25000L, sum)
     }
 }

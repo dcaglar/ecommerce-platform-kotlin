@@ -73,7 +73,7 @@ class PaymentServiceTest {
         assertEquals("payment-123", result.paymentId)
         assertEquals("order-123", result.orderId)
         assertEquals("INITIATED", result.status)
-        assertEquals(10000L, result.totalAmount.value)
+        assertEquals(10000L, result.totalAmount.quantity)
         assertEquals(CurrencyEnum.USD, result.totalAmount.currency)
         
         verify { createPaymentUseCase.create(any()) }
@@ -166,7 +166,7 @@ class PaymentServiceTest {
         // Then
         assertEquals("payment-456", result.paymentId)
         assertEquals("INITIATED", result.status)
-        assertEquals(5000L, result.totalAmount.value)
+        assertEquals(5000L, result.totalAmount.quantity)
         assertEquals(CurrencyEnum.EUR, result.totalAmount.currency)
         
         verify { createPaymentUseCase.create(any()) }
@@ -204,7 +204,7 @@ class PaymentServiceTest {
 
         // Then
         assertEquals("payment-789", result.paymentId)
-        assertEquals(99999999L, result.totalAmount.value)
+        assertEquals(99999999L, result.totalAmount.quantity)
         
         verify { createPaymentUseCase.create(any()) }
     }

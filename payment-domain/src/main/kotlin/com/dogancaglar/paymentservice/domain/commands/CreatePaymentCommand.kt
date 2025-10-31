@@ -13,7 +13,7 @@ data class CreatePaymentCommand(
 ) {
     init {
         require(paymentLines.isNotEmpty()) { "Payment lines cannot be empty" }
-        require(totalAmount.value >= 0) { "Total amount cannot be negative" }
+        require(totalAmount.quantity >= 0) { "Total amount cannot be negative" }
         require(hasConsistentCurrency()) { "All amounts must have same currency" }
         require(isValidTotalAmount()) { "Total amount must equal sum of payment lines" }
     }
@@ -24,7 +24,7 @@ data class CreatePaymentCommand(
     }
     
     private fun isValidTotalAmount(): Boolean {
-        val sum = paymentLines.sumOf { it.amount.value }
-        return sum == totalAmount.value
+        val sum = paymentLines.sumOf { it.amount.quantity }
+        return sum == totalAmount.quantity
     }
 }

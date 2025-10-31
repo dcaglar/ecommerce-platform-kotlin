@@ -13,31 +13,32 @@ import org.junit.jupiter.api.Test
 import java.time.LocalDateTime
 
 /**
- * Unit tests for LedgerEntryAdapter.
+ * Unit tests for LedgerEntryTxAdapter.
  * 
- * Tests the exact behavior of appendLedgerEntry with explicit verification:
+ * Tests the exact behavior of postLedgerEntriesAtomic with explicit verification:
  * 1. Successful insert: maps and persists journal entry + all postings
  * 2. Duplicate journal entry: skips posting inserts when insertJournalEntry returns 0
  * 3. Exception handling: no posting inserts when insertJournalEntry throws
  */
-class LedgerEntryAdapterTest {
+class LedgerEntryTxAdapterTest {
 
     private lateinit var ledgerMapper: LedgerMapper
-    private lateinit var adapter: LedgerEntryAdapter
+    private lateinit var adapter: LedgerEntryTxAdapter
 
     @BeforeEach
     fun setUp() {
         ledgerMapper = mockk(relaxed = true)
-        adapter = LedgerEntryAdapter(ledgerMapper)
+        adapter = LedgerEntryTxAdapter(ledgerMapper)
     }
 
     // ==================== Test 1: Successful Insert ====================
 
     @Test
-    fun `appendLedgerEntry should map and persist journal entry and all postings when successful`() {
+    fun `postLedgerEntriesAtomic should map and persist journal entry and all postings when successful`() {
         // Given - AUTH_HOLD creates 2 postings
         val amount = Amount.of(10000L, Currency("USD"))
-        val journalEntry = JournalEntry.authHold("PAY-123", amount)
+        val journalEntryList = JournalEntry.authHold("PAY-123", amount)
+        val journalEntry = journalEntryList.first()
         val ledgerEntry = LedgerEntry.create(0L, journalEntry, LocalDateTime.now())
         
         // Setup: mapper returns 1 for any insert calls
@@ -45,7 +46,7 @@ class LedgerEntryAdapterTest {
         every { ledgerMapper.insertPosting(any()) } returns 1
 
         // When
-        adapter.appendLedgerEntry(ledgerEntry)
+        adapter.postLedgerEntriesAtomic(listOf(ledgerEntry))
 
         // Then - verify journal entry inserted with exact attributes
         verify(exactly = 1) { 
@@ -90,18 +91,19 @@ class LedgerEntryAdapterTest {
     // ==================== Test 2: Duplicate Journal Entry ====================
 
     @Test
-    fun `appendLedgerEntry should skip postings when insertJournalEntry returns 0`() {
+    fun `postLedgerEntriesAtomic should skip postings when insertJournalEntry returns 0`() {
         // Given - CAPTURE creates 4 postings
         val amount = Amount.of(5000L, Currency("EUR"))
         val merchantAccount = Account.create(AccountType.MERCHANT_ACCOUNT, "merchant-456")
-        val journalEntry = JournalEntry.capture("PAY-789", amount, merchantAccount)
+        val journalEntryList = JournalEntry.capture("PAY-789", amount, merchantAccount)
+        val journalEntry = journalEntryList.first()
         val ledgerEntry = LedgerEntry.create(0L, journalEntry, LocalDateTime.now())
         
         // Setup: mapper returns 0 indicating duplicate
         every { ledgerMapper.insertJournalEntry(any()) } returns 0
 
         // When
-        adapter.appendLedgerEntry(ledgerEntry)
+        adapter.postLedgerEntriesAtomic(listOf(ledgerEntry))
 
         // Then - verify journal entry insert was attempted
         verify(exactly = 1) { 
@@ -126,10 +128,11 @@ class LedgerEntryAdapterTest {
     // ==================== Test 3: Exception Handling ====================
 
     @Test
-    fun `appendLedgerEntry should not insert postings when insertJournalEntry throws exception`() {
+    fun `postLedgerEntriesAtomic should not insert postings when insertJournalEntry throws exception`() {
         // Given - AUTH_HOLD creates 2 postings
         val amount = Amount.of(10000L, Currency("USD"))
-        val journalEntry = JournalEntry.authHold("PAY-999", amount)
+        val journalEntryList = JournalEntry.authHold("PAY-999", amount)
+        val journalEntry = journalEntryList.first()
         val ledgerEntry = LedgerEntry.create(0L, journalEntry, LocalDateTime.now())
         
         // Setup: mapper throws exception
@@ -137,7 +140,7 @@ class LedgerEntryAdapterTest {
 
         // When/Then - verify exception is thrown
         org.junit.jupiter.api.assertThrows<RuntimeException> {
-            adapter.appendLedgerEntry(ledgerEntry)
+            adapter.postLedgerEntriesAtomic(listOf(ledgerEntry))
         }
 
         // Then - verify journal entry insert was attempted

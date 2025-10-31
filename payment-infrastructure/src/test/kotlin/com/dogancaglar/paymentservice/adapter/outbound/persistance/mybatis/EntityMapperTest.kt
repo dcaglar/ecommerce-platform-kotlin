@@ -45,7 +45,7 @@ class EntityMapperTest {
         assertEquals(paymentOrder.paymentId.value, entity.paymentId)
         assertEquals(paymentOrder.publicPaymentId, entity.publicPaymentId)
         assertEquals(paymentOrder.sellerId.value, entity.sellerId)
-        assertEquals(paymentOrder.amount.value, entity.amountValue)
+        assertEquals(paymentOrder.amount.quantity, entity.amountValue)
         assertEquals(paymentOrder.amount.currency.currencyCode, entity.amountCurrency)
         assertEquals(paymentOrder.status, entity.status)
         assertEquals(paymentOrder.createdAt, entity.createdAt)
@@ -69,7 +69,7 @@ class EntityMapperTest {
         assertEquals(entity.paymentId, domain.paymentId.value)
         assertEquals(entity.publicPaymentId, domain.publicPaymentId)
         assertEquals(entity.sellerId, domain.sellerId.value)
-        assertEquals(entity.amountValue, domain.amount.value)
+        assertEquals(entity.amountValue, domain.amount.quantity)
         assertEquals(entity.amountCurrency, domain.amount.currency.currencyCode)
         assertEquals(entity.status, domain.status)
         assertEquals(entity.createdAt, domain.createdAt)
@@ -94,7 +94,7 @@ class EntityMapperTest {
         assertEquals(originalPaymentOrder.paymentId, restoredPaymentOrder.paymentId)
         assertEquals(originalPaymentOrder.publicPaymentId, restoredPaymentOrder.publicPaymentId)
         assertEquals(originalPaymentOrder.sellerId, restoredPaymentOrder.sellerId)
-        assertEquals(originalPaymentOrder.amount.value, restoredPaymentOrder.amount.value)
+        assertEquals(originalPaymentOrder.amount.quantity, restoredPaymentOrder.amount.quantity)
         assertEquals(originalPaymentOrder.amount.currency, restoredPaymentOrder.amount.currency)
         assertEquals(originalPaymentOrder.status, restoredPaymentOrder.status)
         assertEquals(originalPaymentOrder.createdAt, restoredPaymentOrder.createdAt)
@@ -138,7 +138,7 @@ class EntityMapperTest {
         assertEquals(payment.publicPaymentId, entity.publicPaymentId)
         assertEquals(payment.buyerId.value, entity.buyerId)
         assertEquals(payment.orderId.value, entity.orderId)
-        assertEquals(payment.totalAmount.value, entity.amountValue)
+        assertEquals(payment.totalAmount.quantity, entity.amountValue)
         assertEquals(payment.totalAmount.currency.currencyCode, entity.amountCurrency)
         assertEquals(payment.status, entity.status)
         assertEquals(payment.createdAt, entity.createdAt)
@@ -312,24 +312,24 @@ class EntityMapperTest {
     // ==================== Edge Cases and Error Handling ====================
 
     @Test
-    fun `all mappers should handle zero values`() {
-        // Given
+    fun `all mappers should handle zero values except amounts`() {
+        // Given - Amount.of(0L) will throw exception, so we use minimum valid amount (1L)
         val zeroPaymentOrder = createTestPaymentOrder().copy(
             retryCount = 0
         )
-        val zeroPayment = createTestPayment().copy(
-            totalAmount = Amount.of(0L, Currency("USD"))
+        val minimumPayment = createTestPayment().copy(
+            totalAmount = Amount.of(1L, Currency("USD")) // Minimum valid amount
         )
         val zeroOutboxEvent = createTestOutboxEvent().copy(oeid = 0L)
 
         // When
         val paymentOrderEntity = PaymentOrderEntityMapper.toEntity(zeroPaymentOrder)
-        val paymentEntity = PaymentEntityMapper.toEntity(zeroPayment)
+        val paymentEntity = PaymentEntityMapper.toEntity(minimumPayment)
         val outboxEventEntity = OutboxEventEntityMapper.toEntity(zeroOutboxEvent)
 
         // Then
         assertEquals(0, paymentOrderEntity.retryCount)
-        assertEquals(0L, paymentEntity.amountValue)
+        assertEquals(1L, paymentEntity.amountValue) // Minimum valid amount instead of 0L
         assertEquals(0L, outboxEventEntity.oeid)
     }
 

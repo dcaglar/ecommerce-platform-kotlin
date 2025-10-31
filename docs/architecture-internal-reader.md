@@ -600,7 +600,12 @@ sequenceDiagram
     - Event Type Filtering: Factory configured with `expectedEventType = EVENT_TYPE.LEDGER_RECORDING_REQUESTED`
 
 - **RecordLedgerEntriesService**: 
-    - Creates balanced `JournalEntry` objects via `JournalEntryFactory`, persists via `LedgerEntryPort`
+    - Creates balanced `JournalEntry` objects via `JournalEntry` factory methods, persists via `LedgerEntryPort.postLedgerEntriesAtomic()`
+    - **Journal Entry Creation Logic**:
+      - `SUCCESSFUL_FINAL` with `AuthType.SALE` (default): Uses `JournalEntry.authHoldAndCapture()` → returns 2 entries (auth hold + capture)
+      - `SUCCESSFUL_FINAL` with other auth types: Uses `JournalEntry.authHold()` → returns 1 entry
+      - `FAILED_FINAL`/`FAILED`: Uses `JournalEntry.failedPayment()` → returns empty list (no persistence)
+    - Processes entries via `postLedgerEntriesAtomic()` which processes entries sequentially within a single transaction
     - Emits `LedgerEntriesRecorded` with **`aggregateId = sellerId`** to `ledger_entries_recorded_topic`
     - **Maintains Partition Alignment**: Uses same `sellerId` key, ensuring entries stay in same partition
     - Enables future AccountBalanceConsumer to receive all entries for a merchant sequentially (same partition)
@@ -617,6 +622,8 @@ sequenceDiagram
 
 #### Example Journal Flow (SUCCESSFUL\_FINAL)
 
+**Note:** The current implementation uses `JournalEntry.authHoldAndCapture()` for `SUCCESSFUL_FINAL` payments with `AuthType.SALE`, which creates 2 journal entries (AUTH_HOLD + CAPTURE). The table below shows the complete fullFlow for reference.
+
 | Step       | Debit                                              | Credit                              |
 | ---------- | -------------------------------------------------- | ----------------------------------- |
 | AUTH\_HOLD | AUTH\_RECEIVABLE                                   | AUTH\_LIABILITY                     |
@@ -624,6 +631,11 @@ sequenceDiagram
 | SETTLEMENT | SCHEME\_FEES, INTERCHANGE\_FEES, ACQUIRER\_ACCOUNT | PSP\_RECEIVABLE                     |
 | PSP\_FEE   | MERCHANT\_ACCOUNT                                  | PROCESSING\_FEE\_REVENUE            |
 | PAYOUT     | MERCHANT\_ACCOUNT                                  | ACQUIRER\_ACCOUNT                   |
+
+**Current Implementation:**
+- `authHoldAndCapture()` creates entries for AUTH_HOLD and CAPTURE steps only (2 entries total)
+- `authHold()` creates entry for AUTH_HOLD step only (1 entry)
+- `fullFlow()` would create all 5 entries, but is not currently used by `RecordLedgerEntriesService`
 
 #### Idempotency & Replay Handling
 
@@ -637,18 +649,21 @@ sequenceDiagram
 
 **LedgerRecordingConsumer** → **RecordLedgerEntriesService**:
 - Executes within `KafkaTxExecutor` transactional boundary for offset + event commit
-- **Individual Processing**: Each journal entry for a payment order is processed via `appendLedgerEntry()`
-- Database-level idempotency via `ON CONFLICT` in `journal_entries` table
-- When `insertJournalEntry()` returns `0` (duplicate detected):
-  - Entry skipped and no postings are inserted for the duplicate entry
-  - Processing continues with next entry
-  - No exception thrown - graceful no-op
-- **First execution** (`insertJournalEntry` returns `1`):
-  - Entry and all postings inserted successfully
-  - Processing continues with next entry
+- **Batch Processing**: All journal entries for a payment order are processed via `postLedgerEntriesAtomic(entries)` in a single transaction
+- **Entry Processing**: `postLedgerEntriesAtomic()` processes entries sequentially within the transaction:
+  - Each entry is checked for duplicates via `insertJournalEntry()` with `ON CONFLICT DO NOTHING`
+  - When `insertJournalEntry()` returns `0` (duplicate detected): Method returns early, entire batch skipped
+  - When `insertJournalEntry()` returns `1` (new entry): Entry and all postings are inserted successfully
+- **Database-level idempotency** via `ON CONFLICT` in `journal_entries` and `postings` tables
+- **Duplicate Detection Behavior**: 
+  - **Early Exit**: When first duplicate is detected, `postLedgerEntriesAtomic()` returns immediately
+  - **Batch Abandonment**: Remaining entries in the batch are not processed
+  - **Transaction Commit**: Method exits successfully, transaction commits (no-op since no inserts occurred)
+  - Processing moves to next `LedgerRecordingCommand` (not next entry in current batch)
 - **Consequences of replays**:
-  - Duplicate journal entries silently ignored (idempotent)
-  - Each entry processed independently - duplicate detection per entry
+  - Duplicate journal entries cause early return, preventing batch processing
+  - Only entries before the duplicate are processed (if any)
+  - Retries will hit the same duplicate and skip the batch again
   - External systems can detect replays via event deduplication logic
 
 #### Exception Handling & Failure Modes
@@ -662,20 +677,28 @@ sequenceDiagram
 2. **Repeated failures**: If publish consistently fails, event will retry indefinitely until fixed or DLQ configured
 
 **LedgerRecordingConsumer Failure Scenarios**:
-1. **Persistence exception** (`appendLedgerEntry` throws during processing):
+1. **Persistence exception** (`postLedgerEntriesAtomic()` throws during processing):
+   - All entries processed in a single `@Transactional` method
    - Exception propagates before `LedgerEntriesRecorded` event publishing
    - `KafkaTxExecutor` aborts transaction: Consumer offset not committed
+   - **Spring Transaction Rollback**: All DB changes within `postLedgerEntriesAtomic()` are rolled back
    - `LedgerRecordingCommand` will be retried
-   - **State**: Entries processed before exception may already be in DB (within transaction timeout boundary)
+   - **State**: No entries persisted (all-or-nothing within the transaction)
    - No event published
-   - **On retry**: Idempotency protects against double-posting for successfully inserted entries
+   - **On retry**: All entries reprocessed from scratch
 2. **Duplicate entry detected** (entry N is duplicate):
-   - `insertJournalEntry()` returns `0` for entry N
-   - Entry skipped, no postings inserted
-   - Processing continues with next entry
+   - Within `postLedgerEntriesAtomic()`, entries processed sequentially in a single transaction
+   - `insertJournalEntry()` returns `0` for entry N (duplicate detected)
+   - **Early return**: Method exits immediately via `return` statement (does not throw exception)
+   - **Transaction commits**: Method returns successfully, Spring transaction commits
+     - If entries 1 to N-1 were successfully inserted: They are committed to DB
+     - If entry N (duplicate) was the first entry: Transaction commits with no inserts (no-op)
+   - **Remaining entries skipped**: Entries N+1 onwards in the batch are not processed
+   - **Processing continues**: Moves to **next `LedgerRecordingCommand`** (not the next entry in current batch)
    - **On retry**: 
-     - All entries: `ON CONFLICT` detects duplicates, skips gracefully
-     - Processing continues for non-duplicate entries
+     - If the same `LedgerRecordingCommand` is retried, same duplicate will be detected at entry N again
+     - Previously committed entries (1 to N-1) remain in DB due to idempotency via `ON CONFLICT`
+     - Entries N+1 onwards remain unprocessed until a new command without duplicates is received
 3. **Publish exception** (after successful persistence of all entries):
    - Exception propagates to `KafkaTxExecutor`, transaction aborts
    - Kafka offset not committed - command retried
@@ -683,21 +706,23 @@ sequenceDiagram
    - **On retry**: `ON CONFLICT` prevents duplicate entries, all entries skipped
    - Event only published after successful persistence (will succeed on retry)
 4. **Status handling**:
-   - `SUCCESSFUL_FINAL`: Creates 5 journal entries (fullFlow) processed individually
-   - `FAILED_FINAL`/`FAILED`: Returns empty list, no persistence (early return)
-   - Unknown status: Early return, no processing (idempotent no-op)
+    - `SUCCESSFUL_FINAL` with `AuthType.SALE` (default): Creates 2 journal entries via `authHoldAndCapture()` (auth hold + capture)
+    - `SUCCESSFUL_FINAL` with other auth types: Creates 1 journal entry via `authHold()` (auth hold only)
+    - `FAILED_FINAL`/`FAILED`: Returns empty list via `failedPayment()`, no persistence (early return)
+    - Unknown status: Early return, no processing (idempotent no-op)
 
 **Transaction Boundaries & Consistency**:
 - **Kafka Transaction Boundary**: Each consumer invocation is wrapped in `KafkaTxExecutor`
   - Commit: Offset + all published events (atomic)
   - Abort: Offset not committed, all published events not visible
-- **Journal Entry Persistence**: Each entry processed individually via `appendLedgerEntry()` with `@Transactional`
-  - Transaction wrapping controlled by Spring `@Transactional` on adapter
-  - **Duplicate Detection Behavior**: When duplicate is detected, entry skipped and processing continues
-  - Rationale: Each entry processed independently - duplicate detection per entry, remaining entries still processed
-- **Individual Entry Processing**: Each entry is processed in its own transaction context
-  - Duplicate entries skipped gracefully, non-duplicate entries continue processing
-  - On retry: All entries checked again, duplicates skipped, new entries processed
+- **Journal Entry Persistence**: All entries processed together via `postLedgerEntriesAtomic(entries)` with `@Transactional`
+  - Transaction wrapping controlled by Spring `@Transactional` on adapter (single transaction for all entries)
+  - **Duplicate Detection Behavior**: When duplicate is detected, method returns early and entire batch is skipped
+  - **Early Exit**: First duplicate entry causes `postLedgerEntriesAtomic()` to return immediately, no remaining entries processed
+  - Rationale: All entries for a payment order processed together, but batch stops at first duplicate (defensive behavior)
+- **Batch Entry Processing**: All entries processed sequentially within a single transaction context
+  - **Duplicate Handling**: If duplicate detected, entire batch is abandoned, processing moves to next `LedgerRecordingCommand`
+  - On retry: Same command will hit same duplicate again, batch skipped again (requires new command without duplicates)
 - **Event Consistency**: `LedgerEntriesRecorded` only published after all entries processed (success or skipped duplicates)
 
 #### Traceability & Observability

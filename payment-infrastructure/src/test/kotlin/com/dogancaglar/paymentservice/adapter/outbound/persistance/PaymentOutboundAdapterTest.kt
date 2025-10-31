@@ -54,7 +54,7 @@ class PaymentOutboundAdapterTest {
                     entity.publicPaymentId == payment.publicPaymentId &&
                     entity.buyerId == payment.buyerId.value &&
                     entity.orderId == payment.orderId.value &&
-                    entity.amountValue == payment.totalAmount.value &&
+                    entity.amountValue == payment.totalAmount.quantity &&
                     entity.amountCurrency == payment.totalAmount.currency.currencyCode &&
                     entity.status == payment.status &&
                     entity.createdAt == payment.createdAt
@@ -159,7 +159,7 @@ class PaymentOutboundAdapterTest {
                     entity.publicPaymentId == payment.publicPaymentId &&
                     entity.buyerId == payment.buyerId.value &&
                     entity.orderId == payment.orderId.value &&
-                    entity.amountValue == payment.totalAmount.value &&
+                    entity.amountValue == payment.totalAmount.quantity &&
                     entity.amountCurrency == payment.totalAmount.currency.currencyCode &&
                     entity.status == payment.status &&
                     entity.createdAt == payment.createdAt
@@ -223,35 +223,6 @@ class PaymentOutboundAdapterTest {
     }
 
     // ==================== Edge Cases and Error Handling ====================
-
-    @Test
-    fun `should handle payment with zero amount`() {
-        // Given
-        val payment = Payment.Builder()
-            .paymentId(PaymentId(123L))
-            .publicPaymentId("pay-123")
-            .buyerId(BuyerId("buyer-123"))
-            .orderId(OrderId("order-123"))
-            .totalAmount(Amount.of(0L, Currency("USD")))
-            .status(PaymentStatus.INITIATED)
-            .createdAt(LocalDateTime.now())
-            .paymentOrders(emptyList())
-            .build()
-        every { paymentMapper.insert(any()) } returns 1
-
-        // When
-        adapter.save(payment)
-
-        // Then
-        verify(exactly = 1) { 
-            paymentMapper.insert(
-                match { entity ->
-                    entity.amountValue == 0L &&
-                    entity.amountCurrency == "USD"
-                }
-            )
-        }
-    }
 
     @Test
     fun `should handle payment with large amount`() {

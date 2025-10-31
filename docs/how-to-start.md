@@ -152,11 +152,11 @@ curl -i -X POST "$BASE_URL/payments" \
   -d '{
     "orderId": "ORDER-20240508-XYZ",
     "buyerId": "BUYER-123",
-    "totalAmount": { "value": 19949, "currency": "EUR" },
+    "totalAmount": { "quantity": 19949, "currency": "EUR" },
     "paymentOrders": [
-      { "sellerId": "SELLER-111", "amount": { "value": 4999, "currency": "EUR" }},
-      { "sellerId": "SELLER-222", "amount": { "value": 2950, "currency": "EUR" }},
-      { "sellerId": "SELLER-333", "amount": { "value": 12000, "currency": "EUR" }}
+      { "sellerId": "SELLER-111", "amount": { "quantity": 4999, "currency": "EUR" }},
+      { "sellerId": "SELLER-222", "amount": { "quantity": 2950, "currency": "EUR" }},
+      { "sellerId": "SELLER-333", "amount": { "quantity": 12000, "currency": "EUR" }}
     ]
   }'
 ```
@@ -170,11 +170,11 @@ curl -i -X POST http://127.0.0.1/payments \
   -d '{
     "orderId": "ORDER-20240508-XYZ",
     "buyerId": "BUYER-123",
-    "totalAmount": { "value": 199.49, "currency": "EUR" },
+    "totalAmount": { "quantity": 19949, "currency": "EUR" },
     "paymentOrders": [
-      { "sellerId": "SELLER-111", "amount": { "value": 4999, "currency": "EUR" }},
-      { "sellerId": "SELLER-222", "amount": { "value": 2950, "currency": "EUR" }},
-      { "sellerId": "SELLER-333", "amount": { "value": 12000, "currency": "EUR" }}
+      { "sellerId": "SELLER-111", "amount": { "quantity": 4999, "currency": "EUR" }},
+      { "sellerId": "SELLER-222", "amount": { "quantity": 2950, "currency": "EUR" }},
+      { "sellerId": "SELLER-333", "amount": { "quantity": 12000, "currency": "EUR" }}
     ]
   }'
 ```

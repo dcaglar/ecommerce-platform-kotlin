@@ -40,7 +40,7 @@ class PaymentOrderFactoryTest {
         assertEquals(PaymentId(100L), paymentOrder.paymentId)
         assertEquals("payment-100", paymentOrder.publicPaymentId)
         assertEquals(SellerId("seller-123"), paymentOrder.sellerId)
-        assertEquals(100000L, paymentOrder.amount.value)
+        assertEquals(100000L, paymentOrder.amount.quantity)
         assertEquals("USD", paymentOrder.amount.currency.currencyCode)
         assertEquals(PaymentOrderStatus.SUCCESSFUL_FINAL, paymentOrder.status)
         assertEquals(createdAt, paymentOrder.createdAt)
@@ -144,7 +144,6 @@ class PaymentOrderFactoryTest {
     @Test
     fun `fromEvent should handle different amount values`() {
         val amounts = listOf(
-            0L,           // $0.00
             1L,           // $0.01
             10050L,       // $100.50
             999999999L    // $9,999,999.99
@@ -169,7 +168,7 @@ class PaymentOrderFactoryTest {
 
             val paymentOrder = factory.fromEvent(event)
 
-            assertEquals(amount, paymentOrder.amount.value)
+            assertEquals(amount, paymentOrder.amount.quantity)
         }
     }
 

@@ -323,7 +323,7 @@ class PaymentOrderOutboundAdapterTest {
                     entity.paymentId == paymentOrder.paymentId.value &&
                     entity.publicPaymentId == paymentOrder.publicPaymentId &&
                     entity.sellerId == paymentOrder.sellerId.value &&
-                    entity.amountValue == paymentOrder.amount.value &&
+                    entity.amountValue == paymentOrder.amount.quantity &&
                     entity.amountCurrency == paymentOrder.amount.currency.currencyCode &&
                     entity.status == paymentOrder.status &&
                     entity.retryCount == paymentOrder.retryCount &&
@@ -351,7 +351,7 @@ class PaymentOrderOutboundAdapterTest {
         assertEquals(entity.paymentId, domainObject.paymentId.value)
         assertEquals(entity.publicPaymentId, domainObject.publicPaymentId)
         assertEquals(entity.sellerId, domainObject.sellerId.value)
-        assertEquals(entity.amountValue, domainObject.amount.value)
+        assertEquals(entity.amountValue, domainObject.amount.quantity)
         assertEquals(entity.amountCurrency, domainObject.amount.currency.currencyCode)
         assertEquals(entity.status, domainObject.status)
         assertEquals(entity.retryCount, domainObject.retryCount)

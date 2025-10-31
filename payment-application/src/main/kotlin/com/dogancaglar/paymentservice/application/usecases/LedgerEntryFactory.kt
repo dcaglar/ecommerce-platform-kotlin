@@ -11,14 +11,14 @@ import java.time.LocalDateTime
 class LedgerEntryFactory(
     private val clock: Clock
 ) {
-    
+
     fun create(journalEntry: JournalEntry): LedgerEntry =
         LedgerEntry.create(
             ledgerEntryId = 0L, // Will be assigned by database
             journalEntry = journalEntry,
             createdAt = LocalDateTime.now(clock)
         )
-    
+
     fun fromPersistence(
         ledgerEntryId: Long,
         journalEntry: JournalEntry,

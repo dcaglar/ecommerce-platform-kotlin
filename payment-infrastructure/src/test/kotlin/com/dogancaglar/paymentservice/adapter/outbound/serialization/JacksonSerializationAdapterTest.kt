@@ -59,7 +59,7 @@ class JacksonSerializationAdapterTest {
         assertTrue(json.contains("\"publicPaymentOrderId\""))
         assertTrue(json.contains("\"status\""))
         assertTrue(json.contains("\"amount\""))
-        assertTrue(json.contains("\"value\":10000"))
+        assertTrue(json.contains("\"quantity\":10000"))
         assertTrue(json.contains("\"currency\":\"USD\""))
     }
 
@@ -75,7 +75,7 @@ class JacksonSerializationAdapterTest {
         assertNotNull(json)
         assertTrue(json.contains("\"paymentOrderId\""))
         assertTrue(json.contains("\"amount\""))
-        assertTrue(json.contains("\"value\":25000"))
+        assertTrue(json.contains("\"quantity\":25000"))
         assertTrue(json.contains("\"currency\":\"EUR\""))
         assertTrue(json.contains("\"retryCount\":2"))
         assertTrue(json.contains("\"retryReason\":\"PSP_TIMEOUT\""))

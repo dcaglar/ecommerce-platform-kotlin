@@ -17,7 +17,7 @@ object PaymentOrderEntityMapper {
             paymentId = order.paymentId.value,
             publicPaymentId = order.publicPaymentId,
             sellerId = order.sellerId.value,
-            amountValue = order.amount.value,
+            amountValue = order.amount.quantity,
             amountCurrency = order.amount.currency.currencyCode,
             status = order.status,
             createdAt = order.createdAt,

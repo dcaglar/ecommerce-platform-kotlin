@@ -39,7 +39,7 @@ class PaymentOrderDomainEventMapperTest {
         assertEquals(testPaymentOrder.createdAt, event.createdAt)
         assertEquals(testPaymentOrder.updatedAt, event.updatedAt)
         assertEquals(testPaymentOrder.status.name, event.status)
-        assertEquals(testPaymentOrder.amount.value, event.amountValue)
+        assertEquals(testPaymentOrder.amount.quantity, event.amountValue)
         assertEquals(testPaymentOrder.amount.currency.currencyCode, event.currency)
     }
 
@@ -62,7 +62,7 @@ class PaymentOrderDomainEventMapperTest {
         assertEquals(testPaymentOrder.sellerId.value, event.sellerId)
         assertEquals(testPaymentOrder.retryCount, event.retryCount)
         assertEquals(testPaymentOrder.status.name, event.status)
-        assertEquals(testPaymentOrder.amount.value, event.amountValue)
+        assertEquals(testPaymentOrder.amount.quantity, event.amountValue)
         assertEquals(testPaymentOrder.amount.currency.currencyCode, event.currency)
         assertNotNull(event.createdAt)
     }
@@ -121,7 +121,7 @@ class PaymentOrderDomainEventMapperTest {
         assertEquals(testPaymentOrder.paymentId.value.toString(), event.paymentId)
         assertEquals(testPaymentOrder.publicPaymentId, event.publicPaymentId)
         assertEquals(testPaymentOrder.sellerId.value, event.sellerId)
-        assertEquals(testPaymentOrder.amount.value, event.amountValue)
+        assertEquals(testPaymentOrder.amount.quantity, event.amountValue)
         assertEquals(testPaymentOrder.amount.currency.currencyCode, event.currency)
         assertEquals(testPaymentOrder.status.name, event.status)
         // Note: createdAt and updatedAt are set to current time in the event constructor, not from mapper
@@ -138,7 +138,7 @@ class PaymentOrderDomainEventMapperTest {
         assertEquals(testPaymentOrder.paymentId.value.toString(), event.paymentId)
         assertEquals(testPaymentOrder.publicPaymentId, event.publicPaymentId)
         assertEquals(testPaymentOrder.sellerId.value, event.sellerId)
-        assertEquals(testPaymentOrder.amount.value, event.amountValue)
+        assertEquals(testPaymentOrder.amount.quantity, event.amountValue)
         assertEquals(testPaymentOrder.amount.currency.currencyCode, event.currency)
         assertEquals(testPaymentOrder.status.name, event.status)
         // Note: createdAt and updatedAt are set to current time in the event constructor, not from mapper
@@ -174,7 +174,7 @@ class PaymentOrderDomainEventMapperTest {
         assertEquals(testPaymentOrder.retryCount, event.retryCount)
         assertEquals(testPaymentOrder.retryReason, event.retryReason)
         assertEquals(testPaymentOrder.status.name, event.status)
-        assertEquals(testPaymentOrder.amount.value, event.amountValue)
+        assertEquals(testPaymentOrder.amount.quantity, event.amountValue)
         assertEquals(testPaymentOrder.amount.currency.currencyCode, event.currency)
         assertNotNull(event.createdAt)
         assertNotNull(event.updatedAt)
@@ -276,7 +276,7 @@ class PaymentOrderDomainEventMapperTest {
 
     @Test
     fun `should handle different amount values in mapping`() {
-        val amounts = listOf(0L, 1L, 100L, 10000L, 999999999L)
+        val amounts = listOf(1L, 100L, 10000L, 999999999L)
 
         amounts.forEach { amount ->
             val paymentOrder = createTestPaymentOrder(amount = amount)
