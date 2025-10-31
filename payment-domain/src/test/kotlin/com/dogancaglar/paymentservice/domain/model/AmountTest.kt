@@ -7,97 +7,97 @@ class AmountTest {
 
     @Test
     fun `should create Amount with value and currency`() {
-        val amount = Amount(100000L, "USD") // $1000.00 = 100000 cents
+        val amount = Amount.of(100000L, Currency("USD")) // $1000.00 = 100000 cents
 
         assertEquals(100000L, amount.value)
-        assertEquals("USD", amount.currency)
+        assertEquals("USD", amount.currency.currencyCode)
     }
 
     @Test
     fun `should create Amount with zero value`() {
-        val amount = Amount(0L, "USD")
+        val amount = Amount.of(0L, Currency("USD"))
 
         assertEquals(0L, amount.value)
-        assertEquals("USD", amount.currency)
+        assertEquals("USD", amount.currency.currencyCode)
     }
 
     @Test
     fun `should create Amount with decimal equivalent value`() {
-        val amount = Amount(9999L, "EUR") // €99.99 = 9999 cents
+        val amount = Amount.of(9999L, Currency("EUR")) // €99.99 = 9999 cents
 
         assertEquals(9999L, amount.value)
-        assertEquals("EUR", amount.currency)
+        assertEquals("EUR", amount.currency.currencyCode)
     }
 
     @Test
     fun `should support different currencies`() {
-        val usd = Amount(10000L, "USD") // $100.00
-        val eur = Amount(10000L, "EUR") // €100.00
-        val gbp = Amount(10000L, "GBP") // £100.00
-        val jpy = Amount(10000L, "JPY") // ¥100.00
+        val usd = Amount.of(10000L, Currency("USD")) // $100.00
+        val eur = Amount.of(10000L, Currency("EUR")) // €100.00
+        val gbp = Amount.of(10000L, Currency("GBP")) // £100.00
+        val jpy = Amount.of(10000L, Currency("JPY")) // ¥100.00
 
-        assertEquals("USD", usd.currency)
-        assertEquals("EUR", eur.currency)
-        assertEquals("GBP", gbp.currency)
-        assertEquals("JPY", jpy.currency)
+        assertEquals("USD", usd.currency.currencyCode)
+        assertEquals("EUR", eur.currency.currencyCode)
+        assertEquals("GBP", gbp.currency.currencyCode)
+        assertEquals("JPY", jpy.currency.currencyCode)
     }
 
     @Test
     fun `equals should return true for same values`() {
-        val amount1 = Amount(100000L, "USD")
-        val amount2 = Amount(100000L, "USD")
+        val amount1 = Amount.of(100000L, Currency("USD"))
+        val amount2 = Amount.of(100000L, Currency("USD"))
 
         assertEquals(amount1, amount2)
     }
 
     @Test
     fun `equals should return false for different values`() {
-        val amount1 = Amount(100000L, "USD")
-        val amount2 = Amount(200000L, "USD")
+        val amount1 = Amount.of(100000L, Currency("USD"))
+        val amount2 = Amount.of(200000L, Currency("USD"))
 
         assertNotEquals(amount1, amount2)
     }
 
     @Test
     fun `equals should return false for different currencies`() {
-        val amount1 = Amount(100000L, "USD")
-        val amount2 = Amount(100000L, "EUR")
+        val amount1 = Amount.of(100000L, Currency("USD"))
+        val amount2 = Amount.of(100000L, Currency("EUR"))
 
         assertNotEquals(amount1, amount2)
     }
 
     @Test
     fun `hashCode should be equal for equal amounts`() {
-        val amount1 = Amount(100000L, "USD")
-        val amount2 = Amount(100000L, "USD")
+        val amount1 = Amount.of(100000L, Currency("USD"))
+        val amount2 = Amount.of(100000L, Currency("USD"))
 
         assertEquals(amount1.hashCode(), amount2.hashCode())
     }
 
     @Test
     fun `copy should create new instance with modified value`() {
-        val original = Amount(100000L, "USD")
-        val copied = original.copy(value = 200000L)
+        val original = Amount.of(100000L, Currency("USD"))
+        val copied = original.copy(quantity = 200000L)
 
         assertEquals(100000L, original.value)
         assertEquals(200000L, copied.value)
-        assertEquals("USD", copied.currency)
+        assertEquals("USD", copied.currency.currencyCode)
     }
 
     @Test
     fun `copy should create new instance with modified currency`() {
-        val original = Amount(100000L, "USD")
-        val copied = original.copy(currency = "EUR")
+        val original = Amount.of(100000L, Currency("USD"))
+        val copied = original.copy(currency = Currency("EUR"))
 
-        assertEquals("USD", original.currency)
-        assertEquals("EUR", copied.currency)
+        assertEquals("USD", original.currency.currencyCode)
+        assertEquals("EUR", copied.currency.currencyCode)
         assertEquals(100000L, copied.value)
     }
 
     @Test
     fun `should handle large values`() {
         val largeValue = 999999999999L // $9,999,999,999.99
-        val amount = Amount(largeValue, "USD")
+        val amount = Amount.of(largeValue, Currency("USD"))
 
         assertEquals(largeValue, amount.value)
     }
@@ -105,7 +105,7 @@ class AmountTest {
     @Test
     fun `should handle negative values`() {
         val negativeValue = -10000L // -$100.00
-        val amount = Amount(negativeValue, "USD")
+        val amount = Amount.of(negativeValue, Currency("USD"))
 
         assertEquals(negativeValue, amount.value)
     }
@@ -113,16 +113,16 @@ class AmountTest {
     @Test
     fun `should preserve Long precision`() {
         val preciseValue = 123456789L // $1,234,567.89
-        val amount = Amount(preciseValue, "USD")
+        val amount = Amount.of(preciseValue, Currency("USD"))
 
         assertEquals(preciseValue, amount.value)
     }
 
     @Test
     fun `should handle cent values correctly`() {
-        val oneCent = Amount(1L, "USD") // $0.01
-        val ninetNineCents = Amount(99L, "USD") // $0.99
-        val oneDollar = Amount(100L, "USD") // $1.00
+        val oneCent = Amount.of(1L, Currency("USD")) // $0.01
+        val ninetNineCents = Amount.of(99L, Currency("USD")) // $0.99
+        val oneDollar = Amount.of(100L, Currency("USD")) // $1.00
 
         assertEquals(1L, oneCent.value)
         assertEquals(99L, ninetNineCents.value)
@@ -131,7 +131,7 @@ class AmountTest {
 
     @Test
     fun `toString should include value and currency`() {
-        val amount = Amount(100000L, "USD")
+        val amount = Amount.of(100000L, Currency("USD"))
         val string = amount.toString()
 
         assertTrue(string.contains("100000"))
@@ -141,30 +141,30 @@ class AmountTest {
     @Test
     fun `should be usable in collections`() {
         val amounts = listOf(
-            Amount(10000L, "USD"), // $100.00
-            Amount(20000L, "EUR"), // €200.00
-            Amount(30000L, "GBP")  // £300.00
+            Amount.of(10000L, Currency("USD")), // $100.00
+            Amount.of(20000L, Currency("EUR")), // €200.00
+            Amount.of(30000L, Currency("GBP"))  // £300.00
         )
 
         assertEquals(3, amounts.size)
-        assertTrue(amounts.contains(Amount(10000L, "USD")))
+        assertTrue(amounts.contains(Amount.of(10000L, Currency("USD"))))
     }
 
     @Test
     fun `should be usable as map key`() {
         val amountMap = mapOf(
-            Amount(10000L, "USD") to "One hundred dollars",
-            Amount(20000L, "EUR") to "Two hundred euros"
+            Amount.of(10000L, Currency("USD")) to "One hundred dollars",
+            Amount.of(20000L, Currency("EUR")) to "Two hundred euros"
         )
 
-        assertEquals("One hundred dollars", amountMap[Amount(10000L, "USD")])
-        assertEquals("Two hundred euros", amountMap[Amount(20000L, "EUR")])
+        assertEquals("One hundred dollars", amountMap[Amount.of(10000L, Currency("USD"))])
+        assertEquals("Two hundred euros", amountMap[Amount.of(20000L, Currency("EUR"))])
     }
 
     @Test
     fun `should handle very small values`() {
         val smallValue = 1L // $0.01
-        val amount = Amount(smallValue, "USD")
+        val amount = Amount.of(smallValue, Currency("USD"))
 
         assertEquals(smallValue, amount.value)
     }
@@ -172,8 +172,8 @@ class AmountTest {
     @Test
     fun `should create independent instances`() {
         val value = 100000L
-        val amount1 = Amount(value, "USD")
-        val amount2 = Amount(value, "USD")
+        val amount1 = Amount.of(value, Currency("USD"))
+        val amount2 = Amount.of(value, Currency("USD"))
 
         assertEquals(amount1, amount2)
         assertTrue(amount1 !== amount2) // Different objects
@@ -190,7 +190,7 @@ class AmountTest {
         )
 
         cases.forEach { (cents, description) ->
-            val amount = Amount(cents, "USD")
+            val amount = Amount.of(cents, Currency("USD"))
             assertEquals(cents, amount.value, "Failed for $description")
         }
     }

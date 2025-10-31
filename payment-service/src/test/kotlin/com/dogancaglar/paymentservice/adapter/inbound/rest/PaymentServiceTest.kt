@@ -10,6 +10,7 @@ import com.dogancaglar.port.out.web.dto.PaymentOrderRequestDTO
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
@@ -57,7 +58,7 @@ class PaymentServiceTest {
             .publicPaymentId("payment-123")
             .orderId(OrderId("order-123"))
             .buyerId(BuyerId("buyer-456"))
-            .totalAmount(Amount(10000L, "USD"))
+            .totalAmount(Amount.of(10000L, Currency("USD")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .paymentOrders(listOf())
             .buildNew()
@@ -152,7 +153,7 @@ class PaymentServiceTest {
             .publicPaymentId("payment-456")
             .orderId(OrderId("order-123"))
             .buyerId(BuyerId("buyer-456"))
-            .totalAmount(Amount(5000L, "EUR"))
+            .totalAmount(Amount.of(5000L, Currency("EUR")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .paymentOrders(listOf())
             .buildNew()
@@ -191,7 +192,7 @@ class PaymentServiceTest {
             .publicPaymentId("payment-789")
             .orderId(OrderId("order-123"))
             .buyerId(BuyerId("buyer-456"))
-            .totalAmount(Amount(99999999L, "USD"))
+            .totalAmount(Amount.of(99999999L, Currency("USD")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .paymentOrders(listOf())
             .buildNew()

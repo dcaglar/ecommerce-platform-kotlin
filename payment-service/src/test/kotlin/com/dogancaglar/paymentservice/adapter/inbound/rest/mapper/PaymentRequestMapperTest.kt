@@ -2,6 +2,7 @@ package com.dogancaglar.paymentservice.adapter.inbound.rest.mapper
 
 import com.dogancaglar.paymentservice.domain.commands.CreatePaymentCommand
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
@@ -42,10 +43,10 @@ class PaymentRequestMapperTest {
         // Then
         assertEquals(OrderId("order-123"), command.orderId)
         assertEquals(BuyerId("buyer-456"), command.buyerId)
-        assertEquals(Amount(10000L, "USD"), command.totalAmount)
+        assertEquals(Amount.of(10000L, Currency("USD")), command.totalAmount)
         assertEquals(1, command.paymentLines.size)
         assertEquals(SellerId("seller-789"), command.paymentLines[0].sellerId)
-        assertEquals(Amount(10000L, "USD"), command.paymentLines[0].amount)
+        assertEquals(Amount.of(10000L, Currency("USD")), command.paymentLines[0].amount)
     }
 
     @Test
@@ -73,12 +74,12 @@ class PaymentRequestMapperTest {
         // Then
         assertEquals(OrderId("order-123"), command.orderId)
         assertEquals(BuyerId("buyer-456"), command.buyerId)
-        assertEquals(Amount(20000L, "EUR"), command.totalAmount)
+        assertEquals(Amount.of(20000L, Currency("EUR")), command.totalAmount)
         assertEquals(2, command.paymentLines.size)
         assertEquals(SellerId("seller-789"), command.paymentLines[0].sellerId)
-        assertEquals(Amount(15000L, "EUR"), command.paymentLines[0].amount)
+        assertEquals(Amount.of(15000L, Currency("EUR")), command.paymentLines[0].amount)
         assertEquals(SellerId("seller-101"), command.paymentLines[1].sellerId)
-        assertEquals(Amount(5000L, "EUR"), command.paymentLines[1].amount)
+        assertEquals(Amount.of(5000L, Currency("EUR")), command.paymentLines[1].amount)
     }
 
     @Test
@@ -89,7 +90,7 @@ class PaymentRequestMapperTest {
             .publicPaymentId("payment-123")
             .orderId(OrderId("order-123"))
             .buyerId(BuyerId("buyer-456"))
-            .totalAmount(Amount(10000L, "USD"))
+            .totalAmount(Amount.of(10000L, Currency("USD")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .paymentOrders(listOf())
             .buildNew()
@@ -116,7 +117,7 @@ class PaymentRequestMapperTest {
             .publicPaymentId("payment-456")
             .orderId(OrderId("order-456"))
             .buyerId(BuyerId("buyer-789"))
-            .totalAmount(Amount(5000L, "EUR"))
+            .totalAmount(Amount.of(5000L, Currency("EUR")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .paymentOrders(listOf())
             .buildNew()
@@ -150,8 +151,8 @@ class PaymentRequestMapperTest {
         val command = PaymentRequestMapper.toCommand(dto)
 
         // Then
-        assertEquals(Amount(99999999L, "USD"), command.totalAmount)
-        assertEquals(Amount(99999999L, "USD"), command.paymentLines[0].amount)
+        assertEquals(Amount.of(99999999L, Currency("USD")), command.totalAmount)
+        assertEquals(Amount.of(99999999L, Currency("USD")), command.paymentLines[0].amount)
     }
 
     @Test
@@ -173,7 +174,7 @@ class PaymentRequestMapperTest {
         val command = PaymentRequestMapper.toCommand(dto)
 
         // Then
-        assertEquals(Amount(10000L, "GBP"), command.totalAmount)
-        assertEquals(Amount(10000L, "GBP"), command.paymentLines[0].amount)
+        assertEquals(Amount.of(10000L, Currency("GBP")), command.totalAmount)
+        assertEquals(Amount.of(10000L, Currency("GBP")), command.paymentLines[0].amount)
     }
 }

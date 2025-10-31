@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.persistance.entity
 
 import java.time.LocalDateTime
 
-data class PaymentOrderStatusCheckEntity(
+data class PaymentOrderStatusCheckEntity internal constructor(
     val id: Long = 0,
     val paymentOrderId: Long,
     val scheduledAt: LocalDateTime,

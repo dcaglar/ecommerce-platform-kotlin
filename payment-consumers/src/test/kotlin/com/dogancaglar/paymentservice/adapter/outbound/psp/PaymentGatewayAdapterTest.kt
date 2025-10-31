@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.outbound.psp
 
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
@@ -72,7 +73,7 @@ class PaymentGatewayAdapterTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("public-payment-123")
             .sellerId(SellerId("seller-123"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .buildNew()
 
@@ -105,7 +106,7 @@ class PaymentGatewayAdapterTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("public-payment-123")
             .sellerId(SellerId("seller-123"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .buildNew()
 
@@ -137,7 +138,7 @@ class PaymentGatewayAdapterTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("public-payment-123")
             .sellerId(SellerId("seller-123"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .buildNew()
 
@@ -169,7 +170,7 @@ class PaymentGatewayAdapterTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("public-payment-123")
             .sellerId(SellerId("seller-123"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .buildNew()
 
@@ -202,7 +203,7 @@ class PaymentGatewayAdapterTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("public-payment-123")
             .sellerId(SellerId("seller-123"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .buildNew()
 
@@ -233,7 +234,7 @@ class PaymentGatewayAdapterTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("public-payment-123")
             .sellerId(SellerId("seller-123"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .buildNew()
 
@@ -264,7 +265,7 @@ class PaymentGatewayAdapterTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("public-payment-123")
             .sellerId(SellerId("seller-123"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .buildNew()
 
@@ -293,7 +294,7 @@ class PaymentGatewayAdapterTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("public-payment-123")
             .sellerId(SellerId("seller-123"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .buildNew()
 
@@ -323,7 +324,7 @@ class PaymentGatewayAdapterTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("public-payment-123")
             .sellerId(SellerId("seller-123"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .buildNew()
 
@@ -352,7 +353,7 @@ class PaymentGatewayAdapterTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("public-payment-123")
             .sellerId(SellerId("seller-123"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .buildNew()
 
@@ -378,7 +379,7 @@ class PaymentGatewayAdapterTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("public-payment-123")
             .sellerId(SellerId("seller-123"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .buildNew()
 

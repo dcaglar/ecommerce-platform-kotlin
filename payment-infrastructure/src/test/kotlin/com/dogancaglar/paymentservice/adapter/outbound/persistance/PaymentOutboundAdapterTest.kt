@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.persistance
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentEntity
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.PaymentMapper
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
@@ -54,7 +55,7 @@ class PaymentOutboundAdapterTest {
                     entity.buyerId == payment.buyerId.value &&
                     entity.orderId == payment.orderId.value &&
                     entity.amountValue == payment.totalAmount.value &&
-                    entity.amountCurrency == payment.totalAmount.currency &&
+                    entity.amountCurrency == payment.totalAmount.currency.currencyCode &&
                     entity.status == payment.status &&
                     entity.createdAt == payment.createdAt
                 }
@@ -159,7 +160,7 @@ class PaymentOutboundAdapterTest {
                     entity.buyerId == payment.buyerId.value &&
                     entity.orderId == payment.orderId.value &&
                     entity.amountValue == payment.totalAmount.value &&
-                    entity.amountCurrency == payment.totalAmount.currency &&
+                    entity.amountCurrency == payment.totalAmount.currency.currencyCode &&
                     entity.status == payment.status &&
                     entity.createdAt == payment.createdAt
                 }
@@ -203,7 +204,7 @@ class PaymentOutboundAdapterTest {
                 .publicPaymentId("pay-123")
                 .buyerId(BuyerId("buyer-123"))
                 .orderId(OrderId("order-123"))
-                .totalAmount(Amount(10000L, currency))
+                .totalAmount(Amount.of(10000L, Currency(currency)))
                 .status(PaymentStatus.INITIATED)
                 .createdAt(LocalDateTime.now())
                 .paymentOrders(emptyList())
@@ -231,7 +232,7 @@ class PaymentOutboundAdapterTest {
             .publicPaymentId("pay-123")
             .buyerId(BuyerId("buyer-123"))
             .orderId(OrderId("order-123"))
-            .totalAmount(Amount(0L, "USD"))
+            .totalAmount(Amount.of(0L, Currency("USD")))
             .status(PaymentStatus.INITIATED)
             .createdAt(LocalDateTime.now())
             .paymentOrders(emptyList())
@@ -261,7 +262,7 @@ class PaymentOutboundAdapterTest {
             .publicPaymentId("pay-123")
             .buyerId(BuyerId("buyer-123"))
             .orderId(OrderId("order-123"))
-            .totalAmount(Amount(largeAmount, "USD"))
+            .totalAmount(Amount.of(largeAmount, Currency("USD")))
             .status(PaymentStatus.INITIATED)
             .createdAt(LocalDateTime.now())
             .paymentOrders(emptyList())
@@ -289,7 +290,7 @@ class PaymentOutboundAdapterTest {
             .publicPaymentId("pay-123-test_@#$%")
             .buyerId(BuyerId("buyer-456-special!@#"))
             .orderId(OrderId("order-789-unicode-测试"))
-            .totalAmount(Amount(10000L, "USD"))
+            .totalAmount(Amount.of(10000L, Currency("USD")))
             .status(PaymentStatus.INITIATED)
             .createdAt(LocalDateTime.now())
             .paymentOrders(emptyList())
@@ -352,7 +353,7 @@ class PaymentOutboundAdapterTest {
             .publicPaymentId("pay-$id")
             .buyerId(BuyerId("buyer-$id"))
             .orderId(OrderId("order-$id"))
-            .totalAmount(Amount(10000L, "USD"))
+            .totalAmount(Amount.of(10000L, Currency("USD")))
             .status(status)
             .createdAt(LocalDateTime.now())
             .paymentOrders(emptyList())
@@ -365,7 +366,7 @@ class PaymentOutboundAdapterTest {
             .publicPaymentId("pay-456")
             .buyerId(BuyerId("buyer-456"))
             .orderId(OrderId("order-456"))
-            .totalAmount(Amount(50000L, "EUR"))
+            .totalAmount(Amount.of(50000L, Currency("EUR")))
             .status(PaymentStatus.SUCCESS)
             .createdAt(LocalDateTime.of(2023, 6, 15, 10, 30))
             .paymentOrders(emptyList())
@@ -378,7 +379,7 @@ class PaymentOutboundAdapterTest {
             .publicPaymentId("pay-789-complex")
             .buyerId(BuyerId("buyer-789-special"))
             .orderId(OrderId("order-789-unicode-测试"))
-            .totalAmount(Amount(999999L, "JPY"))
+            .totalAmount(Amount.of(999999L, Currency("JPY")))
             .status(PaymentStatus.INITIATED)
             .createdAt(LocalDateTime.of(2023, 12, 31, 23, 59, 59))
             .paymentOrders(emptyList())

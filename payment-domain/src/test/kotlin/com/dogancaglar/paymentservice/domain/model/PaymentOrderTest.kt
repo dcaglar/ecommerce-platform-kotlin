@@ -1,5 +1,7 @@
 package com.dogancaglar.paymentservice.domain.model
 
+import com.dogancaglar.paymentservice.domain.model.Currency
+
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
@@ -15,7 +17,7 @@ class PaymentOrderTest {
         val paymentOrderId = PaymentOrderId(1L)
         val paymentId = PaymentId(100L)
         val sellerId = SellerId("seller-123")
-        val amount = Amount(100000L, "USD") // $1000.00 = 100000 cents
+        val amount = Amount.of(100000L, Currency("USD")) // $1000.00 = 100000 cents
 
         val paymentOrder = PaymentOrder.builder()
             .paymentOrderId(paymentOrderId)
@@ -49,7 +51,7 @@ class PaymentOrderTest {
         val paymentOrderId = PaymentOrderId(1L)
         val paymentId = PaymentId(100L)
         val sellerId = SellerId("seller-123")
-        val amount = Amount(100000L, "USD") // $1000.00 = 100000 cents
+        val amount = Amount.of(100000L, Currency("USD")) // $1000.00 = 100000 cents
 
         val paymentOrder = PaymentOrder.builder()
             .paymentOrderId(paymentOrderId)
@@ -223,7 +225,7 @@ class PaymentOrderTest {
         paymentId: PaymentId = PaymentId(100L),
         publicPaymentId: String = "payment-100",
         sellerId: SellerId = SellerId("seller-123"),
-        amount: Amount = Amount(100000L, "USD"), // $1000.00 = 100000 cents
+        amount: Amount = Amount.of(100000L, Currency("USD")), // $1000.00 = 100000 cents
         status: PaymentOrderStatus = PaymentOrderStatus.INITIATED_PENDING,
         createdAt: LocalDateTime = LocalDateTime.now(),
         updatedAt: LocalDateTime = LocalDateTime.now(),

@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.persistance
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentOrderEntity
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.PaymentOrderMapper
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
@@ -323,7 +324,7 @@ class PaymentOrderOutboundAdapterTest {
                     entity.publicPaymentId == paymentOrder.publicPaymentId &&
                     entity.sellerId == paymentOrder.sellerId.value &&
                     entity.amountValue == paymentOrder.amount.value &&
-                    entity.amountCurrency == paymentOrder.amount.currency &&
+                    entity.amountCurrency == paymentOrder.amount.currency.currencyCode &&
                     entity.status == paymentOrder.status &&
                     entity.retryCount == paymentOrder.retryCount &&
                     entity.retryReason == paymentOrder.retryReason &&
@@ -351,7 +352,7 @@ class PaymentOrderOutboundAdapterTest {
         assertEquals(entity.publicPaymentId, domainObject.publicPaymentId)
         assertEquals(entity.sellerId, domainObject.sellerId.value)
         assertEquals(entity.amountValue, domainObject.amount.value)
-        assertEquals(entity.amountCurrency, domainObject.amount.currency)
+        assertEquals(entity.amountCurrency, domainObject.amount.currency.currencyCode)
         assertEquals(entity.status, domainObject.status)
         assertEquals(entity.retryCount, domainObject.retryCount)
         assertEquals(entity.retryReason, domainObject.retryReason)
@@ -386,7 +387,7 @@ class PaymentOrderOutboundAdapterTest {
             .paymentId(PaymentId(1L))
             .publicPaymentId("payment-1")
             .sellerId(SellerId("seller_1"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .status(PaymentOrderStatus.INITIATED_PENDING)
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())
@@ -424,7 +425,7 @@ class PaymentOrderOutboundAdapterTest {
             .paymentId(PaymentId(999L))
             .publicPaymentId("pay-999")
             .sellerId(SellerId("111"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .status(status)
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())
@@ -441,7 +442,7 @@ class PaymentOrderOutboundAdapterTest {
             .paymentId(PaymentId(888L))
             .publicPaymentId("pay-888")
             .sellerId(SellerId("seller-456"))
-            .amount(Amount(25000L, "EUR"))
+            .amount(Amount.of(25000L, Currency("EUR")))
             .status(PaymentOrderStatus.FAILED_TRANSIENT_ERROR)
             .createdAt(LocalDateTime.of(2023, 6, 15, 10, 30))
             .updatedAt(LocalDateTime.of(2023, 6, 15, 10, 35))

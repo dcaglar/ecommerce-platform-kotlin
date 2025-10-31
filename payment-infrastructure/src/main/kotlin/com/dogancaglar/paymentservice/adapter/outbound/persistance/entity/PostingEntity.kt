@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.persistance.entity
 
 import java.time.LocalDateTime
 
-data class PostingEntity(
+data class PostingEntity internal constructor(
     val id: Long? = null,
     val journalId: String,
     val accountCode: String,

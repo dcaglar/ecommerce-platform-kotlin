@@ -41,7 +41,7 @@ class PaymentOrderFactoryTest {
         assertEquals("payment-100", paymentOrder.publicPaymentId)
         assertEquals(SellerId("seller-123"), paymentOrder.sellerId)
         assertEquals(100000L, paymentOrder.amount.value)
-        assertEquals("USD", paymentOrder.amount.currency)
+        assertEquals("USD", paymentOrder.amount.currency.currencyCode)
         assertEquals(PaymentOrderStatus.SUCCESSFUL_FINAL, paymentOrder.status)
         assertEquals(createdAt, paymentOrder.createdAt)
         assertEquals(updatedAt, paymentOrder.updatedAt)
@@ -137,7 +137,7 @@ class PaymentOrderFactoryTest {
 
             val paymentOrder = factory.fromEvent(event)
 
-            assertEquals(currency, paymentOrder.amount.currency)
+            assertEquals(currency, paymentOrder.amount.currency.currencyCode)
         }
     }
 

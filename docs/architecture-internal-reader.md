@@ -170,9 +170,9 @@ flowchart TB
     end
 
     subgraph Ledger_Subdomain["🧾 Ledger Subdomain"]
-        JournalEntry_Agg["JournalEntry<br/>Aggregate Root<br/>• id: String<br/>• txType: JournalType<br/>• postings: List<Posting>"]
-        Posting_Entity["Posting Entity<br/>• accountCode: String<br/>• amount: Long<br/>• direction: Debit/Credit<br/>• accountType: AccountType"]
-        Account_VO["Account Value Object<br/>• accountCode: String<br/>• accountType: AccountType"]
+        JournalEntry_Agg["JournalEntry<br/>Aggregate Root<br/>• id: String<br/>• txType: JournalType<br/>• postings: List<Posting><br/><br/>Factory Methods:<br/>• authHold()<br/>• capture()<br/>• settlement()<br/>• feeRegistered()<br/>• payout()<br/>• fullFlow()<br/><br/>Private Constructor<br/>Enforces Balance"]
+        Posting_Entity["Posting Entity<br/>(Factory-Enforced)<br/>• account: Account<br/>• amount: Amount<br/>• direction: Debit/Credit<br/><br/>Factories:<br/>• Posting.Debit.create()<br/>• Posting.Credit.create()"]
+        Account_VO["Account Value Object<br/>(Factory-Enforced)<br/>• accountCode: String<br/>• type: AccountType<br/>• entityId: String<br/><br/>Factory:<br/>• Account.create(type, entityId)"]
     end
 
     subgraph Value_Objects["📦 Value Objects"]
@@ -180,7 +180,9 @@ flowchart TB
         PaymentOrderId_VO["PaymentOrderId<br/>(Value Object)"]
         SellerId_VO["SellerId<br/>(Value Object)"]
         BuyerId_VO["BuyerId<br/>(Value Object)"]
-        Amount_VO["Amount<br/>• value: Long<br/>• currency: String"]
+        Amount_VO["Amount<br/>• quantity: Long<br/>• currency: Currency<br/>(Factory: Amount.of())"]
+        Currency_VO["Currency<br/>(Value Class)<br/>• currencyCode: String"]
+        Account_VO["Account<br/>(Factory-Enforced)<br/>• type: AccountType<br/>• entityId: String<br/>(Factory: Account.create())"]
     end
 
     subgraph Domain_Events["📨 Domain Events"]
@@ -253,9 +255,9 @@ flowchart TB
     end
 
     subgraph Ledger_Aggregate_Boundary["🧾 Ledger Aggregate Boundary"]
-        Ledger_Invariants["Invariants:<br/>• Debits = Credits (balanced)<br/>• JournalEntry immutable<br/>• Consistency: Immediate"]
-        Ledger_Actions["Actions:<br/>• JournalEntry.fullFlow()<br/>• JournalEntry.failedPayment()"]
-        Ledger_Balance["Balance Rule:<br/>Σ(Posting.debits) =<br/>Σ(Posting.credits)"]
+        Ledger_Invariants["Invariants:<br/>• Debits = Credits (balanced)<br/>• JournalEntry immutable<br/>• Consistency: Immediate<br/>• Factory-enforced creation<br/>  (private constructors)"]
+        Ledger_Actions["Actions:<br/>• JournalEntry.fullFlow()<br/>• JournalEntry.failedPayment()<br/>• Account.create()<br/>• Amount.of()<br/>• Posting.Debit.create()<br/>• Posting.Credit.create()"]
+        Ledger_Balance["Balance Rule:<br/>Σ(Posting.debits) =<br/>Σ(Posting.credits)<br/><br/>Enforced at creation via<br/>factory methods"]
     end
 
     subgraph Transaction_Scopes["🔒 Transaction Scopes"]
@@ -309,7 +311,7 @@ flowchart TB
 
 | Principle                  | Application in the Codebase                                                                                                       |
 |----------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| **Domain‑Driven Design**   | Clear bounded contexts (`payment`, `wallet`, `shipment`, …) with domain, application, adapter, and config layers in every module. |
+| **Domain‑Driven Design**   | Clear bounded contexts (`payment`, `wallet`, `shipment`, …) with domain, application, adapter, and config layers in every module. **Factory-enforced invariants**: Core domain classes (`Account`, `Amount`, `JournalEntry`, `Posting`) use private constructors with validated factory methods to ensure all objects are created in valid states. |
 | **Hexagonal Architecture** | Domain code depends on *ports* (interfaces); adapters implement them (JPA, Kafka, Redis, PSP, …).                                 |
 | **Event‑Driven**           | Kafka is the backbone; every state change is emitted as an `EventEnvelope<T>`.                                                    |
 | **Outbox Pattern**         | Events are written atomically with DB changes and reliably published by dispatchers.                                              |
@@ -361,7 +363,7 @@ flowchart LR
 
 > **Current Architecture (Jan‑2025):** `payment-consumers` contains six specialized consumers organized into **three independent flows**:
 > - **PSP Flow** (3 consumers):
->   - **PaymentOrderEnqueuer** *(reads `payment_order_created` and enqueues PSP call tasks)*
+>   - **PaymentOrderEnqueuer** *(reads `payment_order_created_topic` and enqueues PSP call tasks)*
 >   - **PaymentOrderPspCallExecutor** *(performs PSP calls and publishes results)*
 >   - **PaymentOrderPspResultApplier** *(applies PSP results and manages retries)*
 > - **Status Check Flow** (1 consumer):
@@ -371,8 +373,9 @@ flowchart LR
 >   - **LedgerRecordingConsumer** *(creates double-entry journal entries)*
 > 
 > **Independent Scaling & Flow Isolation**: Each flow uses separate Kafka topics and consumer groups:
-> - **PSP Flow**: Consumer groups `payment-order-*-consumer-group` (concurrency=8), topics `payment_order_*_topic`
-> - **Ledger Flow**: Consumer groups `ledger-*-consumer-group` (concurrency=4), topics `ledger_*_topic`
+> - **PSP Flow**: Consumer groups `payment-order-*-consumer-group` (concurrency=8), topics `payment_order_*_topic` (48 partitions)
+> - **Status Check Flow**: Consumer group `payment-status-check-scheduler-consumer-group` (concurrency=1), topic `payment_status_check_scheduler_topic` (1 partition)
+> - **Ledger Flow**: Consumer groups `ledger-*-consumer-group` (concurrency=4), topics `ledger_*_topic` (24 partitions)
 > - **Benefits**: PSP processing never impacted by ledger bottlenecks; ledger recording never impacted by PSP latency; each flow scales independently based on its consumer lag
 
 ### 4.3 Payment Flow Sequence Diagram
@@ -543,6 +546,13 @@ Adds a complete **double‑entry accounting subsystem** for reliable financial r
 
 **Note:** Account balance aggregation from ledger entries is planned but not yet implemented (future: `AccountBalanceConsumer`).
 
+**Configuration Sources:**
+- **Consumer Configuration**: `app.kafka.dynamic-consumers[]` in `payment-consumers/src/main/resources/application-local.yml`
+- **Topic Specifications**: `app.kafka.specs` in `payment-service/src/main/resources/application-local.yml`
+- **Factory Beans**: `KafkaTypedConsumerFactoryConfig` in `payment-consumers` module
+- **Consumer Group Constants**: `CONSUMER_GROUPS` object in `common/src/main/kotlin/com/dogancaglar/common/event/Topics.kt`
+- **Event Type Constants**: `EVENT_TYPE` object in `common/src/main/kotlin/com/dogancaglar/common/event/Topics.kt`
+
 #### Ledger Record Sequence Flow
 
 ```mermaid
@@ -566,8 +576,12 @@ sequenceDiagram
 
 - **LedgerRecordingRequestDispatcher**: 
     - Kafka consumer for `payment_order_finalized_topic` (unified topic, partitioned by `paymentOrderId`)
+    - Consumer Group: `ledger-recording-request-dispatcher-consumer-group`
+    - Container Factory: `payment_order_finalized_topic-factory`
+    - Concurrency: 4 (configured in `application-local.yml`)
+    - Uses `@Qualifier("syncPaymentTx") KafkaTxExecutor` for atomic offset commit + event publish
     - Delegates to `RequestLedgerRecordingService` within Kafka transaction boundary
-    - Ensures atomic offset commit + event publish
+    - Log Context: Uses `LogContext.with(env)` to propagate `traceId` and `parentEventId` from envelope
 
 - **RequestLedgerRecordingService**: 
     - Transforms `PaymentOrderEvent` → `LedgerRecordingCommand` with trace and parent event propagation
@@ -577,7 +591,13 @@ sequenceDiagram
 
 - **LedgerRecordingConsumer**: 
     - Listens on `ledger_record_request_queue_topic` (partitioned by `sellerId`)
-    - Invokes `RecordLedgerEntriesService` within Kafka transaction
+    - Consumer Group: `ledger-recording-consumer-group`
+    - Container Factory: `ledger_record_request_queue_topic-factory`
+    - Concurrency: 4 (configured in `application-local.yml`)
+    - Uses `@Qualifier("syncPaymentTx") KafkaTxExecutor` for atomic offset commit + event publish
+    - Invokes `RecordLedgerEntriesUseCase.recordLedgerEntries(command)` within Kafka transaction
+    - Log Context: Uses `LogContext.with(env)` to propagate `traceId` and `parentEventId` from envelope
+    - Event Type Filtering: Factory configured with `expectedEventType = EVENT_TYPE.LEDGER_RECORDING_REQUESTED`
 
 - **RecordLedgerEntriesService**: 
     - Creates balanced `JournalEntry` objects via `JournalEntryFactory`, persists via `LedgerEntryPort`
@@ -617,19 +637,18 @@ sequenceDiagram
 
 **LedgerRecordingConsumer** → **RecordLedgerEntriesService**:
 - Executes within `KafkaTxExecutor` transactional boundary for offset + event commit
-- **Batch Processing**: All journal entries for a payment order are processed atomically via `postLedgerEntriesAtomic()`
+- **Individual Processing**: Each journal entry for a payment order is processed via `appendLedgerEntry()`
 - Database-level idempotency via `ON CONFLICT` in `journal_entries` table
 - When `insertJournalEntry()` returns `0` (duplicate detected):
-  - **All remaining entries in the batch are skipped** - return statement stops batch processing
-  - No postings are inserted for the duplicate entry
+  - Entry skipped and no postings are inserted for the duplicate entry
+  - Processing continues with next entry
   - No exception thrown - graceful no-op
 - **First execution** (`insertJournalEntry` returns `1`):
   - Entry and all postings inserted successfully
-  - Processing continues with next entry in batch
+  - Processing continues with next entry
 - **Consequences of replays**:
   - Duplicate journal entries silently ignored (idempotent)
-  - Entire batch processing stops on first duplicate detection
-  - `LedgerEntriesRecorded` event will contain `0L` IDs for duplicates
+  - Each entry processed independently - duplicate detection per entry
   - External systems can detect replays via event deduplication logic
 
 #### Exception Handling & Failure Modes
@@ -643,29 +662,28 @@ sequenceDiagram
 2. **Repeated failures**: If publish consistently fails, event will retry indefinitely until fixed or DLQ configured
 
 **LedgerRecordingConsumer Failure Scenarios**:
-1. **Persistence exception** (`postLedgerEntriesAtomic` throws during processing):
+1. **Persistence exception** (`appendLedgerEntry` throws during processing):
    - Exception propagates before `LedgerEntriesRecorded` event publishing
    - `KafkaTxExecutor` aborts transaction: Consumer offset not committed
    - `LedgerRecordingCommand` will be retried
    - **State**: Entries processed before exception may already be in DB (within transaction timeout boundary)
    - No event published
    - **On retry**: Idempotency protects against double-posting for successfully inserted entries
-2. **Duplicate entry detected during batch** (entry N is duplicate):
+2. **Duplicate entry detected** (entry N is duplicate):
    - `insertJournalEntry()` returns `0` for entry N
-   - **Processing stops immediately** - `return` statement exits batch processing
-   - Remaining entries (N+1..M) are not processed
+   - Entry skipped, no postings inserted
+   - Processing continues with next entry
    - **On retry**: 
-     - Entries 0..N-1: Already persisted, `ON CONFLICT` detects duplicates, skips
-     - Entries N..M: Fresh attempts to insert
-     - Same behavior: stops on first duplicate
+     - All entries: `ON CONFLICT` detects duplicates, skips gracefully
+     - Processing continues for non-duplicate entries
 3. **Publish exception** (after successful persistence of all entries):
    - Exception propagates to `KafkaTxExecutor`, transaction aborts
    - Kafka offset not committed - command retried
    - **Critical**: All ledger entries already persisted from first attempt
-   - **On retry**: `ON CONFLICT` prevents duplicate entries, processing stops on first duplicate
+   - **On retry**: `ON CONFLICT` prevents duplicate entries, all entries skipped
    - Event only published after successful persistence (will succeed on retry)
 4. **Status handling**:
-   - `SUCCESSFUL_FINAL`: Creates 5 journal entries (fullFlow) processed as batch
+   - `SUCCESSFUL_FINAL`: Creates 5 journal entries (fullFlow) processed individually
    - `FAILED_FINAL`/`FAILED`: Returns empty list, no persistence (early return)
    - Unknown status: Early return, no processing (idempotent no-op)
 
@@ -673,15 +691,14 @@ sequenceDiagram
 - **Kafka Transaction Boundary**: Each consumer invocation is wrapped in `KafkaTxExecutor`
   - Commit: Offset + all published events (atomic)
   - Abort: Offset not committed, all published events not visible
-- **Journal Entry Persistence**: Entries processed sequentially within `postLedgerEntriesAtomic()` with `@Transactional`
+- **Journal Entry Persistence**: Each entry processed individually via `appendLedgerEntry()` with `@Transactional`
   - Transaction wrapping controlled by Spring `@Transactional` on adapter
-  - **Duplicate Detection Behavior**: When duplicate is detected, processing stops for entire batch
-  - Rationale: Batch integrity maintained - either all entries succeed or processing stops on duplicate
-- **Batch Failure Behavior**: If duplicate detected at entry N, entries 0 to N-1 were already persisted
-  - Cannot be rolled back (already committed)
-  - On retry: Duplicate entries detected, processing stops at first duplicate
-  - Remaining entries from original batch are not processed
-- **Event Consistency**: `LedgerEntriesRecorded` only published after batch processing completes (success or duplicate detection)
+  - **Duplicate Detection Behavior**: When duplicate is detected, entry skipped and processing continues
+  - Rationale: Each entry processed independently - duplicate detection per entry, remaining entries still processed
+- **Individual Entry Processing**: Each entry is processed in its own transaction context
+  - Duplicate entries skipped gracefully, non-duplicate entries continue processing
+  - On retry: All entries checked again, duplicates skipped, new entries processed
+- **Event Consistency**: `LedgerEntriesRecorded` only published after all entries processed (success or skipped duplicates)
 
 #### Traceability & Observability
 
@@ -824,16 +841,15 @@ The system ensures **no duplicate records** are created through a combination of
 - **Database-Level Duplicate Detection**:
   - Journal Entries: `ON CONFLICT (id) DO NOTHING` - Unique constraint on journal ID
   - Postings: `ON CONFLICT (journal_id, account_code) DO NOTHING` - Prevents duplicate postings per journal
-- **Batch Processing Behavior**:
-  - `LedgerEntryTxAdapter.postLedgerEntriesAtomic()` processes entries sequentially
+- **Individual Entry Processing**:
+  - `LedgerEntryAdapter.appendLedgerEntry()` processes entries one at a time
   - **On Duplicate Detection**: If `insertJournalEntry()` returns `0` (duplicate):
-    - Processing **stops immediately** (`return` statement)
-    - Remaining entries in batch **not processed**
-    - No postings inserted for duplicate entry
-    - **Rationale**: Either all entries succeed, or processing stops on first duplicate
+    - Entry skipped, no postings inserted
+    - Processing **continues** with next entry
+    - **Rationale**: Each entry processed independently, duplicates skipped gracefully
 - **Idempotent Replay**: If `LedgerRecordingCommand` replayed:
   - First execution: All entries persisted successfully
-  - Replay: `ON CONFLICT` detects duplicates, processing stops, no duplicate records
+  - Replay: `ON CONFLICT` detects duplicates, entries skipped, remaining entries processed if any
 
 **3. Outbox Pattern Idempotency**
 
@@ -972,7 +988,7 @@ Kafka topics use different partitioning strategies based on processing requireme
 - **Consumer groups & concurrency** (current defaults):
     - `payment-order-enqueuer-consumer-group` → concurrency 8
     - `payment-order-psp-call-executor-consumer-group` → concurrency 8
-    - `payment-order-psp-result-applier-consumer-group` → concurrency 8
+    - `payment-order-psp-result-updated-consumer-group` → concurrency 8
     - `payment-status-check-scheduler-consumer-group` → concurrency 1
     - `ledger-recording-request-dispatcher-consumer-group` → concurrency 4
 
@@ -1032,6 +1048,144 @@ Kafka topics use different partitioning strategies based on processing requireme
 
 - **Search keys** (also in logs): `eventId`, `traceId`, `parentEventId`, `aggregateId` (e.g., `paymentOrderId`).
 - JSON logging + Elastic make it trivial to traverse causality chains across services.
+
+### 6.4 Complete Kafka Components Reference
+
+#### Topics & Partitions
+
+| Topic Name | Partitions | Partition Key | Purpose | DLQ Created |
+|------------|-----------|---------------|---------|-------------|
+| `payment_order_created_topic` | 48 | `paymentOrderId` | Initial payment order creation event | ✅ |
+| `payment_order_psp_call_requested_topic` | 48 | `paymentOrderId` | PSP call request queue | ✅ |
+| `payment_order_psp_result_updated_topic` | 48 | `paymentOrderId` | PSP call result publication | ✅ |
+| `payment_order_finalized_topic` | 48 | `paymentOrderId` | Unified finalized events (success/failure) | ✅ |
+| `payment_status_check_scheduler_topic` | 1 | N/A (1 partition) | Async status check requests | ✅ |
+| `ledger_record_request_queue_topic` | 24 | `sellerId` | Ledger recording command queue | ✅ |
+| `ledger_entries_recorded_topic` | 24 | `sellerId` | Ledger recording confirmation events | ✅ |
+
+#### Domain Events & Event Types
+
+| Event Class | Event Type | Topic | Partition Key | Emitted By | Metadata Object |
+|-------------|-----------|-------|---------------|------------|-----------------|
+| `PaymentOrderCreated` | `payment_order_created` | `payment_order_created_topic` | `paymentOrderId` | `CreatePaymentService` | `EventMetadatas.PaymentOrderCreatedMetadata` |
+| `PaymentOrderPspCallRequested` | `payment_order_psp_call_requested` | `payment_order_psp_call_requested_topic` | `paymentOrderId` | `PaymentOrderEnqueuer` | `EventMetadatas.PaymentOrderPspCallRequestedMetadata` |
+| `PaymentOrderPspResultUpdated` | `payment_order_psp_result_updated` | `payment_order_psp_result_updated_topic` | `paymentOrderId` | `PaymentOrderPspCallExecutor` | `EventMetadatas.PaymentOrderPspResultUpdatedMetadata` |
+| `PaymentOrderSucceeded` | `payment_order_success` | `payment_order_finalized_topic` | `paymentOrderId` | `ProcessPaymentService` | `EventMetadatas.PaymentOrderSucceededMetadata` |
+| `PaymentOrderFailed` | `payment_order_failed` | `payment_order_finalized_topic` | `paymentOrderId` | `ProcessPaymentService` | `EventMetadatas.PaymentOrderFailedMetadata` |
+| `PaymentOrderStatusCheckRequested` | `payment_order_status_check_requested` | `payment_status_check_scheduler_topic` | N/A | `ProcessPaymentService` | `EventMetadatas.PaymentOrderStatusCheckScheduledMetadata` |
+| `LedgerRecordingCommand` | `ledger_recording_requested` | `ledger_record_request_queue_topic` | `sellerId` | `RequestLedgerRecordingService` | `EventMetadatas.LedgerRecordingCommandMetadata` |
+| `LedgerEntriesRecorded` | `ledger_entries_recorded` | `ledger_entries_recorded_topic` | `sellerId` | `RecordLedgerEntriesService` | `EventMetadatas.LedgerEntriesRecordedMetadata` |
+
+**Note:** Event type constants are defined in `EVENT_TYPE` object (`common/src/main/kotlin/com/dogancaglar/common/event/Topics.kt`), and metadata objects in `EventMetadatas` (`payment-domain/src/main/kotlin/com/dogancaglar/paymentservice/domain/event/EventMetadatas.kt`) provide type-safe access to topic names and event types.
+
+#### Consumers & Consumer Groups
+
+| Consumer Class | Consumer Group | Topic | Concurrency | Container Factory | Flow | Transaction Executor |
+|----------------|----------------|-------|-------------|-------------------|------|---------------------|
+| `PaymentOrderEnqueuer` | `payment-order-enqueuer-consumer-group` | `payment_order_created_topic` | 8 | `payment_order_created_topic-factory` | PSP | `KafkaTxExecutor` |
+| `PaymentOrderPspCallExecutor` | `payment-order-psp-call-executor-consumer-group` | `payment_order_psp_call_requested_topic` | 8 | `payment_order_psp_call_requested_topic-factory` | PSP | `KafkaTxExecutor` |
+| `PaymentOrderPspResultApplier` | `payment-order-psp-result-updated-consumer-group` | `payment_order_psp_result_updated_topic` | 8 | `payment_order_psp_result_updated_topic-factory` | PSP | `KafkaTxExecutor` |
+| `ScheduledPaymentStatusCheckExecutor` | `payment-status-check-scheduler-consumer-group` | `payment_status_check_scheduler_topic` | 1 | `payment_status_check_scheduler_topic-factory` | Status Check | `KafkaTxExecutor` |
+| `LedgerRecordingRequestDispatcher` | `ledger-recording-request-dispatcher-consumer-group` | `payment_order_finalized_topic` | 4 | `payment_order_finalized_topic-factory` | Ledger | `KafkaTxExecutor` (`syncPaymentTx`) |
+| `LedgerRecordingConsumer` | `ledger-recording-consumer-group` | `ledger_record_request_queue_topic` | 4 | `ledger_record_request_queue_topic-factory` | Ledger | `KafkaTxExecutor` (`syncPaymentTx`) |
+| `AccountBalanceConsumer` | `account-balance-consumer-group` | `ledger_entries_recorded_topic` | TBD | TBD | Balance (Planned) | TBD |
+
+#### Event Flow Map
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         PSP Flow (48 partitions)                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│ payment_order_created_topic                                             │
+│   └─> PaymentOrderEnqueuer                                             │
+│        Consumer Group: payment-order-enqueuer-consumer-group           │
+│        Factory: payment_order_created_topic-factory                     │
+│        Concurrency: 8 | Ack Mode: MANUAL | Event Type: payment_order_created │
+│        └─> payment_order_psp_call_requested_topic                      │
+│             └─> PaymentOrderPspCallExecutor                            │
+│                  Consumer Group: payment-order-psp-call-executor-consumer-group │
+│                  Factory: payment_order_psp_call_requested_topic-factory │
+│                  Concurrency: 8 | Ack Mode: MANUAL                      │
+│                  └─> payment_order_psp_result_updated_topic            │
+│                       └─> PaymentOrderPspResultApplier                  │
+│                            Consumer Group: payment-order-psp-result-updated-consumer-group │
+│                            Factory: payment_order_psp_result_updated_topic-factory │
+│                            Concurrency: 8 | Ack Mode: MANUAL             │
+│                            └─> payment_order_finalized_topic             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    Status Check Flow (1 partition)                       │
+├─────────────────────────────────────────────────────────────────────────┤
+│ payment_status_check_scheduler_topic                                    │
+│   └─> ScheduledPaymentStatusCheckExecutor                               │
+│        Consumer Group: payment-status-check-scheduler-consumer-group    │
+│        Factory: payment_status_check_scheduler_topic-factory            │
+│        Concurrency: 1 | Ack Mode: MANUAL                                │
+│        Event Type: payment_order_status_check_requested                  │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       Ledger Flow (24 partitions)                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│ payment_order_finalized_topic (key: paymentOrderId)                    │
+│   └─> LedgerRecordingRequestDispatcher                                  │
+│        Consumer Group: ledger-recording-request-dispatcher-consumer-group │
+│        Factory: payment_order_finalized_topic-factory                    │
+│        Concurrency: 4 | Ack Mode: MANUAL                                │
+│        Event Types: payment_order_success, payment_order_failed          │
+│        [Partition Key Switch: paymentOrderId → sellerId]                │
+│        └─> ledger_record_request_queue_topic (key: sellerId)           │
+│             └─> LedgerRecordingConsumer                                 │
+│                  Consumer Group: ledger-recording-consumer-group         │
+│                  Factory: ledger_record_request_queue_topic-factory     │
+│                  Concurrency: 4 | Ack Mode: MANUAL                       │
+│                  Event Type: ledger_recording_requested                  │
+│                  └─> ledger_entries_recorded_topic (key: sellerId)     │
+│                       └─> AccountBalanceConsumer (Planned)              │
+│                            Consumer Group: account-balance-consumer-group │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Key Configuration Details
+
+**Container Factory Configuration:**
+- **Naming Pattern**: All factory beans follow `${Topics.*}-factory` pattern (e.g., `payment_order_created_topic-factory`)
+- **Factory Beans**: Created in `KafkaTypedConsumerFactoryConfig` using `createTypedFactory()` helper
+- **Client IDs**: Derived from `app.kafka.dynamic-consumers[].id` in `application-local.yml`
+- **Concurrency**: Loaded from `app.kafka.dynamic-consumers[].concurrency` (PSP: 8, Ledger: 4, Status Check: 1)
+- **Acknowledgment Mode**: All factories use `ContainerProperties.AckMode.MANUAL` for explicit offset management
+- **Event Type Filtering**: Single-event-type factories (e.g., `PaymentOrderCreated`) use `expectedEventType` parameter; multi-event-type factories (e.g., `payment_order_finalized_topic`) use custom `RecordFilterStrategy`
+- **Error Handling**: All factories share common `DefaultErrorHandler` with DLQ recoverer and exponential backoff (5 retries, 2s initial, 2x multiplier, 30s max)
+
+**Partition Key Strategy:**
+- **Payment Flow**: All topics use `paymentOrderId` as partition key to ensure sequential processing per payment order
+- **Ledger Flow**: Uses `sellerId` as partition key (switched at `LedgerRecordingRequestDispatcher`) for merchant-level ordering
+- **Status Check Flow**: Single partition (no key requirement)
+
+**Consumer Configuration:**
+- All consumers use `MANUAL` acknowledgment mode (configured in factory)
+- All consumers use Kafka transactions via `KafkaTxExecutor` (ledger consumers use `@Qualifier("syncPaymentTx")`)
+- Event type filtering at container level prevents processing wrong event types
+- Idempotent handlers with `ON CONFLICT` and duplicate detection
+- **Consumer Properties** (from `application-local.yml`):
+  - `isolation-level: read_committed` - Only read committed messages
+  - `enable-auto-commit: false` - Manual offset management
+  - `max-poll-records: 120` - Batch size per poll
+  - `max-poll-interval: 240000ms` - 4 minute timeout
+  - `partition.assignment.strategy: CooperativeStickyAssignor` - Cooperative rebalancing
+
+**Dead Letter Queues:**
+- All topics have corresponding `.DLQ` topics created automatically (via `TopicAdminConfig`)
+- DLQ naming: `{topic_name}.DLQ` (implemented in `Topics.dlqOf()`)
+- Same partition count as source topic
+- DLQ recoverer captures original serialization bytes and adds error diagnostics headers (`x-error-class`, `x-error-message`, `x-error-stacktrace`, `x-recovered-at`, `x-consumer-group`)
+- Monitored via Grafana dashboards with alert thresholds
+
+**MDC Propagation:**
+- All factories use `HeaderMdcInterceptor` to populate MDC from Kafka headers
+- Propagates: `traceId`, `eventId`, `parentEventId`, `aggregateId`, `eventType`
+- MDC context restored after record processing completes
 
 ---
 
@@ -1216,7 +1370,13 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 
 - Domain entities (`Payment`, `PaymentOrder`, value objects), domain services, and **ports**.
 - Core business logic with no external dependencies.
-- Value objects: `PaymentId`, `PaymentOrderId`, `Amount`, `BuyerId`, `SellerId`, `OrderId`
+- **Factory-Enforced Invariants**: Core domain classes use private constructors with validated factory methods:
+  - `Account.create(type: AccountType, entityId: String? = "GLOBAL")` - Enforces valid account creation
+  - `Amount.of(quantity: Long, currency: Currency)` - Validated monetary amounts
+  - `Posting.Debit.create(account: Account, amount: Amount)` - Balanced debit postings
+  - `Posting.Credit.create(account: Account, amount: Amount)` - Balanced credit postings
+  - `JournalEntry` uses factory methods (`authHold`, `capture`, `settlement`, etc.) that enforce double-entry balance
+- Value objects: `PaymentId`, `PaymentOrderId`, `Amount`, `Currency` (value class), `BuyerId`, `SellerId`, `OrderId`
 - Domain events: `PaymentOrderCreated`, `PaymentOrderSucceeded`, `PaymentOrderFailed`
 - Status enums: `PaymentStatus`, `PaymentOrderStatus`
 
@@ -1242,11 +1402,11 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 - Houses adapters: JPA repos, Kafka publishers/consumers, Redis ZSet retry cache, PSP client, **MyBatis ledger mappers**.
 - **Ledger Persistence**: MyBatis-based adapters for double-entry accounting
     - `LedgerMapper`: Interface for journal entries and postings CRUD operations
-    - `LedgerEntryTxAdapter` (in `payment-consumers`): Implements `LedgerEntryPort` with batch processing
+    - `LedgerEntryAdapter`: Implements `LedgerEntryPort` for individual ledger entry persistence
     - Database tables: `journal_entries` (transaction metadata) and `postings` (debit/credit entries)
     - Uses `ON CONFLICT` for idempotent inserts (duplicate journal entry detection)
-    - **Batch Processing**: `postLedgerEntriesAtomic()` processes all entries for a payment order atomically
-    - **Duplicate Handling**: When duplicate detected, batch processing stops immediately (no remaining entries processed)
+    - **Individual Processing**: `appendLedgerEntry()` processes one entry at a time with duplicate detection
+    - **Duplicate Handling**: When duplicate detected, entry skipped and no postings inserted
 
 ### 9.5 Deployables: `payment-service` & `payment-consumers`
 
@@ -1271,7 +1431,6 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
     - **Services**:
         - `RetryDispatcherScheduler` → Redis retry queue → Kafka dispatcher (every 5 seconds)
         - `PaymentOrderModificationTxAdapter` → PaymentOrder state updates
-        - `LedgerEntryTxAdapter` → Implements `LedgerEntryPort` for batch journal entry persistence
     - **Adapters**: `PaymentGatewayAdapter` - PSP client (mock simulator)
     - **Config**: `KafkaTypedConsumerFactoryConfig` - Dynamic consumer factory, `PaymentConsumerConfig` - Consumer beans
     
@@ -1538,12 +1697,11 @@ verify(exactly = 1) {
     - **Roadmap Reorganization**: Restructured into Short Term, Medium Term, and Long Term categories for better planning clarity
     - **Ledger Recording Updates**: Corrected to reference unified `payment_order_finalized_topic` instead of separate succeeded/failed topics
     - **Technical Accuracy**: All formulas, examples, and implementation details now match the codebase exactly
-- **2025-10-28**: **Ledger Batch Processing Implementation**
-    - **Refactored Ledger Entry Processing**: Changed from individual `appendLedgerEntry()` calls to batch `postLedgerEntriesAtomic()` method
-    - **Behavior Change**: When duplicate journal entry detected, batch processing stops immediately (remaining entries skipped)
-    - **New Component**: `LedgerEntryTxAdapter` in `payment-consumers` module implements `LedgerEntryPort` with batch processing
-    - **Testing**: Created comprehensive `LedgerEntryTxAdapterTest` with 11 tests covering batch operations, duplicate handling, and exception scenarios
-    - **Updated Tests**: Refactored `RecordLedgerEntriesServiceLedgerContentTest` to use batch method
+- **2025-10-30**: **Ledger Entry Processing Simplification**
+    - **Reverted to Individual Processing**: Changed from batch processing back to individual `appendLedgerEntry()` calls
+    - **Behavior**: When duplicate journal entry detected, entry skipped gracefully and processing continues with remaining entries
+    - **Component**: `LedgerEntryAdapter` in `payment-infrastructure` module implements `LedgerEntryPort` with individual entry processing
+    - **Testing**: Updated `RecordLedgerEntriesServiceLedgerContentTest` to verify individual entry processing (5 calls to `appendLedgerEntry()`)
     - **Removed**: Old `LedgerEntryAdapterTest` from `payment-infrastructure` module
 - **2025-10-28**: **Ledger Infrastructure & Testing Improvements**
     - **Database Tables**: Created `journal_entries` and `postings` tables for double-entry accounting via Liquibase

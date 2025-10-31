@@ -4,6 +4,7 @@ import com.dogancaglar.paymentservice.InfraTestBoot
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.PaymentOrderEntityMapper
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.PaymentOrderMapper
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
@@ -85,7 +86,7 @@ class PaymentOrderMapperIntegrationTest {
             .paymentId(paymentId)
             .publicPaymentId("PAY-200")
             .sellerId(sellerId)
-            .amount(Amount(value = 2020000L, currency = "USD"))
+            .amount(Amount.of(2020000L, Currency("USD")))
             .status(PaymentOrderStatus.INITIATED_PENDING)
             .createdAt(now.minusDays(1))
             .updatedAt(now.minusDays(1))
@@ -121,7 +122,7 @@ class PaymentOrderMapperIntegrationTest {
             .paymentId(paymentId)
             .publicPaymentId("PAY-300")
             .sellerId(sellerId)
-            .amount(Amount(value = 3030000L, currency = "USD"))
+            .amount(Amount.of(3030000L, Currency("USD")))
             .status(PaymentOrderStatus.INITIATED_PENDING)
             .createdAt(now.minusDays(1))
             .updatedAt(now.minusDays(1))
@@ -138,7 +139,7 @@ class PaymentOrderMapperIntegrationTest {
             .paymentId(paymentId)
             .publicPaymentId("PAY-300")
             .sellerId(sellerId)
-            .amount(Amount(value = 3030000L, currency = "USD"))
+            .amount(Amount.of(3030000L, Currency("USD")))
             .status(PaymentOrderStatus.SUCCESSFUL_FINAL)
             .createdAt(now.minusDays(1))
             .updatedAt(now)
@@ -164,7 +165,7 @@ class PaymentOrderMapperIntegrationTest {
                 .paymentId(PaymentId(200L + i))
                 .publicPaymentId("PAY-bulk-$i")
                 .sellerId(SellerId("seller-bulk"))
-                .amount(Amount(value = 10000L * i, currency = "USD"))
+                .amount(Amount.of(10000L * i, Currency("USD")))
                 .status(PaymentOrderStatus.INITIATED_PENDING)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -193,7 +194,7 @@ class PaymentOrderMapperIntegrationTest {
             .paymentId(PaymentId(600L))
             .publicPaymentId("PAY-duplicate")
             .sellerId(SellerId("seller-duplicate"))
-            .amount(Amount(value = 50000L, currency = "USD"))
+            .amount(Amount.of(50000L, Currency("USD")))
             .status(PaymentOrderStatus.INITIATED_PENDING)
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())
@@ -222,7 +223,7 @@ class PaymentOrderMapperIntegrationTest {
         val paymentOrderId = PaymentOrderId(700L)
         val paymentId = PaymentId(800L)
         val sellerId = SellerId("seller-find")
-        val amount = Amount(value = 75000L, currency = "EUR")
+        val amount = Amount.of(75000L, Currency("EUR"))
         val now = LocalDateTime.now()
 
         val paymentOrder = PaymentOrder.builder()
@@ -252,7 +253,7 @@ class PaymentOrderMapperIntegrationTest {
         assertEquals("PAY-find-800", entity.publicPaymentId)
         assertEquals(sellerId.value, entity.sellerId)
         assertEquals(amount.value, entity.amountValue)
-        assertEquals(amount.currency, entity.amountCurrency)
+        assertEquals(amount.currency.currencyCode, entity.amountCurrency)
         assertEquals(PaymentOrderStatus.INITIATED_PENDING, entity.status)
     }
 
@@ -270,7 +271,7 @@ class PaymentOrderMapperIntegrationTest {
             .paymentId(paymentId)
             .publicPaymentId("PAY-concurrent-1000")
             .sellerId(sellerId)
-            .amount(Amount(value = 90000L, currency = "USD"))
+            .amount(Amount.of(90000L, Currency("USD")))
             .status(PaymentOrderStatus.INITIATED_PENDING)
             .createdAt(now)
             .updatedAt(now)
@@ -287,7 +288,7 @@ class PaymentOrderMapperIntegrationTest {
             .paymentId(paymentId)
             .publicPaymentId("PAY-concurrent-1000")
             .sellerId(sellerId)
-            .amount(Amount(value = 90000L, currency = "USD"))
+            .amount(Amount.of(90000L, Currency("USD")))
             .status(PaymentOrderStatus.SUCCESSFUL_FINAL)
             .createdAt(now)
             .updatedAt(now.plusMinutes(1))
@@ -305,7 +306,7 @@ class PaymentOrderMapperIntegrationTest {
             .paymentId(paymentId)
             .publicPaymentId("PAY-concurrent-1000")
             .sellerId(sellerId)
-            .amount(Amount(value = 90000L, currency = "USD"))
+            .amount(Amount.of(90000L, Currency("USD")))
             .status(PaymentOrderStatus.FAILED_FINAL)
             .createdAt(now)
             .updatedAt(now.plusMinutes(2))
@@ -334,7 +335,7 @@ class PaymentOrderMapperIntegrationTest {
             .paymentId(paymentId)
             .publicPaymentId("PAY-transaction-1200")
             .sellerId(sellerId)
-            .amount(Amount(value = 110000L, currency = "USD"))
+            .amount(Amount.of(110000L, Currency("USD")))
             .status(PaymentOrderStatus.INITIATED_PENDING)
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())

@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.persistance
 import com.dogancaglar.paymentservice.InfraTestBoot
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.PaymentMapper
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
@@ -131,7 +132,7 @@ class PaymentOutboundAdapterSimpleIntegrationTest {
             .publicPaymentId("pay-$id")
             .buyerId(BuyerId("buyer-$id"))
             .orderId(OrderId("order-$id"))
-            .totalAmount(Amount(10000L, "USD"))
+            .totalAmount(Amount.of(10000L, Currency("USD")))
             .status(status)
             .createdAt(LocalDateTime.now())
             .paymentOrders(emptyList())

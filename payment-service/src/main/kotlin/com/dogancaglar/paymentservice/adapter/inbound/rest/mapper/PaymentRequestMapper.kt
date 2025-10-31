@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.adapter.inbound.rest.mapper
 
 import com.dogancaglar.paymentservice.domain.commands.CreatePaymentCommand
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
@@ -17,11 +18,11 @@ object PaymentRequestMapper {
         CreatePaymentCommand(
             orderId = OrderId(dto.orderId),
             buyerId = BuyerId(dto.buyerId),
-            totalAmount = Amount(dto.totalAmount.value, dto.totalAmount.currency.name), // or get currency from DTO
+            totalAmount = Amount.of(dto.totalAmount.value, Currency(dto.totalAmount.currency.name)),
             paymentLines = dto.paymentOrders.map {
                 PaymentLine(
                     SellerId(it.sellerId),
-                    Amount(it.amount.value, it.amount.currency.name)
+                    Amount.of(it.amount.value, Currency(it.amount.currency.name))
                 )
             }
         )
@@ -42,7 +43,7 @@ object PaymentRequestMapper {
     private fun toDto(order: PaymentOrder): PaymentOrderResponseDTO {
         return PaymentOrderResponseDTO(
             sellerId = order.sellerId.value,
-            amount = AmountDto(order.amount.value, CurrencyEnum.valueOf(order.amount.currency))
+            amount = AmountDto(order.amount.value, CurrencyEnum.valueOf(order.amount.currency.currencyCode))
         )
     }
 }

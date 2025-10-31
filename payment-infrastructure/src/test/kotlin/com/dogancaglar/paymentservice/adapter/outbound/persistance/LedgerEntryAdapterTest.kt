@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.persistance
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.LedgerMapper
 import com.dogancaglar.paymentservice.application.model.LedgerEntry
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.ledger.Account
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
@@ -35,7 +36,7 @@ class LedgerEntryAdapterTest {
     @Test
     fun `appendLedgerEntry should map and persist journal entry and all postings when successful`() {
         // Given - AUTH_HOLD creates 2 postings
-        val amount = Amount(10000L, "USD")
+        val amount = Amount.of(10000L, Currency("USD"))
         val journalEntry = JournalEntry.authHold("PAY-123", amount)
         val ledgerEntry = LedgerEntry.create(0L, journalEntry, LocalDateTime.now())
         
@@ -62,7 +63,7 @@ class LedgerEntryAdapterTest {
             ledgerMapper.insertPosting(
                 match { posting ->
                     posting.journalId == "AUTH:PAY-123" &&
-                    posting.accountCode == "PSP.AUTH_RECEIVABLE" &&
+                    posting.accountCode == "AUTH_RECEIVABLE.GLOBAL" &&
                     posting.accountType == "AUTH_RECEIVABLE" &&
                     posting.direction == "DEBIT" &&
                     posting.amount == 10000L &&
@@ -76,7 +77,7 @@ class LedgerEntryAdapterTest {
             ledgerMapper.insertPosting(
                 match { posting ->
                     posting.journalId == "AUTH:PAY-123" &&
-                    posting.accountCode == "PSP.AUTH_LIABILITY" &&
+                    posting.accountCode == "AUTH_LIABILITY.GLOBAL" &&
                     posting.accountType == "AUTH_LIABILITY" &&
                     posting.direction == "CREDIT" &&
                     posting.amount == 10000L &&
@@ -91,8 +92,8 @@ class LedgerEntryAdapterTest {
     @Test
     fun `appendLedgerEntry should skip postings when insertJournalEntry returns 0`() {
         // Given - CAPTURE creates 4 postings
-        val amount = Amount(5000L, "EUR")
-        val merchantAccount = Account("merchant-456", AccountType.MERCHANT_ACCOUNT)
+        val amount = Amount.of(5000L, Currency("EUR"))
+        val merchantAccount = Account.create(AccountType.MERCHANT_ACCOUNT, "merchant-456")
         val journalEntry = JournalEntry.capture("PAY-789", amount, merchantAccount)
         val ledgerEntry = LedgerEntry.create(0L, journalEntry, LocalDateTime.now())
         
@@ -127,7 +128,7 @@ class LedgerEntryAdapterTest {
     @Test
     fun `appendLedgerEntry should not insert postings when insertJournalEntry throws exception`() {
         // Given - AUTH_HOLD creates 2 postings
-        val amount = Amount(10000L, "USD")
+        val amount = Amount.of(10000L, Currency("USD"))
         val journalEntry = JournalEntry.authHold("PAY-999", amount)
         val ledgerEntry = LedgerEntry.create(0L, journalEntry, LocalDateTime.now())
         

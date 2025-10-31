@@ -6,6 +6,7 @@ import com.dogancaglar.paymentservice.domain.commands.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.LedgerEntriesRecorded
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.ledger.Account
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
@@ -29,9 +30,9 @@ open class RecordLedgerEntriesService(
         val traceId = LogContext.getTraceId() ?: UUID.randomUUID().toString()
         val parentEventId = LogContext.getEventId()
 
-        val amount = Amount(event.amountValue, event.currency)
-        val merchantAccount = Account(event.sellerId, AccountType.MERCHANT_ACCOUNT)
-        val acquirerAccount = Account(event.sellerId, AccountType.ACQUIRER_ACCOUNT)
+        val amount = Amount.of(event.amountValue, Currency(event.currency))
+        val merchantAccount = Account.create(AccountType.MERCHANT_ACCOUNT, event.sellerId)
+        val acquirerAccount = Account.create(AccountType.ACQUIRER_ACCOUNT, event.sellerId)
 
         val journalEntries = when (event.status.uppercase()) {
             "SUCCESSFUL_FINAL" -> JournalEntry.fullFlow(

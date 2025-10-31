@@ -5,6 +5,7 @@ import com.dogancaglar.paymentservice.domain.event.PaymentOrderEvent
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
@@ -39,7 +40,7 @@ class PaymentOrderDomainEventMapperTest {
         assertEquals(testPaymentOrder.updatedAt, event.updatedAt)
         assertEquals(testPaymentOrder.status.name, event.status)
         assertEquals(testPaymentOrder.amount.value, event.amountValue)
-        assertEquals(testPaymentOrder.amount.currency, event.currency)
+        assertEquals(testPaymentOrder.amount.currency.currencyCode, event.currency)
     }
 
     @Test
@@ -62,7 +63,7 @@ class PaymentOrderDomainEventMapperTest {
         assertEquals(testPaymentOrder.retryCount, event.retryCount)
         assertEquals(testPaymentOrder.status.name, event.status)
         assertEquals(testPaymentOrder.amount.value, event.amountValue)
-        assertEquals(testPaymentOrder.amount.currency, event.currency)
+        assertEquals(testPaymentOrder.amount.currency.currencyCode, event.currency)
         assertNotNull(event.createdAt)
     }
 
@@ -84,7 +85,7 @@ class PaymentOrderDomainEventMapperTest {
         assertEquals(PaymentId(testEvent.paymentId.toLong()), paymentOrder.paymentId)
         assertEquals(testEvent.publicPaymentId, paymentOrder.publicPaymentId)
         assertEquals(SellerId(testEvent.sellerId), paymentOrder.sellerId)
-        assertEquals(Amount(testEvent.amountValue, testEvent.currency), paymentOrder.amount)
+        assertEquals(Amount.of(testEvent.amountValue, Currency(testEvent.currency)), paymentOrder.amount)
         assertEquals(PaymentOrderStatus.valueOf(testEvent.status), paymentOrder.status)
         assertEquals(testEvent.createdAt, paymentOrder.createdAt)
         assertEquals(testEvent.updatedAt, paymentOrder.updatedAt)
@@ -121,7 +122,7 @@ class PaymentOrderDomainEventMapperTest {
         assertEquals(testPaymentOrder.publicPaymentId, event.publicPaymentId)
         assertEquals(testPaymentOrder.sellerId.value, event.sellerId)
         assertEquals(testPaymentOrder.amount.value, event.amountValue)
-        assertEquals(testPaymentOrder.amount.currency, event.currency)
+        assertEquals(testPaymentOrder.amount.currency.currencyCode, event.currency)
         assertEquals(testPaymentOrder.status.name, event.status)
         // Note: createdAt and updatedAt are set to current time in the event constructor, not from mapper
         assertNotNull(event.createdAt)
@@ -138,7 +139,7 @@ class PaymentOrderDomainEventMapperTest {
         assertEquals(testPaymentOrder.publicPaymentId, event.publicPaymentId)
         assertEquals(testPaymentOrder.sellerId.value, event.sellerId)
         assertEquals(testPaymentOrder.amount.value, event.amountValue)
-        assertEquals(testPaymentOrder.amount.currency, event.currency)
+        assertEquals(testPaymentOrder.amount.currency.currencyCode, event.currency)
         assertEquals(testPaymentOrder.status.name, event.status)
         // Note: createdAt and updatedAt are set to current time in the event constructor, not from mapper
         assertNotNull(event.createdAt)
@@ -174,7 +175,7 @@ class PaymentOrderDomainEventMapperTest {
         assertEquals(testPaymentOrder.retryReason, event.retryReason)
         assertEquals(testPaymentOrder.status.name, event.status)
         assertEquals(testPaymentOrder.amount.value, event.amountValue)
-        assertEquals(testPaymentOrder.amount.currency, event.currency)
+        assertEquals(testPaymentOrder.amount.currency.currencyCode, event.currency)
         assertNotNull(event.createdAt)
         assertNotNull(event.updatedAt)
     }
@@ -356,7 +357,7 @@ class PaymentOrderDomainEventMapperTest {
             .paymentId(paymentId)
             .publicPaymentId(publicPaymentId)
             .sellerId(sellerId)
-            .amount(Amount(amount, currency))
+            .amount(Amount.of(amount, Currency(currency)))
             .status(status)
             .createdAt(createdAt)
             .updatedAt(updatedAt)

@@ -2,6 +2,7 @@ package com.dogancaglar.paymentservice.domain.util
 
 import com.dogancaglar.paymentservice.domain.commands.CreatePaymentCommand
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.vo.*
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
@@ -17,10 +18,10 @@ class PaymentFactoryTest {
         val paymentOrderIds = listOf(PaymentOrderId(1L), PaymentOrderId(2L))
         val orderId = OrderId("order-1")
         val buyerId = BuyerId("buyer-1")
-        val totalAmount = Amount(200000L, "USD") // $2000.00 = 200000 cents
+        val totalAmount = Amount.of(200000L, Currency("USD")) // $2000.00 = 200000 cents
         val paymentLines = listOf(
-            PaymentLine(sellerId = SellerId("seller-1"), amount = Amount(100000L, "USD")), // $1000.00
-            PaymentLine(sellerId = SellerId("seller-2"), amount = Amount(100000L, "USD"))  // $1000.00
+            PaymentLine(sellerId = SellerId("seller-1"), amount = Amount.of(100000L, Currency("USD"))), // $1000.00
+            PaymentLine(sellerId = SellerId("seller-2"), amount = Amount.of(100000L, Currency("USD")))  // $1000.00
         )
 
         val cmd = CreatePaymentCommand(

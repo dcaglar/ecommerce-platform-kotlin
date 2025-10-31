@@ -32,14 +32,17 @@ enum class AccountType(val normalBalance: NormalBalance, val category: AccountCa
     BANK_FEES(NormalBalance.DEBIT, AccountCategory.EXPENSE)
 }
 
-data class Account(val accountId:String="",val accountType: AccountType) {
-    fun isDebitAccount()=accountType.normalBalance== NormalBalance.DEBIT
-    fun isCreditAccount()=accountType.normalBalance== NormalBalance.CREDIT
-    fun getAccountCode(): String{
-        if (accountId.isNullOrBlank()){
-                return "PSP.${accountType.name}"
-        } else{
-         return "${accountType.name}-$accountId"
+data class Account private  constructor(val type: AccountType, val entityId: String){
+    val accountCode = buildcode()
+    fun buildcode(): String = "${type.name}.$entityId"
+    companion object{
+
+        fun create(type: AccountType, entityId: String?="GLOBAL")= Account(type,entityId!!)
+
     }
-    }
+
+    fun isDebitAccount() = type.normalBalance == NormalBalance.DEBIT
+
+    fun isCreditAccount() = type.normalBalance == NormalBalance.CREDIT
+
 }

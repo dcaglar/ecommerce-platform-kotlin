@@ -4,6 +4,7 @@ import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.Outbox
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentOrderEntity
 import com.dogancaglar.paymentservice.domain.event.OutboxEvent
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
@@ -45,7 +46,7 @@ class EntityMapperTest {
         assertEquals(paymentOrder.publicPaymentId, entity.publicPaymentId)
         assertEquals(paymentOrder.sellerId.value, entity.sellerId)
         assertEquals(paymentOrder.amount.value, entity.amountValue)
-        assertEquals(paymentOrder.amount.currency, entity.amountCurrency)
+        assertEquals(paymentOrder.amount.currency.currencyCode, entity.amountCurrency)
         assertEquals(paymentOrder.status, entity.status)
         assertEquals(paymentOrder.createdAt, entity.createdAt)
         assertEquals(paymentOrder.updatedAt, entity.updatedAt)
@@ -69,7 +70,7 @@ class EntityMapperTest {
         assertEquals(entity.publicPaymentId, domain.publicPaymentId)
         assertEquals(entity.sellerId, domain.sellerId.value)
         assertEquals(entity.amountValue, domain.amount.value)
-        assertEquals(entity.amountCurrency, domain.amount.currency)
+        assertEquals(entity.amountCurrency, domain.amount.currency.currencyCode)
         assertEquals(entity.status, domain.status)
         assertEquals(entity.createdAt, domain.createdAt)
         assertEquals(entity.updatedAt, domain.updatedAt)
@@ -138,7 +139,7 @@ class EntityMapperTest {
         assertEquals(payment.buyerId.value, entity.buyerId)
         assertEquals(payment.orderId.value, entity.orderId)
         assertEquals(payment.totalAmount.value, entity.amountValue)
-        assertEquals(payment.totalAmount.currency, entity.amountCurrency)
+        assertEquals(payment.totalAmount.currency.currencyCode, entity.amountCurrency)
         assertEquals(payment.status, entity.status)
         assertEquals(payment.createdAt, entity.createdAt)
     }
@@ -167,9 +168,16 @@ class EntityMapperTest {
 
         // When/Then
         currencies.forEach { currency ->
-            val payment = createTestPayment().copy(
-                totalAmount = Amount(10000L, currency)
-            )
+            val payment = Payment.Builder()
+                .paymentId(PaymentId(123L))
+                .publicPaymentId("pay-123")
+                .buyerId(BuyerId("buyer-123"))
+                .orderId(OrderId("order-123"))
+                .totalAmount(Amount.of(10000L, Currency(currency)))
+                .status(PaymentStatus.INITIATED)
+                .createdAt(LocalDateTime.now())
+                .paymentOrders(emptyList())
+                .build()
             val entity = PaymentEntityMapper.toEntity(payment)
             assertEquals(currency, entity.amountCurrency)
             assertEquals(10000L, entity.amountValue)
@@ -184,7 +192,7 @@ class EntityMapperTest {
             .publicPaymentId("pay-123-test_@#$%")
             .buyerId(BuyerId("buyer-456-special!@#"))
             .orderId(OrderId("order-789-unicode-测试"))
-            .totalAmount(Amount(10000L, "USD"))
+            .totalAmount(Amount.of(10000L, Currency("USD")))
             .status(PaymentStatus.INITIATED)
             .createdAt(LocalDateTime.now())
             .paymentOrders(emptyList())
@@ -310,7 +318,7 @@ class EntityMapperTest {
             retryCount = 0
         )
         val zeroPayment = createTestPayment().copy(
-            totalAmount = Amount(0L, "USD")
+            totalAmount = Amount.of(0L, Currency("USD"))
         )
         val zeroOutboxEvent = createTestOutboxEvent().copy(oeid = 0L)
 
@@ -334,7 +342,7 @@ class EntityMapperTest {
         )
         val maxPayment = createTestPayment().copy(
             paymentId = PaymentId(Long.MAX_VALUE),
-            totalAmount = Amount(Long.MAX_VALUE, "USD")
+            totalAmount = Amount.of(Long.MAX_VALUE, Currency("USD"))
         )
         val maxOutboxEvent = createTestOutboxEvent().copy(oeid = Long.MAX_VALUE)
 
@@ -364,7 +372,7 @@ class EntityMapperTest {
             .paymentId(PaymentId(999L))
             .publicPaymentId("pay-999")
             .sellerId(SellerId("111"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .status(status)
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())
@@ -381,7 +389,7 @@ class EntityMapperTest {
             .paymentId(PaymentId(888L))
             .publicPaymentId("pay-888")
             .sellerId(SellerId("seller-456"))
-            .amount(Amount(25000L, "EUR"))
+            .amount(Amount.of(25000L, Currency("EUR")))
             .status(PaymentOrderStatus.FAILED_TRANSIENT_ERROR)
             .createdAt(LocalDateTime.of(2023, 6, 15, 10, 30))
             .updatedAt(LocalDateTime.of(2023, 6, 15, 10, 35))
@@ -416,7 +424,7 @@ class EntityMapperTest {
             .publicPaymentId("pay-$id")
             .buyerId(BuyerId("buyer-$id"))
             .orderId(OrderId("order-$id"))
-            .totalAmount(Amount(10000L, "USD"))
+            .totalAmount(Amount.of(10000L, Currency("USD")))
             .status(status)
             .createdAt(LocalDateTime.now())
             .paymentOrders(emptyList())

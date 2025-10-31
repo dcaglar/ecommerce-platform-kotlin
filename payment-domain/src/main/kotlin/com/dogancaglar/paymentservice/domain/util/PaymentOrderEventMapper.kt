@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.domain.util
 import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
 import com.dogancaglar.paymentservice.domain.event.*
 import com.dogancaglar.paymentservice.domain.model.*
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.vo.*
 import java.time.Clock
 import java.time.LocalDateTime
@@ -27,7 +28,7 @@ class PaymentOrderDomainEventMapper(
             createdAt = LocalDateTime.now(clock),
             status = order.status.name,
             amountValue = order.amount.value,
-            currency = order.amount.currency
+            currency = order.amount.currency.currencyCode
         )
 
     /** 🔹 Domain → Event: PSP call requested */
@@ -45,7 +46,7 @@ class PaymentOrderDomainEventMapper(
             updatedAt = order.updatedAt,
             status = order.status.name,
             amountValue = order.amount.value,
-            currency = order.amount.currency
+            currency = order.amount.currency.currencyCode
         )
 
     /** 🔹 Domain → Event: successful final state */
@@ -57,7 +58,7 @@ class PaymentOrderDomainEventMapper(
             publicPaymentId = order.publicPaymentId,
             sellerId = order.sellerId.value,
             amountValue = order.amount.value,
-            currency = order.amount.currency,
+            currency = order.amount.currency.currencyCode,
             status = order.status.name,
             )
 
@@ -69,7 +70,7 @@ class PaymentOrderDomainEventMapper(
             publicPaymentId = order.publicPaymentId,
             sellerId = order.sellerId.value,
             amountValue = order.amount.value,
-            currency = order.amount.currency,
+            currency = order.amount.currency.currencyCode,
             status = order.status.name,
             )
 
@@ -87,7 +88,7 @@ class PaymentOrderDomainEventMapper(
             updatedAt = LocalDateTime.now(clock),
             status = order.status.name,
             amountValue = order.amount.value,
-            currency = order.amount.currency
+            currency = order.amount.currency.currencyCode
         )
 
     /** 🔹 Event → Domain aggregate (consumer-side reconstruction) */
@@ -98,7 +99,7 @@ class PaymentOrderDomainEventMapper(
             .paymentId(PaymentId(event.paymentId.toLong()))
             .publicPaymentId(event.publicPaymentId)
             .sellerId(SellerId(event.sellerId))
-            .amount(Amount(event.amountValue, event.currency))
+            .amount(Amount.of(event.amountValue, Currency(event.currency)))
             .status(PaymentOrderStatus.valueOf(event.status))
             .createdAt(event.createdAt)
             .updatedAt(event.updatedAt)
