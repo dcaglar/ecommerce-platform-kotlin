@@ -9,6 +9,7 @@ import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.ledger.Account
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
+import com.dogancaglar.paymentservice.domain.model.ledger.AuthType
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
 import com.dogancaglar.paymentservice.ports.inbound.RecordLedgerEntriesUseCase
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
@@ -34,13 +35,20 @@ open class RecordLedgerEntriesService(
         val merchantAccount = Account.create(AccountType.MERCHANT_ACCOUNT, event.sellerId)
         val acquirerAccount = Account.create(AccountType.ACQUIRER_ACCOUNT, event.sellerId)
 
-        val journalEntries = when (event.status.uppercase()) {
-            "SUCCESSFUL_FINAL" -> JournalEntry.fullFlow(
-                paymentOrderId = event.publicPaymentOrderId,
-                amount = amount,
-                merchantAccount = merchantAccount,
-                acquirerAccount = acquirerAccount
-            )
+        val journalEntries: List<JournalEntry> = when (event.status.uppercase()) {
+            "SUCCESSFUL_FINAL" ->
+                if(merchantAccount.authType == AuthType.SALE) {
+                    JournalEntry.authHoldAndCapture(
+                        paymentOrderId = event.publicPaymentOrderId,
+                        capturedAmount = amount,
+                        merchantAccount = merchantAccount
+                    )
+                } else {
+                    JournalEntry.authHold(
+                        paymentOrderId = event.publicPaymentOrderId,
+                        authorizedAmount = amount
+                    )
+                }
             "FAILED_FINAL", "FAILED" -> JournalEntry.failedPayment(
                 paymentOrderId = event.publicPaymentOrderId,
                 amount = amount
@@ -53,10 +61,7 @@ open class RecordLedgerEntriesService(
         // 1️⃣ Transform journals to LedgerEntry
         val ledgerEntries = journalEntries.map { ledgerEntryFactory.create(it) }
 
-        // 2️⃣ Persist each entry via outbound port
-        ledgerEntries.forEach { entry ->
-            ledgerWritePort.appendLedgerEntry(entry)
-        }
+        ledgerWritePort.postLedgerEntriesAtomic(ledgerEntries)
 
         // 3️⃣ Build and publish domain event
         val recordedEvent = LedgerEntriesRecorded(

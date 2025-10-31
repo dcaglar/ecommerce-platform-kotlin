@@ -368,7 +368,7 @@ class ProcessPaymentServiceTest {
         assertEquals(event.publicPaymentOrderId, result.publicPaymentOrderId)
         assertEquals(event.publicPaymentId, result.publicPaymentId)
         assertEquals(event.sellerId, result.sellerId.value)
-        assertEquals(event.amountValue, result.amount.value)
+        assertEquals(event.amountValue, result.amount.quantity)
         assertEquals(event.currency, result.amount.currency.currencyCode)
         // Factory preserves values from event
         assertEquals(2, result.retryCount) // Factory preserves retry count from event

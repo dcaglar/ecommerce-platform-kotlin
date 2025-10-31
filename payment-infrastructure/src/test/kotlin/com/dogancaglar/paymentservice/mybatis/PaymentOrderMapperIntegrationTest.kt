@@ -252,7 +252,7 @@ class PaymentOrderMapperIntegrationTest {
         assertEquals(paymentId.value, entity.paymentId)
         assertEquals("PAY-find-800", entity.publicPaymentId)
         assertEquals(sellerId.value, entity.sellerId)
-        assertEquals(amount.value, entity.amountValue)
+        assertEquals(amount.quantity, entity.amountValue)
         assertEquals(amount.currency.currencyCode, entity.amountCurrency)
         assertEquals(PaymentOrderStatus.INITIATED_PENDING, entity.status)
     }

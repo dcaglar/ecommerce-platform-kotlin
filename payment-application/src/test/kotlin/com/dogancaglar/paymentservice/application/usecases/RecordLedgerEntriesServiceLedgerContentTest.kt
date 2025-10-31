@@ -6,6 +6,7 @@ import com.dogancaglar.paymentservice.domain.commands.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.LedgerEntriesRecorded
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.ledger.*
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
@@ -62,26 +63,48 @@ class RecordLedgerEntriesServiceLedgerContentTest {
         every { LogContext.getTraceId() } returns expectedTraceId
 
         // Setup mocks to accept calls
-        every { ledgerWritePort.appendLedgerEntry(any()) } returns Unit
+        every { ledgerWritePort.postLedgerEntriesAtomic(any()) } returns Unit
         every { eventPublisherPort.publishSync<LedgerEntriesRecorded>(any(), any(), any(), any(), any()) } returns mockk()
 
         // when - service processes the command
         service.recordLedgerEntries(command)
 
-        // then - verify SUCCESSFUL_FINAL creates 5 journal entries with exact structure
-        // Expected: 1. AUTH_HOLD, 2. CAPTURE, 3. SETTLEMENT, 4. FEE, 5. PAYOUT
+        // then - verify SUCCESSFUL_FINAL creates 2 journal entries with exact structure
+        // Expected: 1. AUTH_HOLD, 2. CAPTURE (authHoldAndCapture returns both)
         
-        // Verify append was called 5 times and validate content via capture
-        val captured = mutableListOf<LedgerEntry>()
-        verify(exactly = 5) { ledgerWritePort.appendLedgerEntry(capture(captured)) }
-        assertEquals(5, captured.size)
-        // spot-check a few key expectations
-        assertEquals("AUTH:paymentorder-123", captured[0].journalEntry.id)
-        assertEquals(JournalType.AUTH_HOLD, captured[0].journalEntry.txType)
-        assertEquals("CAPTURE:paymentorder-123", captured[1].journalEntry.id)
-        assertEquals(JournalType.CAPTURE, captured[1].journalEntry.txType)
-        assertEquals("PAYOUT:paymentorder-123", captured[4].journalEntry.id)
-        assertEquals(JournalType.PAYOUT, captured[4].journalEntry.txType)
+        // Verify batch was called with 2 entries
+        verify(exactly = 1) {
+            ledgerWritePort.postLedgerEntriesAtomic(
+                match { entries ->
+                    entries.size == 2 &&
+                    // 1. AUTH_HOLD entry
+                    entries[0].ledgerEntryId == 0L &&
+                    entries[0].createdAt != null &&
+                    entries[0].journalEntry.id == "AUTH:paymentorder-123" &&
+                    entries[0].journalEntry.txType == JournalType.AUTH_HOLD &&
+                    entries[0].journalEntry.name == "Authorization Hold" &&
+                    entries[0].journalEntry.postings.size == 2 &&
+                    (entries[0].journalEntry.postings[0] as Posting.Debit).account.type == AccountType.AUTH_RECEIVABLE &&
+                    (entries[0].journalEntry.postings[0] as Posting.Debit).amount.quantity == 10000L &&
+                    (entries[0].journalEntry.postings[0] as Posting.Debit).amount.currency.currencyCode == "EUR" &&
+                    (entries[0].journalEntry.postings[1] as Posting.Credit).account.type == AccountType.AUTH_LIABILITY &&
+                    (entries[0].journalEntry.postings[1] as Posting.Credit).amount.quantity == 10000L &&
+                    (entries[0].journalEntry.postings[1] as Posting.Credit).amount.currency.currencyCode == "EUR" &&
+                    
+                    // 2. CAPTURE entry
+                    entries[1].journalEntry.id == "CAPTURE:paymentorder-123" &&
+                    entries[1].journalEntry.txType == JournalType.CAPTURE &&
+                    entries[1].journalEntry.name == "Payment Capture" &&
+                    entries[1].journalEntry.postings.size == 4 &&
+                    (entries[1].journalEntry.postings[2] as Posting.Credit).account.type == AccountType.MERCHANT_ACCOUNT &&
+                    (entries[1].journalEntry.postings[2] as Posting.Credit).account.entityId == "seller-789" &&
+                    (entries[1].journalEntry.postings[2] as Posting.Credit).amount.quantity == 10000L &&
+                    
+                    // All entries have EUR currency
+                    entries.all { entry -> entry.journalEntry.postings.all { it.amount.currency.currencyCode == "EUR" } }
+                }
+            )
+        }
 
         // then - verify publishSync called with exact parameters
         verify(exactly = 1) {
@@ -91,7 +114,7 @@ class RecordLedgerEntriesServiceLedgerContentTest {
                 data = match { event ->
                     event is LedgerEntriesRecorded &&
                     event.ledgerBatchId.startsWith("ledger-batch-") &&
-                    event.entryCount == 5 && // fullFlow creates 5 entries
+                    event.entryCount == 2 && // authHoldAndCapture creates 2 entries
                     event.publicPaymentOrderId == command.publicPaymentOrderId &&
                     event.paymentOrderId == command.paymentOrderId &&
                     event.sellerId == command.sellerId &&
@@ -152,15 +175,15 @@ class RecordLedgerEntriesServiceLedgerContentTest {
         // Given
         val command = sampleCommand("SUCCESSFUL_FINAL")
         
-        every { ledgerWritePort.appendLedgerEntry(any()) } throws RuntimeException("Database write failed")
+        every { ledgerWritePort.postLedgerEntriesAtomic(any()) } throws RuntimeException("Database write failed")
 
         // When/Then - Should propagate exception before publishing
         assertThrows<RuntimeException> {
             service.recordLedgerEntries(command)
         }
 
-        // Verify that append was attempted
-        verify(atLeast = 1) { ledgerWritePort.appendLedgerEntry(any()) }
+        // Verify that postLedgerEntriesAtomic was attempted
+        verify(exactly = 1) { ledgerWritePort.postLedgerEntriesAtomic(any()) }
         
         // Verify that publishSync was NOT called (exception before publishing)
         verify(exactly = 0) {
@@ -178,10 +201,10 @@ class RecordLedgerEntriesServiceLedgerContentTest {
     fun `should handle exception in publishSync and not crash`() {
         // Given
         val command = sampleCommand("SUCCESSFUL_FINAL")
-        val capturedEntries = mutableListOf<LedgerEntry>()
+        val capturedEntries = slot<List<LedgerEntry>>()
         val capturedEvent = slot<LedgerEntriesRecorded>()
         
-        every { ledgerWritePort.appendLedgerEntry(capture(capturedEntries)) } returns Unit
+        every { ledgerWritePort.postLedgerEntriesAtomic(capture(capturedEntries)) } returns Unit
         every {
             eventPublisherPort.publishSync(
                 eventMetaData = any(),
@@ -197,8 +220,9 @@ class RecordLedgerEntriesServiceLedgerContentTest {
             service.recordLedgerEntries(command)
         }
 
-        // Verify that some entries were persisted before exception
-        assertTrue(capturedEntries.isNotEmpty())
+        // Verify that entries were persisted before exception
+        assertTrue(capturedEntries.captured.isNotEmpty())
+        assertEquals(2, capturedEntries.captured.size)
         
         // Verify that event data was being sent before exception
         assertNotNull(capturedEvent.captured)
@@ -211,7 +235,7 @@ class RecordLedgerEntriesServiceLedgerContentTest {
         // Given - Verify all entries are persisted correctly
         val command = sampleCommand("SUCCESSFUL_FINAL")
         
-        every { ledgerWritePort.appendLedgerEntry(any()) } returns Unit
+        every { ledgerWritePort.postLedgerEntriesAtomic(any()) } returns Unit
         every {
             eventPublisherPort.publishSync(
                 eventMetaData = EventMetadatas.LedgerEntriesRecordedMetadata,
@@ -225,8 +249,12 @@ class RecordLedgerEntriesServiceLedgerContentTest {
         // When
         service.recordLedgerEntries(command)
 
-        // Then - Verify append was called 5 times
-        verify(exactly = 5) { ledgerWritePort.appendLedgerEntry(any()) }
+        // Then - Verify batch was called with 2 entries
+        verify(exactly = 1) {
+            ledgerWritePort.postLedgerEntriesAtomic(
+                match { entries -> entries.size == 2 }
+            )
+        }
 
         // Then - Verify it was called
         verify(exactly = 1) {

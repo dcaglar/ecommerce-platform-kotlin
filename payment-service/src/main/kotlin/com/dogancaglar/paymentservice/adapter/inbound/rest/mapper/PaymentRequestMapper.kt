@@ -18,11 +18,11 @@ object PaymentRequestMapper {
         CreatePaymentCommand(
             orderId = OrderId(dto.orderId),
             buyerId = BuyerId(dto.buyerId),
-            totalAmount = Amount.of(dto.totalAmount.value, Currency(dto.totalAmount.currency.name)),
+            totalAmount = Amount.of(dto.totalAmount.quantity, Currency(dto.totalAmount.currency.name)),
             paymentLines = dto.paymentOrders.map {
                 PaymentLine(
                     SellerId(it.sellerId),
-                    Amount.of(it.amount.value, Currency(it.amount.currency.name))
+                    Amount.of(it.amount.quantity, Currency(it.amount.currency.name))
                 )
             }
         )
@@ -43,7 +43,7 @@ object PaymentRequestMapper {
     private fun toDto(order: PaymentOrder): PaymentOrderResponseDTO {
         return PaymentOrderResponseDTO(
             sellerId = order.sellerId.value,
-            amount = AmountDto(order.amount.value, CurrencyEnum.valueOf(order.amount.currency.currencyCode))
+            amount = AmountDto(order.amount.quantity, CurrencyEnum.valueOf(order.amount.currency.currencyCode))
         )
     }
 }

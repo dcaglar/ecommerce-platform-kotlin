@@ -11,6 +11,11 @@ enum class AccountCategory{
     EQUITY,
     REVENUE
 }
+
+enum class AuthType{
+    AUTH,
+    SALE
+}
 enum class AccountType(val normalBalance: NormalBalance, val category: AccountCategory) {
     // Assets
     CASH(NormalBalance.DEBIT, AccountCategory.ASSET),
@@ -32,12 +37,12 @@ enum class AccountType(val normalBalance: NormalBalance, val category: AccountCa
     BANK_FEES(NormalBalance.DEBIT, AccountCategory.EXPENSE)
 }
 
-data class Account private  constructor(val type: AccountType, val entityId: String){
+data class Account private  constructor(val type: AccountType, val entityId: String,val authType: AuthType?= AuthType.SALE){
     val accountCode = buildcode()
     fun buildcode(): String = "${type.name}.$entityId"
     companion object{
 
-        fun create(type: AccountType, entityId: String?="GLOBAL")= Account(type,entityId!!)
+        fun create(type: AccountType, entityId: String?="GLOBAL")= Account(type=type,entityId=entityId!!)
 
     }
 

@@ -61,7 +61,7 @@ class PaymentConsumerConfig {
 
     @Bean
     fun recordLedgerEntriesService(
-        @Qualifier("ledgerEntryAdapter") ledgerEntryTxAdapter: LedgerEntryPort,
+        @Qualifier("ledgerEntryTxAdapter") ledgerEntryTxAdapter: LedgerEntryPort,
         @Qualifier(
             "syncPaymentEventPublisher") syncPaymentEventPublisher: PaymentEventPublisher,
                                                 clock: Clock): RecordLedgerEntriesService{

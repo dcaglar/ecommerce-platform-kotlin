@@ -9,14 +9,14 @@ object AmountMapper {
 
     fun toDomain(dto: AmountDto): Amount {
         return Amount.of(
-            quantity = dto.value,
+            quantity = dto.quantity,
             currency = Currency(dto.currency.name)
         )
     }
 
     fun toDto(amount: Amount): AmountDto {
         return AmountDto(
-            value = amount.value,
+            quantity = amount.quantity,
             currency = CurrencyEnum.valueOf(amount.currency.currencyCode)
         )
     }

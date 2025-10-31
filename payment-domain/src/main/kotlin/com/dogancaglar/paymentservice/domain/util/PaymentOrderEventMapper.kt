@@ -27,7 +27,7 @@ class PaymentOrderDomainEventMapper(
             retryCount = order.retryCount,
             createdAt = LocalDateTime.now(clock),
             status = order.status.name,
-            amountValue = order.amount.value,
+            amountValue = order.amount.quantity,
             currency = order.amount.currency.currencyCode
         )
 
@@ -45,7 +45,7 @@ class PaymentOrderDomainEventMapper(
             createdAt = order.createdAt,
             updatedAt = order.updatedAt,
             status = order.status.name,
-            amountValue = order.amount.value,
+            amountValue = order.amount.quantity,
             currency = order.amount.currency.currencyCode
         )
 
@@ -57,7 +57,7 @@ class PaymentOrderDomainEventMapper(
             paymentId = order.paymentId.value.toString(),
             publicPaymentId = order.publicPaymentId,
             sellerId = order.sellerId.value,
-            amountValue = order.amount.value,
+            amountValue = order.amount.quantity,
             currency = order.amount.currency.currencyCode,
             status = order.status.name,
             )
@@ -69,7 +69,7 @@ class PaymentOrderDomainEventMapper(
             paymentId = order.paymentId.value.toString(),
             publicPaymentId = order.publicPaymentId,
             sellerId = order.sellerId.value,
-            amountValue = order.amount.value,
+            amountValue = order.amount.quantity,
             currency = order.amount.currency.currencyCode,
             status = order.status.name,
             )
@@ -87,7 +87,7 @@ class PaymentOrderDomainEventMapper(
             createdAt = LocalDateTime.now(clock),
             updatedAt = LocalDateTime.now(clock),
             status = order.status.name,
-            amountValue = order.amount.value,
+            amountValue = order.amount.quantity,
             currency = order.amount.currency.currencyCode
         )
 

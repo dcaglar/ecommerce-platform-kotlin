@@ -9,23 +9,23 @@ class AmountTest {
     fun `should create Amount with value and currency`() {
         val amount = Amount.of(100000L, Currency("USD")) // $1000.00 = 100000 cents
 
-        assertEquals(100000L, amount.value)
+        assertEquals(100000L, amount.quantity)
         assertEquals("USD", amount.currency.currencyCode)
     }
 
     @Test
-    fun `should create Amount with zero value`() {
-        val amount = Amount.of(0L, Currency("USD"))
-
-        assertEquals(0L, amount.value)
-        assertEquals("USD", amount.currency.currencyCode)
+    fun `should reject Amount with zero value`() {
+        val exception = assertThrows(IllegalArgumentException::class.java) {
+            Amount.of(0L, Currency("USD"))
+        }
+        assertTrue(exception.message?.contains("must be greater than zero") == true)
     }
 
     @Test
     fun `should create Amount with decimal equivalent value`() {
         val amount = Amount.of(9999L, Currency("EUR")) // €99.99 = 9999 cents
 
-        assertEquals(9999L, amount.value)
+        assertEquals(9999L, amount.quantity)
         assertEquals("EUR", amount.currency.currencyCode)
     }
 
@@ -79,8 +79,8 @@ class AmountTest {
         val original = Amount.of(100000L, Currency("USD"))
         val copied = original.copy(quantity = 200000L)
 
-        assertEquals(100000L, original.value)
-        assertEquals(200000L, copied.value)
+        assertEquals(100000L, original.quantity)
+        assertEquals(200000L, copied.quantity)
         assertEquals("USD", copied.currency.currencyCode)
     }
 
@@ -91,7 +91,7 @@ class AmountTest {
 
         assertEquals("USD", original.currency.currencyCode)
         assertEquals("EUR", copied.currency.currencyCode)
-        assertEquals(100000L, copied.value)
+        assertEquals(100000L, copied.quantity)
     }
 
     @Test
@@ -99,15 +99,15 @@ class AmountTest {
         val largeValue = 999999999999L // $9,999,999,999.99
         val amount = Amount.of(largeValue, Currency("USD"))
 
-        assertEquals(largeValue, amount.value)
+        assertEquals(largeValue, amount.quantity)
     }
 
     @Test
-    fun `should handle negative values`() {
-        val negativeValue = -10000L // -$100.00
-        val amount = Amount.of(negativeValue, Currency("USD"))
-
-        assertEquals(negativeValue, amount.value)
+    fun `should reject negative values`() {
+        val exception = assertThrows(IllegalArgumentException::class.java) {
+            Amount.of(-10000L, Currency("USD"))
+        }
+        assertTrue(exception.message?.contains("must be greater than zero") == true)
     }
 
     @Test
@@ -115,7 +115,7 @@ class AmountTest {
         val preciseValue = 123456789L // $1,234,567.89
         val amount = Amount.of(preciseValue, Currency("USD"))
 
-        assertEquals(preciseValue, amount.value)
+        assertEquals(preciseValue, amount.quantity)
     }
 
     @Test
@@ -124,9 +124,9 @@ class AmountTest {
         val ninetNineCents = Amount.of(99L, Currency("USD")) // $0.99
         val oneDollar = Amount.of(100L, Currency("USD")) // $1.00
 
-        assertEquals(1L, oneCent.value)
-        assertEquals(99L, ninetNineCents.value)
-        assertEquals(100L, oneDollar.value)
+        assertEquals(1L, oneCent.quantity)
+        assertEquals(99L, ninetNineCents.quantity)
+        assertEquals(100L, oneDollar.quantity)
     }
 
     @Test
@@ -166,7 +166,7 @@ class AmountTest {
         val smallValue = 1L // $0.01
         val amount = Amount.of(smallValue, Currency("USD"))
 
-        assertEquals(smallValue, amount.value)
+        assertEquals(smallValue, amount.quantity)
     }
 
     @Test
@@ -191,7 +191,7 @@ class AmountTest {
 
         cases.forEach { (cents, description) ->
             val amount = Amount.of(cents, Currency("USD"))
-            assertEquals(cents, amount.value, "Failed for $description")
+            assertEquals(cents, amount.quantity, "Failed for $description")
         }
     }
 }

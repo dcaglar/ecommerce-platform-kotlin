@@ -104,7 +104,7 @@ class PaymentRequestMapperTest {
         assertEquals("INITIATED", response.status)
         assertEquals("buyer-456", response.buyerId)
         assertEquals("order-123", response.orderId)
-        assertEquals(10000L, response.totalAmount.value)
+        assertEquals(10000L, response.totalAmount.quantity)
         assertEquals(CurrencyEnum.USD, response.totalAmount.currency)
         assertNotNull(response.createdAt)
     }
@@ -128,7 +128,7 @@ class PaymentRequestMapperTest {
         // Then
         assertEquals("payment-456", response.paymentId)
         assertEquals("INITIATED", response.status)
-        assertEquals(5000L, response.totalAmount.value)
+        assertEquals(5000L, response.totalAmount.quantity)
         assertEquals(CurrencyEnum.EUR, response.totalAmount.currency)
     }
 
