@@ -21,14 +21,14 @@ object LedgerPersistenceMapper {
         entry.journalEntry.postings.map { posting ->
             PostingEntity(
                 journalId = entry.journalEntry.id,
-                accountCode = posting.account.getAccountCode(),
-                accountType = posting.account.accountType.name,
+                accountCode = posting.account.accountCode,
+                accountType = posting.account.type.name,
                 amount = posting.amount.value,
                 direction = when (posting) {
                     is Posting.Debit -> "DEBIT"
                     is Posting.Credit -> "CREDIT"
                 },
-                currency = posting.amount.currency,
+                currency = posting.amount.currency.currencyCode,
                 createdAt = entry.createdAt
             )
         }

@@ -3,7 +3,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.persistance.entity
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import java.time.LocalDateTime
 
-class PaymentOrderEntity(
+ class PaymentOrderEntity internal constructor(
     val paymentOrderId: Long,
     val publicPaymentOrderId: String,
     val paymentId: Long,

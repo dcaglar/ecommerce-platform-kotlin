@@ -8,6 +8,7 @@ import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
@@ -75,7 +76,7 @@ class PaymentOrderPspCallExecutorTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("public-payment-123")
             .sellerId(SellerId("seller-123"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .buildNew()
         
@@ -184,7 +185,7 @@ class PaymentOrderPspCallExecutorTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("public-payment-123")
             .sellerId(SellerId("seller-123"))
-            .amount(Amount(5000L, "EUR"))
+            .amount(Amount.of(5000L, Currency("EUR")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .buildNew()
         
@@ -265,7 +266,7 @@ class PaymentOrderPspCallExecutorTest {
                 .paymentId(PaymentId(456L))
                 .publicPaymentId("public-payment-123")
                 .sellerId(SellerId("seller-123"))
-                .amount(Amount(10000L, "USD"))
+                .amount(Amount.of(10000L, Currency("USD")))
                 .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
                 .buildNew(),
             attempt = 0
@@ -325,7 +326,7 @@ class PaymentOrderPspCallExecutorTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("public-payment-123")
             .sellerId(SellerId("seller-123"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .status(PaymentOrderStatus.SUCCESSFUL_FINAL) // Terminal status
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .updatedAt(clock.instant().atZone(clock.zone).toLocalDateTime())
@@ -393,7 +394,7 @@ class PaymentOrderPspCallExecutorTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("public-payment-123")
             .sellerId(SellerId("seller-123"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .status(PaymentOrderStatus.PENDING_STATUS_CHECK_LATER)
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .updatedAt(clock.instant().atZone(clock.zone).toLocalDateTime())
@@ -461,7 +462,7 @@ class PaymentOrderPspCallExecutorTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("public-payment-123")
             .sellerId(SellerId("seller-123"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .buildNew()
         
@@ -540,7 +541,7 @@ class PaymentOrderPspCallExecutorTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("public-payment-123")
             .sellerId(SellerId("seller-123"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
             .buildNew()
         

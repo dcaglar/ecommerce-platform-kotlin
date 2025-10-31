@@ -20,14 +20,14 @@ class JournalEntry private constructor(
     
     init {
         require(postings.isNotEmpty()) { "JournalEntry must have at least one posting" }
-        val totalDebitAmount = postings.filterIsInstance<Posting.Debit>().sumOf { it.amount.value }
-        val totalCreditAmount = postings.filterIsInstance<Posting.Credit>().sumOf { it.amount.value }
+        val totalDebitAmount = postings.filterIsInstance<Posting.Debit>().sumOf { it.amount.quantity }
+        val totalCreditAmount = postings.filterIsInstance<Posting.Credit>().sumOf { it.amount.quantity }
         require(totalDebitAmount == totalCreditAmount) {
             "Unbalanced journal entry: debits and credits differ (debits=$totalDebitAmount, credits=$totalCreditAmount)"
         }
     }
 
-    companion object {
+    companion object JournalFactory{
         
         // ==================== Factory Methods ====================
         
@@ -37,8 +37,8 @@ class JournalEntry private constructor(
                 txType = JournalType.AUTH_HOLD,
                 name = "Authorization Hold",
                 postings = listOf(
-                    Posting.Debit(Account(accountType = AccountType.AUTH_RECEIVABLE), txAmount),
-                    Posting.Credit(Account(accountType = AccountType.AUTH_LIABILITY), txAmount)
+                    Posting.Debit.create(Account.create(AccountType.AUTH_RECEIVABLE), txAmount),
+                    Posting.Credit.create(Account.create(AccountType.AUTH_LIABILITY), txAmount)
                 )
             )
 
@@ -48,10 +48,10 @@ class JournalEntry private constructor(
                 txType = JournalType.CAPTURE,
                 name = "Payment Capture",
                 postings = listOf(
-                    Posting.Credit(Account(accountType = AccountType.AUTH_RECEIVABLE), capturedAmount),
-                    Posting.Debit(Account(accountType = AccountType.AUTH_LIABILITY), capturedAmount),
-                    Posting.Credit(merchantAccount, capturedAmount),
-                    Posting.Debit(Account(accountType = AccountType.PSP_RECEIVABLES), capturedAmount)
+                    Posting.Credit.create(Account.create(AccountType.AUTH_RECEIVABLE), capturedAmount),
+                    Posting.Debit.create(Account.create(AccountType.AUTH_LIABILITY), capturedAmount),
+                    Posting.Credit.create(merchantAccount, capturedAmount),
+                    Posting.Debit.create(Account.create(AccountType.PSP_RECEIVABLES), capturedAmount)
                 )
             )
 
@@ -67,10 +67,10 @@ class JournalEntry private constructor(
                 txType = JournalType.SETTLEMENT,
                 name = "Funds received from Acquirer",
                 postings = listOf(
-                    Posting.Debit(Account(accountType = AccountType.SCHEME_FEES), schemeFee),
-                    Posting.Debit(Account(accountType = AccountType.INTERCHANGE_FEES), interchangeFee),
-                    Posting.Debit(acquirerAccount, Amount(grossAmount.value - (schemeFee.value + interchangeFee.value), grossAmount.currency)),
-                    Posting.Credit(Account(accountType = AccountType.PSP_RECEIVABLES), grossAmount)
+                    Posting.Debit.create(Account.create(AccountType.SCHEME_FEES), schemeFee),
+                    Posting.Debit.create(Account.create(AccountType.INTERCHANGE_FEES), interchangeFee),
+                    Posting.Debit.create(acquirerAccount, Amount.of(grossAmount.quantity - (schemeFee.quantity + interchangeFee.quantity), grossAmount.currency)),
+                    Posting.Credit.create(Account.create(AccountType.PSP_RECEIVABLES), grossAmount)
                 )
             )
 
@@ -80,8 +80,8 @@ class JournalEntry private constructor(
                 txType = JournalType.FEE,
                 name = "Psp Fee is recorded",
                 postings = listOf(
-                    Posting.Debit(merchantAccount, pspFee),
-                    Posting.Credit(Account(accountType = AccountType.PROCESSING_FEE_REVENUE), pspFee)
+                    Posting.Debit.create(merchantAccount, pspFee),
+                    Posting.Credit.create(Account.create(AccountType.PROCESSING_FEE_REVENUE), pspFee)
                 )
             )
 
@@ -91,15 +91,15 @@ class JournalEntry private constructor(
                 txType = JournalType.PAYOUT,
                 name = "Merchant Payout",
                 postings = listOf(
-                    Posting.Debit(merchantAccount, payoutAmount),
-                    Posting.Credit(acquirerAccount, payoutAmount)
+                    Posting.Debit.create(merchantAccount, payoutAmount),
+                    Posting.Credit.create(acquirerAccount, payoutAmount)
                 )
             )
 
         // ==================== Convenience Methods ====================
 
         fun fullFlow(paymentOrderId: String, amount: Amount, merchantAccount: Account, acquirerAccount: Account): List<JournalEntry> {
-            val pspFee = Amount(200, amount.currency)
+            val pspFee = Amount.of(200, amount.currency)
 
             val authEntry = authHold(paymentOrderId, amount)
             val captureEntry = capture(paymentOrderId, amount, merchantAccount)
@@ -107,15 +107,15 @@ class JournalEntry private constructor(
             val settlementEntry = settlement(
                 paymentOrderId,
                 amount,
-                Amount(0, amount.currency),
-                Amount(0, amount.currency),
+                Amount.of(0, amount.currency),
+                Amount.of(0, amount.currency),
                 acquirerAccount
             )
 
             val feeEntry = feeRegistered(paymentOrderId, pspFee, merchantAccount)
             val payoutEntry = payout(
                 paymentOrderId,
-                Amount(amount.value - pspFee.value, amount.currency),
+                Amount.of(amount.quantity - pspFee.quantity, amount.currency),
                 merchantAccount,
                 acquirerAccount
             )

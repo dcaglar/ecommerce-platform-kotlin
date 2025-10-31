@@ -8,6 +8,7 @@ import com.dogancaglar.paymentservice.domain.event.PaymentOrderFailed
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
@@ -368,7 +369,7 @@ class ProcessPaymentServiceTest {
         assertEquals(event.publicPaymentId, result.publicPaymentId)
         assertEquals(event.sellerId, result.sellerId.value)
         assertEquals(event.amountValue, result.amount.value)
-        assertEquals(event.currency, result.amount.currency)
+        assertEquals(event.currency, result.amount.currency.currencyCode)
         // Factory preserves values from event
         assertEquals(2, result.retryCount) // Factory preserves retry count from event
         assertEquals(PaymentOrderStatus.FAILED_TRANSIENT_ERROR, result.status) // Factory preserves status from event
@@ -407,7 +408,7 @@ class ProcessPaymentServiceTest {
             .paymentId(PaymentId(456L))
             .publicPaymentId("payment-456")
             .sellerId(SellerId("seller-789"))
-            .amount(Amount(100000L, "USD"))
+            .amount(Amount.of(100000L, Currency("USD")))
             .status(status)
             .createdAt(LocalDateTime.now(clock))
             .updatedAt(LocalDateTime.now(clock))

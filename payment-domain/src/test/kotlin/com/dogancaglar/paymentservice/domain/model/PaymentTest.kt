@@ -1,5 +1,7 @@
 package com.dogancaglar.paymentservice.domain.model
 
+import com.dogancaglar.paymentservice.domain.model.Currency
+
 import com.dogancaglar.paymentservice.domain.model.vo.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -12,7 +14,7 @@ class PaymentTest {
         val paymentId = PaymentId(1L)
         val buyerId = BuyerId("buyer-123")
         val orderId = OrderId("order-456")
-        val totalAmount = Amount(200000L, "USD") // $2000.00 = 200000 cents
+        val totalAmount = Amount.of(200000L, Currency("USD")) // $2000.00 = 200000 cents
         val now = LocalDateTime.now()
         val paymentOrders = listOf(
             createTestPaymentOrder(paymentOrderId = PaymentOrderId(1L)),
@@ -47,7 +49,7 @@ class PaymentTest {
             .publicPaymentId("payment-1")
             .buyerId(BuyerId("buyer-123"))
             .orderId(OrderId("order-456"))
-            .totalAmount(Amount(200000L, "USD")) // $2000.00 = 200000 cents
+            .totalAmount(Amount.of(200000L, Currency("USD"))) // $2000.00 = 200000 cents
             .createdAt(LocalDateTime.now())
             .paymentOrders(emptyList())
             .build()
@@ -61,7 +63,7 @@ class PaymentTest {
         val paymentId = PaymentId(1L)
         val buyerId = BuyerId("buyer-123")
         val orderId = OrderId("order-456")
-        val totalAmount = Amount(200000L, "USD") // $2000.00 = 200000 cents
+        val totalAmount = Amount.of(200000L, Currency("USD")) // $2000.00 = 200000 cents
         val now = LocalDateTime.now()
         val paymentOrders = listOf(
             createTestPaymentOrder(paymentOrderId = PaymentOrderId(1L))
@@ -153,7 +155,7 @@ class PaymentTest {
         val paymentId = PaymentId(1L)
         val buyerId = BuyerId("buyer-123")
         val orderId = OrderId("order-456")
-        val totalAmount = Amount(200000L, "USD") // $2000.00 = 200000 cents
+        val totalAmount = Amount.of(200000L, Currency("USD")) // $2000.00 = 200000 cents
         val now = LocalDateTime.now()
         val paymentOrders = listOf(createTestPaymentOrder())
 
@@ -207,7 +209,7 @@ class PaymentTest {
         publicPaymentId: String = "payment-1",
         buyerId: BuyerId = BuyerId("buyer-123"),
         orderId: OrderId = OrderId("order-456"),
-        totalAmount: Amount = Amount(200000L, "USD"), // $2000.00 = 200000 cents
+        totalAmount: Amount = Amount.of(200000L, Currency("USD")), // $2000.00 = 200000 cents
         status: PaymentStatus = PaymentStatus.INITIATED,
         createdAt: LocalDateTime = LocalDateTime.now(),
         paymentOrders: List<PaymentOrder> = emptyList()
@@ -228,7 +230,7 @@ class PaymentTest {
         paymentOrderId: PaymentOrderId = PaymentOrderId(1L),
         paymentId: PaymentId = PaymentId(1L),
         sellerId: SellerId = SellerId("seller-123"),
-        amount: Amount = Amount(100000L, "USD") // $1000.00 = 100000 cents
+        amount: Amount = Amount.of(100000L, Currency("USD")) // $1000.00 = 100000 cents
     ): PaymentOrder {
         return PaymentOrder.builder()
             .paymentOrderId(paymentOrderId)

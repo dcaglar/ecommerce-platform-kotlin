@@ -13,7 +13,7 @@ object PaymentEntityMapper {
             buyerId = payment.buyerId.value,
             orderId = payment.orderId.value,
             amountValue = payment.totalAmount.value,
-            amountCurrency = payment.totalAmount.currency,
+            amountCurrency = payment.totalAmount.currency.currencyCode,
             status = payment.status,
             createdAt = payment.createdAt
         )

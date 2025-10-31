@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.application.usecases
 import com.dogancaglar.paymentservice.application.constants.IdNamespaces
 import com.dogancaglar.paymentservice.domain.commands.CreatePaymentCommand
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.*
 import com.dogancaglar.paymentservice.domain.util.PaymentFactory
@@ -74,10 +75,10 @@ class CreatePaymentServiceTest {
         val command = CreatePaymentCommand(
             orderId = OrderId("order-123"),
             buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount(200000L, "USD"),
+            totalAmount = Amount.of(200000L, Currency("USD")),
             paymentLines = listOf(
-                PaymentLine(SellerId("seller-1"), Amount(100000L, "USD")),
-                PaymentLine(SellerId("seller-2"), Amount(100000L, "USD"))
+                PaymentLine(SellerId("seller-1"), Amount.of(100000L, Currency("USD"))),
+                PaymentLine(SellerId("seller-2"), Amount.of(100000L, Currency("USD")))
             )
         )
 
@@ -98,7 +99,7 @@ class CreatePaymentServiceTest {
                 payment.publicPaymentId == "payment-$paymentId" &&
                 payment.buyerId == BuyerId("buyer-456") &&
                 payment.orderId == OrderId("order-123") &&
-                payment.totalAmount == Amount(200000L, "USD") &&
+                payment.totalAmount == Amount.of(200000L, Currency("USD")) &&
                 payment.status == PaymentStatus.INITIATED &&
                 payment.paymentOrders.size == 2
             })
@@ -126,11 +127,11 @@ class CreatePaymentServiceTest {
         val command = CreatePaymentCommand(
             orderId = OrderId("order-1"),
             buyerId = BuyerId("buyer-1"),
-            totalAmount = Amount(300000L, "USD"),
+            totalAmount = Amount.of(300000L, Currency("USD")),
             paymentLines = listOf(
-                PaymentLine(SellerId("seller-1"), Amount(100000L, "USD")),
-                PaymentLine(SellerId("seller-2"), Amount(100000L, "USD")),
-                PaymentLine(SellerId("seller-3"), Amount(100000L, "USD"))
+                PaymentLine(SellerId("seller-1"), Amount.of(100000L, Currency("USD"))),
+                PaymentLine(SellerId("seller-2"), Amount.of(100000L, Currency("USD"))),
+                PaymentLine(SellerId("seller-3"), Amount.of(100000L, Currency("USD")))
             )
         )
 
@@ -156,10 +157,10 @@ class CreatePaymentServiceTest {
         val command = CreatePaymentCommand(
             orderId = OrderId("order-1"),
             buyerId = BuyerId("buyer-1"),
-            totalAmount = Amount(200000L, "USD"),
+            totalAmount = Amount.of(200000L, Currency("USD")),
             paymentLines = listOf(
-                PaymentLine(SellerId("seller-1"), Amount(100000L, "USD")),
-                PaymentLine(SellerId("seller-2"), Amount(100000L, "USD"))
+                PaymentLine(SellerId("seller-1"), Amount.of(100000L, Currency("USD"))),
+                PaymentLine(SellerId("seller-2"), Amount.of(100000L, Currency("USD")))
             )
         )
 
@@ -201,9 +202,9 @@ class CreatePaymentServiceTest {
         val command = CreatePaymentCommand(
             orderId = OrderId("order-1"),
             buyerId = BuyerId("buyer-1"),
-            totalAmount = Amount(100000L, "USD"),
+            totalAmount = Amount.of(100000L, Currency("USD")),
             paymentLines = listOf(
-                PaymentLine(SellerId("seller-1"), Amount(100000L, "USD"))
+                PaymentLine(SellerId("seller-1"), Amount.of(100000L, Currency("USD")))
             )
         )
 

@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.outbound.redis
 
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
@@ -115,7 +116,7 @@ class PaymentRetryQueueAdapterIntegrationTest {
             .paymentId(PaymentId(999L))
             .publicPaymentId("pay-999")
             .sellerId(SellerId("111"))
-            .amount(Amount(10000L, "USD")) // 100.00 in cents
+            .amount(Amount.of(10000L, Currency("USD"))) // 100.00 in cents
             .status(status)
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())

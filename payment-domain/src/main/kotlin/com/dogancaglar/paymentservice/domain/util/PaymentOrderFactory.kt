@@ -2,6 +2,7 @@ package com.dogancaglar.paymentservice.domain.util
 
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderEvent
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
@@ -17,7 +18,7 @@ class PaymentOrderFactory {
             .paymentId(PaymentId(event.paymentId.toLong()))
             .publicPaymentId(event.publicPaymentId)
             .sellerId(SellerId(event.sellerId))
-            .amount(Amount(event.amountValue, event.currency))
+            .amount(Amount.of(event.amountValue, Currency(event.currency)))
             .status(PaymentOrderStatus.valueOf(event.status))
             .createdAt(event.createdAt)
             .updatedAt(event.updatedAt)

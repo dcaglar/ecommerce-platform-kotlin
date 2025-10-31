@@ -95,8 +95,10 @@ flowchart LR
 ### 4.3 payment-domain
 
 * Defines aggregates: `Payment`, `PaymentOrder`, and `JournalEntry`.
-* Implements business invariants and state transitions.
-* Contains value objects (`PaymentId`, `SellerId`, `Amount`, etc.) and domain events.
+* Implements business invariants and state transitions through factory-enforced object creation.
+* Core domain classes (`Account`, `Amount`, `JournalEntry`, `Posting`) use private constructors with validated factory methods to enforce invariants.
+* Contains value objects (`PaymentId`, `SellerId`, `Amount`, `Currency`, etc.) and domain events.
+* Factory methods: `Account.create()`, `Amount.of()`, `Posting.Debit.create()`, `Posting.Credit.create()`.
 
 ### 4.4 payment-application
 
@@ -190,4 +192,4 @@ flowchart LR
 
 ## 10. Summary
 
-The `ecommerce-platform-kotlin` backend demonstrates a production-grade event-driven architecture applying DDD, SOLID, and cloud-native principles. The system decouples user-facing APIs from external dependencies, achieves exactly-once delivery across asynchronous flows, and provides a foundation for extending into full financial operations — including ledger reconciliation, balance tracking, and settlements.
+The `ecommerce-platform-kotlin` backend demonstrates a production-grade event-driven architecture applying DDD, SOLID, and cloud-native principles. The system decouples user-facing APIs from external dependencies, achieves exactly-once delivery across asynchronous flows, and enforces domain invariants through factory-enforced object creation. Core domain classes (`Account`, `Amount`, `JournalEntry`, `Posting`) use private constructors with validated factory methods, ensuring all objects are created in valid states and preventing invalid domain modeling. The platform provides a foundation for extending into full financial operations — including ledger reconciliation, balance tracking, and settlements.

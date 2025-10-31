@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.persistance.entity
 
 import java.time.LocalDateTime
 
-class OutboxEventEntity(
+class OutboxEventEntity internal constructor(
     val oeid: Long,
     val eventType: String,
     val aggregateId: String,

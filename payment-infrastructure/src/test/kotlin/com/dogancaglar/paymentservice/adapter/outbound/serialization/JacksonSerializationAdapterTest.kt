@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.outbound.serialization
 
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
@@ -107,7 +108,7 @@ class JacksonSerializationAdapterTest {
             .paymentId(PaymentId(1L))
             .publicPaymentId("payment-1")
             .sellerId(SellerId("seller_1"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .status(PaymentOrderStatus.INITIATED_PENDING)
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())
@@ -137,7 +138,7 @@ class JacksonSerializationAdapterTest {
             .paymentId(PaymentId(1L))
             .publicPaymentId("payment-1")
             .sellerId(SellerId("seller-测试-123"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .status(PaymentOrderStatus.INITIATED_PENDING)
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())
@@ -166,7 +167,7 @@ class JacksonSerializationAdapterTest {
             .paymentId(PaymentId(1L))
             .publicPaymentId("payment-1")
             .sellerId(SellerId("seller_1"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .status(PaymentOrderStatus.INITIATED_PENDING)
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())
@@ -196,7 +197,7 @@ class JacksonSerializationAdapterTest {
             .paymentId(PaymentId(1L))
             .publicPaymentId("payment-1")
             .sellerId(SellerId("seller_1"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .status(PaymentOrderStatus.INITIATED_PENDING)
             .createdAt(fixedTime)
             .updatedAt(fixedTime)
@@ -340,7 +341,7 @@ class JacksonSerializationAdapterTest {
             .paymentId(PaymentId(999L))
             .publicPaymentId("pay-999")
             .sellerId(SellerId("111"))
-            .amount(Amount(10000L, "USD"))
+            .amount(Amount.of(10000L, Currency("USD")))
             .status(status)
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())
@@ -357,7 +358,7 @@ class JacksonSerializationAdapterTest {
             .paymentId(PaymentId(888L))
             .publicPaymentId("pay-888")
             .sellerId(SellerId("seller-456"))
-            .amount(Amount(25000L, "EUR"))
+            .amount(Amount.of(25000L, Currency("EUR")))
             .status(PaymentOrderStatus.FAILED_TRANSIENT_ERROR)
             .createdAt(LocalDateTime.of(2023, 6, 15, 10, 30))
             .updatedAt(LocalDateTime.of(2023, 6, 15, 10, 35))
@@ -374,7 +375,7 @@ class JacksonSerializationAdapterTest {
             .paymentId(PaymentId(777L))
             .publicPaymentId("pay-777")
             .sellerId(SellerId("seller-789"))
-            .amount(Amount(5000L, "GBP"))
+            .amount(Amount.of(5000L, Currency("GBP")))
             .status(PaymentOrderStatus.SUCCESSFUL_FINAL)
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())

@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.persistance.entity
 
 import java.time.LocalDateTime
 
-data class LedgerEntryEntity(
+data class LedgerEntryEntity internal constructor(
     val id: Long? = null,
     val journalId: String,
     val accountId: String,

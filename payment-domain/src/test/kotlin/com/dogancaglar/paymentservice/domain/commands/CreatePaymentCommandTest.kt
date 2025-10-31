@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.domain.commands
 
 import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
@@ -16,21 +17,21 @@ class CreatePaymentCommandTest {
         val command = CreatePaymentCommand(
             orderId = OrderId("order-123"),
             buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount(10000L, "USD"),
+            totalAmount = Amount.of(10000L, Currency("USD")),
             paymentLines = listOf(
-                PaymentLine(SellerId("seller-1"), Amount(5000L, "USD")),
-                PaymentLine(SellerId("seller-2"), Amount(5000L, "USD"))
+                PaymentLine(SellerId("seller-1"), Amount.of(5000L, Currency("USD"))),
+                PaymentLine(SellerId("seller-2"), Amount.of(5000L, Currency("USD")))
             )
         )
 
         assertEquals(OrderId("order-123"), command.orderId)
         assertEquals(BuyerId("buyer-456"), command.buyerId)
-        assertEquals(Amount(10000L, "USD"), command.totalAmount)
+        assertEquals(Amount.of(10000L, Currency("USD")), command.totalAmount)
         assertEquals(2, command.paymentLines.size)
         assertEquals(SellerId("seller-1"), command.paymentLines[0].sellerId)
-        assertEquals(Amount(5000L, "USD"), command.paymentLines[0].amount)
+        assertEquals(Amount.of(5000L, Currency("USD")), command.paymentLines[0].amount)
         assertEquals(SellerId("seller-2"), command.paymentLines[1].sellerId)
-        assertEquals(Amount(5000L, "USD"), command.paymentLines[1].amount)
+        assertEquals(Amount.of(5000L, Currency("USD")), command.paymentLines[1].amount)
     }
 
     @Test
@@ -38,14 +39,14 @@ class CreatePaymentCommandTest {
         val command = CreatePaymentCommand(
             orderId = OrderId("order-123"),
             buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount(10000L, "USD"),
+            totalAmount = Amount.of(10000L, Currency("USD")),
             paymentLines = listOf(
-                PaymentLine(SellerId("seller-1"), Amount(10000L, "USD"))
+                PaymentLine(SellerId("seller-1"), Amount.of(10000L, Currency("USD")))
             )
         )
 
         assertEquals(1, command.paymentLines.size)
-        assertEquals(Amount(10000L, "USD"), command.totalAmount)
+        assertEquals(Amount.of(10000L, Currency("USD")), command.totalAmount)
     }
 
     @Test
@@ -53,14 +54,14 @@ class CreatePaymentCommandTest {
         val command = CreatePaymentCommand(
             orderId = OrderId("order-123"),
             buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount(0L, "USD"),
+            totalAmount = Amount.of(0L, Currency("USD")),
             paymentLines = listOf(
-                PaymentLine(SellerId("seller-1"), Amount(0L, "USD"))
+                PaymentLine(SellerId("seller-1"), Amount.of(0L, Currency("USD")))
             )
         )
 
-        assertEquals(Amount(0L, "USD"), command.totalAmount)
-        assertEquals(Amount(0L, "USD"), command.paymentLines[0].amount)
+        assertEquals(Amount.of(0L, Currency("USD")), command.totalAmount)
+        assertEquals(Amount.of(0L, Currency("USD")), command.paymentLines[0].amount)
     }
 
     @Test
@@ -68,14 +69,14 @@ class CreatePaymentCommandTest {
         val command = CreatePaymentCommand(
             orderId = OrderId("order-123"),
             buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount(10000L, "EUR"),
+            totalAmount = Amount.of(10000L, Currency("EUR")),
             paymentLines = listOf(
-                PaymentLine(SellerId("seller-1"), Amount(10000L, "EUR"))
+                PaymentLine(SellerId("seller-1"), Amount.of(10000L, Currency("EUR")))
             )
         )
 
-        assertEquals(Amount(10000L, "EUR"), command.totalAmount)
-        assertEquals("EUR", command.paymentLines[0].amount.currency)
+        assertEquals(Amount.of(10000L, Currency("EUR")), command.totalAmount)
+        assertEquals("EUR", command.paymentLines[0].amount.currency.currencyCode)
     }
 
     @Test
@@ -83,9 +84,9 @@ class CreatePaymentCommandTest {
         val original = CreatePaymentCommand(
             orderId = OrderId("order-123"),
             buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount(10000L, "USD"),
+            totalAmount = Amount.of(10000L, Currency("USD")),
             paymentLines = listOf(
-                PaymentLine(SellerId("seller-1"), Amount(10000L, "USD"))
+                PaymentLine(SellerId("seller-1"), Amount.of(10000L, Currency("USD")))
             )
         )
 
@@ -102,18 +103,18 @@ class CreatePaymentCommandTest {
         val command1 = CreatePaymentCommand(
             orderId = OrderId("order-123"),
             buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount(10000L, "USD"),
+            totalAmount = Amount.of(10000L, Currency("USD")),
             paymentLines = listOf(
-                PaymentLine(SellerId("seller-1"), Amount(10000L, "USD"))
+                PaymentLine(SellerId("seller-1"), Amount.of(10000L, Currency("USD")))
             )
         )
 
         val command2 = CreatePaymentCommand(
             orderId = OrderId("order-123"),
             buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount(10000L, "USD"),
+            totalAmount = Amount.of(10000L, Currency("USD")),
             paymentLines = listOf(
-                PaymentLine(SellerId("seller-1"), Amount(10000L, "USD"))
+                PaymentLine(SellerId("seller-1"), Amount.of(10000L, Currency("USD")))
             )
         )
 
@@ -126,9 +127,9 @@ class CreatePaymentCommandTest {
         val original = CreatePaymentCommand(
             orderId = OrderId("order-123"),
             buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount(10000L, "USD"),
+            totalAmount = Amount.of(10000L, Currency("USD")),
             paymentLines = listOf(
-                PaymentLine(SellerId("seller-1"), Amount(10000L, "USD"))
+                PaymentLine(SellerId("seller-1"), Amount.of(10000L, Currency("USD")))
             )
         )
 
@@ -151,7 +152,7 @@ class CreatePaymentCommandTest {
             CreatePaymentCommand(
                 orderId = OrderId("order-123"),
                 buyerId = BuyerId("buyer-456"),
-                totalAmount = Amount(10000L, "USD"),
+                totalAmount = Amount.of(10000L, Currency("USD")),
                 paymentLines = emptyList()
             )
         }
@@ -165,9 +166,9 @@ class CreatePaymentCommandTest {
             CreatePaymentCommand(
                 orderId = OrderId("order-123"),
                 buyerId = BuyerId("buyer-456"),
-                totalAmount = Amount(-1000L, "USD"),
+                totalAmount = Amount.of(-1000L, Currency("USD")),
                 paymentLines = listOf(
-                    PaymentLine(SellerId("seller-1"), Amount(1000L, "USD"))
+                    PaymentLine(SellerId("seller-1"), Amount.of(1000L, Currency("USD")))
                 )
             )
         }
@@ -181,10 +182,10 @@ class CreatePaymentCommandTest {
             CreatePaymentCommand(
                 orderId = OrderId("order-123"),
                 buyerId = BuyerId("buyer-456"),
-                totalAmount = Amount(10000L, "USD"),
+                totalAmount = Amount.of(10000L, Currency("USD")),
                 paymentLines = listOf(
-                    PaymentLine(SellerId("seller-1"), Amount(5000L, "USD")),
-                    PaymentLine(SellerId("seller-2"), Amount(5000L, "EUR"))
+                    PaymentLine(SellerId("seller-1"), Amount.of(5000L, Currency("USD"))),
+                    PaymentLine(SellerId("seller-2"), Amount.of(5000L, Currency("EUR")))
                 )
             )
         }
@@ -198,9 +199,9 @@ class CreatePaymentCommandTest {
             CreatePaymentCommand(
                 orderId = OrderId("order-123"),
                 buyerId = BuyerId("buyer-456"),
-                totalAmount = Amount(10000L, "USD"),
+                totalAmount = Amount.of(10000L, Currency("USD")),
                 paymentLines = listOf(
-                    PaymentLine(SellerId("seller-1"), Amount(10000L, "EUR"))
+                    PaymentLine(SellerId("seller-1"), Amount.of(10000L, Currency("EUR")))
                 )
             )
         }
@@ -214,10 +215,10 @@ class CreatePaymentCommandTest {
             CreatePaymentCommand(
                 orderId = OrderId("order-123"),
                 buyerId = BuyerId("buyer-456"),
-                totalAmount = Amount(10000L, "USD"),
+                totalAmount = Amount.of(10000L, Currency("USD")),
                 paymentLines = listOf(
-                    PaymentLine(SellerId("seller-1"), Amount(5000L, "USD")),
-                    PaymentLine(SellerId("seller-2"), Amount(3000L, "USD"))
+                    PaymentLine(SellerId("seller-1"), Amount.of(5000L, Currency("USD"))),
+                    PaymentLine(SellerId("seller-2"), Amount.of(3000L, Currency("USD")))
                 )
             )
         }
@@ -231,10 +232,10 @@ class CreatePaymentCommandTest {
             CreatePaymentCommand(
                 orderId = OrderId("order-123"),
                 buyerId = BuyerId("buyer-456"),
-                totalAmount = Amount(5000L, "USD"),
+                totalAmount = Amount.of(5000L, Currency("USD")),
                 paymentLines = listOf(
-                    PaymentLine(SellerId("seller-1"), Amount(5000L, "USD")),
-                    PaymentLine(SellerId("seller-2"), Amount(3000L, "USD"))
+                    PaymentLine(SellerId("seller-1"), Amount.of(5000L, Currency("USD"))),
+                    PaymentLine(SellerId("seller-2"), Amount.of(3000L, Currency("USD")))
                 )
             )
         }
@@ -248,10 +249,10 @@ class CreatePaymentCommandTest {
             CreatePaymentCommand(
                 orderId = OrderId("order-123"),
                 buyerId = BuyerId("buyer-456"),
-                totalAmount = Amount(15000L, "USD"),
+                totalAmount = Amount.of(15000L, Currency("USD")),
                 paymentLines = listOf(
-                    PaymentLine(SellerId("seller-1"), Amount(5000L, "USD")),
-                    PaymentLine(SellerId("seller-2"), Amount(3000L, "USD"))
+                    PaymentLine(SellerId("seller-1"), Amount.of(5000L, Currency("USD"))),
+                    PaymentLine(SellerId("seller-2"), Amount.of(3000L, Currency("USD")))
                 )
             )
         }
@@ -267,9 +268,9 @@ class CreatePaymentCommandTest {
         val command = CreatePaymentCommand(
             orderId = OrderId("order-123"),
             buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount(largeAmount, "USD"),
+            totalAmount = Amount.of(largeAmount, Currency("USD")),
             paymentLines = listOf(
-                PaymentLine(SellerId("seller-1"), Amount(largeAmount, "USD"))
+                PaymentLine(SellerId("seller-1"), Amount.of(largeAmount, Currency("USD")))
             )
         )
 
@@ -282,10 +283,10 @@ class CreatePaymentCommandTest {
         val command = CreatePaymentCommand(
             orderId = OrderId("order-123"),
             buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount(15000L, "USD"),
+            totalAmount = Amount.of(15000L, Currency("USD")),
             paymentLines = listOf(
-                PaymentLine(SellerId("seller-1"), Amount(10000L, "USD")),
-                PaymentLine(SellerId("seller-1"), Amount(5000L, "USD"))
+                PaymentLine(SellerId("seller-1"), Amount.of(10000L, Currency("USD"))),
+                PaymentLine(SellerId("seller-1"), Amount.of(5000L, Currency("USD")))
             )
         )
 
@@ -302,14 +303,14 @@ class CreatePaymentCommandTest {
             val command = CreatePaymentCommand(
                 orderId = OrderId("order-123"),
                 buyerId = BuyerId("buyer-456"),
-                totalAmount = Amount(10000L, currency),
+                totalAmount = Amount.of(10000L, Currency(currency)),
                 paymentLines = listOf(
-                    PaymentLine(SellerId("seller-1"), Amount(10000L, currency))
+                    PaymentLine(SellerId("seller-1"), Amount.of(10000L, Currency(currency)))
                 )
             )
 
-            assertEquals(currency, command.totalAmount.currency)
-            assertEquals(currency, command.paymentLines[0].amount.currency)
+            assertEquals(currency, command.totalAmount.currency.currencyCode)
+            assertEquals(currency, command.paymentLines[0].amount.currency.currencyCode)
         }
     }
 
@@ -318,9 +319,9 @@ class CreatePaymentCommandTest {
         val command = CreatePaymentCommand(
             orderId = OrderId("order-123"),
             buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount(12345L, "USD"), // $123.45
+            totalAmount = Amount.of(12345L, Currency("USD")), // $123.45
             paymentLines = listOf(
-                PaymentLine(SellerId("seller-1"), Amount(12345L, "USD"))
+                PaymentLine(SellerId("seller-1"), Amount.of(12345L, Currency("USD")))
             )
         )
 
@@ -333,12 +334,12 @@ class CreatePaymentCommandTest {
         val command = CreatePaymentCommand(
             orderId = OrderId("order-123"),
             buyerId = BuyerId("buyer-456"),
-            totalAmount = Amount(25000L, "USD"),
+            totalAmount = Amount.of(25000L, Currency("USD")),
             paymentLines = listOf(
-                PaymentLine(SellerId("seller-1"), Amount(10000L, "USD")),
-                PaymentLine(SellerId("seller-2"), Amount(5000L, "USD")),
-                PaymentLine(SellerId("seller-3"), Amount(7500L, "USD")),
-                PaymentLine(SellerId("seller-4"), Amount(2500L, "USD"))
+                PaymentLine(SellerId("seller-1"), Amount.of(10000L, Currency("USD"))),
+                PaymentLine(SellerId("seller-2"), Amount.of(5000L, Currency("USD"))),
+                PaymentLine(SellerId("seller-3"), Amount.of(7500L, Currency("USD"))),
+                PaymentLine(SellerId("seller-4"), Amount.of(2500L, Currency("USD")))
             )
         )
 
