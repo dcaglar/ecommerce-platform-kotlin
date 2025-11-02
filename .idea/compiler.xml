@@ -24,15 +24,12 @@
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="common" options="-parameters" />
-      <module name="common-test" options="-parameters" />
-      <module name="payment-application" options="-parameters" />
-      <module name="payment-consumers" options="-parameters" />
-      <module name="payment-domain" options="-parameters" />
-      <module name="payment-infrastructure" options="-parameters" />
-      <module name="payment-internal-service" options="-parameters" />
-      <module name="payment-service" options="-parameters" />
-      <module name="payment-test-utils" options="-parameters" />
-      <module name="transaction-service" options="-parameters" />
+        <module name="payment-domain" options="-parameters" />
+        <module name="common-test" options="-parameters" />
+        <module name="payment-application" options="-parameters" />
+        <module name="payment-infrastructure" options="-parameters" />
+        <module name="payment-service" options="-parameters" />
+        <module name="payment-consumers" options="-parameters" />
     </option>
   </component>
 </project>
