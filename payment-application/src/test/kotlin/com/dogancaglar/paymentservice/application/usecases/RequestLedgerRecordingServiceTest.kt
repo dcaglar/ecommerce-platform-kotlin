@@ -44,7 +44,7 @@ class RequestLedgerRecordingServiceTest {
         retryCount: Int = 0,
         retryReason: String? = null,
         lastErrorMessage: String? = null
-    ): PaymentOrderSucceeded = PaymentOrderSucceeded(
+    ): PaymentOrderSucceeded = PaymentOrderSucceeded.create(
         paymentOrderId = paymentOrderId,
         publicPaymentOrderId = publicPaymentOrderId,
         paymentId = paymentId,
@@ -72,7 +72,7 @@ class RequestLedgerRecordingServiceTest {
         retryCount: Int = 0,
         retryReason: String? = null,
         lastErrorMessage: String? = null
-    ): PaymentOrderFailed = PaymentOrderFailed(
+    ): PaymentOrderFailed = PaymentOrderFailed.create(
         paymentOrderId = paymentOrderId,
         publicPaymentOrderId = publicPaymentOrderId,
         paymentId = paymentId,
@@ -101,7 +101,7 @@ class RequestLedgerRecordingServiceTest {
         retryCount: Int = 0,
         retryReason: String? = null,
         lastErrorMessage: String? = null
-    ): PaymentOrderStatusCheckRequested = PaymentOrderStatusCheckRequested(
+    ): PaymentOrderStatusCheckRequested = PaymentOrderStatusCheckRequested.create(
         paymentOrderId = paymentOrderId,
         publicPaymentOrderId = publicPaymentOrderId,
         paymentId = paymentId,

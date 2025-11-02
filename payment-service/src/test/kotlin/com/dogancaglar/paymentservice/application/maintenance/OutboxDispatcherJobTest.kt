@@ -214,7 +214,7 @@ class OutboxDispatcherJobTest {
     }
 
     private fun createEventPayload(eventId: String): String {
-        val event = PaymentOrderCreated(
+        val event = PaymentOrderCreated.create(
             paymentOrderId = "po-123",
             publicPaymentOrderId = "public-po-123",
             paymentId = "p-456",

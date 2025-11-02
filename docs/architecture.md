@@ -116,6 +116,13 @@ flowchart LR
 * Implements persistence adapters and ledger mappers.
 * Provides transactional utilities like `KafkaTxExecutor` for atomic consume-produce-commit behavior.
 
+### 4.6 common-test
+
+* Shared test utilities module providing test helpers across all payment modules.
+* Exposes test classes via test-jar artifact (Maven test-jar).
+* Contains test helpers like `LedgerEntriesRecordedTestHelper` for generating test events.
+* Used by both `payment-application` and `payment-consumers` test suites for consistent test data generation.
+
 ---
 
 ## 5. Data Flow Summary

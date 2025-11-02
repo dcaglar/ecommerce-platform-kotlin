@@ -41,10 +41,11 @@
    8.4 [ElasticSearch Search Keys](#84-elasticsearch-search-keys)
 9. [Module Structure](#9--module-structure)  
    9.1 [`common`](#91-common)  
-   9.2 [`payment-domain`](#92-payment-domain)  
-   9.3 [`payment-application`](#93-payment-application)  
-   9.4 [`payment-infrastructure` (Auto‑config)](#94-payment-infrastructure-autoconfig)  
-   9.5 [Deployables: `payment-service` & `payment-consumers`](#95-deployables-payment-service--payment-consumers)
+   9.2 [`common-test`](#92-common-test)  
+   9.3 [`payment-domain`](#93-payment-domain)  
+   9.4 [`payment-application`](#94-payment-application)  
+   9.5 [`payment-infrastructure` (Auto‑config)](#95-payment-infrastructure-autoconfig)  
+   9.6 [Deployables: `payment-service` & `payment-consumers`](#96-deployables-payment-service--payment-consumers)
 10. [Testing & Quality Assurance](#10--testing--quality-assurance)  
     10.1 [Testing Strategy](#101-testing-strategy)  
     10.2 [Test Coverage Results](#102-test-coverage-results)
@@ -1391,7 +1392,15 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 - Used by all other modules for consistent event handling and cross-cutting concerns.
 - Contains `EventEnvelope<T>` wrapper, `LogContext` helpers, and common DTOs.
 
-### 9.2 `payment-domain`
+### 9.2 `common-test`
+
+- Shared test utilities module providing test helpers across all payment modules.
+- Exposes test classes via Maven test-jar artifact for cross-module test code reuse.
+- Contains test helpers like `LedgerEntriesRecordedTestHelper` for generating test events and event data.
+- Used by both `payment-application` and `payment-consumers` test suites for consistent test data generation.
+- Dependencies: `payment-domain` (for domain classes used in test helpers), Kotlin standard library, JUnit.
+
+### 9.3 `payment-domain`
 
 - Domain entities (`Payment`, `PaymentOrder`, value objects), domain services, and **ports**.
 - Core business logic with no external dependencies.
@@ -1405,7 +1414,7 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 - Domain events: `PaymentOrderCreated`, `PaymentOrderSucceeded`, `PaymentOrderFailed`
 - Status enums: `PaymentStatus`, `PaymentOrderStatus`
 
-### 9.3 `payment-application`
+### 9.4 `payment-application`
 
 - Use cases, orchestrators, and application‑level services.
 - Depends on `payment-domain` and defines the **inbound/outbound ports** it needs.
@@ -1419,7 +1428,7 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 - Models: `LedgerEntry` - Persistence model for ledger entries
 - **Note**: Schedulers (`OutboxDispatcherJob`, `RetryDispatcherScheduler`) are in deployable modules, not application layer
 
-### 9.4 `payment-infrastructure` (Auto‑config)
+### 9.5 `payment-infrastructure` (Auto‑config)
 
 - New **auto‑configurable** module consumed by both deployables.
 - Provides Spring Boot auto‑configs for: Micrometer registry, Kafka factory/serializers, Redis/Lettuce beans, task
@@ -1433,7 +1442,7 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
     - **Individual Processing**: `appendLedgerEntry()` processes one entry at a time with duplicate detection
     - **Duplicate Handling**: When duplicate detected, entry skipped and no postings inserted
 
-### 9.5 Deployables: `payment-service` & `payment-consumers`
+### 9.6 Deployables: `payment-service` & `payment-consumers`
 
 - **payment-service**: REST API, DB writes, maintenance jobs.
     - **Controllers**: `PaymentController` - REST endpoints that return `202 Accepted` immediately

@@ -117,6 +117,7 @@ ecommerce-platform-kotlin/
 ├── payment-service/          # REST API, Outbox Dispatcher
 ├── payment-consumers/        # Kafka consumers (Enqueuer, Executor, Ledger, Retry)
 ├── common/                   # Shared contracts, event envelope, logging
+├── common-test/              # Shared test utilities (test-jar for cross-module test helpers)
 ├── charts/                   # Helm charts for deployment
 ├── infra/                    # Local infra scripts (Minikube, monitoring, Keycloak)
 └── docs/                     # Architecture & how-to guides

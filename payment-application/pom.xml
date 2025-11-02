@@ -105,6 +105,14 @@
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib</artifactId>
         </dependency>
+        <!-- Test utilities shared across modules -->
+        <dependency>
+            <groupId>com.dogancaglar</groupId>
+            <artifactId>common-test</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
 </project>

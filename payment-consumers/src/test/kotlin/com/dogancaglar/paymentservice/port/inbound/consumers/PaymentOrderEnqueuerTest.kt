@@ -55,7 +55,7 @@ class PaymentOrderEnqueuerTest {
         val consumedEventId = UUID.fromString("11111111-1111-1111-1111-111111111111")
         val parentEventId = UUID.fromString("22222222-2222-2222-2222-222222222222")
         
-        val paymentOrderCreated = PaymentOrderCreated(
+        val paymentOrderCreated = PaymentOrderCreated.create(
             paymentOrderId = paymentOrderId.value.toString(),
             publicPaymentOrderId = "public-123",
             paymentId = PaymentId(456L).value.toString(),
@@ -153,7 +153,7 @@ class PaymentOrderEnqueuerTest {
         val expectedTraceId = "trace-456"
         val consumedEventId = UUID.fromString("55555555-5555-5555-5555-555555555555")
         val parentEventId = UUID.fromString("66666666-6666-6666-6666-666666666666")
-        val paymentOrderCreated = PaymentOrderCreated(
+        val paymentOrderCreated = PaymentOrderCreated.create(
             paymentOrderId = paymentOrderId.value.toString(),
             publicPaymentOrderId = "public-123",
             paymentId = PaymentId(456L).value.toString(),

@@ -36,6 +36,7 @@ It declares that this module is:
         <module>payment-infrastructure</module>
         <module>payment-service</module>
         <module>payment-consumers</module>
+        <module>common-test</module>
     </modules>
 
     <properties>
@@ -92,6 +93,11 @@ It declares that this module is:
             <dependency>
                 <groupId>com.dogancaglar</groupId>
                 <artifactId>payment-infrastructure</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>com.dogancaglar</groupId>
+                <artifactId>common-test</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
             </dependency>
             <dependency>

@@ -2,6 +2,7 @@ package com.dogancaglar.paymentservice.mybatis
 
 import com.dogancaglar.paymentservice.InfraTestBoot
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.JournalEntryEntity
+import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.LedgerEntryEntity
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PostingEntity
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.LedgerMapper
 import org.junit.jupiter.api.Assertions.*
@@ -139,6 +140,68 @@ class LedgerMapperIntegrationTest {
         assertEquals("REFUND", persisted?.txType)
         assertNull(persisted?.referenceType)
         assertNull(persisted?.referenceId)
+    }
+
+    // ==================== insertLedgerEntry Tests ====================
+
+    @Test
+    fun `insertLedgerEntry should insert a new ledger entry and return generated ID`() {
+        // First create the journal entry
+        val journalId = "journal-for-ledger"
+        ledgerMapper.insertJournalEntry(JournalEntryEntity(
+            id = journalId,
+            txType = "AUTH_HOLD",
+            name = "Test",
+            referenceType = null,
+            referenceId = null,
+            createdAt = LocalDateTime.now()
+        ))
+
+        val ledgerEntry = LedgerEntryEntity(
+            id = null, // Will be auto-generated
+            journalId = journalId,
+            createdAt = LocalDateTime.now()
+        )
+
+        val result = ledgerMapper.insertLedgerEntry(ledgerEntry)
+
+        assertEquals(1, result)
+        assertNotNull(ledgerEntry.id, "ID should be populated by MyBatis after insert")
+        assertTrue(ledgerEntry.id!! > 0, "Generated ID should be positive")
+    }
+
+    @Test
+    fun `insertLedgerEntry should generate unique IDs for multiple entries`() {
+        val journalId = "journal-multi-ledger"
+        ledgerMapper.insertJournalEntry(JournalEntryEntity(
+            id = journalId,
+            txType = "CAPTURE",
+            name = "Multi Ledger Test",
+            referenceType = null,
+            referenceId = null,
+            createdAt = LocalDateTime.now()
+        ))
+
+        val ledgerEntry1 = LedgerEntryEntity(
+            id = null,
+            journalId = journalId,
+            createdAt = LocalDateTime.now()
+        )
+
+        val ledgerEntry2 = LedgerEntryEntity(
+            id = null,
+            journalId = journalId,
+            createdAt = LocalDateTime.now()
+        )
+
+        val result1 = ledgerMapper.insertLedgerEntry(ledgerEntry1)
+        val result2 = ledgerMapper.insertLedgerEntry(ledgerEntry2)
+
+        assertEquals(1, result1)
+        assertEquals(1, result2)
+        assertNotNull(ledgerEntry1.id)
+        assertNotNull(ledgerEntry2.id)
+        assertNotEquals(ledgerEntry1.id, ledgerEntry2.id, "Each entry should have unique ID")
     }
 
     // ==================== insertPosting Tests ====================

@@ -186,7 +186,7 @@ class PaymentRetryQueueAdapterTest {
             aggregateId = "123",
             timestamp = LocalDateTime.now(),
             traceId = UUID.randomUUID().toString(),
-            data = PaymentOrderPspCallRequested(
+            data = PaymentOrderPspCallRequested.create(
                 paymentOrderId = "123",
                 publicPaymentOrderId = "po-123",
                 paymentId = "999",
@@ -238,7 +238,7 @@ class PaymentRetryQueueAdapterTest {
             aggregateId = "123",
             timestamp = LocalDateTime.now(),
             traceId = UUID.randomUUID().toString(),
-            data = PaymentOrderPspCallRequested(
+            data = PaymentOrderPspCallRequested.create(
                 paymentOrderId = "123",
                 publicPaymentOrderId = "po-123",
                 paymentId = "999",

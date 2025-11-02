@@ -1,6 +1,5 @@
-package com.dogancaglar.paymentservice.application.model
+package com.dogancaglar.paymentservice.domain.model.ledger
 
-import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
 import java.time.LocalDateTime
 
 /**
@@ -10,7 +9,7 @@ import java.time.LocalDateTime
  * for factory usage within this module and should not be called directly by application code.
  */
 class  LedgerEntry private constructor (
-    val ledgerEntryId: Long,
+    var ledgerEntryId: Long, // Mutable: populated by persistence layer after insert
     val journalEntry: JournalEntry,
     val createdAt: LocalDateTime
 ) {

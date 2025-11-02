@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="2025-11-01-account-balances-table" author="dogancaglar">
+
+        <!-- ========== ACCOUNT BALANCES TABLE ========== -->
+        <!-- Stores balance snapshots that are periodically merged from Redis deltas -->
+        <createTable tableName="account_balances">
+            <column name="account_code" type="VARCHAR(128)">
+                <constraints primaryKey="true" primaryKeyName="pk_account_balances" nullable="false"/>
+            </column>
+            <column name="balance" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_snapshot_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+
+    </changeSet>
+
+</databaseChangeLog>
+

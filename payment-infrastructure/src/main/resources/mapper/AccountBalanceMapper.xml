@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.AccountBalanceMapper">
+
+    <resultMap id="AccountBalanceResultMap"
+               type="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.AccountBalanceEntity">
+        <id property="accountCode" column="account_code"/>
+        <result property="balance" column="balance"/>
+        <result property="lastSnapshotAt" column="last_snapshot_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="findByAccountCode" resultMap="AccountBalanceResultMap">
+        SELECT account_code, balance, last_snapshot_at, updated_at
+        FROM account_balances
+        WHERE account_code = #{accountCode}
+    </select>
+
+    <insert id="insertOrUpdateSnapshot">
+        INSERT INTO account_balances (account_code, balance, last_snapshot_at, updated_at)
+        VALUES (#{accountCode}, #{balance}, #{lastSnapshotAt}, #{updatedAt})
+        ON CONFLICT (account_code) DO UPDATE
+        SET balance = #{balance},
+            last_snapshot_at = #{lastSnapshotAt},
+            updated_at = #{updatedAt}
+    </insert>
+
+    <select id="findAll" resultMap="AccountBalanceResultMap">
+        SELECT account_code, balance, last_snapshot_at, updated_at
+        FROM account_balances
+        ORDER BY account_code
+    </select>
+
+</mapper>
+

@@ -1,7 +1,11 @@
 package com.dogancaglar.paymentservice.ports.outbound
 
-import com.dogancaglar.paymentservice.application.model.LedgerEntry
+import com.dogancaglar.paymentservice.domain.model.ledger.LedgerEntry
 
 interface LedgerEntryPort {
-    fun postLedgerEntriesAtomic(entries: List<LedgerEntry>)
+    /**
+     * Persists ledger entries atomically and populates the ledgerEntryId in each entry.
+     * @return List of ledger entries with populated IDs (same instances, IDs updated in-place)
+     */
+    fun postLedgerEntriesAtomic(entries: List<LedgerEntry>): List<LedgerEntry>
 }

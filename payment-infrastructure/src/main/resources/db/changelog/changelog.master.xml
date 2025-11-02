@@ -16,5 +16,5 @@
     <include file="2025-09-18-reset-autovacuum-payment-orders.xml" relativeToChangelogFile="true"/>
     <include file="20251014-change-amount-value-to-bigint.xml" relativeToChangelogFile="true"/>
     <include file="2025-10-27-ledger-entry-tables.xml" relativeToChangelogFile="true"/>
-
+    <include file="2025-11-01-account-balances-table.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

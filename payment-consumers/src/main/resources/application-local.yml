@@ -42,6 +42,12 @@ app:
         class-name: com.dogancaglar.paymentservice.port.inbound.consumers.LedgerRecordingConsumer
         concurrency: 4
 
+      - id: account-balance-consumer
+        topic: ledger_entries_recorded_topic
+        group-id: account-balance-consumer-group
+        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.AccountBalanceConsumer
+        concurrency: 4
+
 
 server:
   port: 8080

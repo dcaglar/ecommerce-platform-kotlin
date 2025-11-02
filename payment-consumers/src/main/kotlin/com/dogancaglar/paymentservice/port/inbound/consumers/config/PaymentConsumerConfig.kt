@@ -10,6 +10,10 @@ import com.dogancaglar.paymentservice.application.usecases.RequestLedgerRecordin
 import com.dogancaglar.paymentservice.domain.util.PaymentFactory
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderFactory
+import com.dogancaglar.paymentservice.application.usecases.AccountBalanceService
+import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceUseCase
+import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
+import com.dogancaglar.paymentservice.ports.outbound.BalanceIdempotencyPort
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
 import org.springframework.beans.factory.annotation.Qualifier
@@ -78,4 +82,15 @@ class PaymentConsumerConfig {
     @Bean
     fun createPaymentOrderFactory(clock: Clock) =
         PaymentOrderFactory()
+
+    @Bean
+    fun accountBalanceService(
+        balanceIdempotencyPort: BalanceIdempotencyPort,
+        accountBalanceCachePort: AccountBalanceCachePort
+    ): AccountBalanceService {
+        return AccountBalanceService(
+            balanceIdempotencyPort = balanceIdempotencyPort,
+            accountBalanceCachePort = accountBalanceCachePort
+        )
+    }
 }

@@ -1,7 +1,7 @@
-package com.dogancaglar.paymentservice.application.usecases
+package com.dogancaglar.paymentservice.domain.util
 
-import com.dogancaglar.paymentservice.application.model.LedgerEntry
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
+import com.dogancaglar.paymentservice.domain.model.ledger.LedgerEntry
 import java.time.Clock
 import java.time.LocalDateTime
 
@@ -24,10 +24,9 @@ class LedgerEntryFactory(
         journalEntry: JournalEntry,
         createdAt: LocalDateTime
     ): LedgerEntry =
-        LedgerEntry.create(
+        LedgerEntry.Companion.create(
             ledgerEntryId = ledgerEntryId,
             journalEntry = journalEntry,
             createdAt = createdAt
         )
 }
-

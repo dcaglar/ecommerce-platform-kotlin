@@ -12,6 +12,7 @@ import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderEvent
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspResultUpdated
+import com.dogancaglar.paymentservice.domain.event.LedgerEntriesRecorded
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.Consumer
@@ -164,15 +165,16 @@ class KafkaTypedConsumerFactoryConfig(
         }
 
 
-    private fun <T : Any> createTypedFactory(
+    private fun <T : Any> createFactory(
         clientId: String,
         concurrency: Int,
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         consumerFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler,
         ackMode: ContainerProperties.AckMode = ContainerProperties.AckMode.RECORD,
-        expectedEventType: String? = null,        // ← NEW
-        ackDiscarded: Boolean = true              // ← NEW
+        expectedEventType: String? = null,
+        ackDiscarded: Boolean = true,
+        batchMode: Boolean = false
     ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>> =
         ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>>().apply {
             this.consumerFactory = consumerFactory
@@ -188,9 +190,9 @@ class KafkaTypedConsumerFactoryConfig(
             setCommonErrorHandler(errorHandler)
             containerProperties.ackMode = ackMode
             setConcurrency(concurrency)
-            isBatchListener = false
+            isBatchListener = batchMode
 
-            // ← NEW: enforce semantic type at the container level
+            // enforce semantic type at the container level
             expectedEventType?.let {
                 setRecordFilterStrategy(eventTypeFilter(expectedEventType))
                 setAckDiscarded(ackDiscarded)
@@ -205,7 +207,7 @@ class KafkaTypedConsumerFactoryConfig(
         errorHandler: DefaultErrorHandler
     ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderCreated>> {
         val cfg = cfgFor(EventMetadatas.PaymentOrderCreatedMetadata.topic, "${Topics.PAYMENT_ORDER_CREATED}-factory")
-        return createTypedFactory(
+        return createFactory(
             clientId = cfg.id,
             concurrency = cfg.concurrency,
             interceptor = interceptor,
@@ -213,6 +215,7 @@ class KafkaTypedConsumerFactoryConfig(
             errorHandler = errorHandler,
             ackMode = ContainerProperties.AckMode.MANUAL,
             expectedEventType = EventMetadatas.PaymentOrderCreatedMetadata.eventType,
+            batchMode = false
         )
     }
 
@@ -228,7 +231,7 @@ class KafkaTypedConsumerFactoryConfig(
             EventMetadatas.PaymentOrderPspCallRequestedMetadata.topic,
             "${Topics.PAYMENT_ORDER_PSP_CALL_REQUESTED}-factory"
         )
-        return createTypedFactory(
+        return createFactory(
             clientId = cfg.id,
             concurrency = cfg.concurrency,
             interceptor = interceptor,
@@ -236,6 +239,7 @@ class KafkaTypedConsumerFactoryConfig(
             errorHandler = errorHandler,
             ackMode = ContainerProperties.AckMode.MANUAL,
             expectedEventType = EventMetadatas.PaymentOrderPspCallRequestedMetadata.eventType,
+            batchMode = false
         )
     }
 
@@ -248,7 +252,7 @@ class KafkaTypedConsumerFactoryConfig(
         errorHandler: DefaultErrorHandler
     ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderPspResultUpdated>> {
         val cfg = cfgFor(EventMetadatas.PaymentOrderPspResultUpdatedMetadata.topic, "${Topics.PAYMENT_ORDER_PSP_RESULT_UPDATED}-factory")
-        return createTypedFactory(
+        return createFactory(
             clientId = cfg.id,
             concurrency = cfg.concurrency,
             interceptor = interceptor,
@@ -256,6 +260,7 @@ class KafkaTypedConsumerFactoryConfig(
             errorHandler = errorHandler,
             ackMode = ContainerProperties.AckMode.MANUAL,
             expectedEventType = EventMetadatas.PaymentOrderPspResultUpdatedMetadata.eventType,
+            batchMode = false
         )
     }
 
@@ -273,7 +278,7 @@ class KafkaTypedConsumerFactoryConfig(
             "${Topics.LEDGER_RECORD_REQUEST_QUEUE}-factory"
         )
 
-        return createTypedFactory(
+        return createFactory(
             clientId = cfg.id,
             concurrency = cfg.concurrency,
             interceptor = interceptor,
@@ -281,7 +286,8 @@ class KafkaTypedConsumerFactoryConfig(
             errorHandler = errorHandler,
             ackMode = ContainerProperties.AckMode.MANUAL,
             expectedEventType = EventMetadatas.LedgerRecordingCommandMetadata.eventType,
-            ackDiscarded = true
+            ackDiscarded = true,
+            batchMode = false
         )
     }
 
@@ -296,7 +302,7 @@ class KafkaTypedConsumerFactoryConfig(
             EventMetadatas.PaymentOrderStatusCheckScheduledMetadata.topic,
             "${Topics.PAYMENT_STATUS_CHECK}-factory"
         )
-        return createTypedFactory(
+        return createFactory(
             clientId = cfg.id,
             concurrency = cfg.concurrency,
             interceptor = interceptor,
@@ -304,6 +310,31 @@ class KafkaTypedConsumerFactoryConfig(
             errorHandler = errorHandler,
             ackMode = ContainerProperties.AckMode.MANUAL,
             expectedEventType = EventMetadatas.PaymentOrderStatusCheckScheduledMetadata.eventType,
+            batchMode = false
+        )
+    }
+
+    @Bean("${Topics.LEDGER_ENTRIES_RECORDED}-factory")
+    fun ledgerEntriesRecordedFactory(
+        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
+        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<LedgerEntriesRecorded>> {
+        val cfg = cfgFor(
+            EventMetadatas.LedgerEntriesRecordedMetadata.topic,
+            "${Topics.LEDGER_ENTRIES_RECORDED}-factory"
+        )
+        return createFactory(
+            clientId = cfg.id,
+            concurrency = cfg.concurrency,
+            interceptor = interceptor,
+            consumerFactory = customFactory,
+            errorHandler = errorHandler,
+            ackMode = ContainerProperties.AckMode.MANUAL,
+            expectedEventType = EventMetadatas.LedgerEntriesRecordedMetadata.eventType,
+            ackDiscarded = true,
+            batchMode = true
         )
     }
 
@@ -322,7 +353,7 @@ class KafkaTypedConsumerFactoryConfig(
         )
 
         // ✅ specify type parameter explicitly
-        val factory = createTypedFactory<PaymentOrderEvent>(
+        val factory = createFactory<PaymentOrderEvent>(
             clientId = cfg.id,
             concurrency = cfg.concurrency,
             interceptor = interceptor,
@@ -330,7 +361,8 @@ class KafkaTypedConsumerFactoryConfig(
             errorHandler = errorHandler,
             ackMode = ContainerProperties.AckMode.MANUAL,
             expectedEventType = null,
-            ackDiscarded = true
+            ackDiscarded = true,
+            batchMode = false
         )
 
         factory.setRecordFilterStrategy { rec ->

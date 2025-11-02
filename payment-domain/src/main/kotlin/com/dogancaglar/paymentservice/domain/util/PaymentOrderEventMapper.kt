@@ -18,7 +18,7 @@ class PaymentOrderDomainEventMapper(
 
     /** 🔹 Domain → Event: when PaymentOrder is first created */
     fun toPaymentOrderCreated(order: PaymentOrder): PaymentOrderCreated =
-        PaymentOrderCreated(
+        PaymentOrderCreated.create(
             paymentOrderId = order.paymentOrderId.value.toString(),
             publicPaymentOrderId = order.publicPaymentOrderId,
             paymentId = order.paymentId.value.toString(),
@@ -33,7 +33,7 @@ class PaymentOrderDomainEventMapper(
 
     /** 🔹 Domain → Event: PSP call requested */
     fun toPaymentOrderPspCallRequested(order: PaymentOrder, attempt: Int): PaymentOrderPspCallRequested =
-        PaymentOrderPspCallRequested(
+        PaymentOrderPspCallRequested.create(
             paymentOrderId = order.paymentOrderId.value.toString(),
             publicPaymentOrderId = order.publicPaymentOrderId,
             paymentId = order.paymentId.value.toString(),
@@ -51,7 +51,7 @@ class PaymentOrderDomainEventMapper(
 
     /** 🔹 Domain → Event: successful final state */
     fun toPaymentOrderSucceeded(order: PaymentOrder): PaymentOrderSucceeded =
-        PaymentOrderSucceeded(
+        PaymentOrderSucceeded.create(
             paymentOrderId = order.paymentOrderId.value.toString(),
             publicPaymentOrderId = order.publicPaymentOrderId,
             paymentId = order.paymentId.value.toString(),
@@ -59,11 +59,11 @@ class PaymentOrderDomainEventMapper(
             sellerId = order.sellerId.value,
             amountValue = order.amount.quantity,
             currency = order.amount.currency.currencyCode,
-            status = order.status.name,
-            )
+            status = order.status.name
+        )
 
     fun toPaymentOrderFailed(order: PaymentOrder): PaymentOrderFailed =
-        PaymentOrderFailed(
+        PaymentOrderFailed.create(
             paymentOrderId = order.paymentOrderId.value.toString(),
             publicPaymentOrderId = order.publicPaymentOrderId,
             paymentId = order.paymentId.value.toString(),
@@ -71,12 +71,12 @@ class PaymentOrderDomainEventMapper(
             sellerId = order.sellerId.value,
             amountValue = order.amount.quantity,
             currency = order.amount.currency.currencyCode,
-            status = order.status.name,
-            )
+            status = order.status.name
+        )
 
     /** 🔹 Domain → Event: schedule PSP status check */
     fun toPaymentOrderStatusCheckRequested(order: PaymentOrder): PaymentOrderStatusCheckRequested =
-        PaymentOrderStatusCheckRequested(
+        PaymentOrderStatusCheckRequested.create(
             paymentOrderId = order.paymentOrderId.value.toString(),
             publicPaymentOrderId = order.publicPaymentOrderId,
             paymentId = order.paymentId.value.toString(),

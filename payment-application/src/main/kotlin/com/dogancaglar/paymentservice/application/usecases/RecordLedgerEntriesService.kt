@@ -1,7 +1,6 @@
 package com.dogancaglar.paymentservice.application.usecases
 
 import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.paymentservice.application.model.LedgerEntry
 import com.dogancaglar.paymentservice.domain.commands.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.LedgerEntriesRecorded
@@ -11,6 +10,8 @@ import com.dogancaglar.paymentservice.domain.model.ledger.Account
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
 import com.dogancaglar.paymentservice.domain.model.ledger.AuthType
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
+import com.dogancaglar.paymentservice.domain.util.LedgerDomainEventMapper
+import com.dogancaglar.paymentservice.domain.util.LedgerEntryFactory
 import com.dogancaglar.paymentservice.ports.inbound.RecordLedgerEntriesUseCase
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
@@ -25,6 +26,7 @@ open class RecordLedgerEntriesService(
 ) : RecordLedgerEntriesUseCase {
 
     private val ledgerEntryFactory = LedgerEntryFactory(clock)
+    private val logger = org.slf4j.LoggerFactory.getLogger(javaClass)
 
     override fun recordLedgerEntries(event: LedgerRecordingCommand) {
         val createdAt = LocalDateTime.now(clock)
@@ -33,7 +35,6 @@ open class RecordLedgerEntriesService(
 
         val amount = Amount.of(event.amountValue, Currency(event.currency))
         val merchantAccount = Account.create(AccountType.MERCHANT_ACCOUNT, event.sellerId)
-        val acquirerAccount = Account.create(AccountType.ACQUIRER_ACCOUNT, event.sellerId)
 
         val journalEntries: List<JournalEntry> = when (event.status.uppercase()) {
             "SUCCESSFUL_FINAL" ->
@@ -45,9 +46,9 @@ open class RecordLedgerEntriesService(
                     )
                 } else {
                     JournalEntry.authHold(
-                        paymentOrderId = event.publicPaymentOrderId,
+                paymentOrderId = event.publicPaymentOrderId,
                         authorizedAmount = amount
-                    )
+            )
                 }
             "FAILED_FINAL", "FAILED" -> JournalEntry.failedPayment(
                 paymentOrderId = event.publicPaymentOrderId,
@@ -61,10 +62,20 @@ open class RecordLedgerEntriesService(
         // 1️⃣ Transform journals to LedgerEntry
         val ledgerEntries = journalEntries.map { ledgerEntryFactory.create(it) }
 
-        ledgerWritePort.postLedgerEntriesAtomic(ledgerEntries)
+        // 2️⃣ Persist ledger entries and get populated LedgerEntry objects with IDs
+        val persistedLedgerEntries = ledgerWritePort.postLedgerEntriesAtomic(ledgerEntries)
+        if (persistedLedgerEntries.isEmpty()) {
+            logger.warn("⚠️ No ledger entries were persisted (duplicate or error)")
+            return
+        }
 
-        // 3️⃣ Build and publish domain event
-        val recordedEvent = LedgerEntriesRecorded(
+        // 3️⃣ Map LedgerEntry to LedgerEntryEventData for event publication
+        val ledgerEntryEventDataList = persistedLedgerEntries.map { 
+            LedgerDomainEventMapper.toLedgerEntryEventData(it)
+        }
+
+        // 4️⃣ Build and publish domain event
+        val recordedEvent = LedgerEntriesRecorded.create(
             ledgerBatchId = "ledger-batch-${UUID.randomUUID()}",
             paymentOrderId = event.paymentOrderId,
             publicPaymentOrderId = event.publicPaymentOrderId,
@@ -72,8 +83,7 @@ open class RecordLedgerEntriesService(
             currency = event.currency,
             status = event.status,
             recordedAt = createdAt,
-            entryCount = ledgerEntries.size,
-            ledgerEntryIds = ledgerEntries.map { it.ledgerEntryId },
+            ledgerEntries = ledgerEntryEventDataList,
             traceId = traceId,
             parentEventId = parentEventId?.toString()
         )
@@ -86,7 +96,6 @@ open class RecordLedgerEntriesService(
             traceId = traceId
         )
     }
-
 
 
 }

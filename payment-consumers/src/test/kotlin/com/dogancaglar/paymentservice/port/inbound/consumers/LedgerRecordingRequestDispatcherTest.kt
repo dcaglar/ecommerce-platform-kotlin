@@ -60,7 +60,7 @@ class LedgerRecordingRequestDispatcherTest {
         val consumedEventId = UUID.fromString("11111111-1111-1111-1111-111111111111")
         val parentEventId = UUID.fromString("22222222-2222-2222-2222-222222222222")
         
-        val successEvent = PaymentOrderSucceeded(
+        val successEvent = PaymentOrderSucceeded.create(
             paymentOrderId = paymentOrderId.value.toString(),
             publicPaymentOrderId = "public-123",
             paymentId = PaymentId(456L).value.toString(),
@@ -139,7 +139,7 @@ class LedgerRecordingRequestDispatcherTest {
         val consumedEventId = UUID.fromString("33333333-3333-3333-3333-333333333333")
         val parentEventId = UUID.fromString("44444444-4444-4444-4444-444444444444")
         
-        val failedEvent = PaymentOrderFailed(
+        val failedEvent = PaymentOrderFailed.create(
             paymentOrderId = paymentOrderId.value.toString(),
             publicPaymentOrderId = "public-456",
             paymentId = PaymentId(789L).value.toString(),
@@ -213,7 +213,7 @@ class LedgerRecordingRequestDispatcherTest {
     fun `should propagate exception when use case throws`() {
         // Given
         val paymentOrderId = PaymentOrderId(789L)
-        val successEvent = PaymentOrderSucceeded(
+        val successEvent = PaymentOrderSucceeded.create(
             paymentOrderId = paymentOrderId.value.toString(),
             publicPaymentOrderId = "public-789",
             paymentId = PaymentId(101L).value.toString(),

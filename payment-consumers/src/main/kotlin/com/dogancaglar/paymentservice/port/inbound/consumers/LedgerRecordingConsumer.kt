@@ -44,7 +44,6 @@ class LedgerRecordingConsumer(
                     "🧾 Recording ledger entries for paymentOrderId={} status={} traceId={}",
                     command.publicPaymentOrderId, command.status, env.traceId
                 )
-
                 recordLedgerEntriesUseCase.recordLedgerEntries(command)
 
                 logger.info(

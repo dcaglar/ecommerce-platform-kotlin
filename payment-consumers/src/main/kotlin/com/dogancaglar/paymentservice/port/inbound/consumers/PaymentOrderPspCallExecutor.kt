@@ -102,7 +102,7 @@ class PaymentOrderPspCallExecutor(
             val tookMs = System.currentTimeMillis() - startMs
             pspLatency.record(tookMs, TimeUnit.MILLISECONDS)
             // Build result-updated event (extends PaymentOrderEvent)
-            val result = PaymentOrderPspResultUpdated(
+            val result = PaymentOrderPspResultUpdated.create(
                 paymentOrderId = work.paymentOrderId,
                 publicPaymentOrderId = work.publicPaymentOrderId,
                 paymentId = work.paymentId,
@@ -114,9 +114,9 @@ class PaymentOrderPspCallExecutor(
                 createdAt = work.createdAt,
                 updatedAt = work.updatedAt,
                 retryCount = work.retryCount,       // attempt index (0..n)
+                pspStatus = mappedStatus.name,      // will be interpreted by the Applier
                 retryReason = work.retryReason,
                 lastErrorMessage = work.lastErrorMessage,
-                pspStatus = mappedStatus.name,      // will be interpreted by the Applier
                 pspErrorCode = errorCode,
                 pspErrorDetail = errorDetail,
                 latencyMs = tookMs
