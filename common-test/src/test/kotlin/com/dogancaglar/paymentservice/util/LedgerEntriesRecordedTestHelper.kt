@@ -1,5 +1,8 @@
 package com.dogancaglar.paymentservice.util
 
+import com.dogancaglar.common.event.DomainEventEnvelopeFactory
+import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.LedgerEntriesRecorded
 import com.dogancaglar.paymentservice.domain.event.LedgerEntryEventData
 import com.dogancaglar.paymentservice.domain.event.PostingDirection
@@ -243,6 +246,15 @@ object LedgerEntriesRecordedTestHelper {
             ),
             traceId = traceId,
             parentEventId = parentEventId
+        )
+    }
+
+    fun wrapInEnvelope(event: LedgerEntriesRecorded): EventEnvelope<LedgerEntriesRecorded> {
+        return DomainEventEnvelopeFactory.envelopeFor(
+            data = event,
+            eventMetaData = EventMetadatas.LedgerEntriesRecordedMetadata,
+            aggregateId = event.sellerId,
+            traceId = "trace-123"
         )
     }
 }

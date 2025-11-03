@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.ports.inbound
 
 import com.dogancaglar.paymentservice.domain.event.LedgerEntryEventData
+import com.dogancaglar.paymentservice.domain.model.ledger.LedgerEntry
 
 /**
  * Use case for updating account balances from ledger entries.
@@ -14,7 +15,7 @@ interface AccountBalanceUseCase {
      * @return List of processed ledger entry IDs (already persisted, safe to mark as processed)
      */
     fun updateAccountBalancesBatch(
-        ledgerEntries: List<LedgerEntryEventData>
+        ledgerEntries: List<LedgerEntry>
     ): List<Long>
 }
 

@@ -135,6 +135,18 @@ ecommerce-platform-kotlin/
 traceId:"abc123" AND eventMeta:"PaymentOrderPspCallRequested"
 ```
 
+## 🧪 Testing Strategy
+
+- **Comprehensive Test Suite**: Unit tests with MockK and integration tests with TestContainers
+- **Test Execution**:
+  - **Unit Tests**: `mvn test` (Maven Surefire, `test` phase - fast, runs on every build)
+  - **Integration Tests**: `mvn verify` (Maven Failsafe, `integration-test` + `verify` phases - slower, runs before release)
+  - **Both**: `mvn test && mvn verify`
+- **Test Organization**: Lifecycle-based separation by filename pattern
+  - **Unit tests**: `*Test.kt` (Surefire - fast feedback loop)
+  - **Integration tests**: `*IntegrationTest.kt` (Failsafe - comprehensive validation, all tagged with `@Tag("integration")`)
+- **Design Rationale**: Surefire and Failsafe complement each other - unit tests provide fast CI/CD feedback, integration tests ensure comprehensive validation before releases
+
 ---
 
 ## 📄 License

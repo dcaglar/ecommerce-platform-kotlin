@@ -104,6 +104,7 @@ DROP TABLE IF EXISTS account_balances;
 CREATE TABLE account_balances (
     account_code VARCHAR(128) PRIMARY KEY,
     balance BIGINT NOT NULL,
+    last_applied_entry_id BIGINT NOT NULL DEFAULT 0,
     last_snapshot_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

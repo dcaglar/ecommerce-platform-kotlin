@@ -181,29 +181,42 @@ curl -i -X POST http://127.0.0.1/payments \
 
 ## 2️⃣ Run Unit & Integration Tests
 
-- Why: Verify the codebase with 297 tests using MockK and Testcontainers.
+- Why: Verify the codebase using MockK and Testcontainers.
 - What: Tests cover domain logic, application services, and infrastructure adapters.
 
 ```bash
-# Run all unit tests across all modules (uses Maven Surefire)
+# Run only unit tests (fast, excludes integration tests by filename pattern)
 mvn clean test
 
-# Run integration tests (uses Maven Failsafe)
+# Run only integration tests (slower, uses TestContainers, runs via Failsafe)
 mvn clean verify
 
-# Run tests for specific modules
+# Run both unit and integration tests (requires both commands)
+mvn clean test && mvn clean verify
+
+# Run tests for specific modules (unit tests only)
 mvn clean test -pl payment-application,payment-infrastructure,payment-domain,common
 
-# Run specific test classes
+# Run integration tests for specific modules
+mvn clean verify -pl payment-infrastructure
+
+# Run specific test classes (unit tests)
 mvn test -Dtest=CreatePaymentServiceTest,ProcessPaymentServiceTest
 
-# Run only integration tests
-mvn test -Dtest="*IntegrationTest" -DfailIfNoTests=false
+# Run specific integration test classes
+mvn verify -Dtest=AccountBalanceMapperIntegrationTest
 ```
 
 **Test Organization:**
-- **Unit Tests** (`*Test.kt`): Use mocks only, no external dependencies, run with `mvn test`
-- **Integration Tests** (`*IntegrationTest.kt`): Use real external dependencies via TestContainers, run with `mvn verify`
+- **Unit Tests** (`*Test.kt`): Use mocks only, no external dependencies
+  - **Execution**: Run with `mvn test` (Maven Surefire plugin, `test` phase)
+  - **Design**: Fast tests run on every build for quick feedback
+  - **Configuration**: Surefire excludes `*IntegrationTest.kt` files by filename pattern
+- **Integration Tests** (`*IntegrationTest.kt`): Use real external dependencies via TestContainers, all tagged with `@Tag("integration")`
+  - **Execution**: Run with `mvn verify` (Maven Failsafe plugin, `integration-test` + `verify` phases)
+  - **Design**: Slower tests run before release/deployment for comprehensive validation
+  - **Configuration**: Failsafe includes `*IntegrationTest.kt` files by filename pattern
+  - **Lifecycle Separation**: Surefire and Failsafe complement each other - unit tests provide fast feedback, integration tests provide comprehensive validation before releases
 - **No Hanging Tests**: All MockK syntax issues resolved for reliable test execution
 - **Type Inference Fixed**: Resolved MockK type inference issues in `OutboxDispatcherJobTest.kt` with explicit type hints and Jackson JSR310 module configuration
 

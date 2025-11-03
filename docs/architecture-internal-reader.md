@@ -1493,6 +1493,17 @@ The project employs a comprehensive testing strategy with **297 tests** achievin
 - **TestContainers**: ✅ **YES** - `@Container`, `RedisContainer`, `PostgreSQLContainer`
 - **Spring Boot Tests**: ✅ **YES** - `@SpringBootTest`, `@DataRedisTest`, etc.
 - **Maven Plugin**: **Failsafe** - Runs with `mvn verify`
+- **Test Tagging**: ✅ **ALL TAGGED** - All integration tests use `@Tag("integration")` for future flexibility
+  - **Execution**: 
+    - `mvn test` → Runs unit tests only (Surefire excludes `*IntegrationTest.kt` by filename)
+    - `mvn verify` → Runs integration tests only (Failsafe includes `*IntegrationTest.kt` by filename)
+    - `mvn test && mvn verify` → Runs both unit and integration tests
+  - **Design Rationale**: Lifecycle-based separation (complementary, not competing)
+    - **Surefire (test phase)**: Fast unit tests run on every build for quick feedback
+    - **Failsafe (integration-test + verify phases)**: Slower integration tests run before release/deployment
+    - **Benefits**: Fast CI/CD feedback loop, comprehensive testing before releases, optional integration test execution
+  - **Separation Method**: Maven Surefire/Failsafe plugins use filename patterns (not tags) to separate tests by lifecycle phase
+  - **Consistency**: All 10 integration test files (PostgreSQL + Redis) consistently tagged for future tag-based filtering
 
 #### Unit Testing with MockK
 
@@ -1576,12 +1587,22 @@ verify(exactly = 1) {
 
 #### Integration Testing with TestContainers
 
-- **PostgreSQL Integration Tests**: Real database with partitioned outbox tables and ledger tables
+- **PostgreSQL Integration Tests** (5 test files, all tagged `@Tag("integration")`): Real database with partitioned outbox tables and ledger tables
+    - `AccountBalanceMapperIntegrationTest`: Tests account balance snapshot persistence with watermark-based idempotency
     - `LedgerMapperIntegrationTest`: Tests journal entries and postings persistence with Testcontainers PostgreSQL
-    - Validates MyBatis mapper queries (`LedgerMapper`), duplicate handling via `ON CONFLICT`, and foreign key constraints
+    - `PaymentOrderMapperIntegrationTest`: Tests payment order CRUD operations
+    - `OutboxEventMapperIntegrationTest`: Tests outbox event persistence
+    - `PaymentOutboundAdapterIntegrationTest`: Tests payment persistence operations
+    - All validate MyBatis mapper queries, duplicate handling via `ON CONFLICT`, and foreign key constraints
     - Verifies actual data is persisted correctly, not just return counts
-- **Redis Integration Tests**: Real Redis instances for caching and retry mechanisms
+- **Redis Integration Tests** (5 test files, all tagged `@Tag("integration")`): Real Redis instances for caching and retry mechanisms
+    - `AccountBalanceRedisCacheAdapterIntegrationTest`: Tests Redis Lua scripts for atomic delta/watermark operations
+    - `PaymentRetryQueueAdapterIntegrationTest`: Tests retry queue ZSet operations
+    - `RedisIdGeneratorPortAdapterIntegrationTest`: Tests ID generation
+    - `PspResultRedisCacheAdapterIntegrationTest`: Tests PSP result caching
+    - `PaymentRetryRedisCacheIntegrationTest`: Tests retry cache operations
 - **Kafka Integration Tests**: Real Kafka clusters for event publishing/consuming
+- **Tagging Standard**: All integration tests use `@Tag("integration")` for consistent selective execution
 - Ensures realistic end-to-end behavior
 - Validates outbox pattern, event publishing, and retry mechanisms
 
@@ -1614,6 +1635,7 @@ verify(exactly = 1) {
 8. **Explicit Verification**: Tests verify actual parameters passed to mocked methods, not just that methods were called
 9. **No Self-Reinforcing Mocks**: Stubs use `any()`, verifications use explicit criteria to catch real bugs
 10. **Capturing Only When Necessary**: `capture()` reserved for exception scenarios; normal verification uses explicit `match {}`
+11. **Consistent Tagging**: All integration tests tagged with `@Tag("integration")` for selective execution and CI/CD flexibility
 
 ---
 

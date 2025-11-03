@@ -1,16 +1,8 @@
 package com.dogancaglar.paymentservice.ports.outbound
 
+import com.dogancaglar.paymentservice.domain.model.balance.AccountBalanceSnapshot
 import java.time.LocalDateTime
 
-/**
- * Represents a balance snapshot in the database.
- */
-data class AccountBalanceSnapshot(
-    val accountCode: String, // Primary key: e.g., "MERCHANT_ACCOUNT.MERCHANT-456"
-    val balance: Long, // Current balance in minor currency units
-    val lastSnapshotAt: LocalDateTime,
-    val updatedAt: LocalDateTime
-)
 
 /**
  * Port for persisting account balance snapshots to database.
@@ -31,5 +23,11 @@ interface AccountBalanceSnapshotPort {
      * Finds all snapshots.
      */
     fun findAllSnapshots(): List<AccountBalanceSnapshot>
+
+    /*
+    find accountbalancesnapshots by accountcodes
+     */
+    fun findByAccountCodes(accountCodes: Set<String>): List<AccountBalanceSnapshot>
+
 }
 

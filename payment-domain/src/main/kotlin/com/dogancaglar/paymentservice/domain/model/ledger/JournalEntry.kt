@@ -19,7 +19,7 @@ class JournalEntry private constructor(
 ) {
 
     init {
-        require(postings.isNotEmpty()) { "JournalEntry must have at least one posting" }
+        require(postings.isNotEmpty() && postings.size>=2) { "JournalEntry must have at least one posting" }
         val totalDebitAmount = postings.filterIsInstance<Posting.Debit>().sumOf { it.amount.quantity }
         val totalCreditAmount = postings.filterIsInstance<Posting.Credit>().sumOf { it.amount.quantity }
         require(totalDebitAmount == totalCreditAmount) {
@@ -154,9 +154,24 @@ class JournalEntry private constructor(
         fun failedPayment(paymentOrderId: String, amount: Amount): List<JournalEntry> =
             emptyList()
 
-        // Internal: Test-only method for creating custom entries
-        // Visible to tests in payment-domain module
-        internal fun createForTest(
+        fun fromPersistence(
+            id: String,
+            txType: JournalType,
+            name: String,
+            postings: List<Posting>,
+            referenceType: String? = null,
+            referenceId: String? = null
+        ): JournalEntry = JournalEntry(
+            id = id,
+            txType = txType,
+            name = name,
+            postings = postings,
+            referenceType = referenceType,
+            referenceId = referenceId
+        )
+
+        //Test-only method for creating custom entries
+         fun createForTest(
             id: String,
             txType: JournalType,
             name: String = "Test Entry",
@@ -165,4 +180,6 @@ class JournalEntry private constructor(
             referenceId: String? = null
         ): JournalEntry = JournalEntry(id, txType, name, postings, referenceType, referenceId)
     }
+
+
 }

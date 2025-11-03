@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.persistance
 
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.AccountBalanceEntity
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.AccountBalanceMapper
-import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshot
+import com.dogancaglar.paymentservice.domain.model.balance.AccountBalanceSnapshot
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import org.springframework.stereotype.Repository
 
@@ -21,6 +21,7 @@ class AccountBalanceSnapshotAdapter(
         val entity = AccountBalanceEntity(
             accountCode = snapshot.accountCode,
             balance = snapshot.balance,
+            lastAppliedEntryId = snapshot.lastAppliedEntryId,
             lastSnapshotAt = snapshot.lastSnapshotAt,
             updatedAt = snapshot.updatedAt
         )
@@ -31,11 +32,18 @@ class AccountBalanceSnapshotAdapter(
         return accountBalanceMapper.findAll()
             .map { toSnapshot(it) }
     }
-    
+
+    override fun findByAccountCodes(accountCodes: Set<String>): List<AccountBalanceSnapshot> {
+        return accountBalanceMapper.findByAccountCodes(accountCodes)
+            .map { toSnapshot(it) }
+            .toList()
+    }
+
     private fun toSnapshot(entity: AccountBalanceEntity): AccountBalanceSnapshot {
         return AccountBalanceSnapshot(
             accountCode = entity.accountCode,
             balance = entity.balance,
+            lastAppliedEntryId = entity.lastAppliedEntryId,
             lastSnapshotAt = entity.lastSnapshotAt,
             updatedAt = entity.updatedAt
         )

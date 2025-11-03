@@ -8,5 +8,6 @@ interface AccountBalanceMapper {
     fun findByAccountCode(accountCode: String): AccountBalanceEntity?
     fun insertOrUpdateSnapshot(snapshot: AccountBalanceEntity): Int
     fun findAll(): List<AccountBalanceEntity>
+    fun findByAccountCodes(accountCodes: Set<String>): List<AccountBalanceEntity>
 }
 

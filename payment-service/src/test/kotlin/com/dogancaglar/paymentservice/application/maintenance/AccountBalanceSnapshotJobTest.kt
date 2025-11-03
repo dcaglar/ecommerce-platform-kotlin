@@ -1,11 +1,9 @@
 package com.dogancaglar.paymentservice.application.maintenance
 
+import com.dogancaglar.paymentservice.domain.model.balance.AccountBalanceSnapshot
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
-import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshot
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
-import io.micrometer.core.instrument.MeterRegistry
 import io.mockk.*
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.Duration
@@ -15,7 +13,6 @@ class AccountBalanceSnapshotJobTest {
 
     private lateinit var accountBalanceCachePort: AccountBalanceCachePort
     private lateinit var accountBalanceSnapshotPort: AccountBalanceSnapshotPort
-    private lateinit var meterRegistry: MeterRegistry
     private lateinit var job: AccountBalanceSnapshotJob
     private val snapshotInterval = Duration.ofMinutes(1)
 
@@ -23,43 +20,43 @@ class AccountBalanceSnapshotJobTest {
     fun setUp() {
         accountBalanceCachePort = mockk(relaxed = true)
         accountBalanceSnapshotPort = mockk(relaxed = true)
-        meterRegistry = mockk(relaxed = true)
-        
-        every { meterRegistry.counter(any()) } returns mockk(relaxed = true)
-        every { meterRegistry.timer(any()) } returns mockk(relaxed = true)
-        
         job = AccountBalanceSnapshotJob(
-            accountBalanceCachePort = accountBalanceCachePort,
-            accountBalanceSnapshotPort = accountBalanceSnapshotPort,
-            meterRegistry = meterRegistry,
+            cachePort = accountBalanceCachePort,
+            snapshotPort = accountBalanceSnapshotPort,
             snapshotInterval = snapshotInterval
         )
     }
 
     @Test
-    fun `mergeAccountDeltas should merge delta into snapshot and save`() {
+    fun `mergeDeltasToSnapshots should merge delta into snapshot and save`() {
         // Given
         val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
         val existingSnapshot = AccountBalanceSnapshot(
             accountCode = accountCode,
             balance = 100000L,
+            lastAppliedEntryId = 100L,
             lastSnapshotAt = LocalDateTime.now().minusHours(1),
             updatedAt = LocalDateTime.now().minusHours(1)
         )
         
+        val delta = 5000L
+        val upToEntryId = 150L
+        
+        every { accountBalanceCachePort.getDirtyAccounts() } returns setOf(accountCode)
+        every { accountBalanceCachePort.getAndResetDeltaWithWatermark(accountCode) } returns (delta to upToEntryId)
         every { accountBalanceSnapshotPort.getSnapshot(accountCode) } returns existingSnapshot
-        every { accountBalanceCachePort.getDelta(accountCode) } returns 5000L
-        every { accountBalanceSnapshotPort.saveSnapshot(any()) } returns Unit
+        every { accountBalanceSnapshotPort.saveSnapshot(any()) } just runs
 
         // When
-        job.mergeAccountDeltas(accountCode)
+        job.mergeDeltasToSnapshots()
 
-        // Then - Should merge: 100000 + 5000 = 105000
+        // Then - Should merge: 100000 + 5000 = 105000, watermark = max(100, 150) = 150
         verify(exactly = 1) {
             accountBalanceSnapshotPort.saveSnapshot(
                 match { snapshot ->
                     snapshot.accountCode == accountCode &&
                     snapshot.balance == 105000L &&
+                    snapshot.lastAppliedEntryId == 150L &&
                     snapshot.lastSnapshotAt.isAfter(existingSnapshot.lastSnapshotAt)
                 }
             )
@@ -67,98 +64,149 @@ class AccountBalanceSnapshotJobTest {
     }
 
     @Test
-    fun `mergeAccountDeltas should create new snapshot when not exists`() {
+    fun `mergeDeltasToSnapshots should create new snapshot when not exists`() {
         // Given
         val accountCode = "CASH.GLOBAL"
+        val delta = 10000L
+        val upToEntryId = 200L
         
+        every { accountBalanceCachePort.getDirtyAccounts() } returns setOf(accountCode)
+        every { accountBalanceCachePort.getAndResetDeltaWithWatermark(accountCode) } returns (delta to upToEntryId)
         every { accountBalanceSnapshotPort.getSnapshot(accountCode) } returns null
-        every { accountBalanceCachePort.getDelta(accountCode) } returns 10000L
-        every { accountBalanceSnapshotPort.saveSnapshot(any()) } returns Unit
+        every { accountBalanceSnapshotPort.saveSnapshot(any()) } just runs
 
         // When
-        job.mergeAccountDeltas(accountCode)
+        job.mergeDeltasToSnapshots()
 
         // Then - Should create new snapshot with delta as balance
         verify(exactly = 1) {
             accountBalanceSnapshotPort.saveSnapshot(
                 match { snapshot ->
                     snapshot.accountCode == accountCode &&
-                    snapshot.balance == 10000L
+                    snapshot.balance == 10000L &&
+                    snapshot.lastAppliedEntryId == 200L &&
+                    snapshot.lastSnapshotAt != null &&
+                    snapshot.updatedAt != null
                 }
             )
         }
     }
 
     @Test
-    fun `mergeAccountDeltas should skip when delta is zero`() {
+    fun `mergeDeltasToSnapshots should skip when delta is zero`() {
         // Given
         val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
-        val existingSnapshot = AccountBalanceSnapshot(
-            accountCode = accountCode,
-            balance = 100000L,
-            lastSnapshotAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
-        )
         
-        every { accountBalanceSnapshotPort.getSnapshot(accountCode) } returns existingSnapshot
-        every { accountBalanceCachePort.getDelta(accountCode) } returns 0L
+        every { accountBalanceCachePort.getDirtyAccounts() } returns setOf(accountCode)
+        every { accountBalanceCachePort.getAndResetDeltaWithWatermark(accountCode) } returns (0L to 100L)
 
         // When
-        job.mergeAccountDeltas(accountCode)
+        job.mergeDeltasToSnapshots()
 
-        // Then - Should not save snapshot
+        // Then - Should not fetch snapshot or save
+        verify(exactly = 0) { accountBalanceSnapshotPort.getSnapshot(any()) }
         verify(exactly = 0) { accountBalanceSnapshotPort.saveSnapshot(any()) }
     }
 
     @Test
-    fun `mergeAccountDeltas should handle negative deltas`() {
+    fun `mergeDeltasToSnapshots should handle negative deltas`() {
         // Given
         val accountCode = "CASH.GLOBAL"
         val existingSnapshot = AccountBalanceSnapshot(
             accountCode = accountCode,
             balance = 50000L,
+            lastAppliedEntryId = 50L,
             lastSnapshotAt = LocalDateTime.now(),
             updatedAt = LocalDateTime.now()
         )
         
+        val delta = -10000L
+        val upToEntryId = 75L
+        
+        every { accountBalanceCachePort.getDirtyAccounts() } returns setOf(accountCode)
+        every { accountBalanceCachePort.getAndResetDeltaWithWatermark(accountCode) } returns (delta to upToEntryId)
         every { accountBalanceSnapshotPort.getSnapshot(accountCode) } returns existingSnapshot
-        every { accountBalanceCachePort.getDelta(accountCode) } returns -10000L
-        every { accountBalanceSnapshotPort.saveSnapshot(any()) } returns Unit
+        every { accountBalanceSnapshotPort.saveSnapshot(any()) } just runs
 
         // When
-        job.mergeAccountDeltas(accountCode)
+        job.mergeDeltasToSnapshots()
 
-        // Then - Should merge: 50000 - 10000 = 40000
+        // Then - Should merge: 50000 - 10000 = 40000, watermark = max(50, 75) = 75
         verify(exactly = 1) {
             accountBalanceSnapshotPort.saveSnapshot(
                 match { snapshot ->
-                    snapshot.balance == 40000L
+                    snapshot.balance == 40000L &&
+                    snapshot.lastAppliedEntryId == 75L
                 }
             )
         }
     }
 
     @Test
-    fun `mergeDeltasToSnapshots should execute scheduled job`() {
-        // When - Call the scheduled method
+    fun `mergeDeltasToSnapshots should process multiple dirty accounts`() {
+        // Given
+        val accountCode1 = "MERCHANT_ACCOUNT.MERCHANT-456"
+        val accountCode2 = "MERCHANT_ACCOUNT.MERCHANT-789"
+        
+        val snapshot1 = AccountBalanceSnapshot(
+            accountCode = accountCode1,
+            balance = 100000L,
+            lastAppliedEntryId = 100L,
+            lastSnapshotAt = LocalDateTime.now(),
+            updatedAt = LocalDateTime.now()
+        )
+        val snapshot2 = AccountBalanceSnapshot(
+            accountCode = accountCode2,
+            balance = 50000L,
+            lastAppliedEntryId = 50L,
+            lastSnapshotAt = LocalDateTime.now(),
+            updatedAt = LocalDateTime.now()
+        )
+        
+        every { accountBalanceCachePort.getDirtyAccounts() } returns setOf(accountCode1, accountCode2)
+        every { accountBalanceCachePort.getAndResetDeltaWithWatermark(accountCode1) } returns (5000L to 150L)
+        every { accountBalanceCachePort.getAndResetDeltaWithWatermark(accountCode2) } returns (3000L to 80L)
+        every { accountBalanceSnapshotPort.getSnapshot(accountCode1) } returns snapshot1
+        every { accountBalanceSnapshotPort.getSnapshot(accountCode2) } returns snapshot2
+        every { accountBalanceSnapshotPort.saveSnapshot(any()) } just runs
+
+        // When
         job.mergeDeltasToSnapshots()
 
-        // Then - Should complete without exceptions (placeholder implementation)
-        // In production, this would scan Redis and process deltas
-        verify(exactly = 1) { meterRegistry.counter("account_balance_snapshots_processed_total") }
+        // Then - Should process both accounts
+        verify(exactly = 1) {
+            accountBalanceSnapshotPort.saveSnapshot(
+                match { snapshot -> snapshot.accountCode == accountCode1 && snapshot.balance == 105000L }
+            )
+        }
+        verify(exactly = 1) {
+            accountBalanceSnapshotPort.saveSnapshot(
+                match { snapshot -> snapshot.accountCode == accountCode2 && snapshot.balance == 53000L }
+            )
+        }
+    }
+
+    @Test
+    fun `mergeDeltasToSnapshots should return early when no dirty accounts`() {
+        // Given
+        every { accountBalanceCachePort.getDirtyAccounts() } returns emptySet()
+
+        // When
+        job.mergeDeltasToSnapshots()
+
+        // Then - Should not process anything
+        verify(exactly = 0) { accountBalanceCachePort.getAndResetDeltaWithWatermark(any()) }
+        verify(exactly = 0) { accountBalanceSnapshotPort.getSnapshot(any()) }
+        verify(exactly = 0) { accountBalanceSnapshotPort.saveSnapshot(any()) }
     }
 
     @Test
     fun `mergeDeltasToSnapshots should handle exceptions gracefully`() {
         // Given
-        every { meterRegistry.counter(any()) } throws RuntimeException("Metric error")
+        val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
+        every { accountBalanceCachePort.getDirtyAccounts() } throws RuntimeException("Redis error")
 
         // When/Then - Should not throw
-        try {
-            job.mergeDeltasToSnapshots()
-        } catch (e: Exception) {
-            // Exception is caught and logged internally
-        }
+        job.mergeDeltasToSnapshots()
     }
 }
-

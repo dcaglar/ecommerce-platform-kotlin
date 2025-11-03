@@ -23,6 +23,9 @@
                 <groupId>org.jetbrains.kotlin</groupId>
                 <artifactId>kotlin-maven-plugin</artifactId>
                 <version>${kotlin.version}</version>
+                <configuration>
+                    <testOutput>${project.build.directory}/test-classes</testOutput>
+                </configuration>
                 <executions>
                     <execution>
                         <id>compile</id>

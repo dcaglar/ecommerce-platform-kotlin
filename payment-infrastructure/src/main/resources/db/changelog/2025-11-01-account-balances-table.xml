@@ -16,6 +16,10 @@
             <column name="balance" type="BIGINT">
                 <constraints nullable="false"/>
             </column>
+            <!-- PER ACCOUNT WATERMARK-->
+            <column name="last_applied_entry_id" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
             <column name="last_snapshot_at" type="TIMESTAMP">
                 <constraints nullable="false"/>
             </column>

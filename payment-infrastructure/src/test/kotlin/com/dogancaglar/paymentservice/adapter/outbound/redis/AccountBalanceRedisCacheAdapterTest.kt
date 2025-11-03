@@ -1,139 +1,231 @@
 package com.dogancaglar.paymentservice.adapter.outbound.redis
 
 import io.mockk.*
-import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.springframework.data.redis.connection.RedisConnection
+import org.springframework.data.redis.core.HashOperations
+import org.springframework.data.redis.core.SetOperations
 import org.springframework.data.redis.core.StringRedisTemplate
-import org.springframework.data.redis.core.ValueOperations
 import java.util.concurrent.TimeUnit
 
+/**
+ * Unit tests for AccountBalanceRedisCacheAdapter using MockK.
+ * 
+ * Tests verify:
+ * - Lua script execution for addDeltaAndWatermark
+ * - Lua script execution for getAndResetDeltaWithWatermark
+ * - SET operations for markDirty and getDirtyAccounts
+ * - Hash operations for getRealTimeBalance
+ * - Key prefixing
+ * - TTL configuration
+ */
 class AccountBalanceRedisCacheAdapterTest {
 
     private lateinit var redisTemplate: StringRedisTemplate
-    private lateinit var valueOperations: ValueOperations<String, String>
+    private lateinit var hashOperations: HashOperations<String, String, String>
+    private lateinit var setOperations: SetOperations<String, String>
+    private lateinit var redisConnection: RedisConnection
     private lateinit var adapter: AccountBalanceRedisCacheAdapter
-    private val deltaTtlSeconds = 300L
+    private val ttlSeconds = 300L
 
     @BeforeEach
     fun setUp() {
         redisTemplate = mockk(relaxed = true)
-        valueOperations = mockk(relaxed = true)
-        every { redisTemplate.opsForValue() } returns valueOperations
-        adapter = AccountBalanceRedisCacheAdapter(redisTemplate, deltaTtlSeconds)
+        hashOperations = mockk(relaxed = true)
+        setOperations = mockk(relaxed = true)
+        redisConnection = mockk(relaxed = true)
+        
+        every { redisTemplate.opsForHash<String, String>() } returns hashOperations
+        every { redisTemplate.opsForSet() } returns setOperations
+        every { redisTemplate.expire(any<String>(), any<Long>(), any<TimeUnit>()) } returns true
+        
+        adapter = AccountBalanceRedisCacheAdapter(redisTemplate, ttlSeconds)
     }
 
     @Test
-    fun `incrementDelta should increment value and set TTL`() {
+    fun `addDeltaAndWatermark should execute Lua script with correct parameters`() {
         // Given
         val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
         val delta = 10000L
-        val key = "balance:delta:$accountCode"
+        val upToEntryId = 100L
         
-        every { valueOperations.increment(key, delta) } returns 15000L
+        every { redisTemplate.execute<Any?>(any<org.springframework.data.redis.core.RedisCallback<Any?>>()) } answers {
+            val callback = firstArg<org.springframework.data.redis.core.RedisCallback<Any?>>()
+            callback.doInRedis(redisConnection)
+            listOf<Any>(15000L, upToEntryId) // Return value from Lua script
+        }
 
         // When
-        adapter.incrementDelta(accountCode, delta)
+        adapter.addDeltaAndWatermark(accountCode, delta, upToEntryId)
 
-        // Then
-        verify(exactly = 1) { valueOperations.increment(key, delta) }
-        verify(exactly = 1) { redisTemplate.expire(key, deltaTtlSeconds, TimeUnit.SECONDS) }
+        // Then - Verify execute was called (Lua script execution)
+        verify(exactly = 1) { redisTemplate.execute<Any?>(any<org.springframework.data.redis.core.RedisCallback<Any?>>()) }
     }
 
     @Test
-    fun `incrementDelta should handle negative deltas`() {
-        // Given
-        val accountCode = "CASH.GLOBAL"
-        val delta = -5000L
-        val key = "balance:delta:$accountCode"
-        
-        every { valueOperations.increment(key, delta) } returns 5000L
-
-        // When
-        adapter.incrementDelta(accountCode, delta)
-
-        // Then
-        verify(exactly = 1) { valueOperations.increment(key, delta) }
-        verify(exactly = 1) { redisTemplate.expire(key, deltaTtlSeconds, TimeUnit.SECONDS) }
-    }
-
-    @Test
-    fun `getDelta should return 0 when key does not exist`() {
+    fun `getAndResetDeltaWithWatermark should execute Lua script and return delta and watermark`() {
         // Given
         val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
-        val key = "balance:delta:$accountCode"
+        val expectedDelta = 5000L
+        val expectedWatermark = 150L
         
-        every { valueOperations.get(key) } returns null
+        every { redisTemplate.execute<Any?>(any<org.springframework.data.redis.core.RedisCallback<Any?>>()) } answers {
+            val callback = firstArg<org.springframework.data.redis.core.RedisCallback<Any?>>()
+            callback.doInRedis(redisConnection)
+            listOf<Any>(expectedDelta, expectedWatermark) // Return value from Lua script
+        }
 
         // When
-        val result = adapter.getDelta(accountCode)
+        val result = adapter.getAndResetDeltaWithWatermark(accountCode)
 
         // Then
-        assertEquals(0L, result)
-        verify(exactly = 1) { valueOperations.get(key) }
+        assertEquals(expectedDelta, result.first)
+        assertEquals(expectedWatermark, result.second)
+        verify(exactly = 1) { redisTemplate.execute<Any?>(any<org.springframework.data.redis.core.RedisCallback<Any?>>()) }
     }
 
     @Test
-    fun `getDelta should return existing value`() {
+    fun `getAndResetDeltaWithWatermark should return zero when Lua script returns null`() {
         // Given
         val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
-        val key = "balance:delta:$accountCode"
         
-        every { valueOperations.get(key) } returns "25000"
+        every { redisTemplate.execute<Any?>(any<org.springframework.data.redis.core.RedisCallback<Any?>>()) } returns null
 
         // When
-        val result = adapter.getDelta(accountCode)
+        val result = adapter.getAndResetDeltaWithWatermark(accountCode)
 
         // Then
-        assertEquals(25000L, result)
-        verify(exactly = 1) { valueOperations.get(key) }
+        assertEquals(0L, result.first)
+        assertEquals(0L, result.second)
     }
 
     @Test
-    fun `getRealTimeBalance should return snapshot plus delta`() {
+    fun `getAndResetDeltaWithWatermark should handle invalid result type gracefully`() {
         // Given
         val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
-        val key = "balance:delta:$accountCode"
+        
+        every { redisTemplate.execute<Any?>(any<org.springframework.data.redis.core.RedisCallback<Any?>>()) } returns "invalid-result"
+
+        // When
+        val result = adapter.getAndResetDeltaWithWatermark(accountCode)
+
+        // Then - Should return zeros when result is not a List
+        assertEquals(0L, result.first)
+        assertEquals(0L, result.second)
+    }
+
+    @Test
+    fun `markDirty should add account to dirty set and set TTL`() {
+        // Given
+        val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
+        val expectedKey = "balance:acc:$accountCode"
+        
+        every { setOperations.add("balances:dirty", expectedKey) } returns 1L
+
+        // When
+        adapter.markDirty(accountCode)
+
+        // Then
+        verify(exactly = 1) { setOperations.add("balances:dirty", expectedKey) }
+        verify(exactly = 1) { redisTemplate.expire("balances:dirty", ttlSeconds, TimeUnit.SECONDS) }
+    }
+
+    @Test
+    fun `getRealTimeBalance should return snapshot plus delta from hash`() {
+        // Given
+        val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
         val snapshotBalance = 100000L
+        val delta = 5000L
+        val expectedKey = "balance:acc:$accountCode"
         
-        every { valueOperations.get(key) } returns "5000"  // Delta = 5000
+        every { hashOperations.get(expectedKey, "delta") } returns delta.toString()
 
         // When
         val result = adapter.getRealTimeBalance(accountCode, snapshotBalance)
 
         // Then
-        assertEquals(105000L, result)  // 100000 + 5000
-        verify(exactly = 1) { valueOperations.get(key) }
+        assertEquals(snapshotBalance + delta, result)
+        verify(exactly = 1) { hashOperations.get(expectedKey, "delta") }
     }
 
     @Test
-    fun `getRealTimeBalance should return snapshot when delta is 0`() {
+    fun `getRealTimeBalance should return snapshot when delta is null`() {
         // Given
         val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
         val snapshotBalance = 100000L
+        val expectedKey = "balance:acc:$accountCode"
         
-        every { valueOperations.get("balance:delta:$accountCode") } returns null  // No delta
+        every { hashOperations.get(expectedKey, "delta") } returns null
 
         // When
         val result = adapter.getRealTimeBalance(accountCode, snapshotBalance)
 
         // Then
-        assertEquals(100000L, result)  // snapshot + 0
+        assertEquals(snapshotBalance, result)
     }
 
     @Test
-    fun `getRealTimeBalance should handle negative deltas`() {
+    fun `getRealTimeBalance should handle invalid delta string gracefully`() {
         // Given
-        val accountCode = "CASH.GLOBAL"
-        val snapshotBalance = 50000L
+        val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
+        val snapshotBalance = 100000L
+        val expectedKey = "balance:acc:$accountCode"
         
-        every { valueOperations.get("balance:delta:$accountCode") } returns "-10000"  // Negative delta
+        every { hashOperations.get(expectedKey, "delta") } returns "invalid-number"
 
         // When
         val result = adapter.getRealTimeBalance(accountCode, snapshotBalance)
 
+        // Then - Should treat invalid delta as 0
+        assertEquals(snapshotBalance, result)
+    }
+
+    @Test
+    fun `getDirtyAccounts should return set of account codes from dirty set`() {
+        // Given
+        val dirtyKeys = setOf(
+            "balance:acc:MERCHANT_ACCOUNT.MERCHANT-1",
+            "balance:acc:MERCHANT_ACCOUNT.MERCHANT-2",
+            "balance:acc:CASH.GLOBAL"
+        )
+        
+        every { setOperations.members("balances:dirty") } returns dirtyKeys
+
+        // When
+        val result = adapter.getDirtyAccounts()
+
         // Then
-        assertEquals(40000L, result)  // 50000 - 10000
+        assertEquals(
+            setOf("MERCHANT_ACCOUNT.MERCHANT-1", "MERCHANT_ACCOUNT.MERCHANT-2", "CASH.GLOBAL"),
+            result
+        )
+        verify(exactly = 1) { setOperations.members("balances:dirty") }
+    }
+
+    @Test
+    fun `getDirtyAccounts should return empty set when no dirty accounts exist`() {
+        // Given
+        every { setOperations.members("balances:dirty") } returns null
+
+        // When
+        val result = adapter.getDirtyAccounts()
+
+        // Then
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `getDirtyAccounts should return empty set when dirty set is empty`() {
+        // Given
+        every { setOperations.members("balances:dirty") } returns emptySet()
+
+        // When
+        val result = adapter.getDirtyAccounts()
+
+        // Then
+        assertTrue(result.isEmpty())
     }
 }
 

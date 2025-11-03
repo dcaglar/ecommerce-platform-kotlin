@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.mybatis.spring.annotation.MapperScan
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest
@@ -26,12 +27,27 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.time.LocalDateTime
 
+/**
+ * Integration tests for OutboxEventMapper with real PostgreSQL (Testcontainers).
+ * 
+ * These tests validate:
+ * - Real database persistence operations
+ * - MyBatis mapper integration
+ * - Outbox event CRUD operations
+ * - SQL operations with actual PostgreSQL
+ * 
+ * Tagged as @integration for selective execution:
+ * - mvn test                             -> Runs ALL tests (unit + integration)
+ * - mvn test -Dgroups=integration        -> Runs integration tests only
+ * - mvn test -DexcludedGroups=integration -> Runs unit tests only (fast)
+ */
+@Tag("integration")
 @MybatisTest
 @ContextConfiguration(classes = [InfraTestBoot::class])
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers
 @TestPropertySource(properties = ["spring.liquibase.enabled=false"])
-@MapperScan("com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis") // ← add this
+@MapperScan("com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis")
 class OutboxEventMapperIntegrationTest {
 
     companion object {

@@ -7,6 +7,7 @@ import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.Postin
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.LedgerMapper
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.mybatis.spring.annotation.MapperScan
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest
@@ -22,12 +23,20 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import java.time.LocalDateTime
 
 /**
- * Integration tests for LedgerMapper - tests MyBatis mapping to journal_entries and postings tables.
+ * Integration tests for LedgerMapper with real PostgreSQL (Testcontainers).
  * 
- * LedgerMapper is a simple interface with two insert operations:
- * - insertJournalEntry() - inserts into journal_entries table
- * - insertPosting() - inserts into postings table
+ * These tests validate:
+ * - Real database persistence operations
+ * - MyBatis mapper integration
+ * - Journal entry and posting insertions
+ * - SQL operations with actual PostgreSQL
+ * 
+ * Tagged as @integration for selective execution:
+ * - mvn test                             -> Runs ALL tests (unit + integration)
+ * - mvn test -Dgroups=integration        -> Runs integration tests only
+ * - mvn test -DexcludedGroups=integration -> Runs unit tests only (fast)
  */
+@Tag("integration")
 @MybatisTest
 @ContextConfiguration(classes = [InfraTestBoot::class])
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
