@@ -32,7 +32,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: surefire-results
-          path: '**/target/surefire-reports/*.xml'
+          path: |
+            **/target/surefire-reports/**/*.xml
+            **/target/surefire-reports/*.txt
+          if-no-files-found: ignore
 
   # -----------------------------------------------------------
   # ⚙️ 2. Integration Tests (Failsafe + Testcontainers)
@@ -64,4 +67,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: failsafe-results
-          path: '**/target/failsafe-reports/*.xml'
+          path: |
+            **/target/failsafe-reports/**/*.xml
+            **/target/failsafe-reports/*.txt
+          if-no-files-found: ignore
