@@ -284,14 +284,10 @@ It declares that this module is:
                 <version>${maven.surefire.version}</version>
                 <configuration>
                     <!-- Only run *IntegrationTest classes -->
-                    <includes>
+                    <includes combine.self="override">
                         <include>**/*IntegrationTest.java</include>
                         <include>**/*IntegrationTest.kt</include>
                     </includes>
-                    <excludes>
-                        <exclude>**/*Test.java</exclude>
-                        <exclude>**/*Test.kt</exclude>
-                    </excludes>
                     <failIfNoTests>false</failIfNoTests>
                     <useFile>false</useFile>
                 </configuration>
