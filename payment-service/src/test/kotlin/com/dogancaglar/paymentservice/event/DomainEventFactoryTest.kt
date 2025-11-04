@@ -23,7 +23,7 @@ class DomainEventFactoryTest {
             // when
             val envelope: EventEnvelope<PaymentOrderCreated> = DomainEventEnvelopeFactory.envelopeFor(
                 traceId = traceIdFromMDC,
-                data = PaymentOrderCreated(
+                data = PaymentOrderCreated.create(
                     paymentOrderId = "po-1001",
                     publicPaymentOrderId = "paymentorder-1001",
                     paymentId = "p-123",
@@ -55,7 +55,7 @@ class DomainEventFactoryTest {
         assertThrows<IllegalStateException> {
             DomainEventEnvelopeFactory.envelopeFor(
                 traceId = MDC.get(GenericLogFields.TRACE_ID) ?: throw IllegalStateException("TraceId missing"),
-                data = PaymentOrderCreated(
+                data = PaymentOrderCreated.create(
                     paymentOrderId = "po-1",
                     publicPaymentOrderId = "paymentorder-1",
                     paymentId = "p-1",
@@ -82,7 +82,7 @@ class DomainEventFactoryTest {
         try {
             val event1 = DomainEventEnvelopeFactory.envelopeFor(
                 traceId = traceIdFromMDC,
-                data = PaymentOrderCreated(
+                data = PaymentOrderCreated.create(
                     paymentOrderId = "po-1",
                     publicPaymentOrderId = "paymentorder-1",
                     paymentId = "p-1",
@@ -100,7 +100,7 @@ class DomainEventFactoryTest {
             )
             val event2 = DomainEventEnvelopeFactory.envelopeFor(
                 traceId = traceIdFromMDC,
-                data = PaymentOrderCreated(
+                data = PaymentOrderCreated.create(
                     paymentOrderId = "po-3",
                     publicPaymentOrderId = "paymentorder-1",
                     paymentId = "p-2",
@@ -130,7 +130,7 @@ class DomainEventFactoryTest {
         val traceIdFromMDC = "test-traceid"
         MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
-            val event = PaymentOrderCreated(
+            val event = PaymentOrderCreated.create(
                 paymentOrderId = "po-1001",
                 publicPaymentOrderId = "paymentorder-1001",
                 paymentId = "p-123",
@@ -167,7 +167,7 @@ class DomainEventFactoryTest {
         MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
             val parentId = UUID.randomUUID()
-            val event = PaymentOrderCreated(
+            val event = PaymentOrderCreated.create(
                 paymentOrderId = "po-1001",
                 publicPaymentOrderId = "paymentorder-1001",
                 paymentId = "p-123",

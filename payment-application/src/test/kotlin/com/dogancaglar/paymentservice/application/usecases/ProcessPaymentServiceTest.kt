@@ -380,7 +380,7 @@ class ProcessPaymentServiceTest {
         retryCount: Int = 0,
         status: String = "INITIATED_PENDING"
     ): PaymentOrderEvent {
-        return PaymentOrderPspCallRequested(
+        return PaymentOrderPspCallRequested.create(
             paymentOrderId = "123",
             publicPaymentOrderId = "paymentorder-123",
             paymentId = "456",

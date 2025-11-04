@@ -60,6 +60,7 @@ CREATE TABLE payment_orders (
 
 -- ========== JOURNAL ENTRIES TABLE ==========
 DROP TABLE IF EXISTS postings;
+DROP TABLE IF EXISTS ledger_entries;
 DROP TABLE IF EXISTS journal_entries;
 
 CREATE TABLE journal_entries (
@@ -69,6 +70,14 @@ CREATE TABLE journal_entries (
 	reference_type VARCHAR(64),
 	reference_id VARCHAR(64),
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ========== LEDGER ENTRIES TABLE ==========
+CREATE TABLE ledger_entries (
+	id BIGSERIAL PRIMARY KEY,
+	journal_id VARCHAR(128) NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	CONSTRAINT fk_ledger_entries_journal FOREIGN KEY (journal_id) REFERENCES journal_entries(id) ON DELETE CASCADE
 );
 
 -- ========== POSTINGS TABLE ==========
@@ -88,3 +97,14 @@ CREATE TABLE postings (
 -- Indexes for ledger tables
 CREATE INDEX IF NOT EXISTS idx_postings_journal_id ON postings (journal_id);
 CREATE INDEX IF NOT EXISTS idx_postings_account_code ON postings (account_code);
+
+-- ========== ACCOUNT BALANCES TABLE ==========
+DROP TABLE IF EXISTS account_balances;
+
+CREATE TABLE account_balances (
+    account_code VARCHAR(128) PRIMARY KEY,
+    balance BIGINT NOT NULL,
+    last_applied_entry_id BIGINT NOT NULL DEFAULT 0,
+    last_snapshot_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

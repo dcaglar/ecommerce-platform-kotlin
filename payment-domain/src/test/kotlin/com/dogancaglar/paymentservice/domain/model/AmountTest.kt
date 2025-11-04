@@ -14,6 +14,13 @@ class AmountTest {
     }
 
     @Test
+    fun `sanity check on Amount negate`() {
+        val amt = Amount.of(1000, Currency("EUR"))
+        val neg = amt.negate()
+        println("Original: ${amt.quantity}, Negated: ${neg.quantity}")
+    }
+
+    @Test
     fun `should reject Amount with zero value`() {
         val exception = assertThrows(IllegalArgumentException::class.java) {
             Amount.of(0L, Currency("USD"))

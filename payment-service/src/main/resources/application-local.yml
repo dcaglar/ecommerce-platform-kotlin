@@ -4,6 +4,10 @@ app:
     ttl-seconds: 3600
   payment-service:
     api-key: secretpaymentapikey12345
+  account-balance:
+    delta-ttl-seconds: 300  # 5 minutes - Redis delta TTL
+    idempotency-ttl-seconds: 86400  # 24 hours - Redis idempotency key TTL
+    snapshot-interval: PT1M  # 1 minute - Snapshot job frequency
 
   # TopicAdminConfig reads these
   kafka:

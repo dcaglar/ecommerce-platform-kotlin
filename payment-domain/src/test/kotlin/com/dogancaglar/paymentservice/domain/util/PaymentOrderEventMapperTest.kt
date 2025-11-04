@@ -191,7 +191,7 @@ class PaymentOrderDomainEventMapperTest {
 
     @Test
     fun `copyWithStatus should create new event with updated status`() {
-        val originalEvent = PaymentOrderCreated(
+        val originalEvent = PaymentOrderCreated.create(
             paymentOrderId = "123",
             publicPaymentOrderId = "paymentorder-123",
             paymentId = "456",
@@ -227,7 +227,7 @@ class PaymentOrderDomainEventMapperTest {
 
     @Test
     fun `copyWithStatus should preserve all other fields`() {
-        val originalEvent = PaymentOrderCreated(
+        val originalEvent = PaymentOrderCreated.create(
             paymentOrderId = "999",
             publicPaymentOrderId = "paymentorder-999",
             paymentId = "888",

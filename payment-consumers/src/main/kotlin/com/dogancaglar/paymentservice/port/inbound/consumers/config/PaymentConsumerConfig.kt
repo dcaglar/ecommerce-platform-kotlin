@@ -2,6 +2,8 @@ package com.dogancaglar.paymentservice.port.inbound.consumers.config
 
 
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.PaymentEventPublisher
+import com.dogancaglar.paymentservice.adapter.outbound.persistance.AccountBalanceSnapshotAdapter
+import com.dogancaglar.paymentservice.adapter.outbound.redis.AccountBalanceRedisCacheAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.redis.PaymentRetryQueueAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.redis.PspResultRedisCacheAdapter
 import com.dogancaglar.paymentservice.application.usecases.ProcessPaymentService
@@ -10,6 +12,11 @@ import com.dogancaglar.paymentservice.application.usecases.RequestLedgerRecordin
 import com.dogancaglar.paymentservice.domain.util.PaymentFactory
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderFactory
+import com.dogancaglar.paymentservice.application.usecases.AccountBalanceService
+import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceUseCase
+import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
+import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
+import com.dogancaglar.paymentservice.ports.outbound.BalanceIdempotencyPort
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
 import org.springframework.beans.factory.annotation.Qualifier
@@ -78,4 +85,15 @@ class PaymentConsumerConfig {
     @Bean
     fun createPaymentOrderFactory(clock: Clock) =
         PaymentOrderFactory()
+
+    @Bean
+    fun accountBalanceService(
+        @Qualifier("accountBalanceSnapshotAdapter") accountBalanceSnapshotAdapter: AccountBalanceSnapshotPort,
+        @Qualifier("accountBalanceRedisCacheAdapter") accountBalanceRedisCacheAdapter : AccountBalanceCachePort
+    ): AccountBalanceService {
+        return AccountBalanceService(
+            snapshotPort =accountBalanceSnapshotAdapter,
+            cachePort = accountBalanceRedisCacheAdapter
+        )
+    }
 }

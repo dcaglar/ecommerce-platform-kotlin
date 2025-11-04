@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.mybatis.spring.annotation.MapperScan
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest
@@ -31,6 +32,21 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.time.LocalDateTime
 
+/**
+ * Integration tests for PaymentOrderMapper with real PostgreSQL (Testcontainers).
+ * 
+ * These tests validate:
+ * - Real database persistence operations
+ * - MyBatis mapper integration
+ * - Payment order CRUD operations
+ * - SQL operations with actual PostgreSQL
+ * 
+ * Tagged as @integration for selective execution:
+ * - mvn test                             -> Runs ALL tests (unit + integration)
+ * - mvn test -Dgroups=integration        -> Runs integration tests only
+ * - mvn test -DexcludedGroups=integration -> Runs unit tests only (fast)
+ */
+@Tag("integration")
 @MybatisTest
 @ContextConfiguration(classes = [InfraTestBoot::class])
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

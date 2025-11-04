@@ -40,6 +40,10 @@ enum class AccountType(val normalBalance: NormalBalance, val category: AccountCa
 data class Account private  constructor(val type: AccountType, val entityId: String,val authType: AuthType?= AuthType.SALE){
     val accountCode = buildcode()
     fun buildcode(): String = "${type.name}.$entityId"
+    init {
+        require(entityId.isNotBlank()) { "Entity id cant be empty" }
+    }
+
     companion object{
 
         fun create(type: AccountType, entityId: String?="GLOBAL")= Account(type=type,entityId=entityId!!)

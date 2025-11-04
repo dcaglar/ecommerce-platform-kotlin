@@ -41,10 +41,11 @@
    8.4 [ElasticSearch Search Keys](#84-elasticsearch-search-keys)
 9. [Module Structure](#9--module-structure)  
    9.1 [`common`](#91-common)  
-   9.2 [`payment-domain`](#92-payment-domain)  
-   9.3 [`payment-application`](#93-payment-application)  
-   9.4 [`payment-infrastructure` (Auto‑config)](#94-payment-infrastructure-autoconfig)  
-   9.5 [Deployables: `payment-service` & `payment-consumers`](#95-deployables-payment-service--payment-consumers)
+   9.2 [`common-test`](#92-common-test)  
+   9.3 [`payment-domain`](#93-payment-domain)  
+   9.4 [`payment-application`](#94-payment-application)  
+   9.5 [`payment-infrastructure` (Auto‑config)](#95-payment-infrastructure-autoconfig)  
+   9.6 [Deployables: `payment-service` & `payment-consumers`](#96-deployables-payment-service--payment-consumers)
 10. [Testing & Quality Assurance](#10--testing--quality-assurance)  
     10.1 [Testing Strategy](#101-testing-strategy)  
     10.2 [Test Coverage Results](#102-test-coverage-results)
@@ -477,10 +478,11 @@ flowchart TB
         T7[ledger_entries_recorded_topic<br/>🔑 key: sellerId<br/>📊 24 partitions]:::kafka
     end
 
-    subgraph BALANCE_FLOW["💰 Balance Flow (Planned)"]
-        BALANCE["AccountBalanceConsumer<br/>👥 concurrency: TBD"]:::planned
-        BALANCE_DB[(account_balances<br/>📊 Table)]:::planned
-        CACHE["AccountBalanceCache<br/>⚡ Redis (Planned)"]:::planned
+    subgraph BALANCE_FLOW["💰 Balance Flow (Two-Tier Architecture)"]
+        BALANCE["AccountBalanceConsumer<br/>👥 concurrency: 4<br/>Batch Processing"]:::consumer
+        BALANCE_DB[(account_balances<br/>💾 PostgreSQL Snapshots<br/>last_applied_entry_id)]:::db
+        CACHE["AccountBalanceCache<br/>⚡ Redis Deltas<br/>TTL + Watermarking"]:::redis
+        SNAPSHOT_JOB["AccountBalanceSnapshotJob<br/>⏰ Every 1 minute<br/>Merge dirty deltas → snapshots"]:::consumer
     end
 
     REST -->|"1. Persist + Outbox<br/>(Atomic DB Tx)"| DB
@@ -513,13 +515,16 @@ flowchart TB
     LEDGER -->|"Persist Journals<br/>(Batch, ON CONFLICT)"| DB
     LEDGER -->|"Publish Recorded<br/>🔑 sellerId<br/>(Kafka Tx)"| T7
 
-    T7 -.->|"Planned:<br/>Consume"| BALANCE
-    BALANCE -.->|"Aggregate<br/>Debits/Credits"| BALANCE_DB
-    BALANCE -.->|"Update Cache"| CACHE
+    T7 -->|"Consume<br/>(Batch)"| BALANCE
+    BALANCE -->|"Atomic Delta Update<br/>(Redis Lua)"| CACHE
+    CACHE -->|"Mark Dirty"| CACHE
+    SNAPSHOT_JOB -->|"Read Dirty Accounts"| CACHE
+    SNAPSHOT_JOB -->|"getAndResetDeltaWithWatermark"| CACHE
+    SNAPSHOT_JOB -->|"Merge & Save<br/>(Watermark Check)"| BALANCE_DB
 
     style PSP_FLOW fill:#fff9c4,stroke:#F57F17,stroke-width:3px
     style LEDGER_FLOW fill:#e8f5e9,stroke:#388E3C,stroke-width:3px
-    style BALANCE_FLOW fill:#fafafa,stroke:#9E9E9E,stroke-width:2px
+    style BALANCE_FLOW fill:#e8f5e9,stroke:#388E3C,stroke-width:3px
     style API fill:#e3f2fd,stroke:#1976D2,stroke-width:3px
 ```
 
@@ -531,7 +536,205 @@ flowchart TB
 - **Idempotency**: DB-level constraints (`ON CONFLICT DO NOTHING`) and idempotent updates prevent duplicates
 - **Scaling**: Each flow scales independently based on its own consumer lag metrics
 
-### 4.5 Ledger Recording Architecture
+### 4.5 Account Balance Architecture
+
+#### Purpose
+
+The account balance system maintains real-time, idempotent balance aggregation from double-entry ledger postings using a **two-tier storage architecture** optimized for both speed and durability.
+
+#### Design Overview
+
+**Two-Tier Storage Strategy:**
+1. **Hot Layer (Redis)**: Accumulates balance deltas with TTL (5 minutes) and watermarking for idempotency
+2. **Cold Layer (PostgreSQL)**: Stores durable snapshots with `last_applied_entry_id` for consistency
+
+**Key Components:**
+- **AccountBalanceConsumer**: 
+  - Batch consumer processing `LedgerEntriesRecorded` events (concurrency=4, partitioned by `sellerId`)
+  - Consumes batches of 100-500 events (Kafka batch size)
+  - Uses `KafkaTxExecutor` for atomic offset commit + processing
+  - Extracts all ledger entries from batch, converts to domain objects, passes to service
+  
+- **AccountBalanceService**: 
+  - Processes list of `LedgerEntry` domain objects (from batch)
+  - Extracts all postings, groups by account code
+  - **Batch loads** current snapshots from PostgreSQL (`findByAccountCodes`) for efficiency
+  - For each account: filters postings by watermark, computes delta, updates Redis atomically
+  - Marks accounts as dirty for snapshot job processing
+  
+- **AccountBalanceSnapshotJob**: 
+  - Scheduled job (every 1 minute, configurable via `account-balance.snapshot-interval`)
+  - Reads dirty accounts from Redis set
+  - For each dirty account: atomically gets and resets delta, merges to snapshot, saves to DB
+  - Uses database watermark guard to prevent concurrent overwrites
+  
+- **AccountBalanceReadService**: Provides two read patterns:
+  - `getRealTimeBalance()`: Fast read (`snapshot + redis.delta`, non-consuming)
+  - `getStrongBalance()`: Strong consistency read (consumes delta, merges immediately, returns)
+
+#### Balance Flow Sequence
+
+```mermaid
+sequenceDiagram
+    participant Ledger as LedgerRecordingConsumer
+    participant Kafka as ledger_entries_recorded_topic
+    participant Consumer as AccountBalanceConsumer
+    participant Service as AccountBalanceService
+    participant Redis as Redis (Deltas)
+    participant Job as AccountBalanceSnapshotJob
+    participant DB as PostgreSQL (Snapshots)
+
+    Ledger->>Kafka: Publish LedgerEntriesRecorded (sellerId key)
+    Kafka->>Consumer: Consume batch (100-500 events)
+    Consumer->>Service: updateAccountBalancesBatch(ledgerEntries)
+    Service->>Service: Extract postings, compute signed amounts per account
+    Service->>DB: Load current snapshots (batch query: findByAccountCodes)
+    Service->>Service: Filter postings by watermark (ledgerEntryId > lastAppliedEntryId)
+    Service->>Service: Compute delta = sum(signed_amounts) for filtered postings
+    Service->>Redis: addDeltaAndWatermark (Lua: HINCRBY delta + HSET watermark + SADD dirty)
+    Note over Redis: TTL set on hash (5 min), dirty set marked
+    
+    Note over Job: Every 1 minute (configurable)
+    Job->>Redis: getDirtyAccounts() (reads from dirty set)
+    loop For each dirty account
+        Job->>Redis: getAndResetDeltaWithWatermark (Lua: HGET delta+watermark, then HSET delta=0)
+        alt Delta != 0
+            Job->>DB: Load current snapshot (or create default)
+            Job->>Service: Compute: newBalance = snapshot.balance + delta
+            Job->>Service: Compute: newWatermark = maxOf(current.lastAppliedEntryId, upToEntryId)
+            Job->>DB: saveSnapshot (UPSERT with WHERE watermark guard)
+            Note over DB: Only updates if new watermark > current watermark
+        end
+    end
+```
+
+#### Idempotency & Watermarking
+
+**Watermark-Based Duplicate Prevention (Two-Level Protection):**
+
+1. **Consumer-Level Filtering** (`AccountBalanceService`):
+   - Loads current snapshot watermarks from PostgreSQL (batch query: `findByAccountCodes`)
+   - Filters postings: `WHERE ledger_entry_id > lastAppliedEntryId` before computing deltas
+   - Only processes new ledger entries that haven't been applied yet
+   - Prevents duplicate delta accumulation in Redis on replay/retry
+
+2. **Database-Level Watermark Guard** (`insertOrUpdateSnapshot`):
+   - PostgreSQL UPSERT includes WHERE clause: `WHERE account_balances.last_applied_entry_id < EXCLUDED.last_applied_entry_id`
+   - Update only proceeds if new watermark is **strictly greater** than current watermark
+   - Protects against concurrent snapshot job executions and race conditions
+   - Ensures snapshots always advance monotonically (no rollbacks)
+
+**Atomic Operations:**
+- **Redis Lua Script (`addDeltaAndWatermark`)**: 
+  - `HINCRBY` on delta field (atomic increment)
+  - `HSET` watermark if new value is higher
+  - `EXPIRE` sets TTL on hash (5 minutes)
+  - `SADD` adds account to dirty set (also with TTL)
+- **Redis Lua Script (`getAndResetDeltaWithWatermark`)**:
+  - `HGET` retrieves delta and watermark atomically
+  - `HSET` resets delta to 0 (prevents double-counting)
+  - Returns both values for merging
+- **PostgreSQL UPSERT**: `ON CONFLICT (account_code) DO UPDATE` with watermark guard ensures safe concurrent writes
+
+**Delta Reset Mechanism:**
+- Snapshot job calls `getAndResetDeltaWithWatermark()` which **resets delta to 0** after reading
+- This prevents the same delta from being merged multiple times if job runs concurrently
+- If merge fails after reset, delta is lost but snapshot remains correct (can recompute from ledger)
+
+**TTL as Backup:**
+- Redis deltas have 5-minute TTL (configurable via `account-balance.delta-ttl-seconds`)
+- Dirty set also has 5-minute TTL to prevent stale dirty markers
+- If snapshot job fails, TTL ensures cleanup after 5 minutes (no permanent accumulation)
+
+#### Read Patterns
+
+**Real-Time Read (Fast, Eventual Consistency, Non-Consuming):**
+```kotlin
+fun getRealTimeBalance(accountCode: String): Long {
+    val snapshot = snapshotPort.getSnapshot(accountCode)?.balance ?: 0L
+    // Reads current delta from Redis hash (non-destructive read)
+    return cachePort.getRealTimeBalance(accountCode, snapshot)  // snapshot + redis.delta
+}
+```
+- **Performance**: Fast (single DB read + single Redis HGET)
+- **Consistency**: Eventual (may include unmerged Redis delta)
+- **Side Effects**: None (delta remains in Redis, non-consuming)
+- **Use Case**: Dashboard queries, real-time balance displays where minor staleness is acceptable
+
+**Strong Consistency Read (Slower, Guaranteed Accuracy, Consuming):**
+```kotlin
+fun getStrongBalance(accountCode: String): Long {
+    // 1. Atomically read and RESET delta to 0 (consuming read)
+    val (delta, upToEntryId) = cachePort.getAndResetDeltaWithWatermark(accountCode)
+    val snapshot = snapshotPort.getSnapshot(accountCode) ?: default()
+    if (delta != 0L) {
+        // 2. Merge delta into snapshot immediately
+        val newBalance = snapshot.balance + delta
+        val newWatermark = maxOf(snapshot.lastAppliedEntryId, upToEntryId)
+        // 3. Save merged snapshot (watermark guard prevents concurrent overwrites)
+        snapshotPort.saveSnapshot(snapshot.copy(balance = newBalance, lastAppliedEntryId = newWatermark))
+        return newBalance
+    }
+    return snapshot.balance
+}
+```
+- **Performance**: Slower (DB read + Redis atomic op + DB write)
+- **Consistency**: Strong (delta merged to snapshot before returning)
+- **Side Effects**: Delta is **consumed** (reset to 0) and merged into snapshot
+- **Use Case**: Critical operations requiring exact balance (payouts, settlements, reconciliation)
+
+#### Error Handling & Recovery
+
+**Consumer Failure Scenarios:**
+1. **Kafka transaction abort**: Offset not committed, events retried. On retry, watermark filter prevents duplicate processing.
+2. **Redis update failure**: Exception propagates, Kafka transaction aborts, offset not committed. Retry will re-process same events (idempotent due to watermark filtering).
+3. **Database snapshot load failure**: Exception propagates, transaction aborts. Retry will reload snapshots (watermark check prevents duplicates).
+4. **Duplicate ledger entries**: Watermark filter (`ledgerEntryId > lastAppliedEntryId`) automatically skips already-processed entries - no delta accumulated.
+
+**Snapshot Job Failure Scenarios:**
+1. **Delta reset succeeds, but DB save fails**:
+   - Delta already reset to 0 in Redis (cannot be retried from Redis)
+   - Snapshot not updated in DB (remains at old balance)
+   - **Recovery**: Next consumer batch will re-compute delta from ledger entries (watermark check prevents duplicates, but new entries since snapshot will be processed)
+   - **Alternative Recovery**: Recompute balance from `postings` table if needed
+2. **Redis failure during getAndResetDeltaWithWatermark**:
+   - Delta remains in Redis, dirty marker remains
+   - Job retries on next cycle (1 minute)
+   - If Redis recovers, next cycle will process successfully
+3. **Database failure during saveSnapshot**:
+   - Delta already reset in Redis
+   - DB transaction rollback (if within transaction) or no update
+   - Next cycle will try to process, but delta is 0, so no-op
+   - **Recovery**: Consumer will accumulate new deltas, next job cycle will merge
+4. **Watermark guard rejects update**:
+   - Another job instance already merged with higher watermark
+   - Update skipped (no-op), correct behavior (idempotent)
+   - No data loss, snapshot remains consistent
+
+**Concurrent Snapshot Job Executions:**
+- Multiple job instances can run simultaneously (e.g., during deployment)
+- `getAndResetDeltaWithWatermark()` atomically resets delta (first instance wins)
+- Database watermark guard (`WHERE last_applied_entry_id < EXCLUDED.last_applied_entry_id`) ensures only highest watermark wins
+- Result: Idempotent behavior, no double-counting, eventual consistency
+
+**Recovery from Total Redis Loss:**
+- Snapshots remain intact in PostgreSQL (last known merged state)
+- Redis deltas lost, but TTL would have expired them anyway
+- Can recompute balances from `postings` table:
+  ```sql
+  SELECT account_code, 
+         SUM(CASE 
+             WHEN (account_type.normal_balance = 'DEBIT' AND direction = 'DEBIT') 
+               OR (account_type.normal_balance = 'CREDIT' AND direction = 'CREDIT')
+             THEN amount
+             ELSE -amount
+         END) as balance
+  FROM postings
+  GROUP BY account_code
+  ```
+- Or restart consumer: It will re-process all ledger entries (watermark filtering prevents duplicates)
+
+### 4.6 Ledger Recording Architecture
 
 #### Purpose
 
@@ -542,9 +745,17 @@ Adds a complete **double‑entry accounting subsystem** for reliable financial r
 - **Separate Consumer Groups**: `ledger-recording-request-dispatcher-consumer-group` and `ledger-recording-consumer-group` enable independent scaling
 - **Different Concurrency**: Ledger consumers use concurrency=4 (vs PSP concurrency=8) optimized for I/O-heavy ledger persistence
 - **Performance Isolation**: PSP processing continues unaffected even if ledger recording has backlogs or DB write delays
-- **Future Balance Generation**: Will consume from `ledger_entries_recorded_topic` with its own consumer group, further isolating balance aggregation from ledger recording
+- **Balance Generation**: `AccountBalanceConsumer` consumes from `ledger_entries_recorded_topic` with its own consumer group (`account-balance-consumer-group`), isolating balance aggregation from ledger recording
 
-**Note:** Account balance aggregation from ledger entries is planned but not yet implemented (future: `AccountBalanceConsumer`).
+**Account Balance System Architecture:**
+- **Two-Tier Storage**: Redis (hot layer for deltas) + PostgreSQL (cold layer for durable snapshots)
+- **Batch Processing**: Consumer processes `LedgerEntriesRecorded` events in batches, extracting postings and computing signed amounts
+- **Watermarking for Idempotency**: Redis stores `last_applied_entry_id` watermark per account to prevent duplicate processing
+- **Atomic Delta Updates**: Redis Lua scripts ensure atomic delta + watermark updates (HINCRBY + HSET in single operation)
+- **Scheduled Merge**: `AccountBalanceSnapshotJob` runs every 1 minute, merging dirty Redis deltas into PostgreSQL snapshots
+- **Read Patterns**:
+  - **Real-Time Read**: `snapshot.balance + redis.delta` (fast, eventual consistency)
+  - **Strong Consistency Read**: Atomically merge delta to snapshot before returning (slower, guaranteed accuracy)
 
 **Configuration Sources:**
 - **Consumer Configuration**: `app.kafka.dynamic-consumers[]` in `payment-consumers/src/main/resources/application-local.yml`
@@ -1113,7 +1324,7 @@ Kafka topics use different partitioning strategies based on processing requireme
 | `ScheduledPaymentStatusCheckExecutor` | `payment-status-check-scheduler-consumer-group` | `payment_status_check_scheduler_topic` | 1 | `payment_status_check_scheduler_topic-factory` | Status Check | `KafkaTxExecutor` |
 | `LedgerRecordingRequestDispatcher` | `ledger-recording-request-dispatcher-consumer-group` | `payment_order_finalized_topic` | 4 | `payment_order_finalized_topic-factory` | Ledger | `KafkaTxExecutor` (`syncPaymentTx`) |
 | `LedgerRecordingConsumer` | `ledger-recording-consumer-group` | `ledger_record_request_queue_topic` | 4 | `ledger_record_request_queue_topic-factory` | Ledger | `KafkaTxExecutor` (`syncPaymentTx`) |
-| `AccountBalanceConsumer` | `account-balance-consumer-group` | `ledger_entries_recorded_topic` | TBD | TBD | Balance (Planned) | TBD |
+| `AccountBalanceConsumer` | `account-balance-consumer-group` | `ledger_entries_recorded_topic` | 4 | `ledger_entries_recorded_topic-factory` | Balance | `KafkaTxExecutor` (`syncPaymentTx`) |
 
 #### Event Flow Map
 
@@ -1167,8 +1378,20 @@ Kafka topics use different partitioning strategies based on processing requireme
 │                  Concurrency: 4 | Ack Mode: MANUAL                       │
 │                  Event Type: ledger_recording_requested                  │
 │                  └─> ledger_entries_recorded_topic (key: sellerId)     │
-│                       └─> AccountBalanceConsumer (Planned)              │
+│                       └─> AccountBalanceConsumer                        │
 │                            Consumer Group: account-balance-consumer-group │
+│                            Concurrency: 4 | Ack Mode: MANUAL              │
+│                            [Updates Redis deltas atomically]              │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│             Balance Snapshot Job (Scheduled, Every 1 minute)             │
+├─────────────────────────────────────────────────────────────────────────┤
+│ AccountBalanceSnapshotJob                                               │
+│   └─> Read Dirty Accounts from Redis                                    │
+│        └─> getAndResetDeltaWithWatermark (Atomic)                       │
+│             └─> Merge delta + snapshot → PostgreSQL                     │
+│                  └─> account_balances table (last_applied_entry_id)     │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1391,7 +1614,15 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 - Used by all other modules for consistent event handling and cross-cutting concerns.
 - Contains `EventEnvelope<T>` wrapper, `LogContext` helpers, and common DTOs.
 
-### 9.2 `payment-domain`
+### 9.2 `common-test`
+
+- Shared test utilities module providing test helpers across all payment modules.
+- Exposes test classes via Maven test-jar artifact for cross-module test code reuse.
+- Contains test helpers like `LedgerEntriesRecordedTestHelper` for generating test events and event data.
+- Used by both `payment-application` and `payment-consumers` test suites for consistent test data generation.
+- Dependencies: `payment-domain` (for domain classes used in test helpers), Kotlin standard library, JUnit.
+
+### 9.3 `payment-domain`
 
 - Domain entities (`Payment`, `PaymentOrder`, value objects), domain services, and **ports**.
 - Core business logic with no external dependencies.
@@ -1405,7 +1636,7 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 - Domain events: `PaymentOrderCreated`, `PaymentOrderSucceeded`, `PaymentOrderFailed`
 - Status enums: `PaymentStatus`, `PaymentOrderStatus`
 
-### 9.3 `payment-application`
+### 9.4 `payment-application`
 
 - Use cases, orchestrators, and application‑level services.
 - Depends on `payment-domain` and defines the **inbound/outbound ports** it needs.
@@ -1419,7 +1650,7 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 - Models: `LedgerEntry` - Persistence model for ledger entries
 - **Note**: Schedulers (`OutboxDispatcherJob`, `RetryDispatcherScheduler`) are in deployable modules, not application layer
 
-### 9.4 `payment-infrastructure` (Auto‑config)
+### 9.5 `payment-infrastructure` (Auto‑config)
 
 - New **auto‑configurable** module consumed by both deployables.
 - Provides Spring Boot auto‑configs for: Micrometer registry, Kafka factory/serializers, Redis/Lettuce beans, task
@@ -1433,7 +1664,7 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
     - **Individual Processing**: `appendLedgerEntry()` processes one entry at a time with duplicate detection
     - **Duplicate Handling**: When duplicate detected, entry skipped and no postings inserted
 
-### 9.5 Deployables: `payment-service` & `payment-consumers`
+### 9.6 Deployables: `payment-service` & `payment-consumers`
 
 - **payment-service**: REST API, DB writes, maintenance jobs.
     - **Controllers**: `PaymentController` - REST endpoints that return `202 Accepted` immediately
@@ -1484,6 +1715,17 @@ The project employs a comprehensive testing strategy with **297 tests** achievin
 - **TestContainers**: ✅ **YES** - `@Container`, `RedisContainer`, `PostgreSQLContainer`
 - **Spring Boot Tests**: ✅ **YES** - `@SpringBootTest`, `@DataRedisTest`, etc.
 - **Maven Plugin**: **Failsafe** - Runs with `mvn verify`
+- **Test Tagging**: ✅ **ALL TAGGED** - All integration tests use `@Tag("integration")` for future flexibility
+  - **Execution**: 
+    - `mvn test` → Runs unit tests only (Surefire excludes `*IntegrationTest.kt` by filename)
+    - `mvn verify` → Runs integration tests only (Failsafe includes `*IntegrationTest.kt` by filename)
+    - `mvn test && mvn verify` → Runs both unit and integration tests
+  - **Design Rationale**: Lifecycle-based separation (complementary, not competing)
+    - **Surefire (test phase)**: Fast unit tests run on every build for quick feedback
+    - **Failsafe (integration-test + verify phases)**: Slower integration tests run before release/deployment
+    - **Benefits**: Fast CI/CD feedback loop, comprehensive testing before releases, optional integration test execution
+  - **Separation Method**: Maven Surefire/Failsafe plugins use filename patterns (not tags) to separate tests by lifecycle phase
+  - **Consistency**: All 10 integration test files (PostgreSQL + Redis) consistently tagged for future tag-based filtering
 
 #### Unit Testing with MockK
 
@@ -1567,12 +1809,22 @@ verify(exactly = 1) {
 
 #### Integration Testing with TestContainers
 
-- **PostgreSQL Integration Tests**: Real database with partitioned outbox tables and ledger tables
+- **PostgreSQL Integration Tests** (5 test files, all tagged `@Tag("integration")`): Real database with partitioned outbox tables and ledger tables
+    - `AccountBalanceMapperIntegrationTest`: Tests account balance snapshot persistence with watermark-based idempotency
     - `LedgerMapperIntegrationTest`: Tests journal entries and postings persistence with Testcontainers PostgreSQL
-    - Validates MyBatis mapper queries (`LedgerMapper`), duplicate handling via `ON CONFLICT`, and foreign key constraints
+    - `PaymentOrderMapperIntegrationTest`: Tests payment order CRUD operations
+    - `OutboxEventMapperIntegrationTest`: Tests outbox event persistence
+    - `PaymentOutboundAdapterIntegrationTest`: Tests payment persistence operations
+    - All validate MyBatis mapper queries, duplicate handling via `ON CONFLICT`, and foreign key constraints
     - Verifies actual data is persisted correctly, not just return counts
-- **Redis Integration Tests**: Real Redis instances for caching and retry mechanisms
+- **Redis Integration Tests** (5 test files, all tagged `@Tag("integration")`): Real Redis instances for caching and retry mechanisms
+    - `AccountBalanceRedisCacheAdapterIntegrationTest`: Tests Redis Lua scripts for atomic delta/watermark operations
+    - `PaymentRetryQueueAdapterIntegrationTest`: Tests retry queue ZSet operations
+    - `RedisIdGeneratorPortAdapterIntegrationTest`: Tests ID generation
+    - `PspResultRedisCacheAdapterIntegrationTest`: Tests PSP result caching
+    - `PaymentRetryRedisCacheIntegrationTest`: Tests retry cache operations
 - **Kafka Integration Tests**: Real Kafka clusters for event publishing/consuming
+- **Tagging Standard**: All integration tests use `@Tag("integration")` for consistent selective execution
 - Ensures realistic end-to-end behavior
 - Validates outbox pattern, event publishing, and retry mechanisms
 
@@ -1605,6 +1857,7 @@ verify(exactly = 1) {
 8. **Explicit Verification**: Tests verify actual parameters passed to mocked methods, not just that methods were called
 9. **No Self-Reinforcing Mocks**: Stubs use `any()`, verifications use explicit criteria to catch real bugs
 10. **Capturing Only When Necessary**: `capture()` reserved for exception scenarios; normal verification uses explicit `match {}`
+11. **Consistent Tagging**: All integration tests tagged with `@Tag("integration")` for selective execution and CI/CD flexibility
 
 ---
 
@@ -1658,8 +1911,7 @@ verify(exactly = 1) {
 ## 12 · Roadmap
 
 ### Short Term
-- Implement **AccountBalanceConsumer** and **AccountBalanceCache** - Aggregate balances from ledger entries with Redis caching ([Issue #119](https://github.com/dcaglar/ecommerce-platform-kotlin/issues/119))
-- Create **Balance API** endpoints for querying account balances after AccountBalanceConsumer generates balance data ([Issue #119](https://github.com/dcaglar/ecommerce-platform-kotlin/issues/119))
+- Create **Balance API** endpoints for querying account balances (real-time and strong consistency reads) ([Issue #119](https://github.com/dcaglar/ecommerce-platform-kotlin/issues/119))
 - **Fast Path Optimization** - Introduce a synchronous fast path in payment-api layer where PSP is called for each payment order with a short timeout (100ms). If PSP responds within the timeout, return immediate result; otherwise, fall back to current async flow
 
 ### Medium Term
@@ -1712,6 +1964,24 @@ verify(exactly = 1) {
 
 ## 15 · Changelog
 
+- **2025-11-04**: **Account Balance System Implementation & Documentation Review**
+    - **Two-Tier Storage Architecture**: Implemented Redis (hot layer) + PostgreSQL (cold layer) for balance aggregation
+    - **AccountBalanceConsumer**: Batch consumer processing `LedgerEntriesRecorded` events (100-500 events per batch, concurrency=4) with watermarking for idempotency
+    - **AccountBalanceSnapshotJob**: Scheduled job (every 1 minute, configurable) merging dirty Redis deltas into durable PostgreSQL snapshots
+    - **Watermarking Strategy (Two-Level Protection)**:
+        - Consumer-level: Filters postings by `ledgerEntryId > lastAppliedEntryId` before computing deltas
+        - Database-level: PostgreSQL UPSERT watermark guard (`WHERE last_applied_entry_id < EXCLUDED.last_applied_entry_id`) prevents concurrent overwrites
+    - **Atomic Operations**: 
+        - Redis Lua scripts: `addDeltaAndWatermark` (HINCRBY + HSET watermark + SADD dirty), `getAndResetDeltaWithWatermark` (HGET + reset to 0)
+        - PostgreSQL UPSERT with watermark guard for safe concurrent writes
+    - **Delta Reset Mechanism**: Snapshot job resets delta to 0 after reading to prevent double-counting, with recovery mechanisms documented
+    - **Read Patterns**: 
+        - Real-time read: `snapshot + redis.delta` (fast, non-consuming, eventual consistency)
+        - Strong consistency read: Consumes delta, merges immediately, returns (slower, consuming, guaranteed accuracy)
+    - **Error Recovery**: Comprehensive failure scenarios documented including delta reset failures, concurrent job executions, and Redis loss recovery
+    - **Documentation**: Added comprehensive section 4.5 detailing architecture, sequence flows, idempotency mechanisms, and error handling
+    - **Updated Status**: Changed from "Planned" to "Implemented" in flow diagrams and consumer tables
+    - **Code Review Update**: Documentation updated based on actual code implementation review for accuracy (delta reset behavior, batch loading, watermark guards)
 - **2025-01-15**: **Architecture Documentation Enhancement**
     - **Comprehensive Architecture Review**: Updated both `architecture.md` and `architecture-internal-reader.md` for consistency and completeness
     - **Retry Strategy Documentation**: Added detailed exponential backoff formula with equal jitter, including delay examples for each attempt (1-5)

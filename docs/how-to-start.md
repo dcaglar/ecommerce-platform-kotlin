@@ -95,43 +95,11 @@ KEYCLOAK_URL=http://127.0.0.1:8080 ./keycloak/provision-keycloak.sh
 KC_URL=http://127.0.0.1:8080 ./keycloak/get-token.sh
 ```
 
-11) Call the API with the token (optional smoke test)
-- What: Use the saved token and the host header from endpoints.json (written by deploy-payment-service-local.sh).
-- Example:
-```bash
-BASE_URL=$(jq -r .base_url infra/endpoints.json)
-HOST=$(jq -r .host_header infra/endpoints.json)
-curl -i -H "Host: $HOST" -H "Authorization: Bearer $(cat keycloak/access.token)" "$BASE_URL/actuator/health"
-```
-
-12) Elasticsearch/Logstash/Kibana stack (OPTIONAL)
+11) Elasticsearch/Logstash/Kibana stack (OPTIONAL)
 - What: Installs ELK stack for log aggregation and searching.
 - Run:
 ```bash
 infra/scripts/deploy-observability-stack.sh
-```
-
-## 1️⃣ Generate token and send a test payment request
-
-1) Port-forwarding (if not already running)
-- What: Resilient port-forward loops to: Keycloak (8080), Postgres (5432), Prometheus (9090), Grafana (3000).
-- Run:
-```bash
-infra/scripts/port-forwarding.sh
-```
-
-2) Provision Keycloak (realm and clients)
-- Why: Creates the realm, role, and confidential clients used by the services.
-- Run:
-```bash
-./keycloak/provision-keycloak.sh
-```
-
-3) Generate Access Token for payment-service
-- Why: Retrieves a client-credentials token and saves it to keycloak/access.token.
-- Run:
-```bash
-./keycloak/get-token.sh
 ```
 
 4) Send test payment request
@@ -181,29 +149,42 @@ curl -i -X POST http://127.0.0.1/payments \
 
 ## 2️⃣ Run Unit & Integration Tests
 
-- Why: Verify the codebase with 297 tests using MockK and Testcontainers.
+- Why: Verify the codebase using MockK and Testcontainers.
 - What: Tests cover domain logic, application services, and infrastructure adapters.
 
 ```bash
-# Run all unit tests across all modules (uses Maven Surefire)
+# Run only unit tests (fast, excludes integration tests by filename pattern)
 mvn clean test
 
-# Run integration tests (uses Maven Failsafe)
+# Run only integration tests (slower, uses TestContainers, runs via Failsafe)
 mvn clean verify
 
-# Run tests for specific modules
+# Run both unit and integration tests (requires both commands)
+mvn clean test && mvn clean verify
+
+# Run tests for specific modules (unit tests only)
 mvn clean test -pl payment-application,payment-infrastructure,payment-domain,common
 
-# Run specific test classes
+# Run integration tests for specific modules
+mvn clean verify -pl payment-infrastructure
+
+# Run specific test classes (unit tests)
 mvn test -Dtest=CreatePaymentServiceTest,ProcessPaymentServiceTest
 
-# Run only integration tests
-mvn test -Dtest="*IntegrationTest" -DfailIfNoTests=false
+# Run specific integration test classes
+mvn verify -Dtest=AccountBalanceMapperIntegrationTest
 ```
 
 **Test Organization:**
-- **Unit Tests** (`*Test.kt`): Use mocks only, no external dependencies, run with `mvn test`
-- **Integration Tests** (`*IntegrationTest.kt`): Use real external dependencies via TestContainers, run with `mvn verify`
+- **Unit Tests** (`*Test.kt`): Use mocks only, no external dependencies
+  - **Execution**: Run with `mvn test` (Maven Surefire plugin, `test` phase)
+  - **Design**: Fast tests run on every build for quick feedback
+  - **Configuration**: Surefire excludes `*IntegrationTest.kt` files by filename pattern
+- **Integration Tests** (`*IntegrationTest.kt`): Use real external dependencies via TestContainers, all tagged with `@Tag("integration")`
+  - **Execution**: Run with `mvn verify` (Maven Failsafe plugin, `integration-test` + `verify` phases)
+  - **Design**: Slower tests run before release/deployment for comprehensive validation
+  - **Configuration**: Failsafe includes `*IntegrationTest.kt` files by filename pattern
+  - **Lifecycle Separation**: Surefire and Failsafe complement each other - unit tests provide fast feedback, integration tests provide comprehensive validation before releases
 - **No Hanging Tests**: All MockK syntax issues resolved for reliable test execution
 - **Type Inference Fixed**: Resolved MockK type inference issues in `OutboxDispatcherJobTest.kt` with explicit type hints and Jackson JSR310 module configuration
 
@@ -211,11 +192,11 @@ mvn test -Dtest="*IntegrationTest" -DfailIfNoTests=false
 
 - Why: Exercise the system under constant RPS profiles (run from project root).
 ```bash
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=10 PRE_VUS=40 MAX_VUS=160 k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=10 PRE_VUS=40 MAX_VUS=160 DURATION=20m k6 run load-tests/baseline-smoke-test.js
 CLIENT_TIMEOUT=3100ms MODE=constant RPS=10 PRE_VUS=40 MAX_VUS=160  DURATION=20m k6 run load-tests/baseline-smoke-test.js
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=40 PRE_VUS=40 MAX_VUS=160 k6 run load-tests/baseline-smoke-test.js
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=60 PRE_VUS=40 MAX_VUS=160 k6 run load-tests/baseline-smoke-test.js
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=80 PRE_VUS=40 MAX_VUS=160 DURATION=100m k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=40 PRE_VUS=40 MAX_VUS=160 DURATION=20m  k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=60 PRE_VUS=40 MAX_VUS=160 DURATION=20m  k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=80 PRE_VUS=40 MAX_VUS=160 DURATION=100m DURATION=20m k6 run load-tests/baseline-smoke-test.js
 ```
 
 ## Local Kubernetes Deployment Scripts
