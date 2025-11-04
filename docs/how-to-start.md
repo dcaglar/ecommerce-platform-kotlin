@@ -157,22 +157,22 @@ curl -i -X POST http://127.0.0.1/payments \
 mvn clean test
 
 # Run only integration tests (slower, uses TestContainers, runs via Failsafe)
-mvn clean verify
+mvn -B clean verify -DskipUnitTests=true
 
 # Run both unit and integration tests (requires both commands)
-mvn clean test && mvn clean verify
+mvn  clean verify
 
 # Run tests for specific modules (unit tests only)
 mvn clean test -pl payment-application,payment-infrastructure,payment-domain,common
 
 # Run integration tests for specific modules
-mvn clean verify -pl payment-infrastructure
+mvn clean verify -DskipUnitTests=true -pl payment-infrastructure
 
 # Run specific test classes (unit tests)
 mvn test -Dtest=CreatePaymentServiceTest,ProcessPaymentServiceTest
 
 # Run specific integration test classes
-mvn verify -Dtest=AccountBalanceMapperIntegrationTest
+mvn verify -DskipUnitTests=true -Dtest=AccountBalanceMapperIntegrationTest 
 ```
 
 **Test Organization:**

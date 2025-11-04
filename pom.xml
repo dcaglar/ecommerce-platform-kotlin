@@ -58,6 +58,7 @@ It declares that this module is:
         <mockk.version>1.13.8</mockk.version>
         <container.test.version>1.19.3</container.test.version>
         <mybatis.spring.starter.version>3.0.3</mybatis.spring.starter.version>
+        <skipUnitTests>false</skipUnitTests>
     </properties>
 
     <dependencyManagement>
@@ -245,6 +246,74 @@ It declares that this module is:
                     </execution>
                 </executions>
             </plugin>
+            <!-- 🧠 UNIT TESTS: Surefire runs only *Test.kt -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven.surefire.version}</version>
+                <configuration>
+                    <skipTests>${skipUnitTests}</skipTests>
+                    <!-- Only run *Test classes, not *IntegrationTest -->
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*Test.kt</include>
+                    </includes>
+                    <excludes>
+                        <exclude>**/*IntegrationTest.java</exclude>
+                        <exclude>**/*IntegrationTest.kt</exclude>
+                    </excludes>
+                    <!-- Optional: fail fast and print summary -->
+                    <failIfNoTests>false</failIfNoTests>
+                    <useFile>false</useFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>unit-tests</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- ⚙️ INTEGRATION TESTS: Failsafe runs only *IntegrationTest.kt -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>${maven.surefire.version}</version>
+                <configuration>
+                    <!-- Only run *IntegrationTest classes -->
+                    <includes>
+                        <include>**/*IntegrationTest.java</include>
+                        <include>**/*IntegrationTest.kt</include>
+                    </includes>
+                    <excludes>
+                        <exclude>**/*Test.java</exclude>
+                        <exclude>**/*Test.kt</exclude>
+                    </excludes>
+                    <failIfNoTests>false</failIfNoTests>
+                    <useFile>false</useFile>
+                </configuration>
+                <executions>
+                    <!-- Integration tests run in integration-test phase -->
+                    <execution>
+                        <id>integration-tests</id>
+                        <phase>integration-test</phase>
+                        <goals>
+                            <goal>integration-test</goal>
+                        </goals>
+                    </execution>
+                    <!-- Verify phase checks their results -->
+                    <execution>
+                        <id>verify-results</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
         <pluginManagement>
             <plugins>
@@ -301,14 +370,6 @@ It declares that this module is:
                             <version>${kotlin.version}</version>
                         </dependency>
                     </dependencies>
-                </plugin>
-                <plugin>
-                    <artifactId>maven-surefire-plugin</artifactId>
-                    <version>${maven.surefire.version}</version>
-                </plugin>
-                <plugin>
-                    <artifactId>maven-failsafe-plugin</artifactId>
-                    <version>${maven.surefire.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>

@@ -59,8 +59,8 @@ jobs:
       - name: Verify Docker Environment
         run: docker info
 
-      - name: Run Integration Tests
-        run: mvn -B clean verify
+      - name: Run Integration Tests (Failsafe only)
+        run: mvn -B clean verify -DskipUnitTests=true
 
       - name: Archive Integration Test Results
         if: always()
