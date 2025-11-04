@@ -31,6 +31,28 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
+
+/**
+ * Helper function to truncate LocalDateTime to microseconds (PostgreSQL precision).
+ * PostgreSQL TIMESTAMP has microsecond precision, but Kotlin LocalDateTime has nanosecond precision.
+ */
+private fun LocalDateTime.truncateToMicros(): LocalDateTime = this.truncatedTo(ChronoUnit.MICROS)
+
+/**
+ * Asserts that two LocalDateTime values are equal within 1 microsecond tolerance.
+ * PostgreSQL TIMESTAMP has microsecond precision, but rounding during truncation can cause 1 microsecond differences.
+ */
+private fun assertEqualsWithMicrosecondTolerance(expected: LocalDateTime?, actual: LocalDateTime?, message: String? = null) {
+    if (expected == null || actual == null) {
+        assertEquals(expected, actual, message)
+        return
+    }
+    val expectedMicros = expected.truncateToMicros()
+    val actualMicros = actual.truncateToMicros()
+    val diff = kotlin.math.abs(java.time.Duration.between(expectedMicros, actualMicros).toNanos())
+    assertTrue(diff <= 1000, message ?: "Expected $expectedMicros but was $actualMicros (difference: ${diff}ns, max allowed: 1000ns)")
+}
 
 /**
  * Integration tests for PaymentOrderMapper with real PostgreSQL (Testcontainers).
@@ -169,7 +191,7 @@ class PaymentOrderMapperIntegrationTest {
         // Verify data was updated
         val persisted = paymentOrderMapper.findByPaymentOrderId(paymentOrderId.value).first()
         assertEquals(PaymentOrderStatus.SUCCESSFUL_FINAL, persisted.status)
-        assertEquals(now, persisted.updatedAt)
+        assertEqualsWithMicrosecondTolerance(now, persisted.updatedAt)
     }
 
     @Test
@@ -336,7 +358,7 @@ class PaymentOrderMapperIntegrationTest {
         // Verify final state
         val finalEntity = paymentOrderMapper.findByPaymentOrderId(paymentOrderId.value).first()
         assertEquals(PaymentOrderStatus.SUCCESSFUL_FINAL, finalEntity.status)
-        assertEquals(now.plusMinutes(1), finalEntity.updatedAt)
+        assertEqualsWithMicrosecondTolerance(now.plusMinutes(1), finalEntity.updatedAt)
     }
 
     @Test

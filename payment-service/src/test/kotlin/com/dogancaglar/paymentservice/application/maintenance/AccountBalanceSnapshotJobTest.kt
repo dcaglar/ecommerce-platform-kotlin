@@ -14,7 +14,6 @@ class AccountBalanceSnapshotJobTest {
     private lateinit var accountBalanceCachePort: AccountBalanceCachePort
     private lateinit var accountBalanceSnapshotPort: AccountBalanceSnapshotPort
     private lateinit var job: AccountBalanceSnapshotJob
-    private val snapshotInterval = Duration.ofMinutes(1)
 
     @BeforeEach
     fun setUp() {
@@ -23,7 +22,6 @@ class AccountBalanceSnapshotJobTest {
         job = AccountBalanceSnapshotJob(
             cachePort = accountBalanceCachePort,
             snapshotPort = accountBalanceSnapshotPort,
-            snapshotInterval = snapshotInterval
         )
     }
 
