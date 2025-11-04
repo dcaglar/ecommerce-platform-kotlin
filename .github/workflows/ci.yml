@@ -4,9 +4,6 @@ on:
   pull_request:
     branches:
       - main                # only run for PRs targeting main
-    branches-ignore:
-      - hotfix/*
-      - emergency/*         # skip these branch types
 
 jobs:
   # -----------------------------------------------------------
