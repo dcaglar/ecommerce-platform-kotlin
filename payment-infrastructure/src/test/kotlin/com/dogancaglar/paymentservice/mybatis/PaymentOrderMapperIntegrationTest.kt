@@ -40,6 +40,21 @@ import java.time.temporal.ChronoUnit
 private fun LocalDateTime.truncateToMicros(): LocalDateTime = this.truncatedTo(ChronoUnit.MICROS)
 
 /**
+ * Asserts that two LocalDateTime values are equal within 1 microsecond tolerance.
+ * PostgreSQL TIMESTAMP has microsecond precision, but rounding during truncation can cause 1 microsecond differences.
+ */
+private fun assertEqualsWithMicrosecondTolerance(expected: LocalDateTime?, actual: LocalDateTime?, message: String? = null) {
+    if (expected == null || actual == null) {
+        assertEquals(expected, actual, message)
+        return
+    }
+    val expectedMicros = expected.truncateToMicros()
+    val actualMicros = actual.truncateToMicros()
+    val diff = kotlin.math.abs(java.time.Duration.between(expectedMicros, actualMicros).toNanos())
+    assertTrue(diff <= 1000, message ?: "Expected $expectedMicros but was $actualMicros (difference: ${diff}ns, max allowed: 1000ns)")
+}
+
+/**
  * Integration tests for PaymentOrderMapper with real PostgreSQL (Testcontainers).
  * 
  * These tests validate:
@@ -176,7 +191,7 @@ class PaymentOrderMapperIntegrationTest {
         // Verify data was updated
         val persisted = paymentOrderMapper.findByPaymentOrderId(paymentOrderId.value).first()
         assertEquals(PaymentOrderStatus.SUCCESSFUL_FINAL, persisted.status)
-        assertEquals(now.truncateToMicros(), persisted.updatedAt?.truncateToMicros())
+        assertEqualsWithMicrosecondTolerance(now, persisted.updatedAt)
     }
 
     @Test
@@ -343,7 +358,7 @@ class PaymentOrderMapperIntegrationTest {
         // Verify final state
         val finalEntity = paymentOrderMapper.findByPaymentOrderId(paymentOrderId.value).first()
         assertEquals(PaymentOrderStatus.SUCCESSFUL_FINAL, finalEntity.status)
-        assertEquals(now.plusMinutes(1).truncateToMicros(), finalEntity.updatedAt?.truncateToMicros())
+        assertEqualsWithMicrosecondTolerance(now.plusMinutes(1), finalEntity.updatedAt)
     }
 
     @Test

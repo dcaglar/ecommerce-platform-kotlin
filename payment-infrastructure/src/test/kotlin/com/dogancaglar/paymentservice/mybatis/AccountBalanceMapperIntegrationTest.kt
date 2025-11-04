@@ -28,6 +28,21 @@ import java.time.temporal.ChronoUnit
 private fun LocalDateTime.truncateToMicros(): LocalDateTime = this.truncatedTo(ChronoUnit.MICROS)
 
 /**
+ * Asserts that two LocalDateTime values are equal within 1 microsecond tolerance.
+ * PostgreSQL TIMESTAMP has microsecond precision, but rounding during truncation can cause 1 microsecond differences.
+ */
+private fun assertEqualsWithMicrosecondTolerance(expected: LocalDateTime?, actual: LocalDateTime?, message: String? = null) {
+    if (expected == null || actual == null) {
+        assertEquals(expected, actual, message)
+        return
+    }
+    val expectedMicros = expected.truncateToMicros()
+    val actualMicros = actual.truncateToMicros()
+    val diff = kotlin.math.abs(java.time.Duration.between(expectedMicros, actualMicros).toNanos())
+    assertTrue(diff <= 1000, message ?: "Expected $expectedMicros but was $actualMicros (difference: ${diff}ns, max allowed: 1000ns)")
+}
+
+/**
  * Integration tests for AccountBalanceMapper with real PostgreSQL (Testcontainers).
  * 
  * These tests validate:
@@ -143,8 +158,8 @@ class AccountBalanceMapperIntegrationTest {
         assertEquals(accountCode, persisted?.accountCode)
         assertEquals(75000L, persisted?.balance, "Balance should be updated")
         assertEquals(100L, persisted?.lastAppliedEntryId, "Watermark should be updated")
-        assertEquals(now.truncateToMicros(), persisted?.lastSnapshotAt?.truncateToMicros(), "lastSnapshotAt should be updated")
-        assertEquals(now.truncateToMicros(), persisted?.updatedAt?.truncateToMicros(), "updatedAt should be updated")
+        assertEqualsWithMicrosecondTolerance(now, persisted?.lastSnapshotAt, "lastSnapshotAt should be updated")
+        assertEqualsWithMicrosecondTolerance(now, persisted?.updatedAt, "updatedAt should be updated")
     }
 
     @Test
@@ -240,8 +255,8 @@ class AccountBalanceMapperIntegrationTest {
         assertEquals(accountCode, found?.accountCode)
         assertEquals(200000L, found?.balance)
         assertEquals(200L, found?.lastAppliedEntryId)
-        assertEquals(now.truncateToMicros(), found?.lastSnapshotAt?.truncateToMicros())
-        assertEquals(now.truncateToMicros(), found?.updatedAt?.truncateToMicros())
+        assertEqualsWithMicrosecondTolerance(now, found?.lastSnapshotAt)
+        assertEqualsWithMicrosecondTolerance(now, found?.updatedAt)
     }
 
     @Test
@@ -464,8 +479,8 @@ class AccountBalanceMapperIntegrationTest {
         // Then - Timestamps should be updated when watermark increases
         val persisted = accountBalanceMapper.findByAccountCode(accountCode)
         assertNotNull(persisted)
-        assertEquals(updateTime.truncateToMicros(), persisted?.lastSnapshotAt?.truncateToMicros())
-        assertEquals(updateTime.truncateToMicros(), persisted?.updatedAt?.truncateToMicros())
+        assertEqualsWithMicrosecondTolerance(updateTime, persisted?.lastSnapshotAt)
+        assertEqualsWithMicrosecondTolerance(updateTime, persisted?.updatedAt)
         assertEquals(100L, persisted?.lastAppliedEntryId)
     }
 
@@ -497,8 +512,8 @@ class AccountBalanceMapperIntegrationTest {
         // Then - Timestamps should NOT be updated (watermark protection)
         val persisted = accountBalanceMapper.findByAccountCode(accountCode)
         assertNotNull(persisted)
-        assertEquals(initialTime.truncateToMicros(), persisted?.lastSnapshotAt?.truncateToMicros(), "lastSnapshotAt should NOT change")
-        assertEquals(initialTime.truncateToMicros(), persisted?.updatedAt?.truncateToMicros(), "updatedAt should NOT change")
+        assertEqualsWithMicrosecondTolerance(initialTime, persisted?.lastSnapshotAt, "lastSnapshotAt should NOT change")
+        assertEqualsWithMicrosecondTolerance(initialTime, persisted?.updatedAt, "updatedAt should NOT change")
         assertEquals(50000L, persisted?.balance, "Balance should NOT change")
         assertEquals(100L, persisted?.lastAppliedEntryId)
     }
