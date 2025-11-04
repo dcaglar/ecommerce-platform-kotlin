@@ -31,6 +31,13 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
+
+/**
+ * Helper function to truncate LocalDateTime to microseconds (PostgreSQL precision).
+ * PostgreSQL TIMESTAMP has microsecond precision, but Kotlin LocalDateTime has nanosecond precision.
+ */
+private fun LocalDateTime.truncateToMicros(): LocalDateTime = this.truncatedTo(ChronoUnit.MICROS)
 
 /**
  * Integration tests for PaymentOrderMapper with real PostgreSQL (Testcontainers).
@@ -169,7 +176,7 @@ class PaymentOrderMapperIntegrationTest {
         // Verify data was updated
         val persisted = paymentOrderMapper.findByPaymentOrderId(paymentOrderId.value).first()
         assertEquals(PaymentOrderStatus.SUCCESSFUL_FINAL, persisted.status)
-        assertEquals(now, persisted.updatedAt)
+        assertEquals(now.truncateToMicros(), persisted.updatedAt?.truncateToMicros())
     }
 
     @Test
@@ -336,7 +343,7 @@ class PaymentOrderMapperIntegrationTest {
         // Verify final state
         val finalEntity = paymentOrderMapper.findByPaymentOrderId(paymentOrderId.value).first()
         assertEquals(PaymentOrderStatus.SUCCESSFUL_FINAL, finalEntity.status)
-        assertEquals(now.plusMinutes(1), finalEntity.updatedAt)
+        assertEquals(now.plusMinutes(1).truncateToMicros(), finalEntity.updatedAt?.truncateToMicros())
     }
 
     @Test

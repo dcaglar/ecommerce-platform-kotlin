@@ -19,6 +19,13 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
+
+/**
+ * Helper function to truncate LocalDateTime to microseconds (PostgreSQL precision).
+ * PostgreSQL TIMESTAMP has microsecond precision, but Kotlin LocalDateTime has nanosecond precision.
+ */
+private fun LocalDateTime.truncateToMicros(): LocalDateTime = this.truncatedTo(ChronoUnit.MICROS)
 
 /**
  * Integration tests for AccountBalanceMapper with real PostgreSQL (Testcontainers).
@@ -136,8 +143,8 @@ class AccountBalanceMapperIntegrationTest {
         assertEquals(accountCode, persisted?.accountCode)
         assertEquals(75000L, persisted?.balance, "Balance should be updated")
         assertEquals(100L, persisted?.lastAppliedEntryId, "Watermark should be updated")
-        assertEquals(now, persisted?.lastSnapshotAt, "lastSnapshotAt should be updated")
-        assertEquals(now, persisted?.updatedAt, "updatedAt should be updated")
+        assertEquals(now.truncateToMicros(), persisted?.lastSnapshotAt?.truncateToMicros(), "lastSnapshotAt should be updated")
+        assertEquals(now.truncateToMicros(), persisted?.updatedAt?.truncateToMicros(), "updatedAt should be updated")
     }
 
     @Test
@@ -233,8 +240,8 @@ class AccountBalanceMapperIntegrationTest {
         assertEquals(accountCode, found?.accountCode)
         assertEquals(200000L, found?.balance)
         assertEquals(200L, found?.lastAppliedEntryId)
-        assertEquals(now, found?.lastSnapshotAt)
-        assertEquals(now, found?.updatedAt)
+        assertEquals(now.truncateToMicros(), found?.lastSnapshotAt?.truncateToMicros())
+        assertEquals(now.truncateToMicros(), found?.updatedAt?.truncateToMicros())
     }
 
     @Test
@@ -457,8 +464,8 @@ class AccountBalanceMapperIntegrationTest {
         // Then - Timestamps should be updated when watermark increases
         val persisted = accountBalanceMapper.findByAccountCode(accountCode)
         assertNotNull(persisted)
-        assertEquals(updateTime, persisted?.lastSnapshotAt)
-        assertEquals(updateTime, persisted?.updatedAt)
+        assertEquals(updateTime.truncateToMicros(), persisted?.lastSnapshotAt?.truncateToMicros())
+        assertEquals(updateTime.truncateToMicros(), persisted?.updatedAt?.truncateToMicros())
         assertEquals(100L, persisted?.lastAppliedEntryId)
     }
 
@@ -490,8 +497,8 @@ class AccountBalanceMapperIntegrationTest {
         // Then - Timestamps should NOT be updated (watermark protection)
         val persisted = accountBalanceMapper.findByAccountCode(accountCode)
         assertNotNull(persisted)
-        assertEquals(initialTime, persisted?.lastSnapshotAt, "lastSnapshotAt should NOT change")
-        assertEquals(initialTime, persisted?.updatedAt, "updatedAt should NOT change")
+        assertEquals(initialTime.truncateToMicros(), persisted?.lastSnapshotAt?.truncateToMicros(), "lastSnapshotAt should NOT change")
+        assertEquals(initialTime.truncateToMicros(), persisted?.updatedAt?.truncateToMicros(), "updatedAt should NOT change")
         assertEquals(50000L, persisted?.balance, "Balance should NOT change")
         assertEquals(100L, persisted?.lastAppliedEntryId)
     }
