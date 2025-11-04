@@ -9,7 +9,7 @@ class AmountTest {
     fun `should create Amount with value and currency`() {
         val amount = Amount.of(100000L, Currency("USD")) // $1000.00 = 100000 cents
 
-        assertEquals(100000L, amount.quantity)
+        assertEquals(100001L, amount.quantity)
         assertEquals("USD", amount.currency.currencyCode)
     }
 
