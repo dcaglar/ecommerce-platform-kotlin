@@ -37,13 +37,17 @@ curl -sf -X POST "$KEYCLOAK_URL/admin/realms" \
   -H "Content-Type: application/json" \
   -d '{"realm":"'"$REALM"'","enabled":true}' || log "ℹ️ Realm may already exist"
 
-# --- Create Role ---
+# --- Create Roles ---
+log "🛠️ Creating roles..."
+for role in "payment:write" "FINANCE" "ADMIN" "SELLER"; do
+  log "  Creating role '$role'..."
+  curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/roles" \
+    -H "Authorization: Bearer $KC_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"name":"'"$role"'"}' || log "ℹ️ Role $role may already exist"
+done
+
 ROLE_NAME="payment:write"
-log "🛠️ Ensuring role '$ROLE_NAME' exists..."
-curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/roles" \
-  -H "Authorization: Bearer $KC_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"'"$ROLE_NAME"'"}' || log "ℹ️ Role may already exist"
 
 # --- Functions for Client Management ---
 get_client_id() {
@@ -111,6 +115,7 @@ assign_role_to_service_account() {
 declare -A CLIENTS=(
   [order-service]="ORDER_SERVICE_CLIENT_SECRET"
   [payment-service]="PAYMENT_SERVICE_CLIENT_SECRET"
+  [finance-service]="FINANCE_SERVICE_CLIENT_SECRET"
 )
 
 SECRETS_OUT="$OUTPUT_DIR/secrets.txt"
@@ -119,9 +124,121 @@ for client in "${!CLIENTS[@]}"; do
   client_id=$(create_client "$client")
   secret=$(get_client_secret "$client_id")
   log "🔑 $client secret: $secret"
-  assign_role_to_service_account "$client_id" "$ROLE_NAME"
+  
+  # Assign payment:write to payment-service and order-service
+  if [[ "$client" == "payment-service" || "$client" == "order-service" ]]; then
+    assign_role_to_service_account "$client_id" "$ROLE_NAME"
+  fi
+  
+  # Assign FINANCE role to finance-service (for balance queries)
+  if [[ "$client" == "finance-service" ]]; then
+    assign_role_to_service_account "$client_id" "FINANCE"
+  fi
+  
   echo "${CLIENTS[$client]}=$secret" >> "$SECRETS_OUT"
 done
 
+# --- Create Public Client for Password Grant (for SELLER users) ---
+log "🛠️ Creating public client for password grant (seller authentication)..."
+SELLER_CLIENT_ID="seller-client"
+SELLER_CLIENT_KC_ID=$(get_client_id "$SELLER_CLIENT_ID")
+if [[ -z "$SELLER_CLIENT_KC_ID" || "$SELLER_CLIENT_KC_ID" == "null" ]]; then
+  SELLER_CLIENT_KC_ID=$(curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/clients" \
+    -H "Authorization: Bearer $KC_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "clientId":"'"$SELLER_CLIENT_ID"'",
+      "enabled":true,
+      "protocol":"openid-connect",
+      "publicClient":true,
+      "serviceAccountsEnabled":false,
+      "directAccessGrantsEnabled":true
+    }' | jq -r '.id // empty' || echo "")
+  log "  ✅ Created public client: $SELLER_CLIENT_ID"
+else
+  log "  ℹ️ Public client $SELLER_CLIENT_ID already exists"
+fi
+
+# Configure protocol mapper for seller_id on the seller-client
+if [[ -n "$SELLER_CLIENT_KC_ID" && "$SELLER_CLIENT_KC_ID" != "null" ]]; then
+  log "🛠️ Configuring user attribute mapper for seller_id claim on seller-client..."
+  curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/clients/$SELLER_CLIENT_KC_ID/protocol-mappers/models" \
+    -H "Authorization: Bearer $KC_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "name": "seller-id-mapper",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-usermodel-attribute-mapper",
+      "config": {
+        "user.attribute": "seller_id",
+        "claim.name": "seller_id",
+        "jsonType.label": "String",
+        "id.token.claim": "true",
+        "access.token.claim": "true",
+        "userinfo.token.claim": "true"
+      }
+    }' || log "ℹ️ Mapper may already exist"
+fi
+
+# --- Create Test Users (for SELLER role testing) ---
+log "🛠️ Creating test users for SELLER role..."
+create_test_user() {
+  local username="$1"
+  local seller_id="$2"
+  local password="$3"
+  
+  log "  Creating user '$username' with seller_id=$seller_id..."
+  
+  # Check if user exists
+  local user_id
+  user_id=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/users?username=$username" \
+    -H "Authorization: Bearer $KC_TOKEN" | jq -r '.[0].id // empty')
+  
+  if [[ -z "$user_id" || "$user_id" == "null" ]]; then
+    # Create user
+    user_id=$(curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/users" \
+      -H "Authorization: Bearer $KC_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "username":"'"$username"'",
+        "enabled":true,
+        "credentials":[{"type":"password","value":"'"$password"'","temporary":false}],
+        "attributes":{"seller_id":["'"$seller_id"'"]}
+      }' | jq -r '.id // empty' || echo "")
+    
+    if [[ -z "$user_id" || "$user_id" == "null" ]]; then
+      log "⚠️ Could not create user $username"
+      return 1
+    fi
+    
+    log "  ✅ User $username created"
+  else
+    log "  ℹ️ User $username already exists"
+  fi
+  
+  # Assign SELLER role
+  local role_obj
+  role_obj=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/roles/SELLER" \
+    -H "Authorization: Bearer $KC_TOKEN")
+  
+  if [[ -n "$role_obj" && "$role_obj" != "null" ]]; then
+    curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/users/$user_id/role-mappings/realm" \
+      -H "Authorization: Bearer $KC_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d "[$role_obj]" || log "  ℹ️ SELLER role may already be assigned"
+    log "  ✅ SELLER role assigned to $username"
+  fi
+}
+
+# Create test sellers
+create_test_user "seller-111" "SELLER-111" "seller123"
+create_test_user "seller-222" "SELLER-222" "seller123"
+create_test_user "seller-333" "SELLER-333" "seller123"
+
+
 log "🔒 Client secrets written to $SECRETS_OUT"
+log "📝 Test users created:"
+log "   - seller-111 / seller123 (seller_id: SELLER-111)"
+log "   - seller-222 / seller123 (seller_id: SELLER-222)"
+log "   - seller-333 / seller123 (seller_id: SELLER-333)"
 log "🎉 Keycloak provisioning complete!"

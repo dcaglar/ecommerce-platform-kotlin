@@ -183,17 +183,17 @@ object LedgerEntriesRecordedTestHelper {
                     journalName = "Authorization Hold",
                     createdAt = authCreatedAt,
                     postings = listOf(
-                        // AUTH_HOLD Posting 1: AUTH_RECEIVABLE.GLOBAL DEBIT
+                        // AUTH_HOLD Posting 1: AUTH_RECEIVABLE.GLOBAL.{currency} DEBIT
                         PostingEventData.create(
-                            accountCode = "AUTH_RECEIVABLE.GLOBAL",
+                            accountCode = "AUTH_RECEIVABLE.GLOBAL.$currency",
                             accountType = AccountType.AUTH_RECEIVABLE,
                             amount = amount,
                             currency = currency,
                             direction = PostingDirection.DEBIT
                         ),
-                        // AUTH_HOLD Posting 2: AUTH_LIABILITY.GLOBAL CREDIT
+                        // AUTH_HOLD Posting 2: AUTH_LIABILITY.GLOBAL.{currency} CREDIT
                         PostingEventData.create(
-                            accountCode = "AUTH_LIABILITY.GLOBAL",
+                            accountCode = "AUTH_LIABILITY.GLOBAL.$currency",
                             accountType = AccountType.AUTH_LIABILITY,
                             amount = amount,
                             currency = currency,
@@ -209,33 +209,33 @@ object LedgerEntriesRecordedTestHelper {
                     journalName = "Payment Capture",
                     createdAt = captureCreatedAt,
                     postings = listOf(
-                        // CAPTURE Posting 1: AUTH_RECEIVABLE.GLOBAL CREDIT
+                        // CAPTURE Posting 1: AUTH_RECEIVABLE.GLOBAL.{currency} CREDIT
                         PostingEventData.create(
-                            accountCode = "AUTH_RECEIVABLE.GLOBAL",
+                            accountCode = "AUTH_RECEIVABLE.GLOBAL.$currency",
                             accountType = AccountType.AUTH_RECEIVABLE,
                             amount = amount,
                             currency = currency,
                             direction = PostingDirection.CREDIT
                         ),
-                        // CAPTURE Posting 2: AUTH_LIABILITY.GLOBAL DEBIT
+                        // CAPTURE Posting 2: AUTH_LIABILITY.GLOBAL.{currency} DEBIT
                         PostingEventData.create(
-                            accountCode = "AUTH_LIABILITY.GLOBAL",
+                            accountCode = "AUTH_LIABILITY.GLOBAL.$currency",
                             accountType = AccountType.AUTH_LIABILITY,
                             amount = amount,
                             currency = currency,
                             direction = PostingDirection.DEBIT
                         ),
-                        // CAPTURE Posting 3: MERCHANT_ACCOUNT.{sellerId} CREDIT
+                        // CAPTURE Posting 3: MERCHANT_ACCOUNT.{sellerId}.{currency} CREDIT
                         PostingEventData.create(
-                            accountCode = "MERCHANT_ACCOUNT.$sellerId",
+                            accountCode = "MERCHANT_ACCOUNT.$sellerId.$currency",
                             accountType = AccountType.MERCHANT_ACCOUNT,
                             amount = amount,
                             currency = currency,
                             direction = PostingDirection.CREDIT
                         ),
-                        // CAPTURE Posting 4: PSP_RECEIVABLES.GLOBAL DEBIT
+                        // CAPTURE Posting 4: PSP_RECEIVABLES.GLOBAL.{currency} DEBIT
                         PostingEventData.create(
-                            accountCode = "PSP_RECEIVABLES.GLOBAL",
+                            accountCode = "PSP_RECEIVABLES.GLOBAL.$currency",
                             accountType = AccountType.PSP_RECEIVABLES,
                             amount = amount,
                             currency = currency,

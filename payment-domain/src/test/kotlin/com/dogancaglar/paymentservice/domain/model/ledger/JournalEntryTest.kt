@@ -16,17 +16,18 @@ import kotlin.test.assertTrue
  */
 class JournalEntryTest {
     
+    private val eur = Currency("EUR")
     val acquirerAccount = Account.create(AccountType.ACQUIRER_ACCOUNT, "merchantId")
     val merchantAccount = Account.create(AccountType.MERCHANT_ACCOUNT, "merchantId")
-    val pspFeeRevenueAccount = Account.create(AccountType.PROCESSING_FEE_REVENUE)
-    val authLiabilityAccount = Account.create(AccountType.AUTH_LIABILITY)
-    val authReceivableAccount = Account.create(AccountType.AUTH_RECEIVABLE)
-    val pspReceivableAccount = Account.create(AccountType.PSP_RECEIVABLES)
+    val pspFeeRevenueAccount = Account.create(AccountType.PROCESSING_FEE_REVENUE, "GLOBAL")
+    val authLiabilityAccount = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
+    val authReceivableAccount = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
+    val pspReceivableAccount = Account.create(AccountType.PSP_RECEIVABLES, "GLOBAL")
 
     @Test
     fun `authHold should create balanced entry with AUTH_RECEIVABLE debit and AUTH_LIABILITY credit`() {
-        val amount = Amount.of(10_000, Currency("EUR"))
-        val entryList = JournalEntry.authHold("PAY-1", amount)
+        val amount = Amount.of(10_000, eur)
+        val entryList = JournalEntry.authHold("PAY-1", amount, authReceivableAccount, authLiabilityAccount)
         val entry = entryList.first()
         
         val totalDebitAmount = entry.postings.filterIsInstance<Posting.Debit>().sumOf { it.amount.quantity }
@@ -45,8 +46,8 @@ class JournalEntryTest {
 
     @Test
     fun `capture should balance and shift from auth to psp receivables, and increase merchant payable`() {
-        val amount = Amount.of(10_000, Currency("EUR"))
-        val entryList = JournalEntry.capture("PAY-2", amount, merchantAccount)
+        val amount = Amount.of(10_000, eur)
+        val entryList = JournalEntry.capture("PAY-2", amount, authReceivableAccount, authLiabilityAccount, merchantAccount, pspReceivableAccount)
         val entry = entryList.first()
         
         val drAccounts = entry.postings.filterIsInstance<Posting.Debit>().map { it.account.type }
@@ -75,8 +76,8 @@ class JournalEntryTest {
 
     @Test
     fun `authHoldAndCapture should create both auth hold and capture entries in sequence`() {
-        val amount = Amount.of(10_000, Currency("EUR"))
-        val entryList = JournalEntry.authHoldAndCapture("PAY-COMBO", amount, merchantAccount)
+        val amount = Amount.of(10_000, eur)
+        val entryList = JournalEntry.authHoldAndCapture("PAY-COMBO", amount, authReceivableAccount, authLiabilityAccount, merchantAccount, pspReceivableAccount)
         
         // Should return 2 entries: authHold + capture
         assertEquals(2, entryList.size)
@@ -172,15 +173,14 @@ class JournalEntryTest {
 
     @Test
     fun `fullFlow should net PSP fee as profit and merchant payable cleared`() {
-        val pspFeeRevenueAccount = Account.create(AccountType.PROCESSING_FEE_REVENUE)
-        val eur = Currency("EUR")
+        val pspFeeRevenueAccount = Account.create(AccountType.PROCESSING_FEE_REVENUE, "GLOBAL")
         val capture = Amount.of(10_000, eur)
         val settlement = Amount.of(10_000, eur)
         val fee = Amount.of(200, eur)
         val payout = Amount.of(9_800, eur)
 
         val entryLists = listOf(
-            JournalEntry.capture("PAY-5", capture, merchantAccount),
+            JournalEntry.capture("PAY-5", capture, authReceivableAccount, authLiabilityAccount, merchantAccount, pspReceivableAccount),
             JournalEntry.settlement("PAY-5", settlement, Amount.of(1, eur), Amount.of(1, eur), acquirerAccount),
             JournalEntry.feeRegistered("PAY-5", fee, merchantAccount),
             JournalEntry.payout("MERCHANT-1", payout, merchantAccount, acquirerAccount)
@@ -219,9 +219,12 @@ class JournalEntryTest {
         val amount = Amount.of(1000L, usd)
         val merchantAccount = Account.create(AccountType.MERCHANT_ACCOUNT, "seller-123")
         val acquirerAccount = Account.create(AccountType.ACQUIRER_ACCOUNT, "seller-123")
+        val authReceivable = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
+        val authLiability = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
+        val pspReceivable = Account.create(AccountType.PSP_RECEIVABLES, "GLOBAL")
         
-        assertEquals("AUTH:PAY-123", JournalEntry.authHold("PAY-123", amount).first().id)
-        assertEquals("CAPTURE:PAY-123", JournalEntry.capture("PAY-123", amount, merchantAccount).first().id)
+        assertEquals("AUTH:PAY-123", JournalEntry.authHold("PAY-123", amount, authReceivable, authLiability).first().id)
+        assertEquals("CAPTURE:PAY-123", JournalEntry.capture("PAY-123", amount, authReceivable, authLiability, merchantAccount, pspReceivable).first().id)
         assertEquals("SETTLEMENT:PAY-123", JournalEntry.settlement("PAY-123", amount, Amount.of(1L, usd), Amount.of(1L, usd), acquirerAccount).first().id)
         assertEquals("PSP-FEE:PAY-123", JournalEntry.feeRegistered("PAY-123", amount, merchantAccount).first().id)
         assertEquals("PAYOUT:PAY-123", JournalEntry.payout("PAY-123", amount, merchantAccount, acquirerAccount).first().id)

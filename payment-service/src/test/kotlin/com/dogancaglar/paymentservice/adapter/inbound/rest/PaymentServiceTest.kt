@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
 import com.dogancaglar.paymentservice.adapter.inbound.rest.mapper.PaymentRequestMapper
+import com.dogancaglar.paymentservice.application.validator.PaymentValidator
 import com.dogancaglar.paymentservice.ports.inbound.CreatePaymentUseCase
 import com.dogancaglar.port.out.web.dto.PaymentRequestDTO
 import com.dogancaglar.port.out.web.dto.PaymentResponseDTO
@@ -18,6 +19,8 @@ import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import io.mockk.just
+import io.mockk.Runs
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
@@ -31,11 +34,14 @@ class PaymentServiceTest {
     private lateinit var paymentService: PaymentService
     private lateinit var clock: Clock
 
+    private lateinit var paymentValidator: PaymentValidator
+
     @BeforeEach
     fun setUp() {
         createPaymentUseCase = mockk()
+        paymentValidator = mockk(relaxed = true)
         clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
-        paymentService = PaymentService(createPaymentUseCase)
+        paymentService = PaymentService(createPaymentUseCase, paymentValidator)
     }
 
     @Test

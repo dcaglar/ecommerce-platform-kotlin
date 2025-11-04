@@ -4,10 +4,9 @@ import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.paymentservice.domain.commands.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.LedgerEntriesRecorded
-import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
-import com.dogancaglar.paymentservice.domain.model.ledger.JournalType
-import com.dogancaglar.paymentservice.domain.model.ledger.LedgerEntry
-import com.dogancaglar.paymentservice.domain.model.ledger.Posting
+import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.ledger.*
+import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
 import com.dogancaglar.paymentservice.util.LedgerEntriesRecordedTestHelper
@@ -28,6 +27,7 @@ class RecordLedgerEntriesServiceLedgerContentTest {
 
     private lateinit var ledgerWritePort: LedgerEntryPort
     private lateinit var eventPublisherPort: EventPublisherPort
+    private lateinit var accountDirectory: AccountDirectoryPort
     private lateinit var clock: Clock
     private lateinit var service: RecordLedgerEntriesService
 
@@ -35,8 +35,54 @@ class RecordLedgerEntriesServiceLedgerContentTest {
     fun setup() {
         ledgerWritePort = mockk(relaxed = true)
         eventPublisherPort = mockk(relaxed = true)
+        accountDirectory = mockk(relaxed = true)
         clock = Clock.fixed(Instant.parse("2025-01-01T00:00:00Z"), ZoneOffset.UTC)
-        service = RecordLedgerEntriesService(ledgerWritePort, eventPublisherPort, clock)
+        service = RecordLedgerEntriesService(ledgerWritePort, eventPublisherPort, accountDirectory, clock)
+        
+        // Setup default account directory responses
+        setupAccountDirectoryMocks()
+    }
+    
+    private fun setupAccountDirectoryMocks() {
+        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_ACCOUNT, any()) } answers {
+            val sellerId = secondArg<String>()
+            AccountProfile(
+                accountCode = "MERCHANT_ACCOUNT.$sellerId.EUR",
+                type = AccountType.MERCHANT_ACCOUNT,
+                entityId = sellerId,
+                currency = Currency("EUR"),
+                category = AccountCategory.LIABILITY,
+                country = null,
+                status = AccountStatus.ACTIVE
+            )
+        }
+        every { accountDirectory.getAccountProfile(AccountType.AUTH_RECEIVABLE, "GLOBAL") } returns AccountProfile(
+            accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR",
+            type = AccountType.AUTH_RECEIVABLE,
+            entityId = "GLOBAL",
+            currency = Currency("EUR"),
+            category = AccountCategory.ASSET,
+            country = null,
+            status = AccountStatus.ACTIVE
+        )
+        every { accountDirectory.getAccountProfile(AccountType.AUTH_LIABILITY, "GLOBAL") } returns AccountProfile(
+            accountCode = "AUTH_LIABILITY.GLOBAL.EUR",
+            type = AccountType.AUTH_LIABILITY,
+            entityId = "GLOBAL",
+            currency = Currency("EUR"),
+            category = AccountCategory.LIABILITY,
+            country = null,
+            status = AccountStatus.ACTIVE
+        )
+        every { accountDirectory.getAccountProfile(AccountType.PSP_RECEIVABLES, "GLOBAL") } returns AccountProfile(
+            accountCode = "PSP_RECEIVABLES.GLOBAL.EUR",
+            type = AccountType.PSP_RECEIVABLES,
+            entityId = "GLOBAL",
+            currency = Currency("EUR"),
+            category = AccountCategory.ASSET,
+            country = null,
+            status = AccountStatus.ACTIVE
+        )
     }
 
     private fun sampleCommand(status: String = "SUCCESSFUL_FINAL") = LedgerRecordingCommand(
@@ -106,16 +152,16 @@ class RecordLedgerEntriesServiceLedgerContentTest {
         assertEquals("Authorization Hold", authLedgerEntry.journalEntry.name)
         assertEquals(2, authLedgerEntry.journalEntry.postings.size, "AUTH_HOLD should have 2 postings")
         
-        // AUTH_HOLD Posting 1: AUTH_RECEIVABLE.GLOBAL DEBIT
+        // AUTH_HOLD Posting 1: AUTH_RECEIVABLE.GLOBAL.EUR DEBIT
         val authPosting1 = authLedgerEntry.journalEntry.postings[0] as Posting.Debit
-        assertEquals("AUTH_RECEIVABLE.GLOBAL", authPosting1.account.accountCode)
+        assertEquals("AUTH_RECEIVABLE.GLOBAL.EUR", authPosting1.account.accountCode)
         assertEquals(AccountType.AUTH_RECEIVABLE, authPosting1.account.type)
         assertEquals(10_000L, authPosting1.amount.quantity)
         assertEquals("EUR", authPosting1.amount.currency.currencyCode)
         
-        // AUTH_HOLD Posting 2: AUTH_LIABILITY.GLOBAL CREDIT
+        // AUTH_HOLD Posting 2: AUTH_LIABILITY.GLOBAL.EUR CREDIT
         val authPosting2 = authLedgerEntry.journalEntry.postings[1] as Posting.Credit
-        assertEquals("AUTH_LIABILITY.GLOBAL", authPosting2.account.accountCode)
+        assertEquals("AUTH_LIABILITY.GLOBAL.EUR", authPosting2.account.accountCode)
         assertEquals(AccountType.AUTH_LIABILITY, authPosting2.account.type)
         assertEquals(10_000L, authPosting2.amount.quantity)
         assertEquals("EUR", authPosting2.amount.currency.currencyCode)
@@ -128,31 +174,31 @@ class RecordLedgerEntriesServiceLedgerContentTest {
         assertEquals("Payment Capture", captureLedgerEntry.journalEntry.name)
         assertEquals(4, captureLedgerEntry.journalEntry.postings.size, "CAPTURE should have 4 postings")
         
-        // CAPTURE Posting 1: AUTH_RECEIVABLE.GLOBAL CREDIT
+        // CAPTURE Posting 1: AUTH_RECEIVABLE.GLOBAL.EUR CREDIT
         val capturePosting1 = captureLedgerEntry.journalEntry.postings[0] as Posting.Credit
-        assertEquals("AUTH_RECEIVABLE.GLOBAL", capturePosting1.account.accountCode)
+        assertEquals("AUTH_RECEIVABLE.GLOBAL.EUR", capturePosting1.account.accountCode)
         assertEquals(AccountType.AUTH_RECEIVABLE, capturePosting1.account.type)
         assertEquals(10_000L, capturePosting1.amount.quantity)
         assertEquals("EUR", capturePosting1.amount.currency.currencyCode)
         
-        // CAPTURE Posting 2: AUTH_LIABILITY.GLOBAL DEBIT
+        // CAPTURE Posting 2: AUTH_LIABILITY.GLOBAL.EUR DEBIT
         val capturePosting2 = captureLedgerEntry.journalEntry.postings[1] as Posting.Debit
-        assertEquals("AUTH_LIABILITY.GLOBAL", capturePosting2.account.accountCode)
+        assertEquals("AUTH_LIABILITY.GLOBAL.EUR", capturePosting2.account.accountCode)
         assertEquals(AccountType.AUTH_LIABILITY, capturePosting2.account.type)
         assertEquals(10_000L, capturePosting2.amount.quantity)
         assertEquals("EUR", capturePosting2.amount.currency.currencyCode)
         
-        // CAPTURE Posting 3: MERCHANT_ACCOUNT.seller-789 CREDIT
+        // CAPTURE Posting 3: MERCHANT_ACCOUNT.seller-789.EUR CREDIT
         val capturePosting3 = captureLedgerEntry.journalEntry.postings[2] as Posting.Credit
-        assertEquals("MERCHANT_ACCOUNT.seller-789", capturePosting3.account.accountCode)
+        assertEquals("MERCHANT_ACCOUNT.seller-789.EUR", capturePosting3.account.accountCode)
         assertEquals(AccountType.MERCHANT_ACCOUNT, capturePosting3.account.type)
         assertEquals("seller-789", capturePosting3.account.entityId)
         assertEquals(10_000L, capturePosting3.amount.quantity)
         assertEquals("EUR", capturePosting3.amount.currency.currencyCode)
         
-        // CAPTURE Posting 4: PSP_RECEIVABLES.GLOBAL DEBIT
+        // CAPTURE Posting 4: PSP_RECEIVABLES.GLOBAL.EUR DEBIT
         val capturePosting4 = captureLedgerEntry.journalEntry.postings[3] as Posting.Debit
-        assertEquals("PSP_RECEIVABLES.GLOBAL", capturePosting4.account.accountCode)
+        assertEquals("PSP_RECEIVABLES.GLOBAL.EUR", capturePosting4.account.accountCode)
         assertEquals(AccountType.PSP_RECEIVABLES, capturePosting4.account.type)
         assertEquals(10_000L, capturePosting4.amount.quantity)
         assertEquals("EUR", capturePosting4.amount.currency.currencyCode)

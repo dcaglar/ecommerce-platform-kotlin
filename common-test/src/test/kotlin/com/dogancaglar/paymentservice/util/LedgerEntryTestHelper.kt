@@ -28,7 +28,14 @@ object LedgerEntryTestHelper {
         amountMinor: Long = 1_000L,
         currency: String = "EUR"
     ): LedgerEntry {
-        val journal = JournalEntry.authHold(paymentOrderId, Amount.of(amountMinor, Currency(currency))).first()
+        val authReceivable = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
+        val authLiability = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
+        val journal = JournalEntry.authHold(
+            paymentOrderId, 
+            Amount.of(amountMinor, Currency(currency)),
+            authReceivable,
+            authLiability
+        ).first()
         return LedgerEntry.create(ledgerEntryId, journal, LocalDateTime.now())
     }
 
@@ -43,8 +50,18 @@ object LedgerEntryTestHelper {
         amountMinor: Long = 1_000L,
         currency: String = "EUR"
     ): LedgerEntry {
+        val authReceivable = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
+        val authLiability = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
         val merchantAccount = Account.create(AccountType.MERCHANT_ACCOUNT, merchantId)
-        val journal = JournalEntry.capture(paymentOrderId, Amount.of(amountMinor, Currency(currency)), merchantAccount).first()
+        val pspReceivable = Account.create(AccountType.PSP_RECEIVABLES, "GLOBAL")
+        val journal = JournalEntry.capture(
+            paymentOrderId, 
+            Amount.of(amountMinor, Currency(currency)),
+            authReceivable,
+            authLiability,
+            merchantAccount,
+            pspReceivable
+        ).first()
         return LedgerEntry.create(ledgerEntryId, journal, LocalDateTime.now())
     }
 
@@ -57,8 +74,18 @@ object LedgerEntryTestHelper {
         amountMinor: Long = 1_000L,
         currency: String = "EUR"
     ): List<LedgerEntry> {
+        val authReceivable = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
+        val authLiability = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
         val merchantAccount = Account.create(AccountType.MERCHANT_ACCOUNT, merchantId)
-        val journals = JournalEntry.authHoldAndCapture(paymentOrderId, Amount.of(amountMinor, Currency(currency)), merchantAccount)
+        val pspReceivable = Account.create(AccountType.PSP_RECEIVABLES, "GLOBAL")
+        val journals = JournalEntry.authHoldAndCapture(
+            paymentOrderId, 
+            Amount.of(amountMinor, Currency(currency)),
+            authReceivable,
+            authLiability,
+            merchantAccount,
+            pspReceivable
+        )
         return journals.mapIndexed { i, j ->
             LedgerEntry.create(100L + i, j, LocalDateTime.now())
         }
@@ -75,9 +102,20 @@ object LedgerEntryTestHelper {
         amountMinor: Long = 1_000L,
         currency: String = "EUR"
     ): List<LedgerEntry> {
+        val authReceivable = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
+        val authLiability = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
         val merchant = Account.create(AccountType.MERCHANT_ACCOUNT, merchantId)
+        val pspReceivable = Account.create(AccountType.PSP_RECEIVABLES, "GLOBAL")
         val acquirer = Account.create(AccountType.ACQUIRER_ACCOUNT, acquirerId)
-        val journals = JournalEntry.fullFlow(paymentOrderId, Amount.of(amountMinor, Currency(currency)), merchant, acquirer)
+        val journals = JournalEntry.fullFlow(
+            paymentOrderId, 
+            Amount.of(amountMinor, Currency(currency)),
+            authReceivable,
+            authLiability,
+            pspReceivable,
+            merchant,
+            acquirer
+        )
         return journals.mapIndexed { i, j ->
             LedgerEntry.create(200L + i, j, LocalDateTime.now())
         }

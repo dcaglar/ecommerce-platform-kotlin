@@ -16,6 +16,7 @@ import com.dogancaglar.paymentservice.application.usecases.AccountBalanceService
 import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceUseCase
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
+import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
 import com.dogancaglar.paymentservice.ports.outbound.BalanceIdempotencyPort
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
@@ -68,12 +69,13 @@ class PaymentConsumerConfig {
 
     @Bean
     fun recordLedgerEntriesService(
-        @Qualifier("ledgerEntryTxAdapter") ledgerEntryTxAdapter: LedgerEntryPort,
+        ledgerEntrPort: LedgerEntryPort,
+        syncPaymentEventPublisher: PaymentEventPublisher,
         @Qualifier(
-            "syncPaymentEventPublisher") syncPaymentEventPublisher: PaymentEventPublisher,
+            "accountDirectoryImpl") accountDirectoryImpl: AccountDirectoryPort,
                                                 clock: Clock): RecordLedgerEntriesService{
 
-        return RecordLedgerEntriesService(ledgerEntryTxAdapter,syncPaymentEventPublisher,clock)
+        return RecordLedgerEntriesService(ledgerEntrPort,syncPaymentEventPublisher,accountDirectoryImpl,clock)
     }
 
 

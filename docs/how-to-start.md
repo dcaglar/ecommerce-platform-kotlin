@@ -87,12 +87,30 @@ infra/scripts/port-forwarding.sh
 KEYCLOAK_URL=http://127.0.0.1:8080 ./keycloak/provision-keycloak.sh
 ```
 
-10) Generate an access token for payment-service
-- What: Uses the client secret to get a JWT; saves it to keycloak/access.token.
-- Tip: KC_URL in the script defaults to http://keycloak:8080; override if needed.
-- Run:
+10) Generate access tokens
+- What: Get JWT tokens for different use cases; saves tokens to keycloak/access*.token files.
+- Tip: KC_URL defaults to http://keycloak:8080; override if needed (e.g., when port-forwarding).
+
+**For Payment Creation (Service Account with payment:write):**
 ```bash
 KC_URL=http://127.0.0.1:8080 ./keycloak/get-token.sh
+# Token saved to: keycloak/access.token
+```
+
+**For Balance Queries - Finance/Admin (Service Account with FINANCE role):**
+```bash
+KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-finance.sh
+# Token saved to: keycloak/access-finance.token
+```
+
+**For Balance Queries - Seller Self-Service (User Account with SELLER role):**
+```bash
+# Default: seller-111 (SELLER-111)
+KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-seller.sh
+
+# Or specify a different seller
+KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-seller.sh seller-222 seller123
+# Token saved to: keycloak/access-seller.token
 ```
 
 11) Elasticsearch/Logstash/Kibana stack (OPTIONAL)
@@ -113,7 +131,7 @@ HOST=$(jq -r .host_header infra/endpoints.json)
 echo "Using BASE_URL=$BASE_URL"
 echo "Using Host header=$HOST"
 
-curl -i -X POST "$BASE_URL/payments" \
+curl -i -X POST "$BASE_URL/api/v1/payments" \
   -H "Host: $HOST" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/access.token)" \
@@ -131,7 +149,7 @@ curl -i -X POST "$BASE_URL/payments" \
 
 - Static example (replace host/IP if different):
 ```bash
-curl -i -X POST http://127.0.0.1/payments \
+curl -i -X POST http://127.0.0.1/api/v1/payments \
   -H "Host: payment.192.168.49.2.nip.io" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/access.token)" \
@@ -146,6 +164,92 @@ curl -i -X POST http://127.0.0.1/payments \
     ]
   }'
 ```
+
+## 5️⃣ Query Balance Endpoints
+
+Balance endpoints support two authentication scenarios:
+
+### Scenario A: Finance/Admin Query (Service Account)
+- **Endpoint**: `GET /api/v1/sellers/{sellerId}/balance`
+- **Authorization**: Requires `FINANCE` or `ADMIN` role
+- **Use Case**: Back-office systems querying balance for any seller
+
+**Steps:**
+1. Get a token with FINANCE role:
+```bash
+KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-finance.sh
+```
+
+2. Query balance for any seller (dynamic):
+```bash
+BASE_URL=$(jq -r .base_url infra/endpoints.json)
+HOST=$(jq -r .host_header infra/endpoints.json)
+
+curl -i -X GET "$BASE_URL/api/v1/sellers/SELLER-111/balance" \
+  -H "Host: $HOST" \
+  -H "Authorization: Bearer $(cat ./keycloak/access-finance.token)"
+```
+
+3. Query balance (static):
+```bash
+curl -i -X GET http://127.0.0.1/api/v1/sellers/SELLER-222/balance \
+  -H "Host: payment.192.168.49.2.nip.io" \
+  -H "Authorization: Bearer $(cat ./keycloak/access-finance.token)"
+```
+
+### Scenario B: Seller Self-Service (User Account)
+- **Endpoint**: `GET /api/v1/sellers/me/balance`
+- **Authorization**: Requires `SELLER` role and `seller_id` claim in JWT
+- **Use Case**: Seller querying their own balance
+
+**Steps:**
+1. Get a token for a seller user:
+```bash
+# Default: seller-111 (SELLER-111)
+KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-seller.sh
+
+# Or specify a different seller
+KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-seller.sh seller-222 seller123
+```
+
+2. Query your own balance (dynamic):
+```bash
+BASE_URL=$(jq -r .base_url infra/endpoints.json)
+HOST=$(jq -r .host_header infra/endpoints.json)
+
+curl -i -X GET "$BASE_URL/api/v1/sellers/me/balance" \
+  -H "Host: $HOST" \
+  -H "Authorization: Bearer $(cat ./keycloak/access-seller.token)"
+```
+
+3. Query your own balance (static):
+```bash
+curl -i -X GET http://127.0.0.1/api/v1/sellers/me/balance \
+  -H "Host: payment.192.168.49.2.nip.io" \
+  -H "Authorization: Bearer $(cat ./keycloak/access-seller.token)"
+```
+
+**Expected Response:**
+```json
+{
+  "balance": 50000,
+  "currency": "EUR",
+  "accountCode": "MERCHANT_ACCOUNT.SELLER-111.EUR",
+  "sellerId": "SELLER-111"
+}
+```
+
+**Test Users Created by Provisioning:**
+- `seller-111` / `seller123` → seller_id: `SELLER-111`
+- `seller-222` / `seller123` → seller_id: `SELLER-222`
+- `seller-333` / `seller123` → seller_id: `SELLER-333`
+
+**HTTP Status Codes:**
+- `200 OK` - Success
+- `400 Bad Request` - Invalid request (e.g., missing seller_id claim)
+- `401 Unauthorized` - Missing or invalid JWT token
+- `403 Forbidden` - Valid token but insufficient permissions
+- `404 Not Found` - Seller account not found
 
 ## 2️⃣ Run Unit & Integration Tests
 

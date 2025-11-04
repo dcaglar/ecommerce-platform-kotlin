@@ -1,0 +1,28 @@
+<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistence.AccountDirectoryMapper">
+
+    <select id="findByEntityAndType"
+            parameterType="map"
+            resultType="com.dogancaglar.paymentservice.domain.model.ledger.AccountProfile">
+        SELECT
+        account_code,
+        account_type AS type,
+        entity_id,
+        currency,
+        category,
+        country,
+        status
+        FROM account_directory
+        WHERE account_type = #{accountType}
+        AND entity_id = #{entityId}
+    </select>
+
+    <insert id="insertAccount" parameterType="map">
+        INSERT INTO account_directory(
+        account_code, account_type, entity_id, currency, category, country, status
+        )
+        VALUES (
+        #{accountCode}, #{accountType}, #{entityId}, #{currency}, #{category}, #{country}, 'ACTIVE'
+        )
+        ON CONFLICT (account_code) DO NOTHING
+    </insert>
+</mapper>

@@ -5,10 +5,14 @@ import com.dogancaglar.paymentservice.adapter.outbound.persistance.PaymentOrderO
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.PaymentOutboundAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.redis.RedisIdGeneratorPortAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.serialization.JacksonSerializationAdapter
+import com.dogancaglar.paymentservice.application.usecases.AccountBalanceReadService
 import com.dogancaglar.paymentservice.application.usecases.CreatePaymentService
 import com.dogancaglar.paymentservice.domain.util.PaymentFactory
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceReadUseCase
 import com.dogancaglar.paymentservice.ports.inbound.CreatePaymentUseCase
+import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
+import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.time.Clock
@@ -46,6 +50,17 @@ class PaymentServiceConfig {
             clock = clock,
             paymentOrderDomainEventMapper = paymentOrderDomainEventMapper,
             paymentFactory = paymentFactory
+        )
+    }
+
+    @Bean
+    fun accountBalanceReadUseCase(
+        cachePort: AccountBalanceCachePort,
+        snapshotPort: AccountBalanceSnapshotPort
+    ): AccountBalanceReadUseCase {
+        return AccountBalanceReadService(
+            cachePort = cachePort,
+            snapshotPort = snapshotPort
         )
     }
 }
