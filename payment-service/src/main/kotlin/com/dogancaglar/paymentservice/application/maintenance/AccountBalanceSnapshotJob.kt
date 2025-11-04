@@ -14,8 +14,6 @@ import java.time.Duration
 class AccountBalanceSnapshotJob(
     private val cachePort: AccountBalanceCachePort,
     private val snapshotPort: AccountBalanceSnapshotPort,
-    @Value("\${account-balance.snapshot-interval:PT1M}")
-    private val snapshotInterval: Duration
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 

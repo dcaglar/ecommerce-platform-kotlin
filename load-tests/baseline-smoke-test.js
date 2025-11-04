@@ -131,16 +131,16 @@ function buildPaymentPayload() {
   const numOrders = Math.floor(Math.random() * 2) + 2; // 2 or 3
   const paymentOrders = Array.from({ length: numOrders }, () => ({
     sellerId: randomId('SELLER'),
-    amount: { value: randomAmountCents(10, 200), currency: 'EUR' },
+    amount: { quantity: randomAmountCents(10, 200), currency: 'EUR' },
   }));
 
   // total in cents
-  const totalCents = paymentOrders.reduce((sum, po) => sum + po.amount.value, 0);
+  const totalCents = paymentOrders.reduce((sum, po) => sum + po.amount.quantity, 0);
 
   return JSON.stringify({
     orderId: randomId('ORDER'),
     buyerId: randomId('BUYER'),
-    totalAmount: { value: totalCents, currency: 'EUR' },
+    totalAmount: { quantity: totalCents, currency: 'EUR' },
     paymentOrders,
   });
 }

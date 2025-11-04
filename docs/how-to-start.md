@@ -95,43 +95,11 @@ KEYCLOAK_URL=http://127.0.0.1:8080 ./keycloak/provision-keycloak.sh
 KC_URL=http://127.0.0.1:8080 ./keycloak/get-token.sh
 ```
 
-11) Call the API with the token (optional smoke test)
-- What: Use the saved token and the host header from endpoints.json (written by deploy-payment-service-local.sh).
-- Example:
-```bash
-BASE_URL=$(jq -r .base_url infra/endpoints.json)
-HOST=$(jq -r .host_header infra/endpoints.json)
-curl -i -H "Host: $HOST" -H "Authorization: Bearer $(cat keycloak/access.token)" "$BASE_URL/actuator/health"
-```
-
-12) Elasticsearch/Logstash/Kibana stack (OPTIONAL)
+11) Elasticsearch/Logstash/Kibana stack (OPTIONAL)
 - What: Installs ELK stack for log aggregation and searching.
 - Run:
 ```bash
 infra/scripts/deploy-observability-stack.sh
-```
-
-## 1️⃣ Generate token and send a test payment request
-
-1) Port-forwarding (if not already running)
-- What: Resilient port-forward loops to: Keycloak (8080), Postgres (5432), Prometheus (9090), Grafana (3000).
-- Run:
-```bash
-infra/scripts/port-forwarding.sh
-```
-
-2) Provision Keycloak (realm and clients)
-- Why: Creates the realm, role, and confidential clients used by the services.
-- Run:
-```bash
-./keycloak/provision-keycloak.sh
-```
-
-3) Generate Access Token for payment-service
-- Why: Retrieves a client-credentials token and saves it to keycloak/access.token.
-- Run:
-```bash
-./keycloak/get-token.sh
 ```
 
 4) Send test payment request
@@ -224,11 +192,11 @@ mvn verify -Dtest=AccountBalanceMapperIntegrationTest
 
 - Why: Exercise the system under constant RPS profiles (run from project root).
 ```bash
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=10 PRE_VUS=40 MAX_VUS=160 k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=10 PRE_VUS=40 MAX_VUS=160 DURATION=20m k6 run load-tests/baseline-smoke-test.js
 CLIENT_TIMEOUT=3100ms MODE=constant RPS=10 PRE_VUS=40 MAX_VUS=160  DURATION=20m k6 run load-tests/baseline-smoke-test.js
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=40 PRE_VUS=40 MAX_VUS=160 k6 run load-tests/baseline-smoke-test.js
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=60 PRE_VUS=40 MAX_VUS=160 k6 run load-tests/baseline-smoke-test.js
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=80 PRE_VUS=40 MAX_VUS=160 DURATION=100m k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=40 PRE_VUS=40 MAX_VUS=160 DURATION=20m  k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=60 PRE_VUS=40 MAX_VUS=160 DURATION=20m  k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=80 PRE_VUS=40 MAX_VUS=160 DURATION=100m DURATION=20m k6 run load-tests/baseline-smoke-test.js
 ```
 
 ## Local Kubernetes Deployment Scripts

@@ -149,10 +149,20 @@ flowchart LR
     * `LedgerRecordingConsumer` writes double-entry records to `journal_entries` and `postings` tables.
     * Publishes confirmation `LedgerEntriesRecorded`.
 
-5. **Balance aggregation (planned):**
+5. **Balance aggregation:**
 
-    * `AccountBalanceConsumer` will process `LedgerEntriesRecorded` sequentially per merchant partition.
-    * Updates `account_balances` table and Redis cache for fast balance queries.
+    * `AccountBalanceConsumer` processes `LedgerEntriesRecorded` events in batches (100-500 events, partitioned by `sellerId`, concurrency=4).
+    * **Two-Tier Storage Architecture**:
+        * **Hot Layer (Redis)**: Accumulates balance deltas with TTL (5 minutes) and watermarking. Deltas are atomically updated via Lua scripts (HINCRBY + HSET watermark + SADD dirty set).
+        * **Cold Layer (PostgreSQL)**: Stores durable snapshots with `last_applied_entry_id` watermark. UPSERT includes watermark guard (`WHERE last_applied_entry_id < EXCLUDED.last_applied_entry_id`) preventing concurrent overwrites.
+    * **Idempotency (Two-Level Protection)**:
+        * **Consumer-Level**: Filters postings by watermark (`ledgerEntryId > lastAppliedEntryId`) before computing deltas, preventing duplicate accumulation.
+        * **Database-Level**: Watermark guard ensures snapshots only advance monotonically, protecting against concurrent job executions.
+    * **Batch Processing**: Consumer extracts postings from ledger entries, batch loads snapshots from PostgreSQL (`findByAccountCodes`), computes signed amounts per account, filters by watermark, and updates Redis deltas atomically.
+    * **Scheduled Merge Job**: `AccountBalanceSnapshotJob` (runs every 1 minute, configurable) reads dirty accounts from Redis, atomically gets and resets deltas (`getAndResetDeltaWithWatermark`), merges to snapshots, and saves with watermark guard.
+    * **Read Patterns**:
+        * **Real-Time Read**: `getRealTimeBalance()` returns `snapshot + redis.delta` (fast, non-consuming, eventual consistency).
+        * **Strong Consistency Read**: `getStrongBalance()` atomically resets delta, merges to snapshot, saves, and returns (slower, consuming, guaranteed accuracy).
 
 ---
 
@@ -189,7 +199,7 @@ flowchart LR
 
 | Area                    | Description                                                                     |
 | ----------------------- | ------------------------------------------------------------------------------- |
-| **Account Balances**    | Aggregate per-merchant balances from ledger entries.                            |
+| **Balance APIs**        | Expose REST endpoints for querying account balances (real-time and strong consistency modes). |
 | **Refunds & Captures**  | Introduce reversal and partial capture flows with corresponding ledger entries. |
 | **External PSPs**       | Replace mock PSP with real connectors (Adyen, Stripe, etc.).                    |
 | **Settlement Batching** | Implement merchant payout aggregation.                                          |

@@ -8,6 +8,7 @@ COPY pom.xml ./
 COPY common/pom.xml common/
 COPY payment-domain/pom.xml payment-domain/
 COPY payment-application/pom.xml payment-application/
+COPY common-test/pom.xml common-test/
 COPY payment-infrastructure/pom.xml payment-infrastructure/
 COPY payment-service/pom.xml payment-service/
 COPY payment-consumers/pom.xml payment-consumers/
@@ -16,6 +17,7 @@ RUN mvn -B dependency:go-offline
 # Copy all module source directories (required by parent pom.xml)
 COPY common/ common/
 COPY payment-domain/ payment-domain/
+COPY common-test/ common-test/
 COPY payment-application/ payment-application/
 COPY payment-infrastructure/ payment-infrastructure/
 COPY payment-service/ payment-service/
