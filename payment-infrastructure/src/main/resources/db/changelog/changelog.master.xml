@@ -17,4 +17,5 @@
     <include file="20251014-change-amount-value-to-bigint.xml" relativeToChangelogFile="true"/>
     <include file="2025-10-27-ledger-entry-tables.xml" relativeToChangelogFile="true"/>
     <include file="2025-11-01-account-balances-table.xml" relativeToChangelogFile="true"/>
+    <include file="2025-01-04-account-profile.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

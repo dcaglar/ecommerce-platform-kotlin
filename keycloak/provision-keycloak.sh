@@ -1,9 +1,9 @@
-#!/opt/homebrew/bin/bash
-
+#!/usr/bin/env bash
 set -euo pipefail
 
 # --- Configurable Vars ---
-KEYCLOAK_URL="http://keycloak:8080"
+# Default behavior: try localhost first (for port-forwarding), fallback to cluster-internal
+# Override with KEYCLOAK_URL environment variable to force a specific URL
 REALM="ecommerce-platform"
 ADMIN_USER="admin"
 ADMIN_PASS="adminpassword"
@@ -13,22 +13,58 @@ mkdir -p "$OUTPUT_DIR"
 
 log() { echo "[$(date +'%H:%M:%S')] $*" >&2; }
 
-
+# Auto-detect Keycloak URL if not explicitly set
+# NOTE: The URL used for provisioning doesn't affect JWT issuer - that's controlled by
+# Keycloak's KC_HOSTNAME configuration (set in keycloak-values-local.yaml)
+# Default to localhost assuming port-forwarding is running
+if [[ -z "${KEYCLOAK_URL:-}" ]]; then
+  log "🔍 Auto-detecting Keycloak URL..."
+  # Try localhost first (port-forwarding from host machine)
+  if curl -sf --max-time 2 "http://127.0.0.1:8080/realms/master" >/dev/null 2>&1; then
+    KEYCLOAK_URL="http://127.0.0.1:8080"
+    log "   ✅ Found Keycloak at http://127.0.0.1:8080 (port-forwarding)"
+  # Fallback to cluster-internal URL (running inside cluster)
+  elif curl -sf --max-time 2 "http://keycloak:8080/realms/master" >/dev/null 2>&1; then
+    KEYCLOAK_URL="http://keycloak:8080"
+    log "   ✅ Found Keycloak at http://keycloak:8080 (cluster-internal)"
+  else
+    # Default to localhost (most common scenario)
+    KEYCLOAK_URL="http://127.0.0.1:8080"
+    log "   ⚠️  Could not detect Keycloak, defaulting to http://127.0.0.1:8080"
+  fi
+else
+  log "   Using explicit KEYCLOAK_URL: $KEYCLOAK_URL"
+fi
 
 # --- Authenticate as Admin ---
 log "🔐 Authenticating as admin..."
-KC_TOKEN=$(curl -s \
+log "   Using Keycloak URL: $KEYCLOAK_URL"
+
+# Test connectivity first
+if ! curl -sf --max-time 5 "$KEYCLOAK_URL/realms/master" >/dev/null 2>&1; then
+  log "❌ Cannot reach Keycloak at $KEYCLOAK_URL"
+  log "   Make sure Keycloak is running and accessible."
+  log "   If using port-forwarding, ensure it's active."
+  log "   You can override with: KEYCLOAK_URL=<your-url> ./keycloak/provision-keycloak.sh"
+  exit 1
+fi
+
+# Get admin token with better error handling
+KC_TOKEN=$(curl -f -s --max-time 10 \
   -d "client_id=admin-cli" \
   -d "username=$ADMIN_USER" \
   -d "password=$ADMIN_PASS" \
   -d "grant_type=password" \
-  "$KEYCLOAK_URL/realms/master/protocol/openid-connect/token" \
-  | jq -r .access_token)
+  "$KEYCLOAK_URL/realms/master/protocol/openid-connect/token" 2>/dev/null \
+  | jq -r '.access_token // empty' 2>/dev/null || echo "")
 
 if [[ -z "$KC_TOKEN" || "$KC_TOKEN" == "null" ]]; then
-  log "❌ Failed to get admin token. Exiting."
+  log "❌ Failed to get admin token."
+  log "   Check that Keycloak is running, credentials are correct, and port-forwarding is active."
   exit 1
 fi
+
+log "✅ Admin token obtained"
 
 # --- Create Realm ---
 log "🛠️ Ensuring realm '$REALM' exists..."
@@ -39,7 +75,7 @@ curl -sf -X POST "$KEYCLOAK_URL/admin/realms" \
 
 # --- Create Roles ---
 log "🛠️ Creating roles..."
-for role in "payment:write" "FINANCE" "ADMIN" "SELLER"; do
+for role in "payment:write" "FINANCE" "ADMIN" "SELLER" "SELLER_API"; do
   log "  Creating role '$role'..."
   curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/roles" \
     -H "Authorization: Bearer $KC_TOKEN" \
@@ -104,23 +140,40 @@ assign_role_to_service_account() {
     return 1
   fi
   # Assign role
-  curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/users/$sa_id/role-mappings/realm" \
+  local assign_result
+  assign_result=$(curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/users/$sa_id/role-mappings/realm" \
     -H "Authorization: Bearer $KC_TOKEN" \
     -H "Content-Type: application/json" \
-    -d "[$role_obj]" || log "ℹ️ Role $role_name may already be assigned"
-  log "✅ Role $role_name assigned to service-account-$client_id"
+    -d "[$role_obj]" -w "%{http_code}" -o /dev/null 2>/dev/null || echo "000")
+  
+  # Verify role was assigned by checking current roles
+  sleep 0.3
+  local has_role
+  has_role=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/users/$sa_id/role-mappings/realm" \
+    -H "Authorization: Bearer $KC_TOKEN" | jq -r ".[] | select(.name==\"$role_name\") | .name" | head -1)
+  
+  if [[ "$has_role" == "$role_name" ]]; then
+    log "✅ Role $role_name assigned to service-account-$client_id"
+  else
+    log "⚠️ Role $role_name assignment may have failed - verify manually in Keycloak"
+  fi
 }
 
 # --- Provision Clients & Roles ---
-declare -A CLIENTS=(
-  [order-service]="ORDER_SERVICE_CLIENT_SECRET"
-  [payment-service]="PAYMENT_SERVICE_CLIENT_SECRET"
-  [finance-service]="FINANCE_SERVICE_CLIENT_SECRET"
+# Use bash 3-compatible approach (macOS default bash version)
+# Format: client_name:secret_env_var
+CLIENTS=(
+  "order-service:ORDER_SERVICE_CLIENT_SECRET"
+  "payment-service:PAYMENT_SERVICE_CLIENT_SECRET"
+  "finance-service:FINANCE_SERVICE_CLIENT_SECRET"
 )
 
 SECRETS_OUT="$OUTPUT_DIR/secrets.txt"
 echo -n > "$SECRETS_OUT"
-for client in "${!CLIENTS[@]}"; do
+for client_entry in "${CLIENTS[@]}"; do
+  # Split client_name:secret_env_var
+  IFS=':' read -r client secret_env_var <<< "$client_entry"
+  
   client_id=$(create_client "$client")
   secret=$(get_client_secret "$client_id")
   log "🔑 $client secret: $secret"
@@ -135,34 +188,41 @@ for client in "${!CLIENTS[@]}"; do
     assign_role_to_service_account "$client_id" "FINANCE"
   fi
   
-  echo "${CLIENTS[$client]}=$secret" >> "$SECRETS_OUT"
+  echo "${secret_env_var}=$secret" >> "$SECRETS_OUT"
 done
 
-# --- Create Public Client for Password Grant (for SELLER users) ---
-log "🛠️ Creating public client for password grant (seller authentication)..."
-SELLER_CLIENT_ID="seller-client"
-SELLER_CLIENT_KC_ID=$(get_client_id "$SELLER_CLIENT_ID")
-if [[ -z "$SELLER_CLIENT_KC_ID" || "$SELLER_CLIENT_KC_ID" == "null" ]]; then
-  SELLER_CLIENT_KC_ID=$(curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/clients" \
+# --- Create Customer Area Frontend Client (Case 1: Seller user authentication) ---
+# Supports both OIDC Authorization Code flow (production) and Direct Access Grants (testing)
+log "🛠️ Creating customer-area-frontend client (Case 1: Seller user via frontend)..."
+CUSTOMER_AREA_CLIENT_ID="customer-area-frontend"
+CUSTOMER_AREA_CLIENT_KC_ID=$(get_client_id "$CUSTOMER_AREA_CLIENT_ID")
+if [[ -z "$CUSTOMER_AREA_CLIENT_KC_ID" || "$CUSTOMER_AREA_CLIENT_KC_ID" == "null" ]]; then
+  CUSTOMER_AREA_CLIENT_KC_ID=$(curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/clients" \
     -H "Authorization: Bearer $KC_TOKEN" \
     -H "Content-Type: application/json" \
     -d '{
-      "clientId":"'"$SELLER_CLIENT_ID"'",
+      "clientId":"'"$CUSTOMER_AREA_CLIENT_ID"'",
       "enabled":true,
       "protocol":"openid-connect",
       "publicClient":true,
       "serviceAccountsEnabled":false,
-      "directAccessGrantsEnabled":true
+      "standardFlowEnabled":true,
+      "directAccessGrantsEnabled":true,
+      "implicitFlowEnabled":false,
+      "redirectUris":["http://localhost:*","https://customer-area.example.com/*"],
+      "webOrigins":["*"]
     }' | jq -r '.id // empty' || echo "")
-  log "  ✅ Created public client: $SELLER_CLIENT_ID"
+  if [[ -n "$CUSTOMER_AREA_CLIENT_KC_ID" && "$CUSTOMER_AREA_CLIENT_KC_ID" != "null" ]]; then
+    log "  ✅ Created customer-area-frontend client"
+  fi
 else
-  log "  ℹ️ Public client $SELLER_CLIENT_ID already exists"
+  log "  ℹ️ Customer-area-frontend client already exists"
 fi
 
-# Configure protocol mapper for seller_id on the seller-client
-if [[ -n "$SELLER_CLIENT_KC_ID" && "$SELLER_CLIENT_KC_ID" != "null" ]]; then
-  log "🛠️ Configuring user attribute mapper for seller_id claim on seller-client..."
-  curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/clients/$SELLER_CLIENT_KC_ID/protocol-mappers/models" \
+# Configure protocol mapper for seller_id on customer-area-frontend
+if [[ -n "$CUSTOMER_AREA_CLIENT_KC_ID" && "$CUSTOMER_AREA_CLIENT_KC_ID" != "null" ]]; then
+  log "🛠️ Configuring seller_id mapper for customer-area-frontend..."
+  curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/clients/$CUSTOMER_AREA_CLIENT_KC_ID/protocol-mappers/models" \
     -H "Authorization: Bearer $KC_TOKEN" \
     -H "Content-Type: application/json" \
     -d '{
@@ -177,7 +237,182 @@ if [[ -n "$SELLER_CLIENT_KC_ID" && "$SELLER_CLIENT_KC_ID" != "null" ]]; then
         "access.token.claim": "true",
         "userinfo.token.claim": "true"
       }
-    }' || log "ℹ️ Mapper may already exist"
+    }' || log "  ℹ️ Mapper may already exist"
+fi
+
+# --- Create Backoffice Frontend Client (Case 2: Finance/Admin user authentication) ---
+# Supports both OIDC Authorization Code flow (production) and Direct Access Grants (testing)
+log "🛠️ Creating backoffice-ui client (Case 2: Finance/Admin user via backoffice)..."
+BACKOFFICE_CLIENT_ID="backoffice-ui"
+BACKOFFICE_CLIENT_KC_ID=$(get_client_id "$BACKOFFICE_CLIENT_ID")
+if [[ -z "$BACKOFFICE_CLIENT_KC_ID" || "$BACKOFFICE_CLIENT_KC_ID" == "null" ]]; then
+  BACKOFFICE_CLIENT_KC_ID=$(curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/clients" \
+    -H "Authorization: Bearer $KC_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "clientId":"'"$BACKOFFICE_CLIENT_ID"'",
+      "enabled":true,
+      "protocol":"openid-connect",
+      "publicClient":true,
+      "serviceAccountsEnabled":false,
+      "standardFlowEnabled":true,
+      "directAccessGrantsEnabled":true,
+      "implicitFlowEnabled":false,
+      "redirectUris":["http://localhost:*","https://backoffice.example.com/*"],
+      "webOrigins":["*"]
+    }' | jq -r '.id // empty' || echo "")
+  if [[ -n "$BACKOFFICE_CLIENT_KC_ID" && "$BACKOFFICE_CLIENT_KC_ID" != "null" ]]; then
+    log "  ✅ Created backoffice-ui client"
+  fi
+else
+  log "  ℹ️ Backoffice-ui client already exists"
+fi
+
+# --- Create Merchant API Clients (Case 3: Machine-to-Machine merchant API) ---
+# One client per merchant, using Client Credentials flow with SELLER_API role
+log "🛠️ Creating merchant API clients (Case 3: M2M merchant API)..."
+create_merchant_api_client() {
+  local merchant_id="$1"
+  local client_id="merchant-api-${merchant_id}"
+  
+  log "  Creating merchant API client for $merchant_id..."
+  
+  local client_kc_id
+  client_kc_id=$(get_client_id "$client_id")
+  
+  if [[ -z "$client_kc_id" || "$client_kc_id" == "null" ]]; then
+    client_kc_id=$(curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/clients" \
+      -H "Authorization: Bearer $KC_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "clientId":"'"$client_id"'",
+        "enabled":true,
+        "protocol":"openid-connect",
+        "publicClient":false,
+        "serviceAccountsEnabled":true,
+        "directAccessGrantsEnabled":false,
+        "standardFlowEnabled":false,
+        "attributes":{"access.token.lifespan":"2592000"}
+      }' | jq -r '.id // empty' || echo "")
+    
+    if [[ -n "$client_kc_id" && "$client_kc_id" != "null" ]]; then
+      log "  ✅ Created merchant API client: $client_id"
+    fi
+  else
+    log "  ℹ️ Merchant API client $client_id already exists"
+  fi
+  
+  # Always get secret and write to file (even if client already existed)
+  if [[ -n "$client_kc_id" && "$client_kc_id" != "null" ]]; then
+    # Get client secret
+    local secret
+    secret=$(get_client_secret "$client_kc_id")
+    if [[ -n "$secret" && "$secret" != "null" ]]; then
+      log "  🔑 $client_id secret: $secret"
+      # Remove old entry if exists, then append new one
+      grep -v "^MERCHANT_API_${merchant_id}_CLIENT_SECRET=" "$SECRETS_OUT" > "${SECRETS_OUT}.tmp" 2>/dev/null || true
+      mv "${SECRETS_OUT}.tmp" "$SECRETS_OUT" 2>/dev/null || true
+      echo "MERCHANT_API_${merchant_id}_CLIENT_SECRET=$secret" >> "$SECRETS_OUT"
+    fi
+    
+    # Assign SELLER_API role to service account
+    assign_role_to_service_account "$client_kc_id" "SELLER_API"
+    
+    # Create protocol mapper to inject seller_id claim into token
+    log "  🛠️ Configuring seller_id mapper for $client_id..."
+    
+    # Check if mapper already exists
+    local mapper_exists
+    mapper_exists=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/clients/$client_kc_id/protocol-mappers/models" \
+      -H "Authorization: Bearer $KC_TOKEN" | jq -r '.[] | select(.name=="seller-id-mapper") | .id' | head -1)
+    
+    if [[ -n "$mapper_exists" && "$mapper_exists" != "null" ]]; then
+      # Update existing mapper
+      log "  🔄 Updating existing seller-id-mapper..."
+      curl -sf -X PUT "$KEYCLOAK_URL/admin/realms/$REALM/clients/$client_kc_id/protocol-mappers/models/$mapper_exists" \
+        -H "Authorization: Bearer $KC_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "id": "'"$mapper_exists"'",
+          "name": "seller-id-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.value": "'"$merchant_id"'",
+            "claim.name": "seller_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }' >/dev/null 2>&1 && log "  ✅ Mapper updated" || log "  ⚠️ Could not update mapper"
+    else
+      # Create new mapper
+      curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/clients/$client_kc_id/protocol-mappers/models" \
+        -H "Authorization: Bearer $KC_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "seller-id-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.value": "'"$merchant_id"'",
+            "claim.name": "seller_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }' >/dev/null 2>&1 && log "  ✅ Mapper created" || log "  ⚠️ Could not create mapper"
+    fi
+  fi
+}
+
+# Create merchant API clients for test sellers
+create_merchant_api_client "SELLER-111"
+create_merchant_api_client "SELLER-222"
+create_merchant_api_client "SELLER-333"
+
+# --- Legacy: Keep seller-client for backward compatibility (optional) ---
+# This can be removed if you want to fully migrate to customer-area-frontend
+log "🛠️ Creating legacy seller-client for backward compatibility..."
+SELLER_CLIENT_ID="seller-client"
+SELLER_CLIENT_KC_ID=$(get_client_id "$SELLER_CLIENT_ID")
+if [[ -z "$SELLER_CLIENT_KC_ID" || "$SELLER_CLIENT_KC_ID" == "null" ]]; then
+  SELLER_CLIENT_KC_ID=$(curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/clients" \
+    -H "Authorization: Bearer $KC_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "clientId":"'"$SELLER_CLIENT_ID"'",
+      "enabled":true,
+      "protocol":"openid-connect",
+      "publicClient":true,
+      "serviceAccountsEnabled":false,
+      "directAccessGrantsEnabled":true,
+      "standardFlowEnabled":true
+    }' | jq -r '.id // empty' || echo "")
+  if [[ -n "$SELLER_CLIENT_KC_ID" && "$SELLER_CLIENT_KC_ID" != "null" ]]; then
+    log "  ✅ Created legacy seller-client"
+    # Configure seller_id mapper
+    curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/clients/$SELLER_CLIENT_KC_ID/protocol-mappers/models" \
+      -H "Authorization: Bearer $KC_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "seller-id-mapper",
+        "protocol": "openid-connect",
+        "protocolMapper": "oidc-usermodel-attribute-mapper",
+        "config": {
+          "user.attribute": "seller_id",
+          "claim.name": "seller_id",
+          "jsonType.label": "String",
+          "id.token.claim": "true",
+          "access.token.claim": "true",
+          "userinfo.token.claim": "true"
+        }
+      }' || log "  ℹ️ Mapper may already exist"
+  fi
+else
+  log "  ℹ️ Legacy seller-client already exists"
 fi
 
 # --- Create Test Users (for SELLER role testing) ---
@@ -213,7 +448,31 @@ create_test_user() {
     
     log "  ✅ User $username created"
   else
-    log "  ℹ️ User $username already exists"
+    log "  ℹ️ User $username already exists, deleting and recreating to ensure clean state..."
+    # Delete existing user to ensure clean state (password reset via API is unreliable)
+    curl -sf -X DELETE "$KEYCLOAK_URL/admin/realms/$REALM/users/$user_id" \
+      -H "Authorization: Bearer $KC_TOKEN" >/dev/null 2>&1 || true
+    
+    # Wait a moment for deletion to complete
+    sleep 0.5
+    
+    # Recreate user with correct password
+    user_id=$(curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/users" \
+      -H "Authorization: Bearer $KC_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "username":"'"$username"'",
+        "enabled":true,
+        "credentials":[{"type":"password","value":"'"$password"'","temporary":false}],
+        "attributes":{"seller_id":["'"$seller_id"'"]}
+      }' | jq -r '.id // empty' || echo "")
+    
+    if [[ -z "$user_id" || "$user_id" == "null" ]]; then
+      log "⚠️ Could not recreate user $username"
+      return 1
+    fi
+    
+    log "  ✅ User $username recreated with password"
   fi
   
   # Assign SELLER role

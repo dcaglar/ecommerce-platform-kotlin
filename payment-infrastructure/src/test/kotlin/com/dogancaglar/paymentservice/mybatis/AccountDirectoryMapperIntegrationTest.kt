@@ -273,34 +273,83 @@ class AccountDirectoryMapperIntegrationTest {
     @Test
     @Transactional
     fun `should handle different currencies correctly`() {
-        // Given - Insert USD account
-        val usdAccountCode = "MERCHANT_ACCOUNT.TEST-SELLER.USD"
+        // Given - Insert accounts with different currencies for different entities
+        // This avoids the non-deterministic behavior when querying for an entity with multiple currencies
+        val eurEntityId = "EUR-ENTITY"
+        val usdEntityId = "USD-ENTITY"
+        val gbpEntityId = "GBP-ENTITY"
+        
+        val eurAccountCode = "MERCHANT_ACCOUNT.$eurEntityId.EUR"
+        val usdAccountCode = "MERCHANT_ACCOUNT.$usdEntityId.USD"
+        val gbpAccountCode = "MERCHANT_ACCOUNT.$gbpEntityId.GBP"
+        
+        // Insert EUR account
+        accountDirectoryMapper.insertAccount(
+            mapOf(
+                "accountCode" to eurAccountCode,
+                "accountType" to AccountType.MERCHANT_ACCOUNT.name,
+                "entityId" to eurEntityId,
+                "currency" to "EUR",
+                "category" to AccountCategory.LIABILITY.name,
+                "country" to "NL"
+            )
+        )
+        
+        // Insert USD account
         accountDirectoryMapper.insertAccount(
             mapOf(
                 "accountCode" to usdAccountCode,
                 "accountType" to AccountType.MERCHANT_ACCOUNT.name,
-                "entityId" to "TEST-SELLER",
+                "entityId" to usdEntityId,
                 "currency" to "USD",
                 "category" to AccountCategory.LIABILITY.name,
                 "country" to "US"
             )
         )
-
-        // When - Find EUR account
-        val eurProfile = accountDirectoryMapper.findByEntityAndType(
-            accountType = AccountType.MERCHANT_ACCOUNT.name,
-            entityId = "TEST-SELLER"
+        
+        // Insert GBP account
+        accountDirectoryMapper.insertAccount(
+            mapOf(
+                "accountCode" to gbpAccountCode,
+                "accountType" to AccountType.MERCHANT_ACCOUNT.name,
+                "entityId" to gbpEntityId,
+                "currency" to "GBP",
+                "category" to AccountCategory.LIABILITY.name,
+                "country" to "GB"
+            )
         )
 
-        // Then - Should find EUR account (there are two now, but query should match account_type + entity_id)
-        // Actually, the query matches on account_type + entity_id, so it might return either one
-        // But since we're querying, let's verify it returns a valid profile
-        assertNotNull(eurProfile)
-        val profile = eurProfile!!
-        assertEquals("TEST-SELLER", profile.entityId)
-        assertEquals(AccountType.MERCHANT_ACCOUNT, profile.type)
-        // Currency could be EUR or USD depending on which row matches first
-        assertTrue(profile.currency.currencyCode in listOf("EUR", "USD"))
+        // When - Query each entity (each has only one currency, so result is deterministic)
+        val eurProfile = accountDirectoryMapper.findByEntityAndType(
+            accountType = AccountType.MERCHANT_ACCOUNT.name,
+            entityId = eurEntityId
+        )
+        
+        val usdProfile = accountDirectoryMapper.findByEntityAndType(
+            accountType = AccountType.MERCHANT_ACCOUNT.name,
+            entityId = usdEntityId
+        )
+        
+        val gbpProfile = accountDirectoryMapper.findByEntityAndType(
+            accountType = AccountType.MERCHANT_ACCOUNT.name,
+            entityId = gbpEntityId
+        )
+
+        // Then - Verify each account has the correct currency
+        assertNotNull(eurProfile, "EUR account should be found")
+        assertEquals(Currency("EUR"), eurProfile!!.currency)
+        assertEquals(eurEntityId, eurProfile.entityId)
+        assertEquals(eurAccountCode, eurProfile.accountCode)
+        
+        assertNotNull(usdProfile, "USD account should be found")
+        assertEquals(Currency("USD"), usdProfile!!.currency)
+        assertEquals(usdEntityId, usdProfile.entityId)
+        assertEquals(usdAccountCode, usdProfile.accountCode)
+        
+        assertNotNull(gbpProfile, "GBP account should be found")
+        assertEquals(Currency("GBP"), gbpProfile!!.currency)
+        assertEquals(gbpEntityId, gbpProfile.entityId)
+        assertEquals(gbpAccountCode, gbpProfile.accountCode)
     }
 
     @Test

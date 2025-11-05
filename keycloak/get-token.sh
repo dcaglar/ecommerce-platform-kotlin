@@ -6,7 +6,7 @@ SECRETS_FILE="${OUTPUT_DIR}/secrets.txt"
 ACCESS_TOKEN_FILE="${OUTPUT_DIR}/../access.token"
 CLIENT_ID="payment-service"
 REALM="ecommerce-platform"
-KC_URL="${KC_URL:-http://keycloak:8080}"  # Or change to your forwarded port if needed
+KC_URL="${KC_URL:-http://127.0.0.1:8080}"  # Defaults to localhost (port-forwarding). Override if running inside cluster.
 
 # Extract client secret
 CLIENT_SECRET=$(grep PAYMENT_SERVICE_CLIENT_SECRET= "$SECRETS_FILE" | cut -d= -f2 | tr -d '\r\n')

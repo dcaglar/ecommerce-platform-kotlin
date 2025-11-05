@@ -101,7 +101,13 @@ spring:
   data:
     redis:
       url: redis://redis-master:6379
-      timeout: 2s
+      timeout: 10s               # Increased from 2s to handle ZPOPMIN operations under load
+      lettuce:
+        pool:
+          max-active: 16         # Increased to handle concurrent retry operations
+          max-idle: 8
+          min-idle: 4             # Pre-warm connections for better performance
+          max-wait: 5000ms        # Wait up to 5s for connection from pool
 management:
   health:
     probes:

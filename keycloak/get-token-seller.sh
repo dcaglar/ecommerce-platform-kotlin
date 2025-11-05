@@ -4,14 +4,14 @@ set -e
 OUTPUT_DIR="$(dirname "$0")/output"
 ACCESS_TOKEN_FILE="${OUTPUT_DIR}/../access-seller.token"
 REALM="ecommerce-platform"
-KC_URL="${KC_URL:-http://keycloak:8080}"  # Or change to your forwarded port if needed
+KC_URL="${KC_URL:-http://127.0.0.1:8080}"  # Defaults to localhost (port-forwarding). Override if running inside cluster.
 
 # Default to seller-111, can be overridden
 USERNAME="${1:-seller-111}"
 PASSWORD="${2:-seller123}"
 
 TOKEN_ENDPOINT="$KC_URL/realms/$REALM/protocol/openid-connect/token"
-CLIENT_ID="seller-client"  # Public client created by provisioning script
+CLIENT_ID="customer-area-frontend"  # OIDC client with both Authorization Code and Direct Access Grants
 
 echo "🔐 Requesting JWT with SELLER role for user '$USERNAME' from Keycloak at $TOKEN_ENDPOINT..."
 RESPONSE=$(curl -s -X POST "$TOKEN_ENDPOINT" \

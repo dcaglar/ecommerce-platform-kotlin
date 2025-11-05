@@ -76,11 +76,16 @@ flowchart LR
 
 ### 4.1 payment-service
 
-* REST API for creating payments.
+* REST API for creating payments and querying balances.
 * Writes `Payment` and `PaymentOrder` aggregates to PostgreSQL.
 * Inserts corresponding `OutboxEvent` rows atomically.
 * Returns `202 Accepted` immediately (no PSP calls in request thread).
 * Outbox dispatcher asynchronously publishes domain events to Kafka.
+* **Balance Endpoints** with three authentication scenarios:
+  * **Case 1**: Seller user via customer-area frontend (`GET /api/v1/sellers/me/balance`) - requires `SELLER` role, OIDC Authorization Code flow
+  * **Case 2**: Finance/Admin user via backoffice (`GET /api/v1/sellers/{sellerId}/balance`) - requires `FINANCE`/`ADMIN` role, OIDC Authorization Code flow
+  * **Case 3**: Merchant API M2M (`GET /api/v1/sellers/me/balance`) - requires `SELLER_API` role, Client Credentials flow
+* **Security**: OAuth2 Resource Server with JWT validation (Keycloak), role-based access control
 
 ### 4.2 payment-consumers
 
@@ -195,11 +200,28 @@ flowchart LR
 
 ---
 
-## 9. Future Extensions
+## 9. Security & Authentication
+
+The platform implements OAuth2/JWT-based authentication with Keycloak, supporting three real-world authentication scenarios:
+
+| Case | Endpoint | Role | Client | Grant Type | Use Case |
+|------|----------|------|--------|------------|----------|
+| 1 | `GET /api/v1/sellers/me/balance` | `SELLER` | `customer-area-frontend` | OIDC Authorization Code / Direct Access Grants | Seller logs into customer-area web app |
+| 2 | `GET /api/v1/sellers/{sellerId}/balance` | `FINANCE`/`ADMIN` | `backoffice-ui` / `finance-service` | OIDC Authorization Code / Client Credentials | Finance/admin staff in backoffice app |
+| 3 | `GET /api/v1/sellers/me/balance` | `SELLER_API` | `merchant-api-{SELLER_ID}` | Client Credentials | Merchant's ERP/OMS system (M2M) |
+
+**Implementation Details:**
+- **Payment Endpoint**: `POST /api/v1/payments` requires `payment:write` authority (service-to-service via Client Credentials)
+- **Balance Endpoints**: Role-based access control with `seller_id` claim extraction from JWT tokens
+- **Keycloak Integration**: Clients configured with appropriate OIDC flows (Authorization Code for production frontends, Direct Access Grants for testing, Client Credentials for M2M)
+- **Token Validation**: Spring Security OAuth2 Resource Server validates JWT issuer and extracts roles/claims
+
+---
+
+## 10. Future Extensions
 
 | Area                    | Description                                                                     |
 | ----------------------- | ------------------------------------------------------------------------------- |
-| **Balance APIs**        | Expose REST endpoints for querying account balances (real-time and strong consistency modes). |
 | **Refunds & Captures**  | Introduce reversal and partial capture flows with corresponding ledger entries. |
 | **External PSPs**       | Replace mock PSP with real connectors (Adyen, Stripe, etc.).                    |
 | **Settlement Batching** | Implement merchant payout aggregation.                                          |
@@ -207,6 +229,6 @@ flowchart LR
 
 ---
 
-## 10. Summary
+## 11. Summary
 
 The `ecommerce-platform-kotlin` backend demonstrates a production-grade event-driven architecture applying DDD, SOLID, and cloud-native principles. The system decouples user-facing APIs from external dependencies, achieves exactly-once delivery across asynchronous flows, and enforces domain invariants through factory-enforced object creation. Core domain classes (`Account`, `Amount`, `JournalEntry`, `Posting`) use private constructors with validated factory methods, ensuring all objects are created in valid states and preventing invalid domain modeling. The platform provides a foundation for extending into full financial operations — including ledger reconciliation, balance tracking, and settlements.

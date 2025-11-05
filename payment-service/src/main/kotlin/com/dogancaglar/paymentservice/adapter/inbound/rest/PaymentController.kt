@@ -27,7 +27,7 @@ class PaymentController(
      * @param request Payment request containing order details and payment orders
      * @return ResponseEntity with 201 Created status and PaymentResponseDTO
      */
-    @PostMapping("/api/v1/payments")
+    @PostMapping("/payments")
     @PreAuthorize("hasAuthority('payment:write')")
     fun createPayment(@Valid @RequestBody request: PaymentRequestDTO): ResponseEntity<PaymentResponseDTO> {
         logger.debug("📥 Sending payment request for order: ${request.orderId}")

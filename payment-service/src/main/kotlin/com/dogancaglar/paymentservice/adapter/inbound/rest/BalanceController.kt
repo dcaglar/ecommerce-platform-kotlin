@@ -36,14 +36,17 @@ class BalanceController(
     /**
      * Get balance for the authenticated seller (self-service).
      * 
-     * Requires SELLER role.
+     * Supports two authentication scenarios:
+     * - Case 1: User with SELLER role (via customer-area frontend, OIDC Authorization Code flow)
+     * - Case 3: Machine client with SELLER_API role (via merchant API, Client Credentials flow)
+     * 
      * The sellerId is extracted from the JWT token's "seller_id" claim.
      * 
      * @param authentication JWT authentication token containing seller_id claim
      * @return BalanceDto containing the seller's current balance
      * @throws IllegalArgumentException with 400 Bad Request if seller_id claim is missing
      */
-    @PreAuthorize("hasRole('SELLER')")
+    @PreAuthorize("hasRole('SELLER') or hasRole('SELLER_API')")
     @GetMapping("/sellers/me/balance")
     fun getMyBalance(authentication: JwtAuthenticationToken): ResponseEntity<BalanceDto> {
         val sellerId = authentication.token.claims["seller_id"] as? String
