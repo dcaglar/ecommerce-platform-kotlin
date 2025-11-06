@@ -25,6 +25,16 @@ class JournalEntry private constructor(
         require(totalDebitAmount == totalCreditAmount) {
             "Unbalanced journal entry: debits and credits differ (debits=$totalDebitAmount, credits=$totalCreditAmount)"
         }
+
+        val duplicateAccounts = postings
+            .groupingBy { it.account.accountCode }
+            .eachCount()
+            .filterValues { it > 1 }
+            .keys
+
+        require(duplicateAccounts.isEmpty()) {
+            "JournalEntry contains duplicate accounts: ${duplicateAccounts.joinToString(", ")}"
+        }
     }
 
     companion object JournalFactory {
