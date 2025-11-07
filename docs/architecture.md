@@ -25,6 +25,8 @@ This document summarizes the high-level architecture of the `ecommerce-platform-
 The platform manages payments for multi-seller checkouts, processes them asynchronously, records financial movements in a double-entry ledger, and will later aggregate balances per merchant.
 
 ```mermaid
+
+```mermaid
 flowchart LR
     subgraph API[Payment Service]
         REST[POST /payments]

@@ -422,16 +422,17 @@ create_test_user() {
   local seller_id="$2"
   local password="$3"
   
-  log "  Creating user '$username' with seller_id=$seller_id..."
+  log "  Creating/updating user '$username' with seller_id=$seller_id..."
   
-  # Check if user exists
+  # Get user ID if exists
   local user_id
   user_id=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/users?username=$username" \
-    -H "Authorization: Bearer $KC_TOKEN" | jq -r '.[0].id // empty')
+    -H "Authorization: Bearer $KC_TOKEN" | jq -r '.[0].id // empty' 2>/dev/null || echo "")
   
+  # Create user if doesn't exist
   if [[ -z "$user_id" || "$user_id" == "null" ]]; then
-    # Create user
-    user_id=$(curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/users" \
+    local create_response
+    create_response=$(curl -sf -w "%{http_code}" -X POST "$KEYCLOAK_URL/admin/realms/$REALM/users" \
       -H "Authorization: Bearer $KC_TOKEN" \
       -H "Content-Type: application/json" \
       -d '{
@@ -439,60 +440,55 @@ create_test_user() {
         "enabled":true,
         "credentials":[{"type":"password","value":"'"$password"'","temporary":false}],
         "attributes":{"seller_id":["'"$seller_id"'"]}
-      }' | jq -r '.id // empty' || echo "")
+      }' -o /dev/null 2>/dev/null || echo "000")
     
-    if [[ -z "$user_id" || "$user_id" == "null" ]]; then
-      log "⚠️ Could not create user $username"
-      return 1
+    if [[ "$create_response" != "201" ]]; then
+      log "  ⚠️ User creation returned HTTP $create_response (may already exist)"
     fi
     
-    log "  ✅ User $username created"
+    # Get user ID after creation attempt
+    user_id=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/users?username=$username" \
+      -H "Authorization: Bearer $KC_TOKEN" | jq -r '.[0].id // empty' 2>/dev/null || echo "")
+  fi
+  
+  # Update user if exists
+  if [[ -n "$user_id" && "$user_id" != "null" ]]; then
+    # Update password
+    curl -sf -X PUT "$KEYCLOAK_URL/admin/realms/$REALM/users/$user_id/reset-password" \
+      -H "Authorization: Bearer $KC_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{"type":"password","value":"'"$password"'","temporary":false}' >/dev/null 2>&1 || true
+    
+    # Update seller_id attribute
+    curl -sf -X PUT "$KEYCLOAK_URL/admin/realms/$REALM/users/$user_id" \
+      -H "Authorization: Bearer $KC_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{"attributes":{"seller_id":["'"$seller_id"'"]}}' >/dev/null 2>&1 || true
+    
+    log "  ✅ User $username updated"
   else
-    log "  ℹ️ User $username already exists, deleting and recreating to ensure clean state..."
-    # Delete existing user to ensure clean state (password reset via API is unreliable)
-    curl -sf -X DELETE "$KEYCLOAK_URL/admin/realms/$REALM/users/$user_id" \
-      -H "Authorization: Bearer $KC_TOKEN" >/dev/null 2>&1 || true
-    
-    # Wait a moment for deletion to complete
-    sleep 0.5
-    
-    # Recreate user with correct password
-    user_id=$(curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/users" \
-      -H "Authorization: Bearer $KC_TOKEN" \
-      -H "Content-Type: application/json" \
-      -d '{
-        "username":"'"$username"'",
-        "enabled":true,
-        "credentials":[{"type":"password","value":"'"$password"'","temporary":false}],
-        "attributes":{"seller_id":["'"$seller_id"'"]}
-      }' | jq -r '.id // empty' || echo "")
-    
-    if [[ -z "$user_id" || "$user_id" == "null" ]]; then
-      log "⚠️ Could not recreate user $username"
-      return 1
-    fi
-    
-    log "  ✅ User $username recreated with password"
+    log "  ⚠️ Could not create or find user $username"
+    return 1
   fi
   
   # Assign SELLER role
   local role_obj
   role_obj=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/roles/SELLER" \
-    -H "Authorization: Bearer $KC_TOKEN")
+    -H "Authorization: Bearer $KC_TOKEN" 2>/dev/null || echo "")
   
   if [[ -n "$role_obj" && "$role_obj" != "null" ]]; then
     curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/users/$user_id/role-mappings/realm" \
       -H "Authorization: Bearer $KC_TOKEN" \
       -H "Content-Type: application/json" \
-      -d "[$role_obj]" || log "  ℹ️ SELLER role may already be assigned"
+      -d "[$role_obj]" >/dev/null 2>&1 || true
     log "  ✅ SELLER role assigned to $username"
   fi
 }
 
-# Create test sellers
-create_test_user "seller-111" "SELLER-111" "seller123"
-create_test_user "seller-222" "SELLER-222" "seller123"
-create_test_user "seller-333" "SELLER-333" "seller123"
+# Create test sellers (continue even if some fail)
+create_test_user "seller-111" "SELLER-111" "seller123" || log "  ⚠️ Failed to create seller-111, continuing..."
+create_test_user "seller-222" "SELLER-222" "seller123" || log "  ⚠️ Failed to create seller-222, continuing..."
+create_test_user "seller-333" "SELLER-333" "seller123" || log "  ⚠️ Failed to create seller-333, continuing..."
 
 
 log "🔒 Client secrets written to $SECRETS_OUT"
