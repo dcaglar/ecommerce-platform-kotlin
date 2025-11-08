@@ -2,29 +2,28 @@
 set -e
 
 OUTPUT_DIR="$(dirname "$0")/output"
-SECRETS_FILE="${OUTPUT_DIR}/secrets.txt"
 JWT_DIR="${OUTPUT_DIR}/jwt"
-TOKEN_BASENAME="payment-service.token"
-CLAIMS_BASENAME="payment-service.claims.json"
-ACCESS_TOKEN_FILE="${JWT_DIR}/${TOKEN_BASENAME}"
-CLAIMS_FILE="${JWT_DIR}/${CLAIMS_BASENAME}"
-CLIENT_ID="payment-service"
 REALM="ecommerce-platform"
+CLIENT_ID="backoffice-ui"
 
-# Optional CLI override for Keycloak URL
-CLI_KC_URL="${1:-}"
-TTL_HOURS="${2:4}"
+DEFAULT_USERNAME="finance-ops"
+DEFAULT_PASSWORD="finance123"
+USERNAME="$(echo "${1:-$DEFAULT_USERNAME}" | xargs)"
+PASSWORD="${2:-$DEFAULT_PASSWORD}"
+KC_URL_OVERRIDE="${3:-}"
+TTL_HOURS="${4:-}"
 
-if [[ -n "$CLI_KC_URL" ]]; then
-  KC_URL="$CLI_KC_URL"
+if [[ -n "$KC_URL_OVERRIDE" ]]; then
+  KC_URL="$KC_URL_OVERRIDE"
 fi
 
-KC_URL="${KC_URL:-http://127.0.0.1:8080}"  # Defaults to localhost (port-forwarding). Override if running inside cluster.
+KC_URL="${KC_URL:-http://127.0.0.1:8080}"
+SANITIZED_USERNAME=$(printf '%s' "$USERNAME" | tr -c 'A-Za-z0-9._:-' '_')
+ACCESS_TOKEN_FILE="${JWT_DIR}/finance-${SANITIZED_USERNAME}.token"
+CLAIMS_FILE="${JWT_DIR}/finance-${SANITIZED_USERNAME}.claims.json"
 
-# Ensure output directories exist
 mkdir -p "$JWT_DIR"
 
-# Wait until Keycloak is reachable to avoid race conditions right after provisioning
 wait_for_keycloak() {
   local endpoint="$KC_URL/realms/$REALM/.well-known/openid-configuration"
   local attempt=1
@@ -34,13 +33,11 @@ wait_for_keycloak() {
     if (( attempt == 1 )); then
       echo "⏳ Waiting for Keycloak to become ready at $endpoint ..."
     fi
-
     if (( attempt >= max_attempts )); then
       echo "❌ Keycloak is not reachable after $max_attempts attempts."
       echo "   Tried: $endpoint"
       exit 1
     fi
-
     sleep 1
     attempt=$((attempt + 1))
   done
@@ -50,22 +47,11 @@ wait_for_keycloak() {
   fi
 }
 
-# Ensure Keycloak is ready before requesting a token
 wait_for_keycloak
 
-# Extract client secret
-CLIENT_SECRET=$(grep PAYMENT_SERVICE_CLIENT_SECRET= "$SECRETS_FILE" | cut -d= -f2 | tr -d '\r\n')
-
-if [ -z "$CLIENT_SECRET" ]; then
-  echo "❌ Could not find PAYMENT_SERVICE_CLIENT_SECRET in $SECRETS_FILE"
-  exit 1
-fi
-
 TOKEN_ENDPOINT="$KC_URL/realms/$REALM/protocol/openid-connect/token"
 
-# Optional TTL scaling
-TOKEN_ENDPOINT="$KC_URL/realms/$REALM/protocol/openid-connect/token"
-
+echo "🔐 Requesting JWT with FINANCE role for user '$USERNAME' from Keycloak at $TOKEN_ENDPOINT..."
 declare -a EXTRA_ARGS=()
 TTL_MESSAGE=""
 if [[ -n "$TTL_HOURS" ]]; then
@@ -78,12 +64,12 @@ if [[ -n "$TTL_HOURS" ]]; then
   fi
 fi
 
-echo "🔐 Requesting JWT from Keycloak at $TOKEN_ENDPOINT..."
 RESPONSE=$(curl -s -X POST "$TOKEN_ENDPOINT" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=client_credentials" \
+  -d "grant_type=password" \
   -d "client_id=$CLIENT_ID" \
-  -d "client_secret=$CLIENT_SECRET" \
+  -d "username=$USERNAME" \
+  -d "password=$PASSWORD" \
   "${EXTRA_ARGS[@]}")
 
 ACCESS_TOKEN=$(echo "$RESPONSE" | jq -r .access_token)
@@ -109,7 +95,7 @@ try:
         json.dump(data, sys.stdout, indent=2, sort_keys=True)
     else:
         sys.stdout.write("{}")
-except Exception as exc:
+except Exception:
     sys.stdout.write("{}")
 PY
   echo "📝 Claims saved to $CLAIMS_FILE"
@@ -118,6 +104,16 @@ else
   echo "⚠️  python3 not found; wrote empty claims file to $CLAIMS_FILE"
 fi
 
+if command -v jq >/dev/null 2>&1; then
+  ROLES=$(jq -r '.realm_access.roles // [] | join(",")' "$CLAIMS_FILE" 2>/dev/null)
+  if [[ -n "$ROLES" ]]; then
+    echo "🛡️  Realm roles: $ROLES"
+  fi
+fi
+
 if [[ -n "$TTL_MESSAGE" ]]; then
   echo "⏱️  Requested token lifespan: ${TTL_MESSAGE}h"
 fi
+
+echo "💡 Use this token to query balance for any seller: GET /api/v1/sellers/{sellerId}/balance"
+

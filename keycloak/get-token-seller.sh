@@ -2,24 +2,27 @@
 set -e
 
 OUTPUT_DIR="$(dirname "$0")/output"
-SECRETS_FILE="${OUTPUT_DIR}/secrets.txt"
 JWT_DIR="${OUTPUT_DIR}/jwt"
-TOKEN_BASENAME="payment-service.token"
-CLAIMS_BASENAME="payment-service.claims.json"
-ACCESS_TOKEN_FILE="${JWT_DIR}/${TOKEN_BASENAME}"
-CLAIMS_FILE="${JWT_DIR}/${CLAIMS_BASENAME}"
-CLIENT_ID="payment-service"
 REALM="ecommerce-platform"
 
-# Optional CLI override for Keycloak URL
-CLI_KC_URL="${1:-}"
-TTL_HOURS="${2:4}"
+# Default to seller-111, can be overridden
+DEFAULT_USERNAME="seller-111"
+DEFAULT_PASSWORD="seller123"
+USERNAME="$(echo "${1:-$DEFAULT_USERNAME}" | xargs)"
+PASSWORD="${2:-$DEFAULT_PASSWORD}"
+KC_URL_OVERRIDE="${3:-}"
+TTL_HOURS="${4:-}"
 
-if [[ -n "$CLI_KC_URL" ]]; then
-  KC_URL="$CLI_KC_URL"
+if [[ -n "$KC_URL_OVERRIDE" ]]; then
+  KC_URL="$KC_URL_OVERRIDE"
 fi
 
 KC_URL="${KC_URL:-http://127.0.0.1:8080}"  # Defaults to localhost (port-forwarding). Override if running inside cluster.
+
+SANITIZED_USERNAME=$(printf '%s' "$USERNAME" | tr -c 'A-Za-z0-9._:-' '_')
+BASE_NAME="seller-${SANITIZED_USERNAME}"
+ACCESS_TOKEN_FILE="${JWT_DIR}/${BASE_NAME}.token"
+CLAIMS_FILE="${JWT_DIR}/${BASE_NAME}.claims.json"
 
 # Ensure output directories exist
 mkdir -p "$JWT_DIR"
@@ -53,19 +56,10 @@ wait_for_keycloak() {
 # Ensure Keycloak is ready before requesting a token
 wait_for_keycloak
 
-# Extract client secret
-CLIENT_SECRET=$(grep PAYMENT_SERVICE_CLIENT_SECRET= "$SECRETS_FILE" | cut -d= -f2 | tr -d '\r\n')
-
-if [ -z "$CLIENT_SECRET" ]; then
-  echo "❌ Could not find PAYMENT_SERVICE_CLIENT_SECRET in $SECRETS_FILE"
-  exit 1
-fi
-
 TOKEN_ENDPOINT="$KC_URL/realms/$REALM/protocol/openid-connect/token"
+CLIENT_ID="customer-area-frontend"  # OIDC client with both Authorization Code and Direct Access Grants
 
-# Optional TTL scaling
-TOKEN_ENDPOINT="$KC_URL/realms/$REALM/protocol/openid-connect/token"
-
+echo "🔐 Requesting JWT with SELLER role for user '$USERNAME' from Keycloak at $TOKEN_ENDPOINT..."
 declare -a EXTRA_ARGS=()
 TTL_MESSAGE=""
 if [[ -n "$TTL_HOURS" ]]; then
@@ -78,12 +72,12 @@ if [[ -n "$TTL_HOURS" ]]; then
   fi
 fi
 
-echo "🔐 Requesting JWT from Keycloak at $TOKEN_ENDPOINT..."
 RESPONSE=$(curl -s -X POST "$TOKEN_ENDPOINT" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=client_credentials" \
+  -d "grant_type=password" \
   -d "client_id=$CLIENT_ID" \
-  -d "client_secret=$CLIENT_SECRET" \
+  -d "username=$USERNAME" \
+  -d "password=$PASSWORD" \
   "${EXTRA_ARGS[@]}")
 
 ACCESS_TOKEN=$(echo "$RESPONSE" | jq -r .access_token)
@@ -91,11 +85,24 @@ ACCESS_TOKEN=$(echo "$RESPONSE" | jq -r .access_token)
 if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ]; then
   echo "❌ Failed to obtain access token:"
   echo "$RESPONSE"
+  echo ""
+  echo "💡 Make sure you've run ./keycloak/provision-keycloak.sh first"
+  echo "💡 Available test users: seller-111, seller-222, seller-333 (password: seller123)"
   exit 1
 fi
 
+# Extract seller_id from token (optional, for verification)
+# Decode JWT payload (second part)
+SELLER_ID=$(echo "$ACCESS_TOKEN" | cut -d'.' -f2 | base64 -d 2>/dev/null | jq -r '.seller_id // empty' 2>/dev/null || echo "")
+SELLER_ID=$(echo "$SELLER_ID" | xargs)
+if [ -n "$SELLER_ID" ]; then
+  echo "✅ Token contains seller_id: $SELLER_ID"
+else
+  echo "⚠️  Note: seller_id claim not found in token. Make sure provisioning script configured the mapper."
+fi
+
+# Write token
 echo "$ACCESS_TOKEN" > "$ACCESS_TOKEN_FILE"
-echo "✅ Token saved to $ACCESS_TOKEN_FILE"
 
 if command -v python3 >/dev/null 2>&1; then
   python3 - <<PY > "$CLAIMS_FILE"
@@ -109,15 +116,40 @@ try:
         json.dump(data, sys.stdout, indent=2, sort_keys=True)
     else:
         sys.stdout.write("{}")
-except Exception as exc:
+except Exception:
     sys.stdout.write("{}")
 PY
-  echo "📝 Claims saved to $CLAIMS_FILE"
 else
   echo "{}" > "$CLAIMS_FILE"
   echo "⚠️  python3 not found; wrote empty claims file to $CLAIMS_FILE"
 fi
 
+# Rename files based on seller_id claim if available
+if [[ -n "$SELLER_ID" ]]; then
+  SANITIZED_SELLER_ID=$(printf '%s' "$SELLER_ID" | tr -c 'A-Za-z0-9._:-' '_')
+  TARGET_BASE="seller-${SANITIZED_SELLER_ID}"
+  TARGET_TOKEN="${JWT_DIR}/${TARGET_BASE}.token"
+  TARGET_CLAIMS="${JWT_DIR}/${TARGET_BASE}.claims.json"
+  if [[ "$TARGET_TOKEN" != "$ACCESS_TOKEN_FILE" ]]; then
+    mv "$ACCESS_TOKEN_FILE" "$TARGET_TOKEN"
+    mv "$CLAIMS_FILE" "$TARGET_CLAIMS"
+    ACCESS_TOKEN_FILE="$TARGET_TOKEN"
+    CLAIMS_FILE="$TARGET_CLAIMS"
+  fi
+fi
+
+if command -v jq >/dev/null 2>&1; then
+  ROLES=$(jq -r '.realm_access.roles // [] | join(",")' "$CLAIMS_FILE" 2>/dev/null)
+  if [[ -n "$ROLES" ]]; then
+    echo "🛡️  Realm roles: $ROLES"
+  fi
+fi
+
 if [[ -n "$TTL_MESSAGE" ]]; then
   echo "⏱️  Requested token lifespan: ${TTL_MESSAGE}h"
 fi
+
+echo "✅ Token saved to $ACCESS_TOKEN_FILE"
+echo "📝 Claims saved to $CLAIMS_FILE"
+echo "💡 Use this token to query your own balance: GET /api/v1/sellers/me/balance"
+

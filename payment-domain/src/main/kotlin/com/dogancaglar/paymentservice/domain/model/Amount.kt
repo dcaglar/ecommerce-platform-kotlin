@@ -15,7 +15,11 @@ package com.dogancaglar.paymentservice.domain.model
  */
 
 @JvmInline
-value class Currency(val currencyCode: String)
+value class Currency(val currencyCode: String){
+    init {
+        require(currencyCode.matches(Regex("^[A-Z]{3}$"))) { "Invalid currency code" }
+    }
+}
 
 data class Amount private constructor(val quantity: Long,val currency: Currency){
     

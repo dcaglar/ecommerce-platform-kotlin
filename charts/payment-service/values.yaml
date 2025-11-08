@@ -3,7 +3,8 @@ image:
   tag: "latest"
   pullPolicy: Always
 
-
+serviceMonitor:
+  enabled: false
 
 
 runPrivilegeGrantJob: true

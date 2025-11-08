@@ -74,15 +74,15 @@ class AccountBalanceServiceTest {
         assertEquals(listOf(10L), result)
 
         verify {
-            cachePort.addDeltaAndWatermark(accountCode = "AUTH_RECEIVABLE.GLOBAL", delta = -EUR_10, upToEntryId= 10L)
-            cachePort.addDeltaAndWatermark(accountCode = "AUTH_LIABILITY.GLOBAL", delta = -EUR_10, upToEntryId= 10L)
-            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_A", delta = +EUR_10, upToEntryId= 10L)
-            cachePort.addDeltaAndWatermark(accountCode = "PSP_RECEIVABLES.GLOBAL", delta = +EUR_10, upToEntryId= 10L)
+            cachePort.addDeltaAndWatermark(accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR", delta = -EUR_10, upToEntryId= 10L)
+            cachePort.addDeltaAndWatermark(accountCode = "AUTH_LIABILITY.GLOBAL.EUR", delta = -EUR_10, upToEntryId= 10L)
+            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_A.EUR", delta = +EUR_10, upToEntryId= 10L)
+            cachePort.addDeltaAndWatermark(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR", delta = +EUR_10, upToEntryId= 10L)
 
-            cachePort.markDirty(accountCode = "AUTH_RECEIVABLE.GLOBAL")
-            cachePort.markDirty(accountCode = "AUTH_LIABILITY.GLOBAL")
-            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_A")
-            cachePort.markDirty(accountCode = "PSP_RECEIVABLES.GLOBAL")
+            cachePort.markDirty(accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR")
+            cachePort.markDirty(accountCode = "AUTH_LIABILITY.GLOBAL.EUR")
+            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_A.EUR")
+            cachePort.markDirty(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR")
         }
 
         confirmVerified(cachePort)
@@ -119,15 +119,15 @@ class AccountBalanceServiceTest {
         assertEquals(listOf(7L), result)
 
         verify {
-            cachePort.addDeltaAndWatermark(accountCode = "AUTH_RECEIVABLE.GLOBAL", delta = -(EUR_10 + EUR_20), upToEntryId= 7L)
-            cachePort.addDeltaAndWatermark(accountCode = "AUTH_LIABILITY.GLOBAL", delta = -(EUR_10 + EUR_20), upToEntryId= 7L)
-            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_B", delta = +(EUR_10 + EUR_20), upToEntryId= 7L)
-            cachePort.addDeltaAndWatermark(accountCode = "PSP_RECEIVABLES.GLOBAL", delta = +(EUR_10 + EUR_20), upToEntryId= 7L)
+            cachePort.addDeltaAndWatermark(accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR", delta = -(EUR_10 + EUR_20), upToEntryId= 7L)
+            cachePort.addDeltaAndWatermark(accountCode = "AUTH_LIABILITY.GLOBAL.EUR", delta = -(EUR_10 + EUR_20), upToEntryId= 7L)
+            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_B.EUR", delta = +(EUR_10 + EUR_20), upToEntryId= 7L)
+            cachePort.addDeltaAndWatermark(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR", delta = +(EUR_10 + EUR_20), upToEntryId= 7L)
 
-            cachePort.markDirty(accountCode = "AUTH_RECEIVABLE.GLOBAL")
-            cachePort.markDirty(accountCode = "AUTH_LIABILITY.GLOBAL")
-            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_B")
-            cachePort.markDirty(accountCode = "PSP_RECEIVABLES.GLOBAL")
+            cachePort.markDirty(accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR")
+            cachePort.markDirty(accountCode = "AUTH_LIABILITY.GLOBAL.EUR")
+            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_B.EUR")
+            cachePort.markDirty(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR")
         }
 
         confirmVerified(cachePort)
@@ -184,17 +184,17 @@ class AccountBalanceServiceTest {
         assertEquals(listOf(101L), result)
 
         verify {
-            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_Z", delta = +EUR_10, upToEntryId= 101L)
-            cachePort.addDeltaAndWatermark(accountCode = "PSP_RECEIVABLES.GLOBAL", delta = +EUR_10, upToEntryId= 101L)
-            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_Z")
-            cachePort.markDirty(accountCode = "PSP_RECEIVABLES.GLOBAL")
+            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_Z.EUR", delta = +EUR_10, upToEntryId= 101L)
+            cachePort.addDeltaAndWatermark(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR", delta = +EUR_10, upToEntryId= 101L)
+            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_Z.EUR")
+            cachePort.markDirty(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR")
         }
 
         verify(exactly = 0) {
-            cachePort.addDeltaAndWatermark(accountCode = "AUTH_RECEIVABLE.GLOBAL", delta = any(), upToEntryId= any())
-            cachePort.addDeltaAndWatermark(accountCode = "AUTH_LIABILITY.GLOBAL", delta = any(), upToEntryId= any())
-            cachePort.markDirty(accountCode = "AUTH_RECEIVABLE.GLOBAL")
-            cachePort.markDirty(accountCode = "AUTH_LIABILITY.GLOBAL")
+            cachePort.addDeltaAndWatermark(accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR", delta = any(), upToEntryId= any())
+            cachePort.addDeltaAndWatermark(accountCode = "AUTH_LIABILITY.GLOBAL.EUR", delta = any(), upToEntryId= any())
+            cachePort.markDirty(accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR")
+            cachePort.markDirty(accountCode = "AUTH_LIABILITY.GLOBAL.EUR")
         }
 
         confirmVerified(cachePort)
@@ -226,18 +226,18 @@ class AccountBalanceServiceTest {
         assertEquals(setOf(35L, 40L), result.toSet())
 
         verify {
-            cachePort.addDeltaAndWatermark(accountCode = "AUTH_RECEIVABLE.GLOBAL", delta = -EUR_35, upToEntryId= 40L)
-            cachePort.addDeltaAndWatermark(accountCode = "AUTH_LIABILITY.GLOBAL", delta = -EUR_35, upToEntryId= 40L)
-            cachePort.addDeltaAndWatermark(accountCode = "PSP_RECEIVABLES.GLOBAL", delta = +EUR_35, upToEntryId= 40L)
+            cachePort.addDeltaAndWatermark(accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR", delta = -EUR_35, upToEntryId= 40L)
+            cachePort.addDeltaAndWatermark(accountCode = "AUTH_LIABILITY.GLOBAL.EUR", delta = -EUR_35, upToEntryId= 40L)
+            cachePort.addDeltaAndWatermark(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR", delta = +EUR_35, upToEntryId= 40L)
 
-            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_A", delta = +(EUR_10 + EUR_20), upToEntryId= 35L)
-            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_B", delta = +EUR_05, upToEntryId= 40L)
+            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_A.EUR", delta = +(EUR_10 + EUR_20), upToEntryId= 35L)
+            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_B.EUR", delta = +EUR_05, upToEntryId= 40L)
 
-            cachePort.markDirty(accountCode = "AUTH_RECEIVABLE.GLOBAL")
-            cachePort.markDirty(accountCode = "AUTH_LIABILITY.GLOBAL")
-            cachePort.markDirty(accountCode = "PSP_RECEIVABLES.GLOBAL")
-            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_A")
-            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_B")
+            cachePort.markDirty(accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR")
+            cachePort.markDirty(accountCode = "AUTH_LIABILITY.GLOBAL.EUR")
+            cachePort.markDirty(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR")
+            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_A.EUR")
+            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_B.EUR")
         }
 
         confirmVerified(cachePort)
@@ -279,20 +279,20 @@ class AccountBalanceServiceTest {
 
         assertEquals(listOf(40L), result)
         verify {
-            cachePort.addDeltaAndWatermark(accountCode = "AUTH_RECEIVABLE.GLOBAL", delta = -EUR_35, upToEntryId= 40L)
-            cachePort.addDeltaAndWatermark(accountCode = "AUTH_LIABILITY.GLOBAL", delta = -EUR_35, upToEntryId= 40L)
-            cachePort.addDeltaAndWatermark(accountCode = "PSP_RECEIVABLES.GLOBAL", delta = +EUR_35, upToEntryId= 40L)
-            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_B", delta = +EUR_05, upToEntryId= 40L)
+            cachePort.addDeltaAndWatermark(accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR", delta = -EUR_35, upToEntryId= 40L)
+            cachePort.addDeltaAndWatermark(accountCode = "AUTH_LIABILITY.GLOBAL.EUR", delta = -EUR_35, upToEntryId= 40L)
+            cachePort.addDeltaAndWatermark(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR", delta = +EUR_35, upToEntryId= 40L)
+            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_B.EUR", delta = +EUR_05, upToEntryId= 40L)
 
-            cachePort.markDirty(accountCode = "AUTH_RECEIVABLE.GLOBAL")
-            cachePort.markDirty(accountCode = "AUTH_LIABILITY.GLOBAL")
-            cachePort.markDirty(accountCode = "PSP_RECEIVABLES.GLOBAL")
-            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_B")
+            cachePort.markDirty(accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR")
+            cachePort.markDirty(accountCode = "AUTH_LIABILITY.GLOBAL.EUR")
+            cachePort.markDirty(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR")
+            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_B.EUR")
         }
 
         verify(exactly = 0) {
-            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_A", delta = any(), upToEntryId= any())
-            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_A")
+            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_A.EUR", delta = any(), upToEntryId= any())
+            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_A.EUR")
         }
 
         confirmVerified(cachePort)

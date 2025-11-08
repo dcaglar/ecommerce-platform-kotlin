@@ -1,5 +1,5 @@
 # templates/servicemonitor.yaml
-  {{- if .Values.serviceMonitor.enabled}}
+  {{- if .Values.serviceMonitor.enabled | default false}}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:

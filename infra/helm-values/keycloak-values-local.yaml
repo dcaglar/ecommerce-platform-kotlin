@@ -23,6 +23,14 @@ extraEnvVars:
     value: "kubernetes"
   - name: KC_PROXY
     value: "edge"
+  # Configure hostname to use cluster-internal DNS so JWT issuer matches payment service config
+  # This ensures tokens have issuer: http://keycloak:8080/realms/ecommerce-platform
+  - name: KC_HOSTNAME
+    value: "keycloak"
+  - name: KC_HOSTNAME_PORT
+    value: "8080"
+  - name: KC_HOSTNAME_STRICT
+    value: "false"
   - name: KEYCLOAK_ADMIN
     value: "admin"
   - name: KEYCLOAK_ADMIN_PASSWORD

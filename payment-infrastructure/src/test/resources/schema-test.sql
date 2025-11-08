@@ -108,3 +108,20 @@ CREATE TABLE account_balances (
     last_snapshot_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ========== ACCOUNT DIRECTORY TABLE ==========
+DROP TABLE IF EXISTS account_directory;
+
+CREATE TABLE account_directory (
+    account_code VARCHAR(128) PRIMARY KEY,
+    account_type VARCHAR(64) NOT NULL,
+    entity_id VARCHAR(64) NOT NULL,
+    currency CHAR(3) NOT NULL,
+    category VARCHAR(32),
+    country VARCHAR(2),
+    status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_directory_entity ON account_directory (entity_id);

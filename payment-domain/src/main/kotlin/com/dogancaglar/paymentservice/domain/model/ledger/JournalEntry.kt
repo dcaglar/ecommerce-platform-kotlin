@@ -19,11 +19,21 @@ class JournalEntry private constructor(
 ) {
 
     init {
-        require(postings.isNotEmpty() && postings.size>=2) { "JournalEntry must have at least one posting" }
+        require(postings.isNotEmpty() && postings.size>=2) { "JournalEntry must have at least 2 posting" }
         val totalDebitAmount = postings.filterIsInstance<Posting.Debit>().sumOf { it.amount.quantity }
         val totalCreditAmount = postings.filterIsInstance<Posting.Credit>().sumOf { it.amount.quantity }
         require(totalDebitAmount == totalCreditAmount) {
             "Unbalanced journal entry: debits and credits differ (debits=$totalDebitAmount, credits=$totalCreditAmount)"
+        }
+
+        val duplicateAccounts = postings
+            .groupingBy { it.account.accountCode }
+            .eachCount()
+            .filterValues { it > 1 }
+            .keys
+
+        require(duplicateAccounts.isEmpty()) {
+            "JournalEntry contains duplicate accounts: ${duplicateAccounts.joinToString(", ")}"
         }
     }
 
@@ -31,38 +41,47 @@ class JournalEntry private constructor(
 
         // ==================== Factory Methods ====================
 
-        fun authHold(paymentOrderId: String, authorizedAmount: Amount): List<JournalEntry> =
+        fun authHold(paymentOrderId: String, authorizedAmount: Amount,
+                     authReceivable:Account,
+                     authLiability:Account): List<JournalEntry> =
             listOf(JournalEntry(
                 id = "AUTH:$paymentOrderId",
                 txType = JournalType.AUTH_HOLD,
                 name = "Authorization Hold",
                 postings = listOf(
-                    Posting.Debit.create(Account.create(AccountType.AUTH_RECEIVABLE), authorizedAmount),
-                    Posting.Credit.create(Account.create(AccountType.AUTH_LIABILITY), authorizedAmount)
+                    Posting.Debit.create(authReceivable, authorizedAmount),
+                    Posting.Credit.create(authLiability, authorizedAmount)
                 )
             )
             )
 
-        fun capture(paymentOrderId: String, capturedAmount: Amount, merchantAccount: Account): List<JournalEntry> =
+        fun capture(paymentOrderId: String, capturedAmount: Amount,
+                    authReceivable:Account,
+                    authLiability:Account,
+                    merchantAccount: Account,
+                    pspReceivable : Account): List<JournalEntry> =
             listOf(JournalEntry(
                 id = "CAPTURE:$paymentOrderId",
                 txType = JournalType.CAPTURE,
                 name = "Payment Capture",
                 postings = listOf(
-                    Posting.Credit.create(Account.create(AccountType.AUTH_RECEIVABLE), capturedAmount),
-                    Posting.Debit.create(Account.create(AccountType.AUTH_LIABILITY), capturedAmount),
+                    Posting.Credit.create(authReceivable, capturedAmount),
+                    Posting.Debit.create(authLiability, capturedAmount),
                     Posting.Credit.create(merchantAccount, capturedAmount),
-                    Posting.Debit.create(Account.create(AccountType.PSP_RECEIVABLES), capturedAmount)
+                    Posting.Debit.create(pspReceivable, capturedAmount)
                 )
             ))
 
         fun authHoldAndCapture(
             paymentOrderId: String,
             capturedAmount: Amount,
-            merchantAccount: Account
+            authReceivable:Account,
+            authLiability:Account,
+            merchantAccount: Account,
+            pspReceivable : Account
         ): List<JournalEntry> {
-            val authJournalEntry = authHold(paymentOrderId, capturedAmount);
-            val captureJournalEntry = capture(paymentOrderId, capturedAmount, merchantAccount)
+            val authJournalEntry = authHold(paymentOrderId, capturedAmount,authReceivable,authLiability);
+            val captureJournalEntry = capture(paymentOrderId, capturedAmount, authReceivable,authLiability,merchantAccount,pspReceivable)
             return authJournalEntry + captureJournalEntry;
         }
 
@@ -78,8 +97,8 @@ class JournalEntry private constructor(
                 txType = JournalType.SETTLEMENT,
                 name = "Funds received from Acquirer",
                 postings = listOf(
-                    Posting.Debit.create(Account.create(AccountType.SCHEME_FEES), schemeFee),
-                    Posting.Debit.create(Account.create(AccountType.INTERCHANGE_FEES), interchangeFee),
+                    Posting.Debit.create(Account.mock(AccountType.SCHEME_FEES), schemeFee),
+                    Posting.Debit.create(Account.mock(AccountType.INTERCHANGE_FEES), interchangeFee),
                     Posting.Debit.create(
                         acquirerAccount,
                         Amount.of(
@@ -87,7 +106,7 @@ class JournalEntry private constructor(
                             grossAmount.currency
                         )
                     ),
-                    Posting.Credit.create(Account.create(AccountType.PSP_RECEIVABLES), grossAmount)
+                    Posting.Credit.create(Account.mock(AccountType.PSP_RECEIVABLES), grossAmount)
                 )
             )
             )
@@ -99,7 +118,7 @@ class JournalEntry private constructor(
                 name = "Psp Fee is recorded",
                 postings = listOf(
                     Posting.Debit.create(merchantAccount, pspFee),
-                    Posting.Credit.create(Account.create(AccountType.PROCESSING_FEE_REVENUE), pspFee)
+                    Posting.Credit.create(Account.mock(AccountType.PROCESSING_FEE_REVENUE), pspFee)
                 )
             ))
 
@@ -124,13 +143,16 @@ class JournalEntry private constructor(
         fun fullFlow(
             paymentOrderId: String,
             amount: Amount,
+            authReceivable:Account,
+            authLiability:Account,
+            pspReceivable: Account,
             merchantAccount: Account,
             acquirerAccount: Account
         ): List<JournalEntry> {
             val pspFee = Amount.of(200, amount.currency)
 
-            val authEntry = authHold(paymentOrderId, amount)
-            val captureEntry = capture(paymentOrderId, amount, merchantAccount)
+            val authEntry = authHold(paymentOrderId, amount,authReceivable,authLiability)
+            val captureEntry = capture(paymentOrderId, amount, authReceivable,authLiability,merchantAccount,pspReceivable)
 
             val settlementEntry = settlement(
                 paymentOrderId,
@@ -170,15 +192,6 @@ class JournalEntry private constructor(
             referenceId = referenceId
         )
 
-        //Test-only method for creating custom entries
-         fun createForTest(
-            id: String,
-            txType: JournalType,
-            name: String = "Test Entry",
-            postings: List<Posting>,
-            referenceType: String? = null,
-            referenceId: String? = null
-        ): JournalEntry = JournalEntry(id, txType, name, postings, referenceType, referenceId)
     }
 
 

@@ -41,11 +41,22 @@ class LedgerEntryTxAdapterTest {
     @Test
     fun `postLedgerEntriesAtomic should persist all ledger entries, journal entries and postings from authHoldAndCapture`() {
         // Given - AUTH_HOLD_AND_CAPTURE creates 2 journal entries with 6 postings total
-        val amount = Amount.of(10000L, Currency("USD"))
+        val usdCurrency = Currency("USD")
+        val amount = Amount.of(10000L, usdCurrency)
         val merchantId = "merchant-123"
         val paymentOrderId = "PAY-123"
-        val merchantAccount = Account.create(AccountType.MERCHANT_ACCOUNT, merchantId)
-        val journalEntryList = JournalEntry.authHoldAndCapture(paymentOrderId, amount, merchantAccount)
+        val merchantAccount = Account.mock(AccountType.MERCHANT_ACCOUNT, merchantId, "USD")
+        val authReceivable = Account.mock(AccountType.AUTH_RECEIVABLE, "GLOBAL", "USD")
+        val authLiability = Account.mock(AccountType.AUTH_LIABILITY, "GLOBAL", "USD")
+        val pspReceivable = Account.mock(AccountType.PSP_RECEIVABLES, "GLOBAL", "USD")
+        val journalEntryList = JournalEntry.authHoldAndCapture(
+            paymentOrderId, 
+            amount,
+            authReceivable,
+            authLiability,
+            merchantAccount,
+            pspReceivable
+        )
         
         assertEquals(2, journalEntryList.size, "authHoldAndCapture should create 2 journal entries")
         
@@ -128,17 +139,17 @@ class LedgerEntryTxAdapterTest {
         val authPostings = capturedPostings.filter { it.journalId == "AUTH:$paymentOrderId" }
         assertEquals(2, authPostings.size, "AUTH_HOLD should have 2 postings")
         
-        // AUTH_HOLD Posting 1: AUTH_RECEIVABLE.GLOBAL DEBIT
+        // AUTH_HOLD Posting 1: AUTH_RECEIVABLE.GLOBAL.USD DEBIT
         val authReceivableDebit = authPostings.find { 
-            it.accountCode == "AUTH_RECEIVABLE.GLOBAL" && it.direction == "DEBIT"
+            it.accountCode == "AUTH_RECEIVABLE.GLOBAL.USD" && it.direction == "DEBIT"
         } ?: throw AssertionError("AUTH_RECEIVABLE DEBIT posting not found")
         assertEquals("AUTH_RECEIVABLE", authReceivableDebit.accountType)
         assertEquals(10000L, authReceivableDebit.amount)
         assertEquals("USD", authReceivableDebit.currency)
         
-        // AUTH_HOLD Posting 2: AUTH_LIABILITY.GLOBAL CREDIT
+        // AUTH_HOLD Posting 2: AUTH_LIABILITY.GLOBAL.USD CREDIT
         val authLiabilityCredit = authPostings.find { 
-            it.accountCode == "AUTH_LIABILITY.GLOBAL" && it.direction == "CREDIT"
+            it.accountCode == "AUTH_LIABILITY.GLOBAL.USD" && it.direction == "CREDIT"
         } ?: throw AssertionError("AUTH_LIABILITY CREDIT posting not found")
         assertEquals("AUTH_LIABILITY", authLiabilityCredit.accountType)
         assertEquals(10000L, authLiabilityCredit.amount)
@@ -148,33 +159,33 @@ class LedgerEntryTxAdapterTest {
         val capturePostings = capturedPostings.filter { it.journalId == "CAPTURE:$paymentOrderId" }
         assertEquals(4, capturePostings.size, "CAPTURE should have 4 postings")
         
-        // CAPTURE Posting 1: AUTH_RECEIVABLE.GLOBAL CREDIT
+        // CAPTURE Posting 1: AUTH_RECEIVABLE.GLOBAL.USD CREDIT
         val authReceivableCredit = capturePostings.find { 
-            it.accountCode == "AUTH_RECEIVABLE.GLOBAL" && it.direction == "CREDIT"
+            it.accountCode == "AUTH_RECEIVABLE.GLOBAL.USD" && it.direction == "CREDIT"
         } ?: throw AssertionError("AUTH_RECEIVABLE CREDIT posting not found")
         assertEquals("AUTH_RECEIVABLE", authReceivableCredit.accountType)
         assertEquals(10000L, authReceivableCredit.amount)
         assertEquals("USD", authReceivableCredit.currency)
         
-        // CAPTURE Posting 2: AUTH_LIABILITY.GLOBAL DEBIT
+        // CAPTURE Posting 2: AUTH_LIABILITY.GLOBAL.USD DEBIT
         val authLiabilityDebit = capturePostings.find { 
-            it.accountCode == "AUTH_LIABILITY.GLOBAL" && it.direction == "DEBIT"
+            it.accountCode == "AUTH_LIABILITY.GLOBAL.USD" && it.direction == "DEBIT"
         } ?: throw AssertionError("AUTH_LIABILITY DEBIT posting not found")
         assertEquals("AUTH_LIABILITY", authLiabilityDebit.accountType)
         assertEquals(10000L, authLiabilityDebit.amount)
         assertEquals("USD", authLiabilityDebit.currency)
         
-        // CAPTURE Posting 3: MERCHANT_ACCOUNT.{merchantId} CREDIT
+        // CAPTURE Posting 3: MERCHANT_ACCOUNT.{merchantId}.USD CREDIT
         val merchantCredit = capturePostings.find { 
-            it.accountCode == "MERCHANT_ACCOUNT.$merchantId" && it.direction == "CREDIT"
+            it.accountCode == "MERCHANT_ACCOUNT.$merchantId.USD" && it.direction == "CREDIT"
         } ?: throw AssertionError("MERCHANT_ACCOUNT CREDIT posting not found")
         assertEquals("MERCHANT_ACCOUNT", merchantCredit.accountType)
         assertEquals(10000L, merchantCredit.amount)
         assertEquals("USD", merchantCredit.currency)
         
-        // CAPTURE Posting 4: PSP_RECEIVABLES.GLOBAL DEBIT
+        // CAPTURE Posting 4: PSP_RECEIVABLES.GLOBAL.USD DEBIT
         val pspReceivablesDebit = capturePostings.find { 
-            it.accountCode == "PSP_RECEIVABLES.GLOBAL" && it.direction == "DEBIT"
+            it.accountCode == "PSP_RECEIVABLES.GLOBAL.USD" && it.direction == "DEBIT"
         } ?: throw AssertionError("PSP_RECEIVABLES DEBIT posting not found")
         assertEquals("PSP_RECEIVABLES", pspReceivablesDebit.accountType)
         assertEquals(10000L, pspReceivablesDebit.amount)
@@ -187,8 +198,18 @@ class LedgerEntryTxAdapterTest {
     fun `postLedgerEntriesAtomic should skip postings when insertJournalEntry returns 0`() {
         // Given - AUTH_HOLD_AND_CAPTURE creates multiple journal entries
         val amount = Amount.of(5000L, Currency("EUR"))
-        val merchantAccount = Account.create(AccountType.MERCHANT_ACCOUNT, "merchant-456")
-        val journalEntryList = JournalEntry.authHoldAndCapture("PAY-789", amount, merchantAccount)
+        val merchantAccount = Account.mock(AccountType.MERCHANT_ACCOUNT, "merchant-456", "EUR")
+        val authReceivable = Account.mock(AccountType.AUTH_RECEIVABLE, "GLOBAL", "EUR")
+        val authLiability = Account.mock(AccountType.AUTH_LIABILITY, "GLOBAL", "EUR")
+        val pspReceivable = Account.mock(AccountType.PSP_RECEIVABLES, "GLOBAL", "EUR")
+        val journalEntryList = JournalEntry.authHoldAndCapture(
+            "PAY-789", 
+            amount,
+            authReceivable,
+            authLiability,
+            merchantAccount,
+            pspReceivable
+        )
         // Test with the capture journal entry (4 postings)
         val journalEntry = journalEntryList.last() // Capture is the second entry
         val ledgerEntry = ledgerEntryFactory.create(journalEntry)
@@ -228,8 +249,18 @@ class LedgerEntryTxAdapterTest {
     fun `postLedgerEntriesAtomic should not insert postings when insertJournalEntry throws exception`() {
         // Given - AUTH_HOLD_AND_CAPTURE creates multiple journal entries
         val amount = Amount.of(10000L, Currency("USD"))
-        val merchantAccount = Account.create(AccountType.MERCHANT_ACCOUNT, "merchant-999")
-        val journalEntryList = JournalEntry.authHoldAndCapture("PAY-999", amount, merchantAccount)
+        val merchantAccount = Account.mock(AccountType.MERCHANT_ACCOUNT, "merchant-999", "USD")
+        val authReceivable = Account.mock(AccountType.AUTH_RECEIVABLE, "GLOBAL", "USD")
+        val authLiability = Account.mock(AccountType.AUTH_LIABILITY, "GLOBAL", "USD")
+        val pspReceivable = Account.mock(AccountType.PSP_RECEIVABLES, "GLOBAL", "USD")
+        val journalEntryList = JournalEntry.authHoldAndCapture(
+            "PAY-999", 
+            amount,
+            authReceivable,
+            authLiability,
+            merchantAccount,
+            pspReceivable
+        )
         // Test with the first journal entry (AUTH_HOLD)
         val journalEntry = journalEntryList.first()
         val ledgerEntry = ledgerEntryFactory.create(journalEntry)

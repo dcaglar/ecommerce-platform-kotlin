@@ -122,9 +122,10 @@ export KC_URL=http://127.0.0.1:8080
 ```bash
 KEYCLOAK_URL=http://127.0.0.1:8080 ./keycloak/provision-keycloak.sh
 ```
-- Get token (saved at keycloak/access.token):
+- Get token (saved at `keycloak/output/jwt/payment-service.token`):
 ```bash
 ./keycloak/get-token.sh
+# Optional: ./keycloak/get-token.sh http://127.0.0.1:8080 6   # request 6-hour token
 ```
 
 Helpful references (avoid duplication)

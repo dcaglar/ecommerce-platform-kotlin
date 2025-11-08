@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.AccountDirectoryMapper">
+
+    <select id="findByEntityAndType"
+            parameterType="map"
+            resultType="com.dogancaglar.paymentservice.domain.model.ledger.AccountProfile">
+        SELECT
+        account_code,
+        account_type AS type,
+        entity_id,
+        currency,
+        category,
+        country,
+        status
+        FROM account_directory
+        WHERE account_type = #{accountType}
+        AND entity_id = #{entityId}
+    </select>
+
+    <insert id="insertAccount" parameterType="map">
+        INSERT INTO account_directory(
+        account_code, account_type, entity_id, currency, category, country, status
+        )
+        VALUES (
+        #{accountCode}, #{accountType}, #{entityId}, #{currency}, #{category}, #{country}, 'ACTIVE'
+        )
+        ON CONFLICT (account_code) DO NOTHING
+    </insert>
+</mapper>

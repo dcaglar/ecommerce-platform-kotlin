@@ -143,6 +143,24 @@ class PaymentControllerWebExceptionHandler {
         return respond(HttpStatus.BAD_REQUEST, request, trunc(errors))
     }
 
+    // -------- Business Logic Validation Errors (400 Bad Request) --------
+    
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun handleIllegalArgument(ex: IllegalArgumentException, request: HttpServletRequest): ResponseEntity<ErrorResponse> {
+        val message = ex.message ?: "Invalid request"
+        
+        // Check if it's a "not found" error (account not found, etc.)
+        if (message.contains("not found", ignoreCase = true) || 
+            message.contains("Account not found", ignoreCase = true)) {
+            logger.warn("Resource not found at {}: {}", request.requestURI, trunc(message))
+            return respond(HttpStatus.NOT_FOUND, request, trunc(message))
+        }
+        
+        // Otherwise treat as validation error (400)
+        logger.debug("Validation error at {}: {}", request.requestURI, trunc(message))
+        return respond(HttpStatus.BAD_REQUEST, request, trunc(message))
+    }
+
     // -------- DataAccess (mapped, no stack) --------
     @ExceptionHandler(DataAccessException::class)
     fun handleDataAccess(ex: DataAccessException, request: HttpServletRequest): ResponseEntity<ErrorResponse> {

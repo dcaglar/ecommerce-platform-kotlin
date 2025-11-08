@@ -87,13 +87,74 @@ infra/scripts/port-forwarding.sh
 KEYCLOAK_URL=http://127.0.0.1:8080 ./keycloak/provision-keycloak.sh
 ```
 
-10) Generate an access token for payment-service
-- What: Uses the client secret to get a JWT; saves it to keycloak/access.token.
-- Tip: KC_URL in the script defaults to http://keycloak:8080; override if needed.
-- Run:
+10) Generate access tokens
+- What: Get JWT tokens for different use cases; saves tokens under `keycloak/output/jwt`.
+- Tip: KC_URL defaults to http://keycloak:8080; override if needed (e.g., when port-forwarding).
+- Default validity is ~1 hour. Append a TTL (hours) as the final argument to keep a test token alive longer (e.g., `... 6` for 6 h).
+- Reuse the saved token across requests until it expires; no need to regenerate for every call.
+
+**For Payment Creation (Service Account with payment:write):**
 ```bash
 KC_URL=http://127.0.0.1:8080 ./keycloak/get-token.sh
+# Token saved to: keycloak/output/jwt/payment-service.token
+# Claims saved to: keycloak/output/jwt/payment-service.claims.json
+
+# Request a 6-hour token via CLI override:
+./keycloak/get-token.sh http://127.0.0.1:8080 6
 ```
+> Optional CLI override (with TTL): `./keycloak/get-token.sh http://my-keycloak:8080 6`
+
+**For Balance Queries - Finance/Admin (Backoffice user with FINANCE role):**
+```bash
+KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-finance.sh
+# Token saved to: keycloak/output/jwt/finance-<username>.token
+# Claims saved to: keycloak/output/jwt/finance-<username>.claims.json
+
+# Request a 4-hour token for finance-ops:
+./keycloak/get-token-finance.sh finance-ops finance123 http://127.0.0.1:8080 4
+```
+> Example: running without arguments issues a token for the `finance-ops / finance123` user.
+> Optional CLI override (with TTL): `./keycloak/get-token-finance.sh finance-ops finance123 http://my-keycloak:8080 6`
+
+**For Balance Queries - Seller User (User Account with SELLER role, Case 1):**
+```bash
+# Default: seller-111 (SELLER-111)
+KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-seller.sh
+
+# Or specify a different seller
+KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-seller.sh seller-222 seller123
+# Token saved to: keycloak/output/jwt/seller-<username>.token
+# Claims saved to: keycloak/output/jwt/seller-<username>.claims.json
+
+# Request an 8-hour token for seller-222:
+./keycloak/get-token-seller.sh seller-222 seller123 http://127.0.0.1:8080 8
+```
+> Example: running without arguments produces `keycloak/output/jwt/seller-seller-111.token`.
+> Optional CLI override: third argument can pass Keycloak URL; append a fourth argument for TTL (hours).
+
+**For Balance Queries - Merchant API (M2M with SELLER_API role, Case 3):**
+```bash
+# Default: SELLER-111
+KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-merchant-api.sh
+
+# Or specify a different merchant
+KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-merchant-api.sh SELLER-222
+# Token saved to: keycloak/output/jwt/merchant-api-<SELLER_ID>.token
+# Claims saved to: keycloak/output/jwt/merchant-api-<SELLER_ID>.claims.json
+
+# Request a 12-hour token for SELLER-222:
+./keycloak/get-token-merchant-api.sh SELLER-222 http://127.0.0.1:8080 12
+```
+> Example: `SELLER_ID=SELLER-111` writes to `keycloak/output/jwt/merchant-api-SELLER-111.token`.
+> Optional CLI override: second argument can pass Keycloak URL; append a third argument for TTL (hours).
+
+Each script issues a token from a different principal:
+- **payment-service** → service account with `payment:write`
+- **finance-* user** → backoffice user with `FINANCE`
+- **seller-* user** → interactive user with `SELLER`
+- **merchant-api-* client** → machine-to-machine client with `SELLER_API`
+
+Tokens are intentionally scoped to those roles so you can exercise each endpoint with the appropriate identity.
 
 11) Elasticsearch/Logstash/Kibana stack (OPTIONAL)
 - What: Installs ELK stack for log aggregation and searching.
@@ -113,10 +174,10 @@ HOST=$(jq -r .host_header infra/endpoints.json)
 echo "Using BASE_URL=$BASE_URL"
 echo "Using Host header=$HOST"
 
-curl -i -X POST "$BASE_URL/payments" \
+curl -i -X POST "$BASE_URL/api/v1/payments" \
   -H "Host: $HOST" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $(cat ./keycloak/access.token)" \
+  -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
   -d '{
     "orderId": "ORDER-20240508-XYZ",
     "buyerId": "BUYER-123",
@@ -131,10 +192,10 @@ curl -i -X POST "$BASE_URL/payments" \
 
 - Static example (replace host/IP if different):
 ```bash
-curl -i -X POST http://127.0.0.1/payments \
+curl -i -X POST http://127.0.0.1/api/v1/payments \
   -H "Host: payment.192.168.49.2.nip.io" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $(cat ./keycloak/access.token)" \
+  -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
   -d '{
     "orderId": "ORDER-20240508-XYZ",
     "buyerId": "BUYER-123",
@@ -146,6 +207,133 @@ curl -i -X POST http://127.0.0.1/payments \
     ]
   }'
 ```
+
+## 5️⃣ Query Balance Endpoints
+
+Balance endpoints support three authentication scenarios (matching real-world marketplace patterns):
+
+### Case 1: Seller User via Customer Area Frontend
+- **Endpoint**: `GET /api/v1/sellers/me/balance`
+- **Authorization**: Requires `SELLER` role and `seller_id` claim in JWT
+- **Token Type**: User token (OIDC Authorization Code flow or Direct Access Grants for testing)
+- **Use Case**: Merchant logs into customer-area web app and views their balance
+- **Client**: `customer-area-frontend`
+
+**Steps:**
+1. Get a token for a seller user:
+```bash
+# Default: seller-111 (SELLER-111)
+KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-seller.sh
+
+# Or specify a different seller
+KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-seller.sh seller-222 seller123
+# Token saved to: keycloak/output/jwt/seller-<username>.token
+```
+
+2. Query your own balance (dynamic):
+```bash
+BASE_URL=$(jq -r .base_url infra/endpoints.json)
+HOST=$(jq -r .host_header infra/endpoints.json)
+
+echo "Using BASE_URL=$BASE_URL"
+echo "Using Host header=$HOST"
+
+curl -i -X GET "$BASE_URL/api/v1/sellers/me/balance" \
+  -H "Host: $HOST" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $(cat ./keycloak/output/jwt/seller-SELLER-111.token)" 
+```
+
+### Case 2: Finance/Admin User via Backoffice
+- **Endpoint**: `GET /api/v1/sellers/{sellerId}/balance`
+- **Authorization**: Requires `FINANCE` or `ADMIN` role
+- **Token Type**: User token (OIDC Authorization Code flow / Direct Access Grants for testing)
+- **Use Case**: Internal finance or support staff log into backoffice app and check any seller's balance
+- **Client**: `backoffice-ui`
+
+**Steps:**
+1. Get a token with FINANCE role (backoffice user for testing):
+```bash
+KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-finance.sh
+# Token saved to: keycloak/output/jwt/finance-<username>.token
+```
+
+2. Query balance for any seller (dynamic):
+```bash
+BASE_URL=$(jq -r .base_url infra/endpoints.json)
+HOST=$(jq -r .host_header infra/endpoints.json)
+
+echo "Using BASE_URL=$BASE_URL"
+echo "Using Host header=$HOST"
+curl -i -X GET "$BASE_URL/api/v1/sellers/SELLER-111/balance" \
+  -H "Host: $HOST" \
+  -H "Authorization: Bearer $(cat ./keycloak/output/jwt/finance-finance-ops.token)"
+```
+
+
+### Case 3: Merchant API (Machine-to-Machine)
+- **Endpoint**: `GET /api/v1/sellers/me/balance`
+- **Authorization**: Requires `SELLER_API` role and `seller_id` claim in JWT
+- **Token Type**: Machine token (Client Credentials flow)
+- **Use Case**: Merchant's system (ERP, OMS) calls Seller API directly to retrieve balances
+- **Client**: `merchant-api-{SELLER_ID}` (one per merchant)
+
+**Steps:**
+1. Get a token for merchant API (M2M):
+```bash
+# Default: SELLER-111
+KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-merchant-api.sh
+
+# Or specify a different merchant
+KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-merchant-api.sh SELLER-222
+# Token saved to: keycloak/output/jwt/merchant-api-<SELLER_ID>.token
+```
+
+2. Query balance via merchant API (dynamic):
+```bash
+BASE_URL=$(jq -r .base_url infra/endpoints.json)
+HOST=$(jq -r .host_header infra/endpoints.json)
+
+curl -i -X GET "$BASE_URL/api/v1/sellers/me/balance" \
+  -H "Host: $HOST" \
+  -H "Authorization: Bearer $(cat ./keycloak/output/jwt/merchant-api-SELLER-111.token)"  
+```
+
+
+**Expected Response (all cases):**
+```json
+{
+  "balance": 50000,
+  "currency": "EUR",
+  "accountCode": "MERCHANT_ACCOUNT.SELLER-111.EUR",
+  "sellerId": "SELLER-111"
+}
+```
+
+**Test Credentials Created by Provisioning:**
+- **User Accounts (Case 1):**
+  - `seller-111` / `seller123` → seller_id: `SELLER-111`
+  - `seller-222` / `seller123` → seller_id: `SELLER-222`
+  - `seller-333` / `seller123` → seller_id: `SELLER-333`
+- **Merchant API Clients (Case 3):**
+  - `merchant-api-SELLER-111` → Client Credentials, SELLER_API role
+  - `merchant-api-SELLER-222` → Client Credentials, SELLER_API role
+  - `merchant-api-SELLER-333` → Client Credentials, SELLER_API role
+
+**Authentication Flow Summary:**
+
+| Case | Endpoint | Role | Client | Grant Type | Token Type |
+|------|----------|------|--------|------------|------------|
+| 1 | `/api/v1/sellers/me/balance` | `SELLER` | `customer-area-frontend` | OIDC Auth Code / Password | User token |
+| 2 | `/api/v1/sellers/{sellerId}/balance` | `FINANCE`/`ADMIN` | `backoffice-ui` | OIDC Auth Code / Direct Access (testing) | User token |
+| 3 | `/api/v1/sellers/me/balance` | `SELLER_API` | `merchant-api-{SELLER_ID}` | Client Credentials | Machine token |
+
+**HTTP Status Codes:**
+- `200 OK` - Success
+- `400 Bad Request` - Invalid request (e.g., missing seller_id claim)
+- `401 Unauthorized` - Missing or invalid JWT token
+- `403 Forbidden` - Valid token but insufficient permissions
+- `404 Not Found` - Seller account not found
 
 ## 2️⃣ Run Unit & Integration Tests
 
@@ -221,7 +409,13 @@ What each script does (quick reference)
 - keycloak/provision-keycloak.sh
     - Provisions Keycloak (realm, role, clients), writes client secrets to keycloak/output/secrets.txt.
 - keycloak/get-token.sh
-    - Fetches a client-credentials access token and saves it to keycloak/access.token.
+    - Fetches a client-credentials access token for payment-service and saves it to `keycloak/output/jwt/payment-service.token`. Pass an optional TTL (hours) as the final argument.
+- keycloak/get-token-seller.sh
+    - Fetches a user token with SELLER role via Direct Access Grants (password grant) and saves it to `keycloak/output/jwt/seller-<username>.token`. CLI order: username, password, Keycloak URL, TTL (hours).
+- keycloak/get-token-finance.sh
+    - Fetches a user token with FINANCE role (backoffice) and saves it to `keycloak/output/jwt/finance-<username>.token`. CLI order: username, password, Keycloak URL, TTL.
+- keycloak/get-token-merchant-api.sh
+    - Fetches a client-credentials access token for merchant API clients with SELLER_API role and saves it to `keycloak/output/jwt/merchant-api-<SELLER_ID>.token`. CLI order: SELLER_ID, Keycloak URL, TTL.
 
 Name hints vs. your list
 - deploy-monitoring-stack  → deploy-monitoring-stack.sh

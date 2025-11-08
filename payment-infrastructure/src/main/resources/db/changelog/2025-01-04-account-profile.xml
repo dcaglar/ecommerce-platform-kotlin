@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20251104-create-account-directory" author="dogancaglar">
+        <createTable tableName="account_directory">
+            <column name="account_code" type="VARCHAR(128)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="account_type" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="entity_id" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="currency" type="CHAR(3)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="category" type="VARCHAR(32)"/>
+            <column name="country" type="VARCHAR(2)"/>
+            <column name="status" type="VARCHAR(16)" defaultValue="ACTIVE"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+
+        <createIndex tableName="account_directory" indexName="idx_account_directory_entity">
+            <column name="entity_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ========== SEED DATA ========== -->
+    <changeSet id="20251104-seed-account-directory" author="dogancaglar">
+        <loadData
+                file="db/data/account_directory.csv"
+                separator=","
+                tableName="account_directory"/>
+    </changeSet>
+</databaseChangeLog>

@@ -63,8 +63,10 @@ class PaymentControllerTest {
         val result = paymentController.createPayment(request)
 
         // Then
-        assertEquals(HttpStatus.OK, result.statusCode)
+        assertEquals(HttpStatus.CREATED, result.statusCode)
         assertEquals(expectedResponse, result.body)
+        assertNotNull(result.headers["Location"])
+        assertTrue(result.headers["Location"]!!.first().contains("payment-123"))
         verify { paymentService.createPayment(request) }
     }
 
@@ -146,7 +148,7 @@ class PaymentControllerTest {
         val result = paymentController.createPayment(request)
 
         // Then
-        assertEquals(HttpStatus.OK, result.statusCode)
+        assertEquals(HttpStatus.CREATED, result.statusCode)
         assertEquals(expectedResponse, result.body)
         // Note: Logging verification would require a different approach with logback-test.xml
         // or using a logging framework test utility

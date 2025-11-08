@@ -6,7 +6,8 @@ sealed class Posting(open val account: Account, open val amount: Amount) {
     abstract fun getSignedAmount(): Amount
     class Debit private  constructor(override val account: Account, override val amount: Amount) : Posting(account, amount) {
         override fun getSignedAmount(): Amount {
-            if (account.isDebitAccount()) {
+            if (
+                account.isDebitAccount()) {
                 return amount
             } else {
                 return amount.negate()

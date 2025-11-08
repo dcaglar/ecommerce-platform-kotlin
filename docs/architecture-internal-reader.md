@@ -1667,13 +1667,18 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 ### 9.6 Deployables: `payment-service` & `payment-consumers`
 
 - **payment-service**: REST API, DB writes, maintenance jobs.
-    - **Controllers**: `PaymentController` - REST endpoints that return `202 Accepted` immediately
+    - **Controllers**: 
+      - `PaymentController` - REST endpoints that return `202 Accepted` immediately
+      - `BalanceController` - Balance query endpoints with role-based access control
     - **Services**: `PaymentService` - REST service layer (no PSP calls in request thread)
     - **API Isolation**: Payment state persisted, then returns immediately; PSP calls happen asynchronously in `payment-consumers`
     - **Design**: User-facing API completely isolated from external PSP latency/availability
     - **Config**: Spring configuration (Kafka topics, datasources, MyBatis, security)
     - **Maintenance Jobs**: `OutboxDispatcherJob`, `OutboxPartitionCreator`, `IdResyncStartup`
-    - **Security**: `SecurityConfig` (OAuth2/JWT), `TraceFilter` (request tracing)
+    - **Security**: `SecurityConfig` (OAuth2/JWT with three authentication scenarios), `TraceFilter` (request tracing)
+    - **Balance Endpoints**:
+      - `GET /api/v1/sellers/me/balance` - Seller self-service (Case 1: SELLER role, Case 3: SELLER_API role)
+      - `GET /api/v1/sellers/{sellerId}/balance` - Finance/Admin query (Case 2: FINANCE/ADMIN role)
 
 - **payment-consumers**: Kafka-driven async processing workers. **All PSP calls execute here, completely decoupled from HTTP request lifecycle**.
     - **Consumers**:
@@ -1879,8 +1884,29 @@ verify(exactly = 1) {
 
 ### 11.2 Security
 
-- Resource server with JWT (Keycloak in local dev). Secrets delivered via Kubernetes Secrets/values.
-- Input validation and sanitization at API boundaries.
+- **OAuth2 Resource Server** with JWT validation (Keycloak integration)
+- **Three Authentication Scenarios** (matching real-world marketplace patterns):
+  - **Case 1**: Seller user via customer-area frontend (`GET /api/v1/sellers/me/balance`)
+    - Role: `SELLER`
+    - Client: `customer-area-frontend`
+    - Grant Type: OIDC Authorization Code flow (production) or Direct Access Grants (testing)
+    - Token Type: User token with `seller_id` claim
+  - **Case 2**: Finance/Admin user via backoffice (`GET /api/v1/sellers/{sellerId}/balance`)
+    - Role: `FINANCE` or `ADMIN`
+    - Client: `backoffice-ui` (user) or `finance-service` (service account)
+    - Grant Type: OIDC Authorization Code flow or Client Credentials
+    - Token Type: User token or service account token
+  - **Case 3**: Merchant API M2M (`GET /api/v1/sellers/me/balance`)
+    - Role: `SELLER_API`
+    - Client: `merchant-api-{SELLER_ID}` (one per merchant)
+    - Grant Type: Client Credentials flow
+    - Token Type: Machine token with hardcoded `seller_id` claim
+- **Payment Endpoint**: `POST /api/v1/payments` requires `payment:write` authority (service-to-service)
+- **Spring Security Configuration**: Role-based access control with `hasRole()` and `hasAuthority()` checks
+- **JWT Claims Extraction**: `seller_id` claim extracted from tokens for Case 1 and Case 3
+- **Keycloak Provisioning**: Automated client creation with appropriate OIDC flows and protocol mappers
+- Secrets delivered via Kubernetes Secrets/values
+- Input validation and sanitization at API boundaries
 
 ### 11.3 Cloud‑Native & Deployment
 
@@ -1911,7 +1937,6 @@ verify(exactly = 1) {
 ## 12 · Roadmap
 
 ### Short Term
-- Create **Balance API** endpoints for querying account balances (real-time and strong consistency reads) ([Issue #119](https://github.com/dcaglar/ecommerce-platform-kotlin/issues/119))
 - **Fast Path Optimization** - Introduce a synchronous fast path in payment-api layer where PSP is called for each payment order with a short timeout (100ms). If PSP responds within the timeout, return immediate result; otherwise, fall back to current async flow
 
 ### Medium Term
@@ -1964,6 +1989,16 @@ verify(exactly = 1) {
 
 ## 15 · Changelog
 
+- **2025-01-XX**: **Balance API Authentication Implementation**
+    - **Three Authentication Cases**: Implemented comprehensive authentication for balance endpoints supporting real-world marketplace patterns
+    - **Case 1**: Seller user via customer-area frontend - OIDC Authorization Code flow with `SELLER` role
+    - **Case 2**: Finance/Admin user via backoffice - OIDC Authorization Code flow with `FINANCE`/`ADMIN` role
+    - **Case 3**: Merchant API M2M - Client Credentials flow with `SELLER_API` role (similar to payment endpoint pattern)
+    - **Keycloak Clients**: Created `customer-area-frontend`, `backoffice-ui`, and `merchant-api-{SELLER_ID}` clients with appropriate OIDC flows
+    - **Security Configuration**: Updated `SecurityConfig.kt` to support both `SELLER` and `SELLER_API` roles for `/api/v1/sellers/me/balance`
+    - **Protocol Mappers**: Configured `seller_id` claim injection for all balance-related clients
+    - **Token Scripts**: Created `get-token-merchant-api.sh` for Case 3 token generation (M2M)
+    - **Documentation**: Updated `how-to-start.md` with comprehensive examples for all three cases
 - **2025-11-04**: **Account Balance System Implementation & Documentation Review**
     - **Two-Tier Storage Architecture**: Implemented Redis (hot layer) + PostgreSQL (cold layer) for balance aggregation
     - **AccountBalanceConsumer**: Batch consumer processing `LedgerEntriesRecorded` events (100-500 events per batch, concurrency=4) with watermarking for idempotency

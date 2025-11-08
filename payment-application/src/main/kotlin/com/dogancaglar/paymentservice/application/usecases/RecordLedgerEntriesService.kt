@@ -13,6 +13,7 @@ import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
 import com.dogancaglar.paymentservice.domain.util.LedgerDomainEventMapper
 import com.dogancaglar.paymentservice.domain.util.LedgerEntryFactory
 import com.dogancaglar.paymentservice.ports.inbound.RecordLedgerEntriesUseCase
+import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
 import java.time.Clock
@@ -22,6 +23,7 @@ import java.util.UUID
 open class RecordLedgerEntriesService(
     private val ledgerWritePort: LedgerEntryPort,
     private val eventPublisherPort: EventPublisherPort,
+    private val accountDirectory: AccountDirectoryPort,
     private val clock: Clock
 ) : RecordLedgerEntriesUseCase {
 
@@ -34,7 +36,18 @@ open class RecordLedgerEntriesService(
         val parentEventId = LogContext.getEventId()
 
         val amount = Amount.of(event.amountValue, Currency(event.currency))
-        val merchantAccount = Account.create(AccountType.MERCHANT_ACCOUNT, event.sellerId)
+        val merchantAccount = Account.fromProfile(
+            accountDirectory.getAccountProfile(AccountType.MERCHANT_ACCOUNT, event.sellerId)
+        )
+        val authReceivable = Account.fromProfile(
+            accountDirectory.getAccountProfile(AccountType.AUTH_RECEIVABLE, "GLOBAL")
+        )
+        val authLiability = Account.fromProfile(
+            accountDirectory.getAccountProfile(AccountType.AUTH_LIABILITY, "GLOBAL")
+        )
+        val pspReceivable = Account.fromProfile(
+            accountDirectory.getAccountProfile(AccountType.PSP_RECEIVABLES, "GLOBAL")
+        )
 
         val journalEntries: List<JournalEntry> = when (event.status.uppercase()) {
             "SUCCESSFUL_FINAL" ->
@@ -42,12 +55,17 @@ open class RecordLedgerEntriesService(
                     JournalEntry.authHoldAndCapture(
                         paymentOrderId = event.publicPaymentOrderId,
                         capturedAmount = amount,
-                        merchantAccount = merchantAccount
+                        authReceivable = authReceivable,
+                        authLiability = authLiability,
+                        merchantAccount = merchantAccount,
+                        pspReceivable = pspReceivable
                     )
                 } else {
                     JournalEntry.authHold(
-                paymentOrderId = event.publicPaymentOrderId,
-                        authorizedAmount = amount
+                        paymentOrderId = event.publicPaymentOrderId,
+                        authorizedAmount = amount,
+                        authReceivable = authReceivable,
+                        authLiability = authLiability
             )
                 }
             "FAILED_FINAL", "FAILED" -> JournalEntry.failedPayment(
