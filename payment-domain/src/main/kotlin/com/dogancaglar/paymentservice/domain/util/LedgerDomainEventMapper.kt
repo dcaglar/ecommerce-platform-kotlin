@@ -15,7 +15,11 @@ import com.dogancaglar.paymentservice.domain.model.ledger.Posting
  * Mirrors the structure of PaymentOrderDomainEventMapper for consistency.
  * Used for event serialization when publishing LedgerEntriesRecorded.
  */
+import java.time.Clock
+
 object LedgerDomainEventMapper {
+
+    private val ledgerEntryFactory = LedgerEntryFactory(Clock.systemUTC())
 
     /**
      * Maps LedgerEntry domain model to LedgerEntryEventData DTO.
@@ -43,7 +47,7 @@ object LedgerDomainEventMapper {
             postings = postingsDomain
         )
 
-        return LedgerEntry.create(
+        return ledgerEntryFactory.fromPersistence(
             ledgerEntryId = ledgerEntryEvent.ledgerEntryId,
             journalEntry = journal,
             createdAt = ledgerEntryEvent.createdAt
@@ -69,7 +73,11 @@ object LedgerDomainEventMapper {
     }
 
     fun PostingEventData.toDomain(): Posting {
-        val entityId = accountCode.substringAfter('.', "GLOBAL")
+        val entityId = run {
+            val afterType = accountCode.substringAfter('.', "GLOBAL")
+            val beforeCurrency = afterType.substringBeforeLast('.', afterType)
+            if (beforeCurrency.isBlank()) "GLOBAL" else beforeCurrency
+        }
         val account = Account.create(accountType, entityId)
         val amountVo = Amount.of(amount, Currency(currency))
         return when (direction) {

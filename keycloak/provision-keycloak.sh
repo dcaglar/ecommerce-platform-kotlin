@@ -10,6 +10,73 @@ ADMIN_PASS="adminpassword"
 OUTPUT_DIR="$(dirname "$0")/output"
 
 mkdir -p "$OUTPUT_DIR"
+mkdir -p "$OUTPUT_DIR/jwt"
+# Utility to create or recreate a user and assign roles
+create_internal_user() {
+  local username="$1"
+  local password="$2"
+  shift 2
+  local roles=("$@")
+
+  log "  Creating/updating internal user '$username' with roles=${roles[*]}..."
+
+  local user_id
+  user_id=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/users?username=$username" \
+    -H "Authorization: Bearer $KC_TOKEN" | jq -r '.[0].id // empty' 2>/dev/null || echo "")
+
+  if [[ -n "$user_id" && "$user_id" != "null" ]]; then
+    log "   Existing user found (id=$user_id). Deleting for clean reprovision..."
+    curl -sf -X DELETE "$KEYCLOAK_URL/admin/realms/$REALM/users/$user_id" \
+      -H "Authorization: Bearer $KC_TOKEN" >/dev/null 2>&1 || log "   ⚠️ Failed to delete user $username (id=$user_id)"
+    sleep 0.3
+    user_id=""
+  fi
+
+  if [[ -z "$user_id" || "$user_id" == "null" ]]; then
+    local create_response
+    create_response=$(curl -sf -w "%{http_code}" -X POST "$KEYCLOAK_URL/admin/realms/$REALM/users" \
+      -H "Authorization: Bearer $KC_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "username":"'"$username"'",
+        "enabled":true,
+        "credentials":[{"type":"password","value":"'"$password"'","temporary":false}]
+      }' -o /dev/null 2>/dev/null || echo "000")
+
+    if [[ "$create_response" != "201" ]]; then
+      log "   ⚠️ User creation returned HTTP $create_response (may already exist)"
+    fi
+
+    user_id=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/users?username=$username" \
+      -H "Authorization: Bearer $KC_TOKEN" | jq -r '.[0].id // empty' 2>/dev/null || echo "")
+  fi
+
+  if [[ -n "$user_id" && "$user_id" != "null" ]]; then
+    curl -sf -X PUT "$KEYCLOAK_URL/admin/realms/$REALM/users/$user_id/reset-password" \
+      -H "Authorization: Bearer $KC_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{"type":"password","value":"'"$password"'","temporary":false}' >/dev/null 2>&1 || true
+
+    for role_name in "${roles[@]}"; do
+      local role_obj
+      role_obj=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/roles/$role_name" \
+        -H "Authorization: Bearer $KC_TOKEN" 2>/dev/null || echo "")
+      if [[ -n "$role_obj" && "$role_obj" != "null" ]]; then
+        curl -sf -X POST "$KEYCLOAK_URL/admin/realms/$REALM/users/$user_id/role-mappings/realm" \
+          -H "Authorization: Bearer $KC_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "[$role_obj]" >/dev/null 2>&1 || true
+        log "   ✅ Assigned role $role_name to $username"
+      else
+        log "   ⚠️ Role $role_name not found when assigning to $username"
+      fi
+    done
+    log "  ✅ Internal user $username provisioned"
+  else
+    log "  ⚠️ Could not create or find user $username"
+  fi
+}
+
 
 log() { echo "[$(date +'%H:%M:%S')] $*" >&2; }
 
@@ -429,6 +496,15 @@ create_test_user() {
   user_id=$(curl -sf "$KEYCLOAK_URL/admin/realms/$REALM/users?username=$username" \
     -H "Authorization: Bearer $KC_TOKEN" | jq -r '.[0].id // empty' 2>/dev/null || echo "")
   
+  # If user already exists, delete it so we can recreate with managed credentials (avoids read-only errors)
+  if [[ -n "$user_id" && "$user_id" != "null" ]]; then
+    log "  Existing user found (id=$user_id). Deleting before re-creating to reset credentials..."
+    curl -sf -X DELETE "$KEYCLOAK_URL/admin/realms/$REALM/users/$user_id" \
+      -H "Authorization: Bearer $KC_TOKEN" >/dev/null 2>&1 || log "  ⚠️ Failed to delete user $username (id=$user_id)"
+    sleep 0.3
+    user_id=""
+  fi
+
   # Create user if doesn't exist
   if [[ -z "$user_id" || "$user_id" == "null" ]]; then
     local create_response
@@ -490,10 +566,20 @@ create_test_user "seller-111" "SELLER-111" "seller123" || log "  ⚠️ Failed t
 create_test_user "seller-222" "SELLER-222" "seller123" || log "  ⚠️ Failed to create seller-222, continuing..."
 create_test_user "seller-333" "SELLER-333" "seller123" || log "  ⚠️ Failed to create seller-333, continuing..."
 
+log "🛠️ Creating internal finance/admin users..."
+create_internal_user "finance-ops" "finance123" "FINANCE" || log "  ⚠️ Failed to create finance-ops user"
+create_internal_user "backoffice-admin" "admin123" "ADMIN" "FINANCE" || log "  ⚠️ Failed to create backoffice-admin user"
+
 
 log "🔒 Client secrets written to $SECRETS_OUT"
 log "📝 Test users created:"
 log "   - seller-111 / seller123 (seller_id: SELLER-111)"
 log "   - seller-222 / seller123 (seller_id: SELLER-222)"
 log "   - seller-333 / seller123 (seller_id: SELLER-333)"
+log "📝 Internal users created:"
+log "   - finance-ops / finance123 (roles: FINANCE)"
+log "   - backoffice-admin / admin123 (roles: ADMIN, FINANCE)"
 log "🎉 Keycloak provisioning complete!"
+
+# Keep default access token lifespan moderate (e.g., 1 hour) so CLI overrides in get-token scripts
+# can extend it as needed without touching realm config here.

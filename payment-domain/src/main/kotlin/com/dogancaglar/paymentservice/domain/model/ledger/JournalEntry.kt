@@ -19,7 +19,7 @@ class JournalEntry private constructor(
 ) {
 
     init {
-        require(postings.isNotEmpty() && postings.size>=2) { "JournalEntry must have at least one posting" }
+        require(postings.isNotEmpty() && postings.size>=2) { "JournalEntry must have at least 2 posting" }
         val totalDebitAmount = postings.filterIsInstance<Posting.Debit>().sumOf { it.amount.quantity }
         val totalCreditAmount = postings.filterIsInstance<Posting.Credit>().sumOf { it.amount.quantity }
         require(totalDebitAmount == totalCreditAmount) {

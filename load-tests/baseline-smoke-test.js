@@ -14,6 +14,7 @@ if (!BASE_URL || !HOST_HEADER) {
   HOST_HEADER = HOST_HEADER || endpoints.host_header; // e.g. payment.<minikube-ip>.nip.io
 }
 BASE_URL = BASE_URL.replace(/\/+$/, '');
+const API_BASE = `${BASE_URL}/api/v1`;
 if (!HOST_HEADER) throw new Error('Missing HOST (env HOST or endpoints.json host_header)');
 
 // ---------- load knobs ----------
@@ -105,7 +106,7 @@ function buildOptions() {
 export const options = buildOptions();
 
 // ---------- auth ----------
-const ACCESS_TOKEN = open('../keycloak/access.token').replace(/[\r\n]+$/, '');
+const ACCESS_TOKEN = open('../keycloak/output/jwt/payment-service.token').replace(/[\r\n]+$/, '');
 
 // ---------- metrics ----------
 const statusCount = new Counter('status_count');
@@ -113,6 +114,8 @@ const failKinds   = new Counter('fail_kind_count');
 const reqs        = new Counter('reqs');
 
 // ---------- helpers ----------
+const KNOWN_SELLER_IDS = ['SELLER-111', 'SELLER-222'];
+
 function jwtExpSeconds(token) {
   try {
     const payload = JSON.parse(b64decode(token.split('.')[1], 'rawstd', 'utf-8'));
@@ -128,9 +131,17 @@ function randomAmountCents(minEuros, maxEuros) {
 
 function buildPaymentPayload() {
   // generate 2–3 random seller payment lines
-  const numOrders = Math.floor(Math.random() * 2) + 2; // 2 or 3
-  const paymentOrders = Array.from({ length: numOrders }, () => ({
-    sellerId: randomId('SELLER'),
+  const maxLines = Math.min(KNOWN_SELLER_IDS.length, 3);
+  const numOrders = Math.min(Math.floor(Math.random() * 2) + 2, maxLines); // 2 or 3 unique sellers
+
+  const shuffledSellers = KNOWN_SELLER_IDS
+    .slice()
+    .sort(() => Math.random() - 0.5);
+
+  const selectedSellers = shuffledSellers.slice(0, numOrders);
+
+  const paymentOrders = selectedSellers.map((sellerId) => ({
+    sellerId,
     amount: { quantity: randomAmountCents(10, 200), currency: 'EUR' },
   }));
 
@@ -153,6 +164,9 @@ export function setup() {
   const now = Math.floor(Date.now() / 1000);
   const ttl = exp ? (exp - now) : -1;
   console.log(`🔐 token TTL: ${ttl}s (exp=${exp || 'n/a'})  BASE_URL=${BASE_URL}  HOST=${HOST_HEADER}`);
+  if (ttl <= 0) {
+    console.warn('⚠️  Token appears expired or missing exp claim. Regenerate via ./keycloak/get-token.sh [KC_URL] [TTL_hours].');
+  }
   console.log(`🧪 mode=${MODE}  rps=${RPS}  duration=${DURATION}  preVUs=${options.scenarios[Object.keys(options.scenarios)[0]].preAllocatedVUs || 'n/a'}  maxVUs=${options.scenarios[Object.keys(options.scenarios)[0]].maxVUs || 'n/a'}`);
   return { authToken: ACCESS_TOKEN, tokenExp: exp };
 }
@@ -170,7 +184,7 @@ export default function (data) {
 
   let res;
   try {
-    res = http.post(`${BASE_URL}/payments`, payload, params);
+    res = http.post(`${API_BASE}/payments`, payload, params);
   } catch (e) {
     // Network/timeout/DNS/etc. -> count by kind
     failKinds.add(1, { kind: e.name || 'network_error' });
