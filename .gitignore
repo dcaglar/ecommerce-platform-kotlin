@@ -41,6 +41,7 @@
 .DS_Store
 # Keycloak client secrets and access tokens
 keycloak/secrets.txt
+keycloak/output/jwt/
 keycloak/*.token
 /local-dir/
 
