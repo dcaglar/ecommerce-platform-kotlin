@@ -1,9 +1,9 @@
 package com.dogancaglar.paymentservice.adapter.outbound.psp
 
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import com.dogancaglar.paymentservice.domain.util.PSPCaptureStatusMapper
-import com.dogancaglar.paymentservice.ports.outbound.PspCaptureGatewayPort
+import com.dogancaglar.paymentservice.domain.model.Payment
+import com.dogancaglar.paymentservice.domain.model.PaymentStatus
+import com.dogancaglar.paymentservice.domain.util.PSPAuthorizationStatusMapper
+import com.dogancaglar.paymentservice.ports.outbound.PspAuthGatewayPort
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
 import org.slf4j.LoggerFactory
@@ -14,12 +14,12 @@ import java.util.concurrent.*
 import kotlin.random.Random
 
 @Component
-class PspCaptureGatewayAdapter(
-    private val simulator: CaptureNetworkSimulator,
-    private val config: CaptureSimulationProperties,
-    @Qualifier("paymentOrderPspPool") private val pspExecutor: ThreadPoolTaskExecutor,
+class PspAuthorizationGatewayAdapter(
+    private val simulator: AuthorizationNetworkSimulator,
+    private val config: AuthorizationSimulationProperties,
+    @Qualifier("paymentPspPool") private val pspExecutor: ThreadPoolTaskExecutor,
     private val meterRegistry: MeterRegistry        // <--- add this
-) : PspCaptureGatewayPort {
+) : PspAuthGatewayPort {
     private val pspQueueDelay = Timer.builder("psp_queue_delay")
         .publishPercentileHistogram()
         .register(meterRegistry)
@@ -30,25 +30,25 @@ class PspCaptureGatewayAdapter(
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    private val active: CaptureSimulationProperties.ScenarioConfig
+    private val active: AuthorizationSimulationProperties.ScenarioConfig
         get() = config.scenarios[config.scenario]
             ?: throw IllegalStateException("No scenario config for ${config.scenario}")
 
     /** Public API: caller is a Kafka listener thread. Keep it clean. */
-    override fun capture(order: PaymentOrder): PaymentOrderStatus {
+    override fun authorize(order: Payment): PaymentStatus {
         var causeLabel = "EXCEPTION"
-        var future: Future<PaymentOrderStatus>? = null
+        var future: Future<PaymentStatus>? = null
         val enqueuedAt = System.nanoTime()
 
         return try {
-            future = pspExecutor.submit<PaymentOrderStatus>
+            future = pspExecutor.submit<PaymentStatus>
             {
                 val startedAt = System.nanoTime()
                 pspQueueDelay.record(startedAt - enqueuedAt, TimeUnit.NANOSECONDS)
                 val t0 = System.nanoTime()
                 try {
-                    //simulating now
-                    doCapture()
+                    //use your unique paymetid as idempotency key.
+                    doAuth(order.publicPaymentId)
                 } finally {
                     pspExecDuration.record(System.nanoTime() - t0, TimeUnit.NANOSECONDS)
                 }
@@ -62,7 +62,7 @@ class PspCaptureGatewayAdapter(
             future?.cancel(true)                // interrupts worker
             logger.warn("PSP call timed out (>{}s)", 1)
             causeLabel = "TIMEOUT"
-            return PaymentOrderStatus.TIMEOUT_EXCEEDED_1S_TRANSIENT
+            return PaymentStatus.PENDING_AUTH
         } catch (e: InterruptedException) {
             // Listener thread was interrupted while waiting. We are continuing the listener,
             // so CLEAR the flag to avoid poisoning Kafka client paths.
@@ -70,16 +70,16 @@ class PspCaptureGatewayAdapter(
             logger.warn("Listener interrupted while waiting PSP result; mapping to transient timeout")
             Thread.interrupted()                // clear flag on listener thread
             causeLabel = "INTERRUPTED"
-            return PaymentOrderStatus.TIMEOUT_EXCEEDED_1S_TRANSIENT
+            return PaymentStatus.PENDING_AUTH
         } catch (e: CancellationException) {
             logger.warn("PSP future cancelled; mapping to transient timeout")
             causeLabel = "CANCELLED"
-            return PaymentOrderStatus.TIMEOUT_EXCEEDED_1S_TRANSIENT
+            return PaymentStatus.PENDING_AUTH
         } catch (e: ExecutionException) {
             if (e.cause is InterruptedException) {
                 logger.warn("Worker interrupted; mapping to transient timeout")
                 causeLabel = "WORKER_INTERRUPTED"
-                return PaymentOrderStatus.TIMEOUT_EXCEEDED_1S_TRANSIENT
+                return PaymentStatus.PENDING_AUTH
             }
             logger.error("PSP worker failed: {}", e.cause?.message ?: e.message)
             causeLabel = "EXCEPTION"
@@ -88,13 +88,13 @@ class PspCaptureGatewayAdapter(
             // Thrown by submit(...) when pool/queue are saturated (AbortPolicy)
             logger.warn("PSP executor saturated; treating as transient: {}", e.message)
             causeLabel = "REJECTED"
-            return PaymentOrderStatus.TIMEOUT_EXCEEDED_1S_TRANSIENT
+            return PaymentStatus.PENDING_AUTH
         } finally {
             meterRegistry.counter("psp_calls_total", "result", causeLabel).increment()
         }
     }
     /** Actual PSP work runs on the pool worker thread. */
-    private fun doCapture(): PaymentOrderStatus {
+    private fun doAuth(idempotencyKey: String): PaymentStatus {
         // If this thread gets interrupted (e.g., due to cancel(true)),
         // any blocking/interruptible call below will throw InterruptedException.
         try {
@@ -105,19 +105,19 @@ class PspCaptureGatewayAdapter(
             throw ie
         }
 
-        val pspResponse = getCaptureResponse()
-        return PSPCaptureStatusMapper.fromPspCaptureResponseCode(pspResponse.status)
+        val pspResponse = getAuthoriationResponse()
+        return PSPAuthorizationStatusMapper.fromPspAuthCode  (pspResponse.status)
     }
 
-    private fun getCaptureResponse(): CapturePspResponse {
+    private fun getAuthoriationResponse(): AuthorizationPspResponse {
         val roll = Random.nextInt(100)
         val result = when {
-            roll < active.response.successful -> "CAPTURE_SUCCESS"
+            roll < active.response.successful -> "AUTHORIZED"
             roll < active.response.successful + active.response.retryable -> "TRANSIENT_NETWORK_ERROR"
-            roll < active.response.successful + active.response.retryable + active.response.nonRetryable -> "CAPTURE_DECLINED_FINAL"
-            else -> PaymentOrderStatus.PENDING_CAPTURE
+            roll < active.response.successful + active.response.retryable + active.response.nonRetryable -> "DECLINED"
+            else -> PaymentStatus.PENDING_AUTH
         }
-        return CapturePspResponse(result.toString())
+        return AuthorizationPspResponse(result.toString())
     }
 
 }

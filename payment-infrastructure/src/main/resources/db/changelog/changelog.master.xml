@@ -7,14 +7,6 @@
     <include file="payment-changelog.xml" relativeToChangelogFile="true"/>
     <include file="payment-order-changelog.xml" relativeToChangelogFile="true"/>
     <include file="payment-outbox-changelog.xml" relativeToChangelogFile="true"/>
-    <include file="20250518-create-scheduled-payment-order-status-request.xml" relativeToChangelogFile="true"/>
-    <include file="20250526-remove-paymentorderid-payment.xml" relativeToChangelogFile="true"/>
-    <include file="20250526-remove-public-paymentorderid-payment.xml" relativeToChangelogFile="true"/>
-    <include file="20250526-remove-sellerid-payment.xml" relativeToChangelogFile="true"/>
-    <include file="20250601-create-payment-order-status-checks.xml" relativeToChangelogFile="true"/>
-    <include file="20250615-add-pk-on-payment-id.xml" relativeToChangelogFile="true"/>
-    <include file="2025-09-18-reset-autovacuum-payment-orders.xml" relativeToChangelogFile="true"/>
-    <include file="20251014-change-amount-value-to-bigint.xml" relativeToChangelogFile="true"/>
     <include file="2025-10-27-ledger-entry-tables.xml" relativeToChangelogFile="true"/>
     <include file="2025-11-01-account-balances-table.xml" relativeToChangelogFile="true"/>
     <include file="2025-01-04-account-profile.xml" relativeToChangelogFile="true"/>

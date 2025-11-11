@@ -84,6 +84,7 @@ class PaymentTest {
 
     @Test
     fun `should add captured amount and transition to CAPTURED_PARTIALLY`() {
+
         val payment = Payment.createNew(paymentId,  buyerId, orderId, totalAmount)
             .authorize()
 

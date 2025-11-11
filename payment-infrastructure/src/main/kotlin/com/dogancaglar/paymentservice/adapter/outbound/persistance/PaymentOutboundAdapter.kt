@@ -11,14 +11,30 @@ import org.springframework.stereotype.Repository
 class PaymentOutboundAdapter(
     private val paymentMapper: PaymentMapper
 ) : PaymentRepository {
-    override fun save(payment: Payment) {
-        val entity = PaymentEntityMapper.toEntity(payment)
-        paymentMapper.insert(entity)
+
+    override fun saveIdempotent(payment: Payment): Payment {
+        val inserted = paymentMapper.insertIgnore(PaymentEntityMapper.toEntity(payment))
+        return if (inserted == 0) {
+            // Already exists, fetch existing
+            paymentMapper.findByIdempotencyKey(payment.idempotencyKey)!!.let { PaymentEntityMapper.toDomain(it) }
+        } else {
+            payment
+        }
     }
+
+    override fun findByIdempotencyKey(key: String): Payment? {
+        return paymentMapper.findByIdempotencyKey(key)?.let { PaymentEntityMapper.toDomain(it) }
+    }
+
 
     override fun getMaxPaymentId(): PaymentId {
         val paymentIdLong = paymentMapper.getMaxPaymentId() ?: 0
         return PaymentId(paymentIdLong)
+    }
+
+    override fun updatePayment(payment: Payment): Unit {
+        val entity = PaymentEntityMapper.toEntity(payment)
+        paymentMapper.update(entity);
     }
 
 }

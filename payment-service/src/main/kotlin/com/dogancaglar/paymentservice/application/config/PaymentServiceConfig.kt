@@ -6,13 +6,13 @@ import com.dogancaglar.paymentservice.adapter.outbound.persistance.PaymentOutbou
 import com.dogancaglar.paymentservice.adapter.outbound.redis.RedisIdGeneratorPortAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.serialization.JacksonSerializationAdapter
 import com.dogancaglar.paymentservice.application.usecases.AccountBalanceReadService
-import com.dogancaglar.paymentservice.application.usecases.CreatePaymentService
+import com.dogancaglar.paymentservice.application.usecases.AuthorizePaymentService
 import com.dogancaglar.paymentservice.application.util.PaymentFactory
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceReadUseCase
-import com.dogancaglar.paymentservice.ports.inbound.CreatePaymentUseCase
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
+import com.dogancaglar.paymentservice.ports.outbound.PspAuthGatewayPort
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.time.Clock
@@ -31,25 +31,23 @@ class PaymentServiceConfig {
         PaymentFactory(clock)
 
     @Bean
-    fun createPaymentService(
+    fun createAuthorizePaymentService(
         idGeneratorPort: RedisIdGeneratorPortAdapter,
         paymentRepository: PaymentOutboundAdapter,
-        paymentOrderRepository: PaymentOrderOutboundAdapter,
         outboxEventPort: OutboxBufferAdapter,
         serializationPort: JacksonSerializationAdapter,
         clock: Clock,
         paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
-        paymentFactory: PaymentFactory
-    ): CreatePaymentUseCase {
-        return CreatePaymentService(
+        pspAuthGatewayPort: PspAuthGatewayPort
+    ): AuthorizePaymentService {
+        return AuthorizePaymentService(
             idGeneratorPort = idGeneratorPort,
             paymentRepository = paymentRepository,
-            paymentOrderRepository = paymentOrderRepository,
+            psp = pspAuthGatewayPort,
             outboxEventPort = outboxEventPort,
             serializationPort = serializationPort,
             clock = clock,
-            paymentOrderDomainEventMapper = paymentOrderDomainEventMapper,
-            paymentFactory = paymentFactory
+            paymentOrderDomainEventMapper = paymentOrderDomainEventMapper
         )
     }
 

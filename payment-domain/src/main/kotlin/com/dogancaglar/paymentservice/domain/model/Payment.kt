@@ -15,6 +15,7 @@ class Payment private constructor(
     val totalAmount: Amount,
     val capturedAmount: Amount,
     val status: PaymentStatus,
+    val idempotencyKey: String,            // <-- internal business idempotency
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime,
     val paymentOrders: List<PaymentOrder>
@@ -25,15 +26,17 @@ class Payment private constructor(
 
     // --- Domain Behavior ---
 
-    fun authorize(): Payment {
+    fun authorize(updatedAt: LocalDateTime= LocalDateTime.now(Clock.systemUTC())): Payment {
         require(status == PaymentStatus.PENDING_AUTH) { "Payment can only be authorized from PENDING_AUTH" }
-        return copy(status = PaymentStatus.AUTHORIZED)
+        return copy(status = PaymentStatus.AUTHORIZED, updatedAt = updatedAt )
     }
 
-    fun decline(): Payment {
+
+    fun decline(updatedAt: LocalDateTime= LocalDateTime.now(Clock.systemUTC())): Payment {
         require(status == PaymentStatus.PENDING_AUTH) { "Payment can only be declined from PENDING_AUTH" }
-        return copy(status = PaymentStatus.DECLINED)
+        return copy(status = PaymentStatus.DECLINED, updatedAt = updatedAt)
     }
+
 
     fun addCapturedAmount(amount: Amount): Payment {
         val newCaptured = this.capturedAmount + amount
@@ -45,7 +48,7 @@ class Payment private constructor(
             else -> status
         }
 
-        return copy(capturedAmount = newCaptured, status = newStatus)
+        return copy(capturedAmount = newCaptured, status = newStatus,updatedAt=updatedAt)
     }
 
     fun addPaymentOrder(paymentOrder: PaymentOrder): Payment {
@@ -55,16 +58,16 @@ class Payment private constructor(
         require(paymentOrder.amount.currency == totalAmount.currency) {
             "Currency mismatch between Payment and PaymentOrder"
         }
-        return copy(paymentOrders = paymentOrders + paymentOrder)
+        return copy(paymentOrders = paymentOrders + paymentOrder, updatedAt = updatedAt)
     }
 
 
     // --- Internal copy (immutability) ---
-    private fun copy(
+    private fun  copy(
         capturedAmount: Amount = this.capturedAmount,
         status: PaymentStatus = this.status,
         paymentOrders: List<PaymentOrder> = this.paymentOrders,
-        updatedAt: LocalDateTime = LocalDateTime.now()
+        updatedAt: LocalDateTime
     ): Payment = Payment(
         paymentId = paymentId,
         buyerId = buyerId,
@@ -72,6 +75,7 @@ class Payment private constructor(
         totalAmount = totalAmount,
         capturedAmount = capturedAmount,
         status = status,
+        idempotencyKey = idempotencyKey,
         createdAt = createdAt,
         updatedAt = updatedAt,
         paymentOrders = paymentOrders
@@ -86,7 +90,7 @@ class Payment private constructor(
             clock: Clock = Clock.systemUTC()
         ): Payment {
             require(totalAmount.isPositive()) { "Total amount must be positive" }
-
+            val idempotencyKeyGenerated = "${buyerId.value}:${orderId.value}:${totalAmount.quantity}:${totalAmount.currency.currencyCode}"
             return Payment(
                 paymentId = paymentId,
                 buyerId = buyerId,
@@ -94,6 +98,7 @@ class Payment private constructor(
                 totalAmount = totalAmount,
                 capturedAmount = Amount.zero(totalAmount.currency),
                 status = PaymentStatus.PENDING_AUTH,
+                idempotencyKey = idempotencyKeyGenerated,
                 createdAt = LocalDateTime.now(clock),
                 updatedAt = LocalDateTime.now(clock),
                 paymentOrders = emptyList()
@@ -108,6 +113,7 @@ class Payment private constructor(
             totalAmount: Amount,
             capturedAmount: Amount,
             status: PaymentStatus,
+            idempotencyKey: String,
             createdAt: LocalDateTime,
             updatedAt: LocalDateTime
         ): Payment = Payment(
@@ -117,6 +123,7 @@ class Payment private constructor(
             totalAmount,
             capturedAmount,
             status,
+            idempotencyKey,
             createdAt,
             updatedAt,
             emptyList()

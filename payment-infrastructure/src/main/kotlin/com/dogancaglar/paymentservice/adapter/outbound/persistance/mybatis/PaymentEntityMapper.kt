@@ -20,6 +20,7 @@ object PaymentEntityMapper {
             capturedAmountValue = payment.capturedAmount.quantity,
             currency = payment.totalAmount.currency.currencyCode,
             status = payment.status.name,
+            idempotencyKey = payment.idempotencyKey,
             createdAt = payment.createdAt,
             updatedAt = payment.updatedAt
         )
@@ -34,6 +35,7 @@ object PaymentEntityMapper {
             totalAmount = total,
             capturedAmount = captured,
             status = PaymentStatus.valueOf(entity.status),
+            idempotencyKey = entity.idempotencyKey,
             createdAt = entity.createdAt,
             updatedAt = entity.updatedAt
         )

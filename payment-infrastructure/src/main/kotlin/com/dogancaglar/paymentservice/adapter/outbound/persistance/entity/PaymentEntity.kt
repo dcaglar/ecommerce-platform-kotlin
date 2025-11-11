@@ -9,6 +9,7 @@ data class PaymentEntity(
     val totalAmountValue: Long,
     val currency: String,
     val capturedAmountValue: Long,
+    val idempotencyKey: String,
     val status: String,
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime

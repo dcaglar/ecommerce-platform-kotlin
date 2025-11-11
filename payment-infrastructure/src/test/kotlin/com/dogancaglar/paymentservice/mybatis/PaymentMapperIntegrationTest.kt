@@ -72,13 +72,14 @@ class PaymentMapperIntegrationTest {
             orderId = "order-1",
             totalAmountValue = 10_000,
             capturedAmountValue = 0,
+            idempotencyKey = "12345",
             currency = "USD",
             status = "PENDING_AUTH",
             createdAt = createdAt,
             updatedAt = createdAt
         )
 
-        val inserted = paymentMapper.insert(entity)
+        val inserted = paymentMapper.insertIgnore(entity)
         assertEquals(1, inserted)
 
         val fetched = paymentMapper.findById(101L)

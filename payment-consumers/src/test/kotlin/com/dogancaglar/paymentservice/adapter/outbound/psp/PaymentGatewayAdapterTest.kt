@@ -16,7 +16,7 @@ import java.util.concurrent.CompletableFuture
 
 class PaymentGatewayAdapterTest {
 
-    private lateinit var networkSimulator: NetworkSimulator
+    private lateinit var networkSimulator: CaptureNetworkSimulator
     private lateinit var config: CaptureSimulationProperties
     private lateinit var pspExecutor: ThreadPoolTaskExecutor
     private lateinit var meterRegistry: MeterRegistry
@@ -36,7 +36,7 @@ class PaymentGatewayAdapterTest {
         every { meterRegistry.counter(any<String>(), any<String>(), any<String>()) } returns counter
         every { meterRegistry.timer(any<String>()) } returns mockk<Timer>()
         
-        // Mock NetworkSimulator behavior
+        // Mock CaptureNetworkSimulator behavior
         every { networkSimulator.simulate() } returns Unit
         
         // Mock ThreadPoolTaskExecutor behavior - use relaxed mocking to avoid signature issues

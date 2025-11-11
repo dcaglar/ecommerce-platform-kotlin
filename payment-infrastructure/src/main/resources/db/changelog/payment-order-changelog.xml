@@ -77,6 +77,12 @@
             CHECK (amount_value > 0);
         </sql>
 
+        <sql>
+            ALTER TABLE payment_orders
+            RESET (autovacuum_enabled);
+        </sql>
+
+
         <!-- 3️⃣ Useful indexes -->
         <createIndex indexName="idx_payment_orders_payment_id"
                      tableName="payment_orders">

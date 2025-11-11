@@ -9,9 +9,9 @@ interface PaymentMapper {
     fun getMaxPaymentId(): Long?
 
     // Add other CRUD methods as needed, e.g.:
-    fun insert(payment: PaymentEntity): Int
+    fun insertIgnore(payment: PaymentEntity): Int
+    fun findByIdempotencyKey(idempotencyKey: String): PaymentEntity?
     fun findById(id: Long): PaymentEntity?
-    fun update(payment: PaymentEntity): Int
+    fun update(payment: PaymentEntity): Unit
     fun deleteById(id: Long): Int
-    fun deleteAll(): Int
 }

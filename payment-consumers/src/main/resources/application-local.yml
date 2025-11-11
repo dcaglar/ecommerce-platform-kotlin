@@ -180,94 +180,95 @@ management:
         enabled: true
 
 psp:
-  simulation:
-    currentScenario: NORMAL
-    scenarios:
-      NORMAL:
-        timeouts:
-          enabled: true
-          probability: 20       # 2% of total requests time out
-        latency:
-          fast:
-            probability: 100    # rest of 100% are fast (50–150ms)
-            minMs: 50
-            maxMs: 150
-          moderate:
-            probability: 0    # 0% are moderate (150–300ms)
-            minMs: 150
-            maxMs: 300
-          slow:
-            probability: 0     # 0% are slow (300–600ms)
-            minMs: 300
-            maxMs: 600
-        response:
-          successful: 70
-          retryable: 20
-          statusCheck: 0
-          nonRetryable: 10
-      PEAK:
-        timeouts:
-          enabled: true
-          probability: 25      # 25% timeouts
-        latency:
-          fast:
-            probability: 30    # 30% fast (250–500ms)
-            minMs: 250
-            maxMs: 500
-          moderate:
-            probability: 50    # 50% moderate (501–1500ms)
-            minMs: 501
-            maxMs: 1500
-          slow:
-            probability: 20    # 20% slow (1501–2500ms)
-            minMs: 1501
-            maxMs: 2500
-        response:
-          successful: 50
-          retryable: 45
-          statusCheck: 0
-          nonRetryable: 5
-      DEGRADED:
-        timeouts:
-          enabled: true
-          probability: 30      # 30% timeouts
-        latency:
-          fast:
-            probability: 20    # 20% fast (2000–2200ms)
-            minMs: 2000
-            maxMs: 2200
-          moderate:
-            probability: 20    # 20% moderate (2201–2600ms)
-            minMs: 2201
-            maxMs: 2600
-          slow:
-            probability: 60    # 60% slow (2601–2990ms)
-            minMs: 2601
-            maxMs: 2990
-        response:
-          successful: 50
-          retryable: 40
-          statusCheck: 0
-          nonRetryable: 10
-      BEST_PSP_EVER:
-        timeouts:
-          enabled: false
-          probability: 0
-        latency:
-          fast:
-            probability: 100   # 100% fast (1–2ms)
-            minMs: 1
-            maxMs: 2
-          moderate:
+  capture:
+    simulation:
+      currentScenario: NORMAL
+      scenarios:
+        NORMAL:
+          timeouts:
+            enabled: true
+            probability: 20       # 2% of total requests time out
+          latency:
+            fast:
+              probability: 100    # rest of 100% are fast (50–150ms)
+              minMs: 50
+              maxMs: 150
+            moderate:
+              probability: 0    # 0% are moderate (150–300ms)
+              minMs: 150
+              maxMs: 300
+            slow:
+              probability: 0     # 0% are slow (300–600ms)
+              minMs: 300
+              maxMs: 600
+          response:
+            successful: 70
+            retryable: 20
+            statusCheck: 0
+            nonRetryable: 10
+        PEAK:
+          timeouts:
+            enabled: true
+            probability: 25      # 25% timeouts
+          latency:
+            fast:
+              probability: 30    # 30% fast (250–500ms)
+              minMs: 250
+              maxMs: 500
+            moderate:
+              probability: 50    # 50% moderate (501–1500ms)
+              minMs: 501
+              maxMs: 1500
+            slow:
+              probability: 20    # 20% slow (1501–2500ms)
+              minMs: 1501
+              maxMs: 2500
+          response:
+            successful: 50
+            retryable: 45
+            statusCheck: 0
+            nonRetryable: 5
+        DEGRADED:
+          timeouts:
+            enabled: true
+            probability: 30      # 30% timeouts
+          latency:
+            fast:
+              probability: 20    # 20% fast (2000–2200ms)
+              minMs: 2000
+              maxMs: 2200
+            moderate:
+              probability: 20    # 20% moderate (2201–2600ms)
+              minMs: 2201
+              maxMs: 2600
+            slow:
+              probability: 60    # 60% slow (2601–2990ms)
+              minMs: 2601
+              maxMs: 2990
+          response:
+            successful: 50
+            retryable: 40
+            statusCheck: 0
+            nonRetryable: 10
+        BEST_PSP_EVER:
+          timeouts:
+            enabled: false
             probability: 0
-            minMs: 0
-            maxMs: 0
-          slow:
-            probability: 0
-            minMs: 0
-            maxMs: 0
-        response:
-          successful: 100
-          retryable: 0
-          statusCheck: 0
-          nonRetryable: 0
+          latency:
+            fast:
+              probability: 100   # 100% fast (1–2ms)
+              minMs: 1
+              maxMs: 2
+            moderate:
+              probability: 0
+              minMs: 0
+              maxMs: 0
+            slow:
+              probability: 0
+              minMs: 0
+              maxMs: 0
+          response:
+            successful: 100
+            retryable: 0
+            statusCheck: 0
+            nonRetryable: 0

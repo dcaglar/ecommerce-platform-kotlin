@@ -5,12 +5,12 @@ import org.springframework.stereotype.Component
 import kotlin.random.Random
 
 @Component
-class NetworkSimulator(
-    private val config: CaptureSimulationProperties
+class AuthorizationNetworkSimulator(
+    private val config: AuthorizationSimulationProperties
 ) {
-    private val logger = LoggerFactory.getLogger(NetworkSimulator::class.java)
+    private val logger = LoggerFactory.getLogger(AuthorizationNetworkSimulator::class.java)
 
-    private val active: CaptureSimulationProperties.ScenarioConfig
+    private val active: AuthorizationSimulationProperties.ScenarioConfig
         get() = config.scenarios[config.scenario]
             ?: throw IllegalStateException("No scenario config for ${config.scenario}")
 

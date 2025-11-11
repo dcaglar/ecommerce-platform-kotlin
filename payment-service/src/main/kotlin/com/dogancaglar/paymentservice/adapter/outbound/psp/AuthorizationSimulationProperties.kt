@@ -3,17 +3,17 @@ package com.dogancaglar.paymentservice.adapter.outbound.psp
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Configuration
 
-enum class PspCaptureScenario { NORMAL, PEAK, DEGRADED, BEST_PSP_EVER }
+enum class PspAuthorizationScenario { NORMAL }
 
 @Configuration
-@ConfigurationProperties(prefix = "psp.capture.simulation")
-class CaptureSimulationProperties {
+@ConfigurationProperties(prefix = "psp.authorization.simulation")
+class AuthorizationSimulationProperties {
     var currentScenario: String? = null
-    val scenario: PspCaptureScenario
-        get() = PspCaptureScenario.valueOf(currentScenario ?: PspCaptureScenario.NORMAL.name)
+    val scenario: PspAuthorizationScenario
+        get() = PspAuthorizationScenario.valueOf(currentScenario ?: PspAuthorizationScenario.NORMAL.name)
 
     // now wrap your existing blocks under a map of named configs
-    var scenarios: Map<PspCaptureScenario, ScenarioConfig> = emptyMap()
+    var scenarios: Map<PspAuthorizationScenario, ScenarioConfig> = emptyMap()
 
     class ScenarioConfig {
         var timeouts: TimeoutConfig = TimeoutConfig()

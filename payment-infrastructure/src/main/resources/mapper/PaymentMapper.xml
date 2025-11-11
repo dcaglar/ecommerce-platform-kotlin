@@ -20,7 +20,7 @@
         SELECT MAX(payment_id) FROM payments
     </select>
 
-    <insert id="insert"
+    <insert id="insertIgnore"
             parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentEntity">
         INSERT INTO payments (
         payment_id,
@@ -30,6 +30,7 @@
         captured_amount_value,
         currency,
         status,
+        idempotency_key,
         created_at,
         updated_at
         ) VALUES (
@@ -40,10 +41,17 @@
         #{capturedAmountValue},
         #{currency},
         #{status},
+        #{idempotencyKey},
         #{createdAt},
         #{updatedAt}
         )
+        ON CONFLICT (idempotency_key) DO NOTHING;
     </insert>
+
+    <select id="findByIdempotencyKey" parameterType="string"
+            resultType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentEntity">
+        SELECT * FROM payments WHERE idempotency_key = #{idempotencyKey}
+    </select>
 
     <select id="findById" resultMap="PaymentResultMap">
         SELECT payment_id,

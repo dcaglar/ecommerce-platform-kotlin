@@ -184,3 +184,31 @@ db:
       statement-timeout-ms: 2000
       lock-timeout-ms: 200
       idle-in-tx-timeout-ms: 0
+
+psp:
+  authorization:
+    simulation:
+      currentScenario: NORMAL
+      scenarios:
+        NORMAL:
+          timeouts:
+            enabled: true
+            probability: 0       # 2% of total requests time out
+          latency:
+            fast:
+              probability: 100    # rest of 100% are fast (50–150ms)
+              minMs: 50
+              maxMs: 150
+            moderate:
+              probability: 20    # 0% are moderate (150–300ms)
+              minMs: 150
+              maxMs: 300
+            slow:
+              probability: 0     # 0% are slow (300–600ms)
+              minMs: 300
+              maxMs: 600
+          response:
+            successful: 70
+            retryable: 20
+            statusCheck: 0
+            nonRetryable: 10

@@ -16,6 +16,25 @@ class PaymentOrderDomainEventMapper(
     private val clock: Clock = Clock.systemUTC() // inject clock for deterministic timestamps in tests
 ) {
 
+    fun toPaymentAuthorized(updated: Payment,paymentLines: List<PaymentLine>): PaymentAuthorized{
+        return PaymentAuthorized.create(
+            paymentId = updated.paymentId.value.toString(),
+            publicPaymentId = updated.publicPaymentId,
+            buyerId = updated.buyerId.value,
+            orderId = updated.orderId.value,
+            totalAmountValue = updated.totalAmount.quantity,
+            currency = updated.totalAmount.currency.currencyCode,
+            paymentLines = paymentLines.map {
+                PaymentAuthorizedLine.of(
+                    sellerId = it.sellerId.value,
+                    amountValue = it.amount.quantity,
+                    currency = it.amount.currency.currencyCode
+                )
+            },
+            status = updated.status.name
+        )
+    }
+
     /** 🔹 Domain → Event: when PaymentOrder is first created */
     fun toPaymentOrderCreated(order: PaymentOrder): PaymentOrderCreated =
         PaymentOrderCreated.create(

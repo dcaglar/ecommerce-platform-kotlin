@@ -35,6 +35,10 @@
                 <constraints nullable="false"/>
             </column>
 
+            <column name="idempotency_key" type="VARCHAR(128)">
+                <constraints nullable="false"/>
+            </column>
+
             <column name="status" type="VARCHAR(50)">
                 <constraints nullable="false"/>
             </column>
@@ -47,6 +51,11 @@
                 <constraints nullable="false"/>
             </column>
         </createTable>
+
+        <addUniqueConstraint
+                tableName="payments"
+                columnNames="idempotency_key"
+                constraintName="uq_journal_idempotency_key"/>
 
         <!-- 2️⃣ Constraints via SQL (Liquibase-safe for all 4.x versions) -->
         <sql>
@@ -76,16 +85,6 @@
             );
         </sql>
 
-        <!-- 3️⃣ Helpful indexes -->
-        <createIndex indexName="idx_payments_order_id"
-                     tableName="payments">
-            <column name="order_id"/>
-        </createIndex>
-
-        <createIndex indexName="idx_payments_buyer_id"
-                     tableName="payments">
-            <column name="buyer_id"/>
-        </createIndex>
 
         <!-- 4️⃣ Rollback -->
         <rollback>

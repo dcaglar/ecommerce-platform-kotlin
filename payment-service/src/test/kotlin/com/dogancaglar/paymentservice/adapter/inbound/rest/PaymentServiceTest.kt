@@ -1,10 +1,8 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
-import com.dogancaglar.paymentservice.adapter.inbound.rest.mapper.PaymentRequestMapper
+import com.dogancaglar.paymentservice.application.usecases.AuthorizePaymentService
 import com.dogancaglar.paymentservice.application.validator.PaymentValidator
-import com.dogancaglar.paymentservice.ports.inbound.CreatePaymentUseCase
 import com.dogancaglar.port.out.web.dto.PaymentRequestDTO
-import com.dogancaglar.port.out.web.dto.PaymentResponseDTO
 import com.dogancaglar.port.out.web.dto.AmountDto
 import com.dogancaglar.port.out.web.dto.CurrencyEnum
 import com.dogancaglar.port.out.web.dto.PaymentOrderRequestDTO
@@ -14,12 +12,9 @@ import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import io.mockk.just
-import io.mockk.Runs
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
@@ -29,7 +24,7 @@ import java.time.ZoneOffset
 
 class PaymentServiceTest {
 
-    private lateinit var createPaymentUseCase: CreatePaymentUseCase
+    private lateinit var authorizePaymentService: AuthorizePaymentService
     private lateinit var paymentService: PaymentService
     private lateinit var clock: Clock
 
@@ -37,10 +32,10 @@ class PaymentServiceTest {
 
     @BeforeEach
     fun setUp() {
-        createPaymentUseCase = mockk()
+        authorizePaymentService = mockk()
         paymentValidator = mockk(relaxed = true)
         clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
-        paymentService = PaymentService(createPaymentUseCase, paymentValidator)
+        paymentService = PaymentService(authorizePaymentService, paymentValidator)
     }
 
     @Test
@@ -66,7 +61,7 @@ class PaymentServiceTest {
             clock = clock
         )
         
-        every { createPaymentUseCase.create(any()) } returns expectedPayment
+        every { authorizePaymentService.authorize(any()) } returns expectedPayment
 
         // When
         val result = paymentService.createPayment(request)
@@ -79,7 +74,7 @@ class PaymentServiceTest {
         assertEquals(10000L, result.totalAmount.quantity)
         assertEquals(CurrencyEnum.USD, result.totalAmount.currency)
         
-        verify { createPaymentUseCase.create(any()) }
+        verify { authorizePaymentService.authorize(any()) }
     }
 
     @Test
@@ -98,7 +93,7 @@ class PaymentServiceTest {
         )
         
         val exception = RuntimeException("Use case failed")
-        every { createPaymentUseCase.create(any()) } throws exception
+        every { authorizePaymentService.authorize(any()) } throws exception
 
         // When & Then
         val thrownException = assertThrows(RuntimeException::class.java) {
@@ -106,7 +101,7 @@ class PaymentServiceTest {
         }
         
         assertEquals("Use case failed", thrownException.message)
-        verify { createPaymentUseCase.create(any()) }
+        verify { authorizePaymentService.authorize(any()) }
     }
 
     @Test
@@ -125,7 +120,7 @@ class PaymentServiceTest {
         )
         
         val validationException = IllegalArgumentException("Invalid payment data")
-        every { createPaymentUseCase.create(any()) } throws validationException
+        every { authorizePaymentService.authorize(any()) } throws validationException
 
         // When & Then
         val thrownException = assertThrows(IllegalArgumentException::class.java) {
@@ -133,7 +128,7 @@ class PaymentServiceTest {
         }
         
         assertEquals("Invalid payment data", thrownException.message)
-        verify { createPaymentUseCase.create(any()) }
+        verify { authorizePaymentService.authorize(any()) }
     }
 
     @Test
@@ -159,7 +154,7 @@ class PaymentServiceTest {
             clock = clock
         ).authorize()
         
-        every { createPaymentUseCase.create(any()) } returns expectedPayment
+        every { authorizePaymentService.authorize(any()) } returns expectedPayment
 
         // When
         val result = paymentService.createPayment(request)
@@ -170,7 +165,7 @@ class PaymentServiceTest {
         assertEquals(5000L, result.totalAmount.quantity)
         assertEquals(CurrencyEnum.EUR, result.totalAmount.currency)
         
-        verify { createPaymentUseCase.create(any()) }
+        verify { authorizePaymentService.authorize(any()) }
     }
 
     @Test
@@ -196,7 +191,7 @@ class PaymentServiceTest {
             clock = clock
         )
         
-        every { createPaymentUseCase.create(any()) } returns expectedPayment
+        every { authorizePaymentService.authorize(any()) } returns expectedPayment
 
         // When
         val result = paymentService.createPayment(request)
@@ -205,6 +200,6 @@ class PaymentServiceTest {
         assertEquals("payment-789", result.paymentId)
         assertEquals(99999999L, result.totalAmount.quantity)
         
-        verify { createPaymentUseCase.create(any()) }
+        verify { authorizePaymentService.authorize(any()) }
     }
 }

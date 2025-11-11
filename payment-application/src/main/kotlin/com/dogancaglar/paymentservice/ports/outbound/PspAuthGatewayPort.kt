@@ -10,5 +10,5 @@ import com.dogancaglar.paymentservice.domain.model.PaymentStatus
  * Implementations can be real or simulated.
  */
 interface PspAuthGatewayPort {
-    fun auth(order: Payment): PaymentStatus
+    fun authorize(order: Payment): PaymentStatus
 }

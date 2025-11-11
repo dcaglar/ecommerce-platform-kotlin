@@ -1,6 +1,10 @@
 package com.dogancaglar.common.event
 
 object EVENT_TYPE {
+
+    const val PAYMENT_AUTHORIZED = "payment_authorized"
+
+
     const val PAYMENT_ORDER_SUCCEDED = "payment_order_success"
     const val PAYMENT_ORDER_FAILED = "payment_order_failed"
     const val PAYMENT_ORDER_CREATED = "payment_order_created"

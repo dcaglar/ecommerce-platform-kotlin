@@ -1,9 +1,0 @@
-<databaseChangeLog
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
-        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
-        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
-    <changeSet id="remove-payment-order-id-column" author="dogancaglar">
-        <dropColumn tableName="payments" columnName="payment_order_id"/>
-    </changeSet>
-</databaseChangeLog>
