@@ -43,19 +43,19 @@ class LedgerRecordingConsumer(
                 kafkaTx.run(offsets, groupMeta) {
                     logger.info(
                         "🧾 Recording ledger entries for paymentOrderId={} status={} traceId={}",
-                        command.publicPaymentOrderId, command.status, env.traceId
+                        command.paymentOrderId, command.status, env.traceId
                     )
                     recordLedgerEntriesUseCase.recordLedgerEntries(command)
 
                     logger.info(
                         "✅ Ledger recording complete and event published for paymentOrderId={}",
-                        command.publicPaymentOrderId
+                        command.paymentOrderId
                     )
                 }
             } catch (e: Exception) {
                 logger.error(
                     "❌ Failed to record ledger entries for paymentOrderId={} status={} traceId={}: {}",
-                    command.publicPaymentOrderId, command.status, env.traceId, e.message, e
+                    command.paymentOrderId, command.status, env.traceId, e.message, e
                 )
                 throw e // Re-throw to let Spring Kafka error handler process it
             }

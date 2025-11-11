@@ -1,34 +1,15 @@
 package com.dogancaglar.paymentservice.adapter.outbound.persistance.entity
 
-import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import java.time.LocalDateTime
 
-class PaymentEntity internal constructor(
+data class PaymentEntity(
     val paymentId: Long,
-    val publicPaymentId: String,
     val buyerId: String,
     val orderId: String,
-    val amountValue: Long,
-    val amountCurrency: String,
-    val status: PaymentStatus,
-    val createdAt: LocalDateTime = LocalDateTime.now(),
-    val updatedAt: LocalDateTime? = null,
-    val retryCount: Int? = null,
-    val retryReason: String? = null,
-    val lastErrorMessage: String? = null
-) {
-    constructor(paymentId: Long, publicPaymentId: String) : this(
-        paymentId = paymentId,
-        publicPaymentId = publicPaymentId,
-        buyerId = "",
-        orderId = "",
-        amountValue = 0L,
-        amountCurrency = "EUR",
-        status = PaymentStatus.INITIATED,
-        createdAt = LocalDateTime.now(),
-        updatedAt = null,
-        retryCount = null,
-        retryReason = null,
-        lastErrorMessage = null
-    )
-}
+    val totalAmountValue: Long,
+    val currency: String,
+    val capturedAmountValue: Long,
+    val status: String,
+    val createdAt: LocalDateTime,
+    val updatedAt: LocalDateTime
+)

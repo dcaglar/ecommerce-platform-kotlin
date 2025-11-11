@@ -5,12 +5,12 @@ import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Repository
 
 @Repository
-open class PaymentRetryRedisCache(
+open class PaymentOrderRetryRedisCache(
     private val redisTemplate: StringRedisTemplate
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
-    private val queue = "payment_retry_queue"
-    private val inflight = "payment_retry_inflight"   // ZSET: member = raw JSON, score = first-picked timestamp
+    private val queue = "payment_order_retry_queue"
+    private val inflight = "payment_order_retry_inflight"   // ZSET: member = raw JSON, score = first-picked timestamp
 
     fun getRetryCount(paymentOrderId: Long): Int {
         val retryKey = "retry:count:$paymentOrderId"

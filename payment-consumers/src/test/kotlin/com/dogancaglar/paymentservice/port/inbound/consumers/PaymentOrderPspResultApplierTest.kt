@@ -64,7 +64,7 @@ class PaymentOrderPspResultApplierTest {
             retryCount = 0,
             retryReason = null,
             lastErrorMessage = null,
-            pspStatus = PaymentOrderStatus.SUCCESSFUL_FINAL.name,
+            pspStatus = PaymentOrderStatus.CAPTURED.name,
             pspErrorCode = null,
             pspErrorDetail = null,
             latencyMs = 150L
@@ -109,19 +109,19 @@ class PaymentOrderPspResultApplierTest {
         verify(exactly = 1) {
             processPspResultUseCase.processPspResult(
                 event = pspResultUpdated,
-                pspStatus = PaymentOrderStatus.SUCCESSFUL_FINAL
+                pspStatus = PaymentOrderStatus.CAPTURED
             )
         }
-        
+
         // Verify LogContext was called with the correct envelope for tracing
         verify(exactly = 1) {
             LogContext.with<PaymentOrderPspResultUpdated>(
                 match { env ->
                     env is EventEnvelope<*> &&
-                    env.eventId == consumedEventId &&
-                    env.aggregateId == paymentOrderId.value.toString() &&
-                    env.traceId == expectedTraceId &&
-                    env.parentEventId == parentEventId
+                            env.eventId == consumedEventId &&
+                            env.aggregateId == paymentOrderId.value.toString() &&
+                            env.traceId == expectedTraceId &&
+                            env.parentEventId == parentEventId
                 },
                 any(),  // additionalContext (defaults to emptyMap)
                 any()   // block lambda
@@ -150,7 +150,7 @@ class PaymentOrderPspResultApplierTest {
             retryCount = 0,
             retryReason = null,
             lastErrorMessage = null,
-            pspStatus = PaymentOrderStatus.FAILED_TRANSIENT_ERROR.name,
+            pspStatus = PaymentOrderStatus.PENDING_CAPTURE.name,
             pspErrorCode = "INSUFFICIENT_FUNDS",
             pspErrorDetail = "Account has insufficient funds",
             latencyMs = 200L
@@ -194,106 +194,19 @@ class PaymentOrderPspResultApplierTest {
         verify(exactly = 1) {
             processPspResultUseCase.processPspResult(
                 event = pspResultUpdated,
-                pspStatus = PaymentOrderStatus.FAILED_TRANSIENT_ERROR
+                pspStatus = PaymentOrderStatus.PENDING_CAPTURE
             )
         }
-        
+
         // Verify LogContext was called with the correct envelope for tracing
         verify(exactly = 1) {
             LogContext.with<PaymentOrderPspResultUpdated>(
                 match { env ->
                     env is EventEnvelope<*> &&
-                    env.eventId == consumedEventId &&
-                    env.aggregateId == paymentOrderId.value.toString() &&
-                    env.traceId == expectedTraceId &&
-                    env.parentEventId == parentEventId
-                },
-                any(),  // additionalContext (defaults to emptyMap)
-                any()   // block lambda
-            )
-        }
-    }
-
-    @Test
-    fun `should handle different PSP statuses correctly`() {
-        // Given
-        val paymentOrderId = PaymentOrderId(123L)
-        val expectedTraceId = "trace-789"
-        val consumedEventId = UUID.fromString("77777777-7777-7777-7777-777777777777")
-        val parentEventId = UUID.fromString("88888888-8888-8888-8888-888888888888")
-        val localDateTime = clock.instant().atZone(clock.zone).toLocalDateTime()
-
-        val pendingResult = PaymentOrderPspResultUpdated.create(
-            paymentOrderId = paymentOrderId.value.toString(),
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L).value.toString(),
-            publicPaymentId = "public-payment-123",
-            sellerId = SellerId("seller-123").value,
-            amountValue = 10000L,
-            currency = "USD",
-            status = PaymentOrderStatus.INITIATED_PENDING.name,
-            createdAt = localDateTime,
-            updatedAt = localDateTime,
-            retryCount = 0,
-            retryReason = null,
-            lastErrorMessage = null,
-            pspStatus = PaymentOrderStatus.PENDING_STATUS_CHECK_LATER.name,
-            pspErrorCode = null,
-            pspErrorDetail = null,
-            latencyMs = 300L
-        )
-
-        val envelope = DomainEventEnvelopeFactory.envelopeFor(
-            preSetEventId = consumedEventId,
-            data = pendingResult,
-            eventMetaData = EventMetadatas.PaymentOrderPspResultUpdatedMetadata,
-            aggregateId = paymentOrderId.value.toString(),
-            traceId = expectedTraceId,
-            parentEventId = parentEventId
-        )
-
-        val record = ConsumerRecord(
-            "payment-order-psp-result-updated",
-            0,
-            0L,
-            paymentOrderId.value.toString(),
-            envelope
-        )
-
-        mockkObject(LogContext)
-        every { LogContext.with(any<EventEnvelope<*>>(), any(), any()) } answers {
-            val lambda = thirdArg<() -> Unit>()
-            lambda.invoke()
-        }
-
-        every { kafkaTxExecutor.run(any<Map<TopicPartition, OffsetAndMetadata>>(), any(), any<() -> Unit>()) } answers {
-            val lambda = thirdArg<() -> Unit>()
-            lambda.invoke()
-        }
-        every { processPspResultUseCase.processPspResult(any(), any()) } returns Unit
-
-        // When
-        val consumer = mockk<Consumer<*, *>>()
-        every { consumer.groupMetadata() } returns mockk()
-        applier.onPspResultUpdated(record, consumer)
-
-        // Then
-        verify(exactly = 1) {
-            processPspResultUseCase.processPspResult(
-                event = pendingResult,
-                pspStatus = PaymentOrderStatus.PENDING_STATUS_CHECK_LATER
-            )
-        }
-        
-        // Verify LogContext was called with the correct envelope for tracing
-        verify(exactly = 1) {
-            LogContext.with<PaymentOrderPspResultUpdated>(
-                match { env ->
-                    env is EventEnvelope<*> &&
-                    env.eventId == consumedEventId &&
-                    env.aggregateId == paymentOrderId.value.toString() &&
-                    env.traceId == expectedTraceId &&
-                    env.parentEventId == parentEventId
+                            env.eventId == consumedEventId &&
+                            env.aggregateId == paymentOrderId.value.toString() &&
+                            env.traceId == expectedTraceId &&
+                            env.parentEventId == parentEventId
                 },
                 any(),  // additionalContext (defaults to emptyMap)
                 any()   // block lambda

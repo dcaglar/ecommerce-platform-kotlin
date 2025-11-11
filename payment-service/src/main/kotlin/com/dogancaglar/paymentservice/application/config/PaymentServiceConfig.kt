@@ -7,7 +7,7 @@ import com.dogancaglar.paymentservice.adapter.outbound.redis.RedisIdGeneratorPor
 import com.dogancaglar.paymentservice.adapter.outbound.serialization.JacksonSerializationAdapter
 import com.dogancaglar.paymentservice.application.usecases.AccountBalanceReadService
 import com.dogancaglar.paymentservice.application.usecases.CreatePaymentService
-import com.dogancaglar.paymentservice.domain.util.PaymentFactory
+import com.dogancaglar.paymentservice.application.util.PaymentFactory
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceReadUseCase
 import com.dogancaglar.paymentservice.ports.inbound.CreatePaymentUseCase

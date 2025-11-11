@@ -28,6 +28,7 @@ interface PaymentOrderMapper {
 
     fun insertAllIgnore(list: List<PaymentOrderEntity>): Int              // new: bulk create simple
 
+    fun insert(paymentOrder: PaymentOrderEntity): Int
 
     fun updateReturningIdempotent(paymentOrder: PaymentOrderEntity): PaymentOrderEntity?
 

@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.domain.util
 
-import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
+import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.domain.event.*
 import com.dogancaglar.paymentservice.domain.model.*
 import com.dogancaglar.paymentservice.domain.model.Currency
@@ -32,16 +32,14 @@ class PaymentOrderDomainEventMapper(
         )
 
     /** 🔹 Domain → Event: PSP call requested */
-    fun toPaymentOrderPspCallRequested(order: PaymentOrder, attempt: Int): PaymentOrderPspCallRequested =
-        PaymentOrderPspCallRequested.create(
+    fun toPaymentOrderCaptureCommand(order: PaymentOrder, attempt: Int): PaymentOrderCaptureCommand =
+        PaymentOrderCaptureCommand.create(
             paymentOrderId = order.paymentOrderId.value.toString(),
             publicPaymentOrderId = order.publicPaymentOrderId,
             paymentId = order.paymentId.value.toString(),
             publicPaymentId = order.publicPaymentId,
             sellerId = order.sellerId.value,
             retryCount = attempt,
-            retryReason = order.retryReason,
-            lastErrorMessage = order.lastErrorMessage,
             createdAt = order.createdAt,
             updatedAt = order.updatedAt,
             status = order.status.name,
@@ -74,39 +72,18 @@ class PaymentOrderDomainEventMapper(
             status = order.status.name
         )
 
-    /** 🔹 Domain → Event: schedule PSP status check */
-    fun toPaymentOrderStatusCheckRequested(order: PaymentOrder): PaymentOrderStatusCheckRequested =
-        PaymentOrderStatusCheckRequested.create(
-            paymentOrderId = order.paymentOrderId.value.toString(),
-            publicPaymentOrderId = order.publicPaymentOrderId,
-            paymentId = order.paymentId.value.toString(),
-            publicPaymentId = order.publicPaymentId,
-            sellerId = order.sellerId.value,
-            retryCount = order.retryCount,
-            retryReason = order.retryReason,
-            createdAt = LocalDateTime.now(clock),
-            updatedAt = LocalDateTime.now(clock),
-            status = order.status.name,
-            amountValue = order.amount.quantity,
-            currency = order.amount.currency.currencyCode
-        )
-
     /** 🔹 Event → Domain aggregate (consumer-side reconstruction) */
     fun fromEvent(event: PaymentOrderEvent): PaymentOrder =
-        PaymentOrder.builder()
-            .paymentOrderId(PaymentOrderId(event.paymentOrderId.toLong()))
-            .publicPaymentOrderId(event.publicPaymentOrderId)
-            .paymentId(PaymentId(event.paymentId.toLong()))
-            .publicPaymentId(event.publicPaymentId)
-            .sellerId(SellerId(event.sellerId))
-            .amount(Amount.of(event.amountValue, Currency(event.currency)))
-            .status(PaymentOrderStatus.valueOf(event.status))
-            .createdAt(event.createdAt)
-            .updatedAt(event.updatedAt)
-            .retryCount(event.retryCount)
-            .retryReason(event.retryReason)
-            .lastErrorMessage(event.lastErrorMessage)
-            .buildFromPersistence()
+        PaymentOrder.rehydrate(
+            paymentOrderId = PaymentOrderId(event.paymentOrderId.toLong()),
+            paymentId = PaymentId(event.paymentId.toLong()),
+            sellerId = SellerId(event.sellerId),
+            amount = Amount.of(event.amountValue, Currency(event.currency)),
+            status = PaymentOrderStatus.valueOf(event.status),
+            retryCount = event.retryCount,
+            createdAt = event.createdAt,
+            updatedAt = event.updatedAt
+        )
 
     /** 🔹 Copy helper: change event status immutably */
     fun copyWithStatus(event: PaymentOrderCreated, newStatus: String): PaymentOrderCreated =

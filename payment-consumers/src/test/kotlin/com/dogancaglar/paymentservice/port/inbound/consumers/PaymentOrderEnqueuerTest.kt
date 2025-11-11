@@ -6,7 +6,7 @@ import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
+import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
@@ -22,7 +22,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
-import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.UUID
 
@@ -50,6 +49,7 @@ class PaymentOrderEnqueuerTest {
     fun `should enqueue payment order for PSP call when status is INITIATED_PENDING`() {
         // Given
         val paymentOrderId = PaymentOrderId(123L)
+        val paymentId = PaymentId(2L)
         val expectedTraceId = "trace-123"
         val expectedCreatedAt = clock.instant().atZone(clock.zone).toLocalDateTime()
         val consumedEventId = UUID.fromString("11111111-1111-1111-1111-111111111111")
@@ -66,9 +66,6 @@ class PaymentOrderEnqueuerTest {
             status = PaymentOrderStatus.INITIATED_PENDING.name,
             createdAt = expectedCreatedAt,
             updatedAt = expectedCreatedAt,
-            retryCount = 0,
-            retryReason = null,
-            lastErrorMessage = null
         )
         
         val envelope = DomainEventEnvelopeFactory.envelopeFor(
@@ -100,7 +97,7 @@ class PaymentOrderEnqueuerTest {
             val lambda = thirdArg<() -> Unit>()
             lambda.invoke()
         }
-        every { eventPublisherPort.publishSync<PaymentOrderPspCallRequested>(any(), any(), any(), any(), any(), any(), any()) } returns mockk()
+        every { eventPublisherPort.publishSync<PaymentOrderCaptureCommand>(any(), any(), any(), any(), any(), any(), any()) } returns mockk()
 
         // When
         val consumer = mockk<Consumer<*, *>>()
@@ -109,16 +106,16 @@ class PaymentOrderEnqueuerTest {
 
         // Then - verify publishSync called with exact parameters
         verify(exactly = 1) {
-            eventPublisherPort.publishSync<PaymentOrderPspCallRequested>(
+            eventPublisherPort.publishSync<PaymentOrderCaptureCommand>(
                 preSetEventIdFromCaller = any(),
                 aggregateId = paymentOrderId.value.toString(),
-                eventMetaData = EventMetadatas.PaymentOrderPspCallRequestedMetadata,
+                eventMetaData = EventMetadatas.PaymentOrderCaptureRequestedMetadata,
                 data = match { data ->
-                    data is PaymentOrderPspCallRequested &&
+                    data is PaymentOrderCaptureCommand &&
                     data.paymentOrderId == paymentOrderId.value.toString() &&
-                    data.publicPaymentOrderId == "public-123" &&
+                    data.publicPaymentOrderId == "paymentorder-${paymentOrderId.value}" &&
                     data.paymentId == PaymentId(456L).value.toString() &&
-                    data.publicPaymentId == "public-payment-123" &&
+                    data.publicPaymentId == "payment-${PaymentId(456L).value}" &&
                     data.sellerId == SellerId("seller-123").value &&
                     data.amountValue == 10000L &&
                     data.currency == "USD" &&
@@ -161,12 +158,9 @@ class PaymentOrderEnqueuerTest {
             sellerId = SellerId("seller-123").value,
             amountValue = 10000L,
             currency = "USD",
-            status = PaymentOrderStatus.SUCCESSFUL_FINAL.name,
+            status = PaymentOrderStatus.CAPTURED.name,
             createdAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
-            updatedAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
-            retryCount = 0,
-            retryReason = null,
-            lastErrorMessage = null
+            updatedAt = clock.instant().atZone(clock.zone).toLocalDateTime()
         )
         
         val envelope = DomainEventEnvelopeFactory.envelopeFor(
@@ -203,7 +197,7 @@ class PaymentOrderEnqueuerTest {
         enqueuer.onCreated(record, consumer)
 
         // Then
-        verify(exactly = 0) { eventPublisherPort.publishSync<PaymentOrderPspCallRequested>(any(), any(), any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { eventPublisherPort.publishSync<PaymentOrderCaptureCommand>(any(), any(), any(), any(), any(), any(), any()) }
         
         // Verify LogContext was called with the correct envelope for tracing
         verify(exactly = 1) {

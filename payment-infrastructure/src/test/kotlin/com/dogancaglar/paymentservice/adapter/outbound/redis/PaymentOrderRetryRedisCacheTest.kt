@@ -13,7 +13,7 @@ import org.springframework.data.redis.core.ZSetOperations
 import org.springframework.data.redis.connection.zset.Tuple
 
 /**
- * Unit tests for PaymentRetryRedisCache using MockK.
+ * Unit tests for PaymentOrderRetryRedisCache using MockK.
  * 
  * Tests verify:
  * - Retry count tracking
@@ -22,7 +22,7 @@ import org.springframework.data.redis.connection.zset.Tuple
  * - Reclaim logic
  * - Atomic operations
  */
-class PaymentRetryRedisCacheTest {
+class PaymentOrderRetryRedisCacheTest {
     
     // Helper function to create a mocked Tuple
     private fun createMockedTuple(value: ByteArray, score: Double): Tuple {
@@ -38,7 +38,7 @@ class PaymentRetryRedisCacheTest {
     private lateinit var connectionFactory: RedisConnectionFactory
     private lateinit var connection: RedisConnection
     private lateinit var zSetCommands: RedisZSetCommands
-    private lateinit var cache: PaymentRetryRedisCache
+    private lateinit var cache: PaymentOrderRetryRedisCache
 
     @BeforeEach
     fun setUp() {
@@ -55,7 +55,7 @@ class PaymentRetryRedisCacheTest {
         every { connectionFactory.connection } returns connection
         every { connection.zSetCommands() } returns zSetCommands
 
-        cache = PaymentRetryRedisCache(redisTemplate)
+        cache = PaymentOrderRetryRedisCache(redisTemplate)
     }
 
     // ==================== Retry Counter Tests ====================
@@ -141,45 +141,45 @@ class PaymentRetryRedisCacheTest {
         // Given
         val json = """{"eventId":"evt-123"}"""
         val retryAt = 1234567890.0
-        every { zSetOperations.add("payment_retry_queue", json, retryAt) } returns true
+        every { zSetOperations.add("payment_order_retry_queue", json, retryAt) } returns true
 
         // When
         cache.scheduleRetry(json, retryAt)
 
         // Then
-        verify(exactly = 1) { zSetOperations.add("payment_retry_queue", json, retryAt) }
+        verify(exactly = 1) { zSetOperations.add("payment_order_retry_queue", json, retryAt) }
     }
 
     @Test
     fun `pureRemoveDueRetry should remove from sorted set`() {
         // Given
         val json = """{"eventId":"evt-456"}"""
-        every { zSetOperations.remove("payment_retry_queue", json) } returns 1L
+        every { zSetOperations.remove("payment_order_retry_queue", json) } returns 1L
 
         // When
         cache.pureRemoveDueRetry(json)
 
         // Then
-        verify(exactly = 1) { zSetOperations.remove("payment_retry_queue", json) }
+        verify(exactly = 1) { zSetOperations.remove("payment_order_retry_queue", json) }
     }
 
     @Test
     fun `zsetSize should return queue size`() {
         // Given
-        every { zSetOperations.zCard("payment_retry_queue") } returns 42L
+        every { zSetOperations.zCard("payment_order_retry_queue") } returns 42L
 
         // When
         val size = cache.zsetSize()
 
         // Then
         assertEquals(42L, size)
-        verify(exactly = 1) { zSetOperations.zCard("payment_retry_queue") }
+        verify(exactly = 1) { zSetOperations.zCard("payment_order_retry_queue") }
     }
 
     @Test
     fun `zsetSize should return 0 when zCard returns null`() {
         // Given
-        every { zSetOperations.zCard("payment_retry_queue") } returns null
+        every { zSetOperations.zCard("payment_order_retry_queue") } returns null
 
         // When
         val size = cache.zsetSize()
@@ -193,7 +193,7 @@ class PaymentRetryRedisCacheTest {
     @Test
     fun `popDueToInflight should return empty list when no items to pop`() {
         // Given
-        val queueBytes = "payment_retry_queue".toByteArray()
+        val queueBytes = "payment_order_retry_queue".toByteArray()
         every { zSetCommands.zPopMin(queueBytes, 1000) } returns emptySet()
 
         // When
@@ -213,8 +213,8 @@ class PaymentRetryRedisCacheTest {
         
         val tuple = createMockedTuple(jsonBytes, dueScore)
         
-        every { zSetCommands.zPopMin("payment_retry_queue".toByteArray(), 1000) } returns setOf(tuple)
-        every { zSetCommands.zAdd("payment_retry_inflight".toByteArray(), any<Double>(), jsonBytes) } returns true
+        every { zSetCommands.zPopMin("payment_order_retry_queue".toByteArray(), 1000) } returns setOf(tuple)
+        every { zSetCommands.zAdd("payment_order_retry_inflight".toByteArray(), any<Double>(), jsonBytes) } returns true
 
         // When
         val result = cache.popDueToInflight(1000)
@@ -223,7 +223,7 @@ class PaymentRetryRedisCacheTest {
         assertEquals(1, result.size)
         assertArrayEquals(jsonBytes, result[0])
         verify(exactly = 1) { 
-            zSetCommands.zAdd("payment_retry_inflight".toByteArray(), any(), jsonBytes) 
+            zSetCommands.zAdd("payment_order_retry_inflight".toByteArray(), any(), jsonBytes) 
         }
     }
 
@@ -236,8 +236,8 @@ class PaymentRetryRedisCacheTest {
         
         val tuple = createMockedTuple(jsonBytes, futureScore)
         
-        every { zSetCommands.zPopMin("payment_retry_queue".toByteArray(), 1000) } returns setOf(tuple)
-        every { zSetCommands.zAdd("payment_retry_queue".toByteArray(), futureScore, jsonBytes) } returns true
+        every { zSetCommands.zPopMin("payment_order_retry_queue".toByteArray(), 1000) } returns setOf(tuple)
+        every { zSetCommands.zAdd("payment_order_retry_queue".toByteArray(), futureScore, jsonBytes) } returns true
 
         // When
         val result = cache.popDueToInflight(1000)
@@ -245,10 +245,10 @@ class PaymentRetryRedisCacheTest {
         // Then
         assertTrue(result.isEmpty(), "Not-due items should not be returned")
         verify(exactly = 1) { 
-            zSetCommands.zAdd("payment_retry_queue".toByteArray(), futureScore, jsonBytes) 
+            zSetCommands.zAdd("payment_order_retry_queue".toByteArray(), futureScore, jsonBytes) 
         }
         verify(exactly = 0) { 
-            zSetCommands.zAdd("payment_retry_inflight".toByteArray(), any<Double>(), any<ByteArray>()) 
+            zSetCommands.zAdd("payment_order_retry_inflight".toByteArray(), any<Double>(), any<ByteArray>()) 
         }
     }
 
@@ -263,7 +263,7 @@ class PaymentRetryRedisCacheTest {
         val futureBytes = """{"eventId":"future"}""".toByteArray()
         val futureTuple = createMockedTuple(futureBytes, now + 10000)
         
-        every { zSetCommands.zPopMin("payment_retry_queue".toByteArray(), 1000) } returns setOf(dueTuple, futureTuple)
+        every { zSetCommands.zPopMin("payment_order_retry_queue".toByteArray(), 1000) } returns setOf(dueTuple, futureTuple)
         every { zSetCommands.zAdd(any(), any<Double>(), any()) } returns true
 
         // When
@@ -275,12 +275,12 @@ class PaymentRetryRedisCacheTest {
         
         // Verify due item moved to inflight
         verify(exactly = 1) { 
-            zSetCommands.zAdd("payment_retry_inflight".toByteArray(), any<Double>(), dueBytes) 
+            zSetCommands.zAdd("payment_order_retry_inflight".toByteArray(), any<Double>(), dueBytes) 
         }
         
         // Verify future item requeued
         verify(exactly = 1) { 
-            zSetCommands.zAdd("payment_retry_queue".toByteArray(), now + 10000, futureBytes) 
+            zSetCommands.zAdd("payment_order_retry_queue".toByteArray(), now + 10000, futureBytes) 
         }
     }
 
@@ -288,32 +288,32 @@ class PaymentRetryRedisCacheTest {
     fun `removeFromInflight should remove item from inflight set`() {
         // Given
         val raw = """{"eventId":"evt-123"}""".toByteArray()
-        every { zSetCommands.zRem("payment_retry_inflight".toByteArray(), raw) } returns 1L
+        every { zSetCommands.zRem("payment_order_retry_inflight".toByteArray(), raw) } returns 1L
 
         // When
         cache.removeFromInflight(raw)
 
         // Then
-        verify(exactly = 1) { zSetCommands.zRem("payment_retry_inflight".toByteArray(), raw) }
+        verify(exactly = 1) { zSetCommands.zRem("payment_order_retry_inflight".toByteArray(), raw) }
     }
 
     @Test
     fun `inflightSize should return number of inflight items`() {
         // Given
-        every { zSetCommands.zCard("payment_retry_inflight".toByteArray()) } returns 5L
+        every { zSetCommands.zCard("payment_order_retry_inflight".toByteArray()) } returns 5L
 
         // When
         val size = cache.inflightSize()
 
         // Then
         assertEquals(5L, size)
-        verify(exactly = 1) { zSetCommands.zCard("payment_retry_inflight".toByteArray()) }
+        verify(exactly = 1) { zSetCommands.zCard("payment_order_retry_inflight".toByteArray()) }
     }
 
     @Test
     fun `inflightSize should return 0 when zCard returns null`() {
         // Given
-        every { zSetCommands.zCard("payment_retry_inflight".toByteArray()) } returns null
+        every { zSetCommands.zCard("payment_order_retry_inflight".toByteArray()) } returns null
 
         // When
         val size = cache.inflightSize()
@@ -331,7 +331,7 @@ class PaymentRetryRedisCacheTest {
         val staleBytes = """{"eventId":"stale"}""".toByteArray()
         
         every { 
-            zSetCommands.zRangeByScore("payment_retry_inflight".toByteArray(), 0.0, any()) 
+            zSetCommands.zRangeByScore("payment_order_retry_inflight".toByteArray(), 0.0, any()) 
         } returns mutableSetOf(staleBytes)
         
         every { zSetCommands.zAdd(any(), any<Double>(), any()) } returns true
@@ -342,13 +342,13 @@ class PaymentRetryRedisCacheTest {
 
         // Then - verify the actual calls made through the connection
         verify(exactly = 1) { 
-            zSetCommands.zRangeByScore("payment_retry_inflight".toByteArray(), 0.0, any()) 
+            zSetCommands.zRangeByScore("payment_order_retry_inflight".toByteArray(), 0.0, any()) 
         }
         verify(exactly = 1) { 
-            zSetCommands.zAdd("payment_retry_queue".toByteArray(), any<Double>(), staleBytes) 
+            zSetCommands.zAdd("payment_order_retry_queue".toByteArray(), any<Double>(), staleBytes) 
         }
         verify(exactly = 1) { 
-            zSetCommands.zRem("payment_retry_inflight".toByteArray(), staleBytes) 
+            zSetCommands.zRem("payment_order_retry_inflight".toByteArray(), staleBytes) 
         }
     }
 
@@ -359,7 +359,7 @@ class PaymentRetryRedisCacheTest {
         val cutoff = (System.currentTimeMillis() - olderThanMs).toDouble()
         
         every { 
-            zSetCommands.zRangeByScore("payment_retry_inflight".toByteArray(), 0.0, cutoff) 
+            zSetCommands.zRangeByScore("payment_order_retry_inflight".toByteArray(), 0.0, cutoff) 
         } returns null
 
         // When
@@ -379,7 +379,7 @@ class PaymentRetryRedisCacheTest {
         val stale3 = """{"eventId":"stale3"}""".toByteArray()
         
         every { 
-            zSetCommands.zRangeByScore("payment_retry_inflight".toByteArray(), 0.0, any()) 
+            zSetCommands.zRangeByScore("payment_order_retry_inflight".toByteArray(), 0.0, any()) 
         } returns mutableSetOf(stale1, stale2, stale3)
         
         every { zSetCommands.zAdd(any(), any<Double>(), any()) } returns true
@@ -390,13 +390,13 @@ class PaymentRetryRedisCacheTest {
 
         // Then - verify the actual calls made through the connection
         verify(exactly = 1) { 
-            zSetCommands.zRangeByScore("payment_retry_inflight".toByteArray(), 0.0, any()) 
+            zSetCommands.zRangeByScore("payment_order_retry_inflight".toByteArray(), 0.0, any()) 
         }
         verify(exactly = 3) { 
-            zSetCommands.zAdd("payment_retry_queue".toByteArray(), any<Double>(), any<ByteArray>()) 
+            zSetCommands.zAdd("payment_order_retry_queue".toByteArray(), any<Double>(), any<ByteArray>()) 
         }
         verify(exactly = 3) { 
-            zSetCommands.zRem("payment_retry_inflight".toByteArray(), any()) 
+            zSetCommands.zRem("payment_order_retry_inflight".toByteArray(), any()) 
         }
     }
 
@@ -406,7 +406,7 @@ class PaymentRetryRedisCacheTest {
         val customOlderThanMs = 120_000L
         
         every { 
-            zSetCommands.zRangeByScore("payment_retry_inflight".toByteArray(), 0.0, any()) 
+            zSetCommands.zRangeByScore("payment_order_retry_inflight".toByteArray(), 0.0, any()) 
         } returns mutableSetOf()
 
         // When
@@ -414,7 +414,7 @@ class PaymentRetryRedisCacheTest {
 
         // Then - verify cutoff calculation
         verify(exactly = 1) { 
-            zSetCommands.zRangeByScore("payment_retry_inflight".toByteArray(), 0.0, any()) 
+            zSetCommands.zRangeByScore("payment_order_retry_inflight".toByteArray(), 0.0, any()) 
         }
     }
 }

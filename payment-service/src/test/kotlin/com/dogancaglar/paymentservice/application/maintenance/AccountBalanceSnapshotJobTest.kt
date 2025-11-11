@@ -28,7 +28,7 @@ class AccountBalanceSnapshotJobTest {
     @Test
     fun `mergeDeltasToSnapshots should merge delta into snapshot and save`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
+        val accountCode = "MERCHANT_PAYABLE.MERCHANT-456"
         val existingSnapshot = AccountBalanceSnapshot(
             accountCode = accountCode,
             balance = 100000L,
@@ -64,7 +64,7 @@ class AccountBalanceSnapshotJobTest {
     @Test
     fun `mergeDeltasToSnapshots should create new snapshot when not exists`() {
         // Given
-        val accountCode = "CASH.GLOBAL"
+        val accountCode = "PLATFORM_CASH.GLOBAL"
         val delta = 10000L
         val upToEntryId = 200L
         
@@ -93,7 +93,7 @@ class AccountBalanceSnapshotJobTest {
     @Test
     fun `mergeDeltasToSnapshots should skip when delta is zero`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
+        val accountCode = "MERCHANT_PAYABLE.MERCHANT-456"
         
         every { accountBalanceCachePort.getDirtyAccounts() } returns setOf(accountCode)
         every { accountBalanceCachePort.getAndResetDeltaWithWatermark(accountCode) } returns (0L to 100L)
@@ -109,7 +109,7 @@ class AccountBalanceSnapshotJobTest {
     @Test
     fun `mergeDeltasToSnapshots should handle negative deltas`() {
         // Given
-        val accountCode = "CASH.GLOBAL"
+        val accountCode = "PLATFORM_CASH.GLOBAL"
         val existingSnapshot = AccountBalanceSnapshot(
             accountCode = accountCode,
             balance = 50000L,
@@ -143,8 +143,8 @@ class AccountBalanceSnapshotJobTest {
     @Test
     fun `mergeDeltasToSnapshots should process multiple dirty accounts`() {
         // Given
-        val accountCode1 = "MERCHANT_ACCOUNT.MERCHANT-456"
-        val accountCode2 = "MERCHANT_ACCOUNT.MERCHANT-789"
+        val accountCode1 = "MERCHANT_PAYABLE.MERCHANT-456"
+        val accountCode2 = "MERCHANT_PAYABLE.MERCHANT-789"
         
         val snapshot1 = AccountBalanceSnapshot(
             accountCode = accountCode1,
@@ -201,7 +201,7 @@ class AccountBalanceSnapshotJobTest {
     @Test
     fun `mergeDeltasToSnapshots should handle exceptions gracefully`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
+        val accountCode = "MERCHANT_PAYABLE.MERCHANT-456"
         every { accountBalanceCachePort.getDirtyAccounts() } throws RuntimeException("Redis error")
 
         // When/Then - Should not throw

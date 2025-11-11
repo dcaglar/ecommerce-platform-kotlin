@@ -10,7 +10,7 @@ import java.time.LocalDateTime
 interface AccountBalanceSnapshotPort {
     /**
      * Gets a snapshot for an account (or null if not exists).
-     * @param accountCode The account code (e.g., "MERCHANT_ACCOUNT.MERCHANT-456")
+     * @param accountCode The account code (e.g., "MERCHANT_PAYABLE.MERCHANT-456")
      */
     fun getSnapshot(accountCode: String): AccountBalanceSnapshot?
     

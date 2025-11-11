@@ -21,7 +21,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
- * Integration tests for PaymentRetryRedisCache with real Redis (Testcontainers).
+ * Integration tests for PaymentOrderRetryRedisCache with real Redis (Testcontainers).
  * 
  * These tests validate:
  * - Real Redis Sorted Set operations
@@ -33,12 +33,12 @@ import java.util.concurrent.TimeUnit
  * Tagged as @integration for selective execution.
  */
 @Tag("integration")
-@SpringBootTest(classes = [PaymentRetryRedisCacheIntegrationTest.TestConfig::class])
+@SpringBootTest(classes = [PaymentOrderRetryRedisCacheIntegrationTest.TestConfig::class])
 @Testcontainers
-class PaymentRetryRedisCacheIntegrationTest {
+class PaymentOrderRetryRedisCacheIntegrationTest {
 
     @Configuration
-    @Import(RedisAutoConfiguration::class, PaymentRetryRedisCache::class)
+    @Import(RedisAutoConfiguration::class, PaymentOrderRetryRedisCache::class)
     class TestConfig
 
     companion object {
@@ -57,7 +57,7 @@ class PaymentRetryRedisCacheIntegrationTest {
     }
 
     @Autowired
-    private lateinit var cache: PaymentRetryRedisCache
+    private lateinit var cache: PaymentOrderRetryRedisCache
 
     @Autowired
     private lateinit var redisTemplate: StringRedisTemplate

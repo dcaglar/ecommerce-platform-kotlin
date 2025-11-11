@@ -7,14 +7,14 @@ import com.dogancaglar.common.event.Topics
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
+import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
-import com.dogancaglar.paymentservice.ports.outbound.PaymentGatewayPort
+import com.dogancaglar.paymentservice.ports.outbound.PspCaptureGatewayPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
@@ -28,8 +28,8 @@ import org.springframework.stereotype.Component
 import java.util.concurrent.TimeUnit
 
 @Component
-class PaymentOrderPspCallExecutor(
-    private val pspClient: PaymentGatewayPort,
+class PaymentOrderCaptureExecutor(
+    private val captureClient: PspCaptureGatewayPort,
     private val meterRegistry: MeterRegistry,
     @param:Qualifier("syncPaymentTx") private val kafkaTx: KafkaTxExecutor,
     @param:Qualifier("syncPaymentEventPublisher") private val publisher: EventPublisherPort,
@@ -44,12 +44,12 @@ class PaymentOrderPspCallExecutor(
         .register(meterRegistry)
 
     @KafkaListener(
-        topics = [Topics.PAYMENT_ORDER_PSP_CALL_REQUESTED],
-        containerFactory = "${Topics.PAYMENT_ORDER_PSP_CALL_REQUESTED}-factory",
-        groupId = CONSUMER_GROUPS.PAYMENT_ORDER_PSP_CALL_EXECUTOR
+        topics = [Topics.PAYMENT_ORDER_CAPTURE_REQUEST_QUEUE],
+        containerFactory = "${Topics.PAYMENT_ORDER_CAPTURE_REQUEST_QUEUE}-factory",
+        groupId = CONSUMER_GROUPS.PAYMENT_ORDER_CAPTURE_EXECUTOR
     )
     fun onPspRequested(
-        record: ConsumerRecord<String, EventEnvelope<PaymentOrderPspCallRequested>>,
+        record: ConsumerRecord<String, EventEnvelope<PaymentOrderCaptureCommand>>,
         consumer: org.apache.kafka.clients.consumer.Consumer<*, *>
     ) {
         val env = record.value()
@@ -72,15 +72,6 @@ class PaymentOrderPspCallExecutor(
                 return@with
             }
 
-            if (current.isTerminal()) {
-                logger.warn(
-                    "Dropping PSP call: terminal status={} agg={} attempt={}",
-                    current.status, env.aggregateId, work.retryCount
-                )
-                kafkaTx.run(offsets, groupMeta) {}
-                return@with
-            }
-
             val attempt = work.retryCount
             if (current.retryCount > attempt) {
                 logger.warn(
@@ -98,7 +89,7 @@ class PaymentOrderPspCallExecutor(
             var errorCode: String? = null
             var errorDetail: String? = null
             val startMs = System.currentTimeMillis()
-            mappedStatus = pspClient.charge(orderForPsp)
+            mappedStatus = captureClient.capture(orderForPsp)
             val tookMs = System.currentTimeMillis() - startMs
             pspLatency.record(tookMs, TimeUnit.MILLISECONDS)
             // Build result-updated event (extends PaymentOrderEvent)
@@ -115,8 +106,6 @@ class PaymentOrderPspCallExecutor(
                 updatedAt = work.updatedAt,
                 retryCount = work.retryCount,       // attempt index (0..n)
                 pspStatus = mappedStatus.name,      // will be interpreted by the Applier
-                retryReason = work.retryReason,
-                lastErrorMessage = work.lastErrorMessage,
                 pspErrorCode = errorCode,
                 pspErrorDetail = errorDetail,
                 latencyMs = tookMs

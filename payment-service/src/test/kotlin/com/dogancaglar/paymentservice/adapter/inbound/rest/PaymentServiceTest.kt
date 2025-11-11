@@ -9,7 +9,6 @@ import com.dogancaglar.port.out.web.dto.AmountDto
 import com.dogancaglar.port.out.web.dto.CurrencyEnum
 import com.dogancaglar.port.out.web.dto.PaymentOrderRequestDTO
 import com.dogancaglar.paymentservice.domain.model.Payment
-import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
@@ -59,15 +58,13 @@ class PaymentServiceTest {
             )
         )
         
-        val expectedPayment = Payment.builder()
-            .paymentId(PaymentId(123L))
-            .publicPaymentId("payment-123")
-            .orderId(OrderId("order-123"))
-            .buyerId(BuyerId("buyer-456"))
-            .totalAmount(Amount.of(10000L, Currency("USD")))
-            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
-            .paymentOrders(listOf())
-            .buildNew()
+        val expectedPayment = Payment.createNew(
+            paymentId = PaymentId(123L),
+            buyerId = BuyerId("buyer-456"),
+            orderId = OrderId("order-123"),
+            totalAmount = Amount.of(10000L, Currency("USD")),
+            clock = clock
+        )
         
         every { createPaymentUseCase.create(any()) } returns expectedPayment
 
@@ -78,7 +75,7 @@ class PaymentServiceTest {
         assertNotNull(result)
         assertEquals("payment-123", result.paymentId)
         assertEquals("order-123", result.orderId)
-        assertEquals("INITIATED", result.status)
+        assertEquals("PENDING_AUTH", result.status)
         assertEquals(10000L, result.totalAmount.quantity)
         assertEquals(CurrencyEnum.USD, result.totalAmount.currency)
         
@@ -154,15 +151,13 @@ class PaymentServiceTest {
             )
         )
         
-        val expectedPayment = Payment.builder()
-            .paymentId(PaymentId(456L))
-            .publicPaymentId("payment-456")
-            .orderId(OrderId("order-123"))
-            .buyerId(BuyerId("buyer-456"))
-            .totalAmount(Amount.of(5000L, Currency("EUR")))
-            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
-            .paymentOrders(listOf())
-            .buildNew()
+        val expectedPayment = Payment.createNew(
+            paymentId = PaymentId(456L),
+            buyerId = BuyerId("buyer-456"),
+            orderId = OrderId("order-123"),
+            totalAmount = Amount.of(5000L, Currency("EUR")),
+            clock = clock
+        ).authorize()
         
         every { createPaymentUseCase.create(any()) } returns expectedPayment
 
@@ -171,7 +166,7 @@ class PaymentServiceTest {
 
         // Then
         assertEquals("payment-456", result.paymentId)
-        assertEquals("INITIATED", result.status)
+        assertEquals("AUTHORIZED", result.status)
         assertEquals(5000L, result.totalAmount.quantity)
         assertEquals(CurrencyEnum.EUR, result.totalAmount.currency)
         
@@ -193,15 +188,13 @@ class PaymentServiceTest {
             )
         )
         
-        val expectedPayment = Payment.builder()
-            .paymentId(PaymentId(789L))
-            .publicPaymentId("payment-789")
-            .orderId(OrderId("order-123"))
-            .buyerId(BuyerId("buyer-456"))
-            .totalAmount(Amount.of(99999999L, Currency("USD")))
-            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
-            .paymentOrders(listOf())
-            .buildNew()
+        val expectedPayment = Payment.createNew(
+            paymentId = PaymentId(789L),
+            buyerId = BuyerId("buyer-456"),
+            orderId = OrderId("order-123"),
+            totalAmount = Amount.of(99999999L, Currency("USD")),
+            clock = clock
+        )
         
         every { createPaymentUseCase.create(any()) } returns expectedPayment
 

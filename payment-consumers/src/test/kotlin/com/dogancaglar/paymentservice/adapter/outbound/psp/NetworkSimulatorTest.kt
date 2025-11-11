@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 
 class NetworkSimulatorTest {
 
-    private lateinit var config: PspSimulationProperties
+    private lateinit var config: CaptureSimulationProperties
     private lateinit var clock: Clock
     private lateinit var networkSimulator: NetworkSimulator
 
@@ -214,13 +214,13 @@ class NetworkSimulatorTest {
         slowProbability: Int = 0,
         slowMinMs: Long = 0L,
         slowMaxMs: Long = 0L
-    ): PspSimulationProperties.ScenarioConfig {
-        val scenarioConfig = mockk<PspSimulationProperties.ScenarioConfig>()
-        val timeoutConfig = mockk<PspSimulationProperties.TimeoutConfig>()
-        val latencyConfig = mockk<PspSimulationProperties.LatencyConfig>()
-        val fastBucket = mockk<PspSimulationProperties.LatencyBucket>()
-        val moderateBucket = mockk<PspSimulationProperties.LatencyBucket>()
-        val slowBucket = mockk<PspSimulationProperties.LatencyBucket>()
+    ): CaptureSimulationProperties.ScenarioConfig {
+        val scenarioConfig = mockk<CaptureSimulationProperties.ScenarioConfig>()
+        val timeoutConfig = mockk<CaptureSimulationProperties.TimeoutConfig>()
+        val latencyConfig = mockk<CaptureSimulationProperties.LatencyConfig>()
+        val fastBucket = mockk<CaptureSimulationProperties.LatencyBucket>()
+        val moderateBucket = mockk<CaptureSimulationProperties.LatencyBucket>()
+        val slowBucket = mockk<CaptureSimulationProperties.LatencyBucket>()
 
         every { scenarioConfig.timeouts } returns timeoutConfig
         every { scenarioConfig.latency } returns latencyConfig

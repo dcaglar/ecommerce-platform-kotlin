@@ -1,245 +1,163 @@
 package com.dogancaglar.paymentservice.domain.model
 
-import com.dogancaglar.paymentservice.domain.model.Currency
-
 import com.dogancaglar.paymentservice.domain.model.vo.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 
 class PaymentTest {
 
-    @Test
-    fun `Payment builder should create Payment with INITIATED status and payment orders`() {
-        val paymentId = PaymentId(1L)
-        val buyerId = BuyerId("buyer-123")
-        val orderId = OrderId("order-456")
-        val totalAmount = Amount.of(200000L, Currency("USD")) // $2000.00 = 200000 cents
-        val now = LocalDateTime.now()
-        val paymentOrders = listOf(
-            createTestPaymentOrder(paymentOrderId = PaymentOrderId(1L)),
-            createTestPaymentOrder(paymentOrderId = PaymentOrderId(2L))
-        )
+    private val paymentId = PaymentId(1L)
+    private val publicPaymentId = "payment-1"
+    private val buyerId = BuyerId("buyer-xyz")
+    private val orderId = OrderId("order-xyz")
+    private val currency = Currency("EUR")
+    private val totalAmount = Amount.of(10000L, currency) // €100.00
+    private val clock = Clock.fixed(Instant.parse("2024-01-01T00:00:00Z"), ZoneOffset.UTC)
 
-        val payment = Payment.Builder()
-            .paymentId(paymentId)
-            .publicPaymentId("payment-1")
-            .buyerId(buyerId)
-            .orderId(orderId)
-            .totalAmount(totalAmount)
-            .createdAt(now)
-            .paymentOrders(paymentOrders)
-            .build()
+    // --- ✅ Creation ---
+
+    @Test
+    fun `should create new payment with initial state`() {
+        val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount, clock)
 
         assertEquals(paymentId, payment.paymentId)
-        assertEquals("payment-1", payment.publicPaymentId)
+        assertEquals(publicPaymentId, payment.publicPaymentId)
         assertEquals(buyerId, payment.buyerId)
         assertEquals(orderId, payment.orderId)
         assertEquals(totalAmount, payment.totalAmount)
-        assertEquals(PaymentStatus.INITIATED, payment.status)
-        assertEquals(now, payment.createdAt)
-        assertEquals(2, payment.paymentOrders.size)
-        assertEquals(paymentOrders, payment.paymentOrders)
+        assertEquals(Amount.zero(currency), payment.capturedAmount)
+        assertEquals(PaymentStatus.PENDING_AUTH, payment.status)
+        assertEquals(0, payment.paymentOrders.size)
+        assertEquals(LocalDateTime.now(clock), payment.createdAt)
     }
 
     @Test
-    fun `Payment builder should create Payment with empty paymentOrders list`() {
-        val payment = Payment.Builder()
-            .paymentId(PaymentId(1L))
-            .publicPaymentId("payment-1")
-            .buyerId(BuyerId("buyer-123"))
-            .orderId(OrderId("order-456"))
-            .totalAmount(Amount.of(200000L, Currency("USD"))) // $2000.00 = 200000 cents
-            .createdAt(LocalDateTime.now())
-            .paymentOrders(emptyList())
-            .build()
+    fun `should reject creation with non-positive total amount`() {
+        val ex = assertThrows<IllegalArgumentException> {
+            Payment.createNew(paymentId, buyerId, orderId, Amount.zero( currency))
+        }
+        assertTrue(ex.message!!.contains("Total amount must be positive"))
+    }
 
-        assertEquals(PaymentStatus.INITIATED, payment.status)
-        assertTrue(payment.paymentOrders.isEmpty())
+    // --- ✅ Authorize & Decline ---
+
+    @Test
+    fun `should transition from PENDING_AUTH to AUTHORIZED`() {
+        val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount)
+        val authorized = payment.authorize()
+
+        assertEquals(PaymentStatus.AUTHORIZED, authorized.status)
+        assertTrue(authorized.updatedAt.isAfter(payment.updatedAt))
     }
 
     @Test
-    fun `Payment builder should recreate Payment with all fields from persistence`() {
-        val paymentId = PaymentId(1L)
-        val buyerId = BuyerId("buyer-123")
-        val orderId = OrderId("order-456")
-        val totalAmount = Amount.of(200000L, Currency("USD")) // $2000.00 = 200000 cents
-        val now = LocalDateTime.now()
-        val paymentOrders = listOf(
-            createTestPaymentOrder(paymentOrderId = PaymentOrderId(1L))
+    fun `should transition from PENDING_AUTH to DECLINED`() {
+        val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount)
+        val declined = payment.decline()
+
+        assertEquals(PaymentStatus.DECLINED, declined.status)
+        assertTrue(declined.updatedAt.isAfter(payment.updatedAt))
+    }
+
+    @Test
+    fun `should fail to authorize if already AUTHORIZED`() {
+        val authorized = Payment.createNew(paymentId, buyerId, orderId, totalAmount).authorize()
+
+        val ex = assertThrows<IllegalArgumentException> { authorized.authorize() }
+        assertTrue(ex.message!!.contains("Payment can only be authorized"))
+    }
+
+    @Test
+    fun `should fail to decline if not PENDING_AUTH`() {
+        val authorized = Payment.createNew(paymentId,  buyerId, orderId, totalAmount).authorize()
+
+        val ex = assertThrows<IllegalArgumentException> { authorized.decline() }
+        assertTrue(ex.message!!.contains("can only be declined"))
+    }
+
+    // --- ✅ Captured Amount ---
+
+    @Test
+    fun `should add captured amount and transition to CAPTURED_PARTIALLY`() {
+        val payment = Payment.createNew(paymentId,  buyerId, orderId, totalAmount)
+            .authorize()
+
+        val partial = payment.addCapturedAmount(Amount.of(4000L, currency)) // €40.00 captured
+
+        assertEquals(Amount.of(4000L, currency), partial.capturedAmount)
+        assertEquals(PaymentStatus.CAPTURED_PARTIALLY, partial.status)
+    }
+
+    @Test
+    fun `should transition to CAPTURED when total captured equals total amount`() {
+        val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount)
+            .authorize()
+
+        val captured = payment.addCapturedAmount(Amount.of(10000L, currency))
+
+        assertEquals(totalAmount, captured.capturedAmount)
+        assertEquals(PaymentStatus.CAPTURED, captured.status)
+    }
+
+    @Test
+    fun `should fail when captured amount exceeds total`() {
+        val payment = Payment.createNew(paymentId,buyerId, orderId, totalAmount)
+            .authorize()
+
+        val ex = assertThrows<IllegalArgumentException> {
+            payment.addCapturedAmount(Amount.of(20000L, currency))
+        }
+        assertTrue(ex.message!!.contains("Captured amount cannot exceed total"))
+    }
+
+    // --- ✅ addPaymentOrder() ---
+
+    @Test
+    fun `should add valid payment order to payment`() {
+        val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount)
+        val order = PaymentOrder.createNew(
+            paymentOrderId = PaymentOrderId(10L),
+            paymentId = paymentId,
+            sellerId = SellerId("seller-1"),
+            amount = Amount.of(5000L, currency)
         )
 
-        val payment = Payment.Builder()
-            .paymentId(paymentId)
-            .publicPaymentId("payment-1")
-            .buyerId(buyerId)
-            .orderId(orderId)
-            .totalAmount(totalAmount)
-            .status(PaymentStatus.SUCCESS)
-            .createdAt(now)
-            .paymentOrders(paymentOrders)
-            .build()
-
-        assertEquals(paymentId, payment.paymentId)
-        assertEquals("payment-1", payment.publicPaymentId)
-        assertEquals(buyerId, payment.buyerId)
-        assertEquals(orderId, payment.orderId)
-        assertEquals(totalAmount, payment.totalAmount)
-        assertEquals(PaymentStatus.SUCCESS, payment.status)
-        assertEquals(now, payment.createdAt)
-        assertEquals(1, payment.paymentOrders.size)
-    }
-
-    @Test
-    fun `markAsPaid should change status to SUCCESS`() {
-        val payment = createTestPayment(status = PaymentStatus.INITIATED)
-
-        val updated = payment.markAsPaid()
-
-        assertEquals(PaymentStatus.SUCCESS, updated.status)
-        assertEquals(payment.paymentId, updated.paymentId)
-        assertEquals(payment.totalAmount, updated.totalAmount)
-        assertEquals(payment.paymentOrders, updated.paymentOrders)
-    }
-
-    @Test
-    fun `markAsFailed should change status to FAILED`() {
-        val payment = createTestPayment(status = PaymentStatus.INITIATED)
-
-        val updated = payment.markAsFailed()
-
-        assertEquals(PaymentStatus.FAILED, updated.status)
-        assertEquals(payment.paymentId, updated.paymentId)
-        assertEquals(payment.totalAmount, updated.totalAmount)
-    }
-
-    @Test
-    fun `addPaymentOrder should add a new payment order to the list`() {
-        val initialOrder = createTestPaymentOrder(paymentOrderId = PaymentOrderId(1L))
-        val payment = createTestPayment(paymentOrders = listOf(initialOrder))
-
-        val newOrder = createTestPaymentOrder(paymentOrderId = PaymentOrderId(2L))
-        val updated = payment.addPaymentOrder(newOrder)
-
-        assertEquals(2, updated.paymentOrders.size)
-        assertTrue(updated.paymentOrders.contains(initialOrder))
-        assertTrue(updated.paymentOrders.contains(newOrder))
-        assertEquals(payment.status, updated.status)
-    }
-
-    @Test
-    fun `addPaymentOrder should work on payment with empty orders list`() {
-        val payment = createTestPayment(paymentOrders = emptyList())
-
-        val newOrder = createTestPaymentOrder(paymentOrderId = PaymentOrderId(1L))
-        val updated = payment.addPaymentOrder(newOrder)
+        val updated = payment.addPaymentOrder(order)
 
         assertEquals(1, updated.paymentOrders.size)
-        assertEquals(newOrder, updated.paymentOrders.first())
+        assertEquals(order.paymentOrderId, updated.paymentOrders.first().paymentOrderId)
     }
 
     @Test
-    fun `addPaymentOrder should preserve immutability`() {
-        val initialOrder = createTestPaymentOrder(paymentOrderId = PaymentOrderId(1L))
-        val payment = createTestPayment(paymentOrders = listOf(initialOrder))
+    fun `should reject adding PaymentOrder with mismatched payment id`() {
+        val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount)
+        val invalidOrder = PaymentOrder.createNew(
+            paymentOrderId = PaymentOrderId(10L),
+            paymentId = PaymentId(999L), // ❌ different
+            sellerId = SellerId("seller-1"),
+            amount = Amount.of(5000L, currency)
+        )
 
-        val newOrder = createTestPaymentOrder(paymentOrderId = PaymentOrderId(2L))
-        val updated = payment.addPaymentOrder(newOrder)
-
-        assertEquals(1, payment.paymentOrders.size)
-        assertEquals(2, updated.paymentOrders.size)
+        val ex = assertThrows<IllegalArgumentException> { payment.addPaymentOrder(invalidOrder) }
+        assertTrue(ex.message!!.contains("must reference the same Payment"))
     }
 
     @Test
-    fun `Builder should create Payment with all fields`() {
-        val paymentId = PaymentId(1L)
-        val buyerId = BuyerId("buyer-123")
-        val orderId = OrderId("order-456")
-        val totalAmount = Amount.of(200000L, Currency("USD")) // $2000.00 = 200000 cents
-        val now = LocalDateTime.now()
-        val paymentOrders = listOf(createTestPaymentOrder())
+    fun `should reject adding PaymentOrder with currency mismatch`() {
+        val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount)
+        val invalidOrder = PaymentOrder.createNew(
+            paymentOrderId = PaymentOrderId(10L),
+            paymentId = paymentId,
+            sellerId = SellerId("seller-1"),
+            amount = Amount.of(5000L, Currency("USD")) // ❌ different currency
+        )
 
-        val payment = Payment.Builder()
-            .paymentId(paymentId)
-            .publicPaymentId("payment-1")
-            .buyerId(buyerId)
-            .orderId(orderId)
-            .totalAmount(totalAmount)
-            .status(PaymentStatus.SUCCESS)
-            .createdAt(now)
-            .paymentOrders(paymentOrders)
-            .build()
-
-        assertEquals(paymentId, payment.paymentId)
-        assertEquals("payment-1", payment.publicPaymentId)
-        assertEquals(buyerId, payment.buyerId)
-        assertEquals(orderId, payment.orderId)
-        assertEquals(totalAmount, payment.totalAmount)
-        assertEquals(PaymentStatus.SUCCESS, payment.status)
-        assertEquals(now, payment.createdAt)
-        assertEquals(paymentOrders, payment.paymentOrders)
-    }
-
-
-
-    @Test
-    fun `copy should preserve immutability when changing status`() {
-        val original = createTestPayment(status = PaymentStatus.INITIATED)
-        val updated = original.markAsPaid()
-
-        assertNotEquals(original.status, updated.status)
-        assertEquals(PaymentStatus.INITIATED, original.status)
-        assertEquals(PaymentStatus.SUCCESS, updated.status)
-    }
-
-    @Test
-    fun `multiple status changes should be independent`() {
-        val payment = createTestPayment(status = PaymentStatus.INITIATED)
-
-        val paid = payment.markAsPaid()
-        val failed = payment.markAsFailed()
-
-        assertEquals(PaymentStatus.INITIATED, payment.status)
-        assertEquals(PaymentStatus.SUCCESS, paid.status)
-        assertEquals(PaymentStatus.FAILED, failed.status)
-    }
-
-    private fun createTestPayment(
-        paymentId: PaymentId = PaymentId(1L),
-        publicPaymentId: String = "payment-1",
-        buyerId: BuyerId = BuyerId("buyer-123"),
-        orderId: OrderId = OrderId("order-456"),
-        totalAmount: Amount = Amount.of(200000L, Currency("USD")), // $2000.00 = 200000 cents
-        status: PaymentStatus = PaymentStatus.INITIATED,
-        createdAt: LocalDateTime = LocalDateTime.now(),
-        paymentOrders: List<PaymentOrder> = emptyList()
-    ): Payment {
-        return Payment.Builder()
-            .paymentId(paymentId)
-            .publicPaymentId(publicPaymentId)
-            .buyerId(buyerId)
-            .orderId(orderId)
-            .totalAmount(totalAmount)
-            .status(status)
-            .createdAt(createdAt)
-            .paymentOrders(paymentOrders)
-            .build()
-    }
-
-    private fun createTestPaymentOrder(
-        paymentOrderId: PaymentOrderId = PaymentOrderId(1L),
-        paymentId: PaymentId = PaymentId(1L),
-        sellerId: SellerId = SellerId("seller-123"),
-        amount: Amount = Amount.of(100000L, Currency("USD")) // $1000.00 = 100000 cents
-    ): PaymentOrder {
-        return PaymentOrder.builder()
-            .paymentOrderId(paymentOrderId)
-            .publicPaymentOrderId("paymentorder-${paymentOrderId.value}")
-            .paymentId(paymentId)
-            .publicPaymentId("payment-${paymentId.value}")
-            .sellerId(sellerId)
-            .amount(amount)
-            .createdAt(LocalDateTime.now())
-            .buildNew()
+        val ex = assertThrows<IllegalArgumentException> { payment.addPaymentOrder(invalidOrder) }
+        assertTrue(ex.message!!.contains("Currency mismatch"))
     }
 }

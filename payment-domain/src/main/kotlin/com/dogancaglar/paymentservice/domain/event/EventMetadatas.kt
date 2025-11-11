@@ -4,8 +4,8 @@ import com.dogancaglar.common.event.EVENT_TYPE
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
 import com.dogancaglar.common.event.Topics
-import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
 import com.dogancaglar.paymentservice.domain.commands.LedgerRecordingCommand
+import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
 import com.fasterxml.jackson.core.type.TypeReference
 
 object EventMetadatas {
@@ -18,11 +18,11 @@ object EventMetadatas {
         override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderCreated>>() {}
     }
 
-    object PaymentOrderPspCallRequestedMetadata : EventMetadata<PaymentOrderPspCallRequested> {
-        override val topic = Topics.PAYMENT_ORDER_PSP_CALL_REQUESTED
-        override val eventType = EVENT_TYPE.PAYMENT_ORDER_PSP_CALL_REQUESTED
-        override val clazz = PaymentOrderPspCallRequested::class.java
-        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderPspCallRequested>>() {}
+    object PaymentOrderCaptureRequestedMetadata : EventMetadata<PaymentOrderCaptureCommand> {
+        override val topic = Topics.PAYMENT_ORDER_CAPTURE_REQUEST_QUEUE
+        override val eventType = EVENT_TYPE.PAYMENT_ORDER_CAPTURE_REQUESTED
+        override val clazz = PaymentOrderCaptureCommand::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderCaptureCommand>>() {}
     }
 
     object PaymentOrderPspResultUpdatedMetadata : EventMetadata<PaymentOrderPspResultUpdated> {
@@ -62,20 +62,12 @@ object EventMetadatas {
 
 
 
-    object PaymentOrderStatusCheckScheduledMetadata : EventMetadata<PaymentOrderStatusCheckRequested> {
-        override val topic = Topics.PAYMENT_STATUS_CHECK
-        override val eventType = EVENT_TYPE.PAYMENT_ORDER_STATUS_CHECK_REQUESTED
-        override val clazz = PaymentOrderStatusCheckRequested::class.java
-        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderStatusCheckRequested>>() {}
-    }
-
 
     val all: List<EventMetadata<*>> = listOf(
         PaymentOrderCreatedMetadata,
-        PaymentOrderPspCallRequestedMetadata,
+        PaymentOrderCaptureRequestedMetadata,
         PaymentOrderSucceededMetadata,
         PaymentOrderFailedMetadata,
-        PaymentOrderStatusCheckScheduledMetadata,
         PaymentOrderPspResultUpdatedMetadata,
         LedgerRecordingCommandMetadata,
         LedgerEntriesRecordedMetadata

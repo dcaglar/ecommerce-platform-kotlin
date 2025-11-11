@@ -6,11 +6,11 @@ import kotlin.random.Random
 
 @Component
 class NetworkSimulator(
-    private val config: PspSimulationProperties
+    private val config: CaptureSimulationProperties
 ) {
     private val logger = LoggerFactory.getLogger(NetworkSimulator::class.java)
 
-    private val active: PspSimulationProperties.ScenarioConfig
+    private val active: CaptureSimulationProperties.ScenarioConfig
         get() = config.scenarios[config.scenario]
             ?: throw IllegalStateException("No scenario config for ${config.scenario}")
 

@@ -6,9 +6,8 @@ import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.*
-import com.dogancaglar.paymentservice.domain.util.PaymentFactory
+import com.dogancaglar.paymentservice.application.util.PaymentFactory
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderFactory
 import com.dogancaglar.paymentservice.ports.outbound.OutboxEventPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
@@ -37,8 +36,8 @@ class CreatePaymentServiceTest {
     fun setUp() {
         idGeneratorPort = mockk()
         paymentRepository = mockk()
-        paymentOrderRepository = mockk()
-        outboxEventPort = mockk()
+        paymentOrderRepository = mockk(relaxed = true)
+        outboxEventPort = mockk(relaxed = true)
         serializationPort = mockk()
         clock = Clock.fixed(Instant.parse("2024-01-01T12:00:00Z"), ZoneId.of("UTC"))
 
@@ -67,10 +66,8 @@ class CreatePaymentServiceTest {
 
         every { idGeneratorPort.nextId(IdNamespaces.PAYMENT) } returns paymentId
         every { idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER) } returnsMany listOf(paymentOrderId1, paymentOrderId2)
-        every { serializationPort.toJson<Any>(match { it is com.dogancaglar.common.event.EventEnvelope<*> }) } returns """{"eventType":"test"}"""
-        every { paymentRepository.save(match { it is com.dogancaglar.paymentservice.domain.model.Payment }) } returns Unit
-        every { paymentOrderRepository.insertAll(match { it is List<*> && it.size == 2 }) } returns Unit
-        every { outboxEventPort.saveAll(match { it is List<*> && it.size == 2 }) } returns emptyList()
+        every { serializationPort.toJson<Any>(any()) } returns """{"eventType":"test"}"""
+        every { paymentRepository.save(any()) } returns Unit
 
         val command = CreatePaymentCommand(
             orderId = OrderId("order-123"),
@@ -88,9 +85,7 @@ class CreatePaymentServiceTest {
         // Then
         assertNotNull(result)
         assertEquals(PaymentId(paymentId), result.paymentId)
-        assertEquals(2, result.paymentOrders.size)
-        assertEquals(PaymentOrderId(paymentOrderId1), result.paymentOrders[0].paymentOrderId)
-        assertEquals(PaymentOrderId(paymentOrderId2), result.paymentOrders[1].paymentOrderId)
+        assertTrue(result.paymentOrders.isEmpty(), "payment orders are now created downstream")
 
         // Verify interactions
         verify(exactly = 1) { 
@@ -100,18 +95,14 @@ class CreatePaymentServiceTest {
                 payment.buyerId == BuyerId("buyer-456") &&
                 payment.orderId == OrderId("order-123") &&
                 payment.totalAmount == Amount.of(200000L, Currency("USD")) &&
-                payment.status == PaymentStatus.INITIATED &&
-                payment.paymentOrders.size == 2
+                payment.status == PaymentStatus.PENDING_AUTH &&
+                payment.paymentOrders.isEmpty()
             })
         }
-        verify(exactly = 1) {
-            paymentOrderRepository.insertAll(match { list ->
-                list.size == 2 &&
-                        list[0].paymentOrderId.value == paymentOrderId1 &&
-                        list[1].paymentOrderId.value == paymentOrderId2
-            })
-        }
-        verify(exactly = 1) { outboxEventPort.saveAll(match { it.size == 2 }) }
+        verify(exactly = 1) { paymentOrderRepository.insertAll(emptyList()) }
+        verify(exactly = 1) { outboxEventPort.saveAll(emptyList()) }
+        verify(exactly = 1) { idGeneratorPort.nextId(IdNamespaces.PAYMENT) }
+        verify(exactly = 2) { idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER) }
     }
 
     @Test
@@ -119,10 +110,8 @@ class CreatePaymentServiceTest {
         // Given
         every { idGeneratorPort.nextId(IdNamespaces.PAYMENT) } returns 100L
         every { idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER) } returnsMany listOf(200L, 201L, 202L)
-        every { serializationPort.toJson<Any>(match { it is com.dogancaglar.common.event.EventEnvelope<*> }) } returns """{"eventType":"test"}"""
-        every { paymentRepository.save(match { it is com.dogancaglar.paymentservice.domain.model.Payment }) } returns Unit
-        every { paymentOrderRepository.insertAll(match { it is List<*> && it.size == 3 }) } returns Unit
-        every { outboxEventPort.saveAll(match { it is List<*> && it.size == 3 }) } returns emptyList()
+        every { serializationPort.toJson<Any>(any()) } returns """{"eventType":"test"}"""
+        every { paymentRepository.save(any()) } returns Unit
 
         val command = CreatePaymentCommand(
             orderId = OrderId("order-1"),
@@ -139,7 +128,7 @@ class CreatePaymentServiceTest {
         val result = service.create(command)
 
         // Then
-        assertEquals(3, result.paymentOrders.size)
+        assertTrue(result.paymentOrders.isEmpty())
         verify(exactly = 1) { idGeneratorPort.nextId(IdNamespaces.PAYMENT) }
         verify(exactly = 3) { idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER) }
     }
@@ -149,10 +138,8 @@ class CreatePaymentServiceTest {
         // Given
         every { idGeneratorPort.nextId(IdNamespaces.PAYMENT) } returns 100L
         every { idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER) } returnsMany listOf(200L, 201L)
-        every { serializationPort.toJson<Any>(match { it is com.dogancaglar.common.event.EventEnvelope<*> }) } returns """{"test":"data"}"""
-        every { paymentRepository.save(match { it is com.dogancaglar.paymentservice.domain.model.Payment }) } returns Unit
-        every { paymentOrderRepository.insertAll(match { it is List<*> && it.size == 2 }) } returns Unit
-        every { outboxEventPort.saveAll(match { it is List<*> && it.size == 2 }) } returns emptyList()
+        every { serializationPort.toJson<Any>(any()) } returns """{"test":"data"}"""
+        every { paymentRepository.save(any()) } returns Unit
 
         val command = CreatePaymentCommand(
             orderId = OrderId("order-1"),
@@ -168,7 +155,7 @@ class CreatePaymentServiceTest {
         service.create(command)
 
         // Then
-        verify(exactly = 1) { outboxEventPort.saveAll(match { it.size == 2 }) }
+        verify(exactly = 1) { outboxEventPort.saveAll(emptyList()) }
     }
     @Test
     fun `create should use clock for timestamps`() {
@@ -176,8 +163,6 @@ class CreatePaymentServiceTest {
         val fixedInstant = Instant.parse("2024-06-15T10:30:00Z")
         val fixedClock = Clock.fixed(fixedInstant, ZoneId.of("UTC"))
 
-        // NEW deps that the service now requires
-        val paymentOrderFactory = PaymentOrderFactory()
         val paymentOrderDomainEventMapper = PaymentOrderDomainEventMapper(fixedClock)
         val paymentFactory = PaymentFactory(fixedClock)
 
@@ -194,10 +179,8 @@ class CreatePaymentServiceTest {
 
         every { idGeneratorPort.nextId(IdNamespaces.PAYMENT) } returns 100L
         every { idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER) } returns 200L
-        every { serializationPort.toJson<Any>(match { it is com.dogancaglar.common.event.EventEnvelope<*> }) } returns "{}"
-        every { paymentRepository.save(match { it is com.dogancaglar.paymentservice.domain.model.Payment }) } returns Unit
-        every { paymentOrderRepository.insertAll(match { it is List<*> && it.size == 1 }) } returns Unit
-        every { outboxEventPort.saveAll(match { it is List<*> && it.size == 1 }) } returns emptyList()
+        every { serializationPort.toJson<Any>(any()) } returns "{}"
+        every { paymentRepository.save(any()) } returns Unit
 
         val command = CreatePaymentCommand(
             orderId = OrderId("order-1"),
@@ -214,8 +197,6 @@ class CreatePaymentServiceTest {
         // Then
         val expectedLocalDateTime = LocalDateTime.ofInstant(fixedInstant, fixedClock.zone)
         assertEquals(expectedLocalDateTime, result.createdAt)
-        result.paymentOrders.forEach { order ->
-            assertEquals(expectedLocalDateTime, order.createdAt)
-        }
+        assertTrue(result.paymentOrders.isEmpty())
     }
 }

@@ -6,7 +6,6 @@ import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderEvent
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderFailed
-import com.dogancaglar.paymentservice.domain.PaymentOrderStatusCheckRequested
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import io.mockk.*
 import org.junit.jupiter.api.BeforeEach
@@ -41,9 +40,7 @@ class RequestLedgerRecordingServiceTest {
         sellerId: String = "seller-789",
         amountValue: Long = 10000L,
         currency: String = "EUR",
-        retryCount: Int = 0,
-        retryReason: String? = null,
-        lastErrorMessage: String? = null
+        retryCount: Int = 0
     ): PaymentOrderSucceeded = PaymentOrderSucceeded.create(
         paymentOrderId = paymentOrderId,
         publicPaymentOrderId = publicPaymentOrderId,
@@ -55,9 +52,7 @@ class RequestLedgerRecordingServiceTest {
         status = "SUCCESSFUL_FINAL",
         createdAt = LocalDateTime.now(clock),
         updatedAt = LocalDateTime.now(clock),
-        retryCount = retryCount,
-        retryReason = retryReason,
-        lastErrorMessage = lastErrorMessage
+        retryCount = retryCount
     )
 
     // Helper method to create PaymentOrderFailed with FAILED_FINAL status
@@ -83,40 +78,8 @@ class RequestLedgerRecordingServiceTest {
         status = "FAILED_FINAL",
         createdAt = LocalDateTime.now(clock),
         updatedAt = LocalDateTime.now(clock),
-        retryCount = retryCount,
-        retryReason = retryReason,
-        lastErrorMessage = lastErrorMessage
+        retryCount = retryCount
     )
-
-    // Helper method to create PaymentOrderStatusCheckRequested with non-final status
-    private fun createPaymentOrderStatusCheckRequested(
-        paymentOrderId: String = "po-888",
-        publicPaymentOrderId: String = "paymentorder-888",
-        paymentId: String = "p-888",
-        publicPaymentId: String = "payment-888",
-        sellerId: String = "seller-123",
-        amountValue: Long = 3000L,
-        currency: String = "USD",
-        status: String = "PENDING_STATUS_CHECK_LATER",
-        retryCount: Int = 0,
-        retryReason: String? = null,
-        lastErrorMessage: String? = null
-    ): PaymentOrderStatusCheckRequested = PaymentOrderStatusCheckRequested.create(
-        paymentOrderId = paymentOrderId,
-        publicPaymentOrderId = publicPaymentOrderId,
-        paymentId = paymentId,
-        publicPaymentId = publicPaymentId,
-        sellerId = sellerId,
-        amountValue = amountValue,
-        currency = currency,
-        status = status,
-        createdAt = LocalDateTime.now(clock),
-        updatedAt = LocalDateTime.now(clock),
-        retryCount = retryCount,
-        retryReason = retryReason,
-        lastErrorMessage = lastErrorMessage
-    )
-
     @Test
     fun `should publish LedgerRecordingCommand for PaymentOrderSucceeded with SUCCESSFUL_FINAL status`() {
         // given - PaymentOrderSucceeded with SUCCESSFUL_FINAL status
@@ -143,9 +106,7 @@ class RequestLedgerRecordingServiceTest {
                 data = match { cmd ->
                     cmd is LedgerRecordingCommand &&
                     cmd.paymentOrderId == event.paymentOrderId &&
-                    cmd.publicPaymentOrderId == event.publicPaymentOrderId &&
                     cmd.paymentId == event.paymentId &&
-                    cmd.publicPaymentId == event.publicPaymentId &&
                     cmd.sellerId == event.sellerId &&
                     cmd.amountValue == event.amountValue &&
                     cmd.currency == event.currency &&
@@ -186,9 +147,7 @@ class RequestLedgerRecordingServiceTest {
                     cmd is LedgerRecordingCommand &&
                     cmd.status == "FAILED_FINAL" &&
                     cmd.paymentOrderId == failedEvent.paymentOrderId &&
-                    cmd.publicPaymentOrderId == failedEvent.publicPaymentOrderId &&
                     cmd.paymentId == failedEvent.paymentId &&
-                    cmd.publicPaymentId == failedEvent.publicPaymentId &&
                     cmd.sellerId == failedEvent.sellerId &&
                     cmd.amountValue == failedEvent.amountValue &&
                     cmd.currency == failedEvent.currency &&
@@ -199,49 +158,6 @@ class RequestLedgerRecordingServiceTest {
             )
         }
     }
-
-    @Test
-    fun `should skip publishing for PaymentOrderStatusCheckRequested with non-final status`() {
-        // given - PaymentOrderStatusCheckRequested with non-final status (PENDING_STATUS_CHECK_LATER)
-        val eventWithNonFinalStatus = createPaymentOrderStatusCheckRequested()
-        
-        // when - service processes the event
-        service.requestLedgerRecording(eventWithNonFinalStatus)
-
-        // then - verify publishSync was NOT called (skipped for non-final status)
-        verify(exactly = 0) {
-            eventPublisherPort.publishSync<LedgerRecordingCommand>(
-                eventMetaData = any(),
-                aggregateId = any(),
-                data = any(),
-                parentEventId = any(),
-                traceId = any()
-            )
-        }
-    }
-
-    @Test
-    fun `should skip publishing for PaymentOrderStatusCheckRequested with AUTH_NEEDED status`() {
-        // given - PaymentOrderStatusCheckRequested with another non-final status
-        val eventWithAuthNeeded = createPaymentOrderStatusCheckRequested(
-            status = "AUTH_NEEDED_STAUS_CHECK_LATER"
-        )
-        
-        // when - service processes the event
-        service.requestLedgerRecording(eventWithAuthNeeded)
-
-        // then - verify publishSync was NOT called (skipped for non-final status)
-        verify(exactly = 0) {
-            eventPublisherPort.publishSync<LedgerRecordingCommand>(
-                eventMetaData = any(),
-                aggregateId = any(),
-                data = any(),
-                parentEventId = any(),
-                traceId = any()
-            )
-        }
-    }
-    
     @Test
     fun `should handle exception in publishSync and propagate it for PaymentOrderSucceeded`() {
         // given - PaymentOrderSucceeded event
@@ -265,7 +181,7 @@ class RequestLedgerRecordingServiceTest {
 
         // then - verify publishSync was attempted with correct data before exception
         assertNotNull(capturedCommand.captured)
-        assertEquals(event.publicPaymentOrderId, capturedCommand.captured.publicPaymentOrderId)
+        assertEquals(event.paymentOrderId, capturedCommand.captured.paymentOrderId)
         assertEquals("SUCCESSFUL_FINAL", capturedCommand.captured.status)
     }
 
@@ -284,8 +200,6 @@ class RequestLedgerRecordingServiceTest {
             override val createdAt = LocalDateTime.now(clock)
             override val updatedAt = LocalDateTime.now(clock)
             override val retryCount = 0
-            override val retryReason = null
-            override val lastErrorMessage = null
         }
         
         // when - service processes the event
@@ -318,8 +232,6 @@ class RequestLedgerRecordingServiceTest {
             override val createdAt = LocalDateTime.now(clock)
             override val updatedAt = LocalDateTime.now(clock)
             override val retryCount = 0
-            override val retryReason = null
-            override val lastErrorMessage = null
         }
         
         // when - service processes the event

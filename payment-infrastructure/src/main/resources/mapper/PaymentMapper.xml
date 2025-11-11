@@ -6,17 +6,14 @@
     <resultMap id="PaymentResultMap"
                type="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentEntity">
         <id property="paymentId" column="payment_id"/>
-        <result property="publicPaymentId" column="public_payment_id"/>
-        <result property="orderId" column="order_id"/>
         <result property="buyerId" column="buyer_id"/>
-        <result property="amountValue" column="amount_value"/>
-        <result property="amountCurrency" column="amount_currency"/>
+        <result property="orderId" column="order_id"/>
+        <result property="totalAmountValue" column="total_amount_value"/>
+        <result property="capturedAmountValue" column="captured_amount_value"/>
+        <result property="currency" column="currency"/>
         <result property="status" column="status"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
-        <result property="retryCount" column="retry_count"/>
-        <result property="retryReason" column="retry_reason"/>
-        <result property="lastErrorMessage" column="last_error_message"/>
     </resultMap>
 
     <select id="getMaxPaymentId" resultType="long">
@@ -26,15 +23,40 @@
     <insert id="insert"
             parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentEntity">
         INSERT INTO payments (
-        payment_id, public_payment_id, buyer_id, order_id, amount_value, amount_currency, status, created_at
+        payment_id,
+        buyer_id,
+        order_id,
+        total_amount_value,
+        captured_amount_value,
+        currency,
+        status,
+        created_at,
+        updated_at
         ) VALUES (
-        #{paymentId}, #{publicPaymentId}, #{buyerId}, #{orderId}, #{amountValue}, #{amountCurrency},
-        #{status}, #{createdAt}
+        #{paymentId},
+        #{buyerId},
+        #{orderId},
+        #{totalAmountValue},
+        #{capturedAmountValue},
+        #{currency},
+        #{status},
+        #{createdAt},
+        #{updatedAt}
         )
     </insert>
 
     <select id="findById" resultMap="PaymentResultMap">
-        SELECT * FROM payments WHERE payment_id = #{id}
+        SELECT payment_id,
+               buyer_id,
+               order_id,
+               total_amount_value,
+               captured_amount_value,
+               currency,
+               status,
+               created_at,
+               updated_at
+        FROM payments
+        WHERE payment_id = #{id}
     </select>
 
     <delete id="deleteAll">
@@ -44,17 +66,14 @@
     <update id="update"
             parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentEntity">
         UPDATE payments SET
-        public_payment_id = #{publicPaymentId},
         order_id = #{orderId},
         buyer_id = #{buyerId},
-        amount_value = #{amountValue},
-        amount_currency = #{amountCurrency},
+        total_amount_value = #{totalAmountValue},
+        captured_amount_value = #{capturedAmountValue},
+        currency = #{currency},
         status = #{status},
         created_at = #{createdAt},
-        updated_at = #{updatedAt},
-        retry_count = #{retryCount},
-        retry_reason = #{retryReason},
-        last_error_message = #{lastErrorMessage}
+        updated_at = #{updatedAt}
         WHERE payment_id = #{paymentId}
     </update>
 

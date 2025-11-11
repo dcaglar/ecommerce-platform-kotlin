@@ -6,9 +6,7 @@
     <resultMap id="PaymentOrderResultMap"
                type="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentOrderEntity">
         <id property="paymentOrderId" column="payment_order_id"/>
-        <result property="publicPaymentOrderId" column="public_payment_order_id"/>
         <result property="paymentId" column="payment_id"/>
-        <result property="publicPaymentId" column="public_payment_id"/>
         <result property="sellerId" column="seller_id"/>
         <result property="amountValue" column="amount_value"/>
         <result property="amountCurrency" column="amount_currency"/>
@@ -17,19 +15,32 @@
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
         <result property="retryCount" column="retry_count"/>
-        <result property="retryReason" column="retry_reason"/>
-        <result property="lastErrorMessage" column="last_error_message"/>
     </resultMap>
 
     <select id="findByPaymentId" resultMap="PaymentOrderResultMap">
-        SELECT payment_order_id, public_payment_order_id, payment_id, public_payment_id, seller_id, amount_value,
-        amount_currency, status, created_at, updated_at, retry_count, retry_reason, last_error_message FROM
-        payment_orders WHERE payment_id = #{paymentId}
+        SELECT payment_order_id,
+               payment_id,
+               seller_id,
+               amount_value,
+               amount_currency,
+               status,
+               created_at,
+               updated_at,
+               retry_count
+        FROM payment_orders
+        WHERE payment_id = #{paymentId}
     </select>
 
     <select id="findByPaymentOrderId" resultMap="PaymentOrderResultMap">
-        SELECT payment_order_id, public_payment_order_id, payment_id, public_payment_id, seller_id, amount_value,
-        amount_currency, status, created_at, updated_at, retry_count, retry_reason, last_error_message
+        SELECT payment_order_id,
+               payment_id,
+               seller_id,
+               amount_value,
+               amount_currency,
+               status,
+               created_at,
+               updated_at,
+               retry_count
         FROM payment_orders
         WHERE payment_order_id = #{paymentOrderId}
     </select>
@@ -65,14 +76,27 @@
 
     <insert id="insertAllIgnore" parameterType="java.util.List">
         INSERT INTO payment_orders (
-        payment_order_id, public_payment_order_id, payment_id, public_payment_id, seller_id,
-        amount_value, amount_currency, status, created_at, updated_at, retry_count, retry_reason, last_error_message
+        payment_order_id,
+        payment_id,
+        seller_id,
+        amount_value,
+        amount_currency,
+        status,
+        created_at,
+        updated_at,
+        retry_count
         )
         VALUES
         <foreach collection="list" item="po" separator=",">
-            (#{po.paymentOrderId}, #{po.publicPaymentOrderId}, #{po.paymentId}, #{po.publicPaymentId}, #{po.sellerId},
-            #{po.amountValue}, #{po.amountCurrency}, #{po.status}, #{po.createdAt}, #{po.updatedAt},
-            #{po.retryCount}, #{po.retryReason}, #{po.lastErrorMessage})
+            (#{po.paymentOrderId},
+            #{po.paymentId},
+            #{po.sellerId},
+            #{po.amountValue},
+            #{po.amountCurrency},
+            #{po.status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.typehandler.PaymentOrderStatusTypeHandler},
+            #{po.createdAt},
+            #{po.updatedAt},
+            #{po.retryCount})
         </foreach>
         ON CONFLICT (payment_order_id) DO NOTHING
     </insert>
@@ -81,11 +105,25 @@
     <insert id="insert"
             parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentOrderEntity">
         INSERT INTO payment_orders (
-        payment_order_id, public_payment_order_id, payment_id, public_payment_id, seller_id, amount_value,
-        amount_currency, status, created_at, updated_at, retry_count, retry_reason, last_error_message
+        payment_order_id,
+        payment_id,
+        seller_id,
+        amount_value,
+        amount_currency,
+        status,
+        created_at,
+        updated_at,
+        retry_count
         ) VALUES (
-        #{paymentOrderId}, #{publicPaymentOrderId}, #{paymentId}, #{publicPaymentId}, #{sellerId}, #{amountValue},
-        #{amountCurrency}, #{status}, #{createdAt}, #{updatedAt}, #{retryCount}, #{retryReason}, #{lastErrorMessage}
+        #{paymentOrderId},
+        #{paymentId},
+        #{sellerId},
+        #{amountValue},
+        #{amountCurrency},
+        #{status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.typehandler.PaymentOrderStatusTypeHandler},
+        #{createdAt},
+        #{updatedAt},
+        #{retryCount}
         )
     </insert>
 
@@ -96,19 +134,22 @@
         UPDATE payment_orders p
         SET
         status = CASE
-        WHEN p.status IN ('SUCCESSFUL_FINAL','FAILED_FINAL','DECLINED_FINAL') THEN p.status
-        ELSE #{status}
+        WHEN p.status IN ('CAPTURED','REFUNDED') THEN p.status
+        ELSE #{status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.typehandler.PaymentOrderStatusTypeHandler}
         END,
         updated_at = GREATEST(p.updated_at, #{updatedAt}),
-        retry_count = GREATEST(p.retry_count, #{retryCount}),
-        retry_reason = COALESCE(#{retryReason}, p.retry_reason),
-        last_error_message = COALESCE(#{lastErrorMessage}, p.last_error_message)
+        retry_count = GREATEST(p.retry_count, #{retryCount})
         WHERE p.payment_order_id = #{paymentOrderId}
-        AND p.status NOT IN ('SUCCESSFUL_FINAL','FAILED_FINAL','DECLINED_FINAL')
         RETURNING
-        p.payment_order_id, p.public_payment_order_id, p.payment_id, p.public_payment_id,
-        p.seller_id, p.amount_value, p.amount_currency, p.status, p.created_at, p.updated_at,
-        p.retry_count, p.retry_reason, p.last_error_message
+        p.payment_order_id,
+        p.payment_id,
+        p.seller_id,
+        p.amount_value,
+        p.amount_currency,
+        p.status,
+        p.created_at,
+        p.updated_at,
+        p.retry_count
         )
         SELECT * FROM updated
     </select>

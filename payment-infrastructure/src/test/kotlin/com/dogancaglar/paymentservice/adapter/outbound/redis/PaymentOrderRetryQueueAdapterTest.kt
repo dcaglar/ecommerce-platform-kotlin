@@ -1,12 +1,11 @@
 package com.dogancaglar.paymentservice.adapter.outbound.redis
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
+import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import com.dogancaglar.paymentservice.domain.model.RetryItem
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
@@ -20,12 +19,11 @@ import io.mockk.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.*
 
 /**
- * Unit tests for PaymentRetryQueueAdapter using MockK.
+ * Unit tests for PaymentOrderRetryQueueAdapter using MockK.
  * 
  * Tests verify:
  * - Retry scheduling with event envelope creation
@@ -34,26 +32,26 @@ import java.util.*
  * - Error handling (poison messages)
  * - Retry counter operations
  */
-class PaymentRetryQueueAdapterTest {
+class PaymentOrderRetryQueueAdapterTest {
 
-    private lateinit var paymentRetryRedisCache: PaymentRetryRedisCache
+    private lateinit var paymentOrderRetryRedisCache: PaymentOrderRetryRedisCache
     private lateinit var meterRegistry: MeterRegistry
     private lateinit var objectMapper: ObjectMapper
-    private lateinit var adapter: PaymentRetryQueueAdapter
+    private lateinit var adapter: PaymentOrderRetryQueueAdapter
 
     @BeforeEach
     fun setUp() {
-        paymentRetryRedisCache = mockk(relaxed = true)
+        paymentOrderRetryRedisCache = mockk(relaxed = true)
         meterRegistry = SimpleMeterRegistry()
         objectMapper = ObjectMapper().apply {
             registerModule(JavaTimeModule())
         }
         
         // Mock zsetSize for gauge registration
-        every { paymentRetryRedisCache.zsetSize() } returns 0L
+        every { paymentOrderRetryRedisCache.zsetSize() } returns 0L
         
-        adapter = PaymentRetryQueueAdapter(
-            paymentRetryRedisCache,
+        adapter = PaymentOrderRetryQueueAdapter(
+            paymentOrderRetryRedisCache,
             meterRegistry,
             objectMapper,
             PaymentOrderDomainEventMapper()
@@ -63,23 +61,20 @@ class PaymentRetryQueueAdapterTest {
     private fun createTestPaymentOrder(
         id: Long = 123L,
         retryCount: Int = 0,
-        status: PaymentOrderStatus = PaymentOrderStatus.INITIATED_PENDING
-    ): PaymentOrder {
-        return PaymentOrder.builder()
-            .paymentOrderId(PaymentOrderId(id))
-            .publicPaymentOrderId("po-$id")
-            .paymentId(PaymentId(999L))
-            .publicPaymentId("pay-999")
-            .sellerId(SellerId("111"))
-            .amount(Amount.of(10000L, Currency("USD"))) // 100.00 in cents
-            .status(status)
-            .createdAt(LocalDateTime.now())
-            .updatedAt(LocalDateTime.now())
-            .retryCount(retryCount)
-            .retryReason(null)
-            .lastErrorMessage(null)
-            .buildFromPersistence()
-    }
+        status: PaymentOrderStatus = PaymentOrderStatus.INITIATED_PENDING,
+        createdAt: LocalDateTime = LocalDateTime.now(),
+        updatedAt: LocalDateTime = createdAt
+    ): PaymentOrder =
+        PaymentOrder.rehydrate(
+            paymentOrderId = PaymentOrderId(id),
+            paymentId = PaymentId(999L),
+            sellerId = SellerId("111"),
+            amount = Amount.of(10000L, Currency("USD")), // cents
+            status = status,
+            retryCount = retryCount,
+            createdAt = createdAt,
+            updatedAt = updatedAt
+        )
 
     // ==================== Schedule Retry Tests ====================
 
@@ -88,18 +83,22 @@ class PaymentRetryQueueAdapterTest {
         // Given
         val paymentOrder = createTestPaymentOrder(id = 123L, retryCount = 1)
         val backOffMillis = 5000L
-        val retryReason = "PSP_TIMEOUT"
-        val lastErrorMessage = "Connection timeout"
 
         // When
-        adapter.scheduleRetry(paymentOrder, backOffMillis, retryReason, lastErrorMessage)
+        adapter.scheduleRetry(paymentOrder, backOffMillis)
 
         // Then
         verify(exactly = 1) {
-            paymentRetryRedisCache.scheduleRetry(
+            paymentOrderRetryRedisCache.scheduleRetry(
                 match { json ->
-                    json.contains("\"eventType\":\"payment_order_psp_call_requested\"") &&
-                    json.contains("\"paymentOrderId\":\"123\"")
+                    try {
+                        val node = objectMapper.readTree(json)
+                        node["eventType"].asText() == "payment_order_capture_requested" &&
+                            node["data"]["paymentOrderId"].asText() == "123" &&
+                            node["data"]["publicPaymentOrderId"].asText() == "paymentorder-123"
+                    } catch (ex: Exception) {
+                        false
+                    }
                 },
                 match { score -> score > System.currentTimeMillis() }
             )
@@ -114,11 +113,11 @@ class PaymentRetryQueueAdapterTest {
         val startTime = System.currentTimeMillis()
 
         // When
-        adapter.scheduleRetry(paymentOrder, backOffMillis, null, null)
+        adapter.scheduleRetry(paymentOrder, backOffMillis)
 
         // Then
         verify(exactly = 1) {
-            paymentRetryRedisCache.scheduleRetry(
+            paymentOrderRetryRedisCache.scheduleRetry(
                 any(),
                 match { score ->
                     val expectedTime = startTime + backOffMillis
@@ -135,11 +134,11 @@ class PaymentRetryQueueAdapterTest {
         val backOffMillis = 1000L
 
         // When
-        adapter.scheduleRetry(paymentOrder, backOffMillis, null, null)
+        adapter.scheduleRetry(paymentOrder, backOffMillis)
 
         // Then
         verify(exactly = 1) {
-            paymentRetryRedisCache.scheduleRetry(
+            paymentOrderRetryRedisCache.scheduleRetry(
                 match { json ->
                     json.contains("\"retryCount\":3")
                 },
@@ -153,12 +152,12 @@ class PaymentRetryQueueAdapterTest {
         // Given
         val paymentOrder = createTestPaymentOrder()
         every { 
-            paymentRetryRedisCache.scheduleRetry(any(), any()) 
+            paymentOrderRetryRedisCache.scheduleRetry(any(), any())
         } throws RuntimeException("Redis connection failed")
 
         // When/Then
         assertThrows(RuntimeException::class.java) {
-            adapter.scheduleRetry(paymentOrder, 1000L, null, null)
+            adapter.scheduleRetry(paymentOrder, 1000L)
         }
     }
 
@@ -167,14 +166,14 @@ class PaymentRetryQueueAdapterTest {
     @Test
     fun `pollDueRetriesToInflight should return empty list when no items`() {
         // Given
-        every { paymentRetryRedisCache.popDueToInflight(any()) } returns emptyList()
+        every { paymentOrderRetryRedisCache.popDueToInflight(any()) } returns emptyList()
 
         // When
         val result = adapter.pollDueRetriesToInflight(100)
 
         // Then
         assertTrue(result.isEmpty())
-        verify(exactly = 1) { paymentRetryRedisCache.popDueToInflight(100) }
+        verify(exactly = 1) { paymentOrderRetryRedisCache.popDueToInflight(100) }
     }
 
     @Test
@@ -182,15 +181,15 @@ class PaymentRetryQueueAdapterTest {
         // Given
         val eventEnvelope = EventEnvelope(
             eventId = UUID.randomUUID(),
-            eventType = "payment_order_psp_call_requested",
+            eventType = "payment_order_capture_requested",
             aggregateId = "123",
             timestamp = LocalDateTime.now(),
             traceId = UUID.randomUUID().toString(),
-            data = PaymentOrderPspCallRequested.create(
+            data = PaymentOrderCaptureCommand.create(
                 paymentOrderId = "123",
-                publicPaymentOrderId = "po-123",
+                publicPaymentOrderId = "paymentorder-123",
                 paymentId = "999",
-                publicPaymentId = "pay-999",
+                publicPaymentId = "payment-999",
                 sellerId = "111",
                 amountValue = 10000L,
                 currency = "USD",
@@ -201,7 +200,7 @@ class PaymentRetryQueueAdapterTest {
         )
         
         val jsonBytes = objectMapper.writeValueAsBytes(eventEnvelope)
-        every { paymentRetryRedisCache.popDueToInflight(any()) } returns listOf(jsonBytes)
+        every { paymentOrderRetryRedisCache.popDueToInflight(any()) } returns listOf(jsonBytes)
 
         // When
         val result = adapter.pollDueRetriesToInflight(100)
@@ -218,15 +217,15 @@ class PaymentRetryQueueAdapterTest {
     fun `pollDueRetriesToInflight should handle poison messages by removing from inflight`() {
         // Given
         val invalidJson = "{ invalid json }".toByteArray()
-        every { paymentRetryRedisCache.popDueToInflight(any()) } returns listOf(invalidJson)
-        every { paymentRetryRedisCache.removeFromInflight(any()) } just Runs
+        every { paymentOrderRetryRedisCache.popDueToInflight(any()) } returns listOf(invalidJson)
+        every { paymentOrderRetryRedisCache.removeFromInflight(any()) } just Runs
 
         // When
         val result = adapter.pollDueRetriesToInflight(100)
 
         // Then
         assertTrue(result.isEmpty(), "Poison messages should not be returned")
-        verify(exactly = 1) { paymentRetryRedisCache.removeFromInflight(invalidJson) }
+        verify(exactly = 1) { paymentOrderRetryRedisCache.removeFromInflight(invalidJson) }
     }
 
     @Test
@@ -234,15 +233,15 @@ class PaymentRetryQueueAdapterTest {
         // Given
         val validEnvelope = EventEnvelope(
             eventId = UUID.randomUUID(),
-            eventType = "payment_order_psp_call_requested",
+            eventType = "payment_order_capture_requested",
             aggregateId = "123",
             timestamp = LocalDateTime.now(),
             traceId = UUID.randomUUID().toString(),
-            data = PaymentOrderPspCallRequested.create(
+            data = PaymentOrderCaptureCommand.create(
                 paymentOrderId = "123",
-                publicPaymentOrderId = "po-123",
+                publicPaymentOrderId = "paymentorder-123",
                 paymentId = "999",
-                publicPaymentId = "pay-999",
+                publicPaymentId = "payment-999",
                 sellerId = "111",
                 amountValue = 10000L,
                 currency = "USD",
@@ -255,8 +254,8 @@ class PaymentRetryQueueAdapterTest {
         val validJson = objectMapper.writeValueAsBytes(validEnvelope)
         val invalidJson = "{ broken".toByteArray()
         
-        every { paymentRetryRedisCache.popDueToInflight(any()) } returns listOf(validJson, invalidJson)
-        every { paymentRetryRedisCache.removeFromInflight(any()) } just Runs
+        every { paymentOrderRetryRedisCache.popDueToInflight(any()) } returns listOf(validJson, invalidJson)
+        every { paymentOrderRetryRedisCache.removeFromInflight(any()) } just Runs
 
         // When
         val result = adapter.pollDueRetriesToInflight(100)
@@ -264,7 +263,7 @@ class PaymentRetryQueueAdapterTest {
         // Then
         assertEquals(1, result.size, "Only valid message should be returned")
         assertEquals(validEnvelope.eventId, result[0].envelope.eventId)
-        verify(exactly = 1) { paymentRetryRedisCache.removeFromInflight(invalidJson) }
+        verify(exactly = 1) { paymentOrderRetryRedisCache.removeFromInflight(invalidJson) }
     }
 
     @Test
@@ -276,7 +275,7 @@ class PaymentRetryQueueAdapterTest {
         adapter.pollDueRetriesToInflight(maxBatchSize)
 
         // Then
-        verify(exactly = 1) { paymentRetryRedisCache.popDueToInflight(maxBatchSize) }
+        verify(exactly = 1) { paymentOrderRetryRedisCache.popDueToInflight(maxBatchSize) }
     }
 
     // ==================== Retry Counter Tests ====================
@@ -285,27 +284,27 @@ class PaymentRetryQueueAdapterTest {
     fun `getRetryCount should delegate to cache`() {
         // Given
         val paymentOrderId = PaymentOrderId(456L)
-        every { paymentRetryRedisCache.getRetryCount(456L) } returns 3
+        every { paymentOrderRetryRedisCache.getRetryCount(456L) } returns 3
 
         // When
         val count = adapter.getRetryCount(paymentOrderId)
 
         // Then
         assertEquals(3, count)
-        verify(exactly = 1) { paymentRetryRedisCache.getRetryCount(456L) }
+        verify(exactly = 1) { paymentOrderRetryRedisCache.getRetryCount(456L) }
     }
 
     @Test
     fun `resetRetryCounter should delegate to cache`() {
         // Given
         val paymentOrderId = PaymentOrderId(789L)
-        every { paymentRetryRedisCache.resetRetryCounter(789L) } just Runs
+        every { paymentOrderRetryRedisCache.resetRetryCounter(789L) } just Runs
 
         // When
         adapter.resetRetryCounter(paymentOrderId)
 
         // Then
-        verify(exactly = 1) { paymentRetryRedisCache.resetRetryCounter(789L) }
+        verify(exactly = 1) { paymentOrderRetryRedisCache.resetRetryCounter(789L) }
     }
 
     // ==================== Inflight Management Tests ====================
@@ -319,7 +318,7 @@ class PaymentRetryQueueAdapterTest {
         adapter.removeFromInflight(raw)
 
         // Then
-        verify(exactly = 1) { paymentRetryRedisCache.removeFromInflight(raw) }
+        verify(exactly = 1) { paymentOrderRetryRedisCache.removeFromInflight(raw) }
     }
 
     @Test
@@ -328,7 +327,7 @@ class PaymentRetryQueueAdapterTest {
         adapter.reclaimInflight()
 
         // Then
-        verify(exactly = 1) { paymentRetryRedisCache.reclaimInflight(60_000) }
+        verify(exactly = 1) { paymentOrderRetryRedisCache.reclaimInflight(60_000) }
     }
 
     @Test
@@ -337,7 +336,7 @@ class PaymentRetryQueueAdapterTest {
         adapter.reclaimInflight(olderThanMs = 120_000)
 
         // Then
-        verify(exactly = 1) { paymentRetryRedisCache.reclaimInflight(120_000) }
+        verify(exactly = 1) { paymentOrderRetryRedisCache.reclaimInflight(120_000) }
     }
 
     // ==================== Edge Cases and Error Handling ====================
@@ -350,11 +349,11 @@ class PaymentRetryQueueAdapterTest {
         val startTime = System.currentTimeMillis()
 
         // When
-        adapter.scheduleRetry(paymentOrder, backOffMillis, null, null)
+        adapter.scheduleRetry(paymentOrder, backOffMillis)
 
         // Then - should schedule for immediate retry
         verify(exactly = 1) {
-            paymentRetryRedisCache.scheduleRetry(
+            paymentOrderRetryRedisCache.scheduleRetry(
                 any(),
                 match { score -> 
                     score >= startTime && score <= startTime + 100
@@ -370,11 +369,11 @@ class PaymentRetryQueueAdapterTest {
         val backOffMillis = 86400000L // 24 hours
 
         // When
-        adapter.scheduleRetry(paymentOrder, backOffMillis, null, null)
+        adapter.scheduleRetry(paymentOrder, backOffMillis)
 
         // Then
         verify(exactly = 1) {
-            paymentRetryRedisCache.scheduleRetry(
+            paymentOrderRetryRedisCache.scheduleRetry(
                 any(),
                 match { score -> 
                     val expectedTime = System.currentTimeMillis() + backOffMillis
@@ -388,15 +387,15 @@ class PaymentRetryQueueAdapterTest {
     fun `pollDueRetriesToInflight should handle empty byte array`() {
         // Given
         val emptyBytes = ByteArray(0)
-        every { paymentRetryRedisCache.popDueToInflight(any()) } returns listOf(emptyBytes)
-        every { paymentRetryRedisCache.removeFromInflight(any()) } just Runs
+        every { paymentOrderRetryRedisCache.popDueToInflight(any()) } returns listOf(emptyBytes)
+        every { paymentOrderRetryRedisCache.removeFromInflight(any()) } just Runs
 
         // When
         val result = adapter.pollDueRetriesToInflight(100)
 
         // Then
         assertTrue(result.isEmpty())
-        verify(exactly = 1) { paymentRetryRedisCache.removeFromInflight(emptyBytes) }
+        verify(exactly = 1) { paymentOrderRetryRedisCache.removeFromInflight(emptyBytes) }
     }
 
     @Test
@@ -415,17 +414,17 @@ class PaymentRetryQueueAdapterTest {
         val paymentOrder = createTestPaymentOrder()
 
         // When
-        adapter.scheduleRetry(paymentOrder, 1000L, null, null)
+        adapter.scheduleRetry(paymentOrder, 1000L)
 
         // Then
         verify(exactly = 1) {
-            paymentRetryRedisCache.scheduleRetry(
+            paymentOrderRetryRedisCache.scheduleRetry(
                 match { json ->
                     val envelope = objectMapper.readValue(
                         json,
-                        object : TypeReference<EventEnvelope<PaymentOrderPspCallRequested>>() {}
+                        object : TypeReference<EventEnvelope<PaymentOrderCaptureCommand>>() {}
                     )
-                    envelope.eventType == "payment_order_psp_call_requested"
+                    envelope.eventType == "payment_order_capture_requested"
                 },
                 any()
             )

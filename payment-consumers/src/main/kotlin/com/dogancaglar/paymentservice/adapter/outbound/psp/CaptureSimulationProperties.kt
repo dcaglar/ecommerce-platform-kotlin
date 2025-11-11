@@ -6,8 +6,8 @@ import org.springframework.context.annotation.Configuration
 enum class PspScenario { NORMAL, PEAK, DEGRADED, BEST_PSP_EVER }
 
 @Configuration
-@ConfigurationProperties(prefix = "psp.simulation")
-class PspSimulationProperties {
+@ConfigurationProperties(prefix = "psp.capture.simulation")
+class CaptureSimulationProperties {
     var currentScenario: String? = null
     val scenario: PspScenario
         get() = PspScenario.valueOf(currentScenario ?: PspScenario.NORMAL.name)

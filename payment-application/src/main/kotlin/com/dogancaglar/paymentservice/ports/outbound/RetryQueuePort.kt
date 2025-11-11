@@ -9,8 +9,6 @@ interface RetryQueuePort<T> {
     fun scheduleRetry(
         paymentOrder: PaymentOrder,
         backOffMillis: Long,
-        retryReason: String? = null,
-        lastErrorMessage: String? = null
     )
 
 

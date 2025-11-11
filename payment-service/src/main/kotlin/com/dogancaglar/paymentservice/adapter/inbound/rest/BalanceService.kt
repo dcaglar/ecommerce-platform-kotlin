@@ -1,6 +1,5 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
-import com.dogancaglar.paymentservice.adapter.inbound.rest.mapper.AmountMapper
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
 import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceReadUseCase
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
@@ -30,7 +29,7 @@ class BalanceService(
         logger.debug("Retrieving balance for seller: {}", sellerId)
         
         // Get account profile to determine account code and currency
-        val profile = accountDirectory.getAccountProfile(AccountType.MERCHANT_ACCOUNT, sellerId)
+        val profile = accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, sellerId)
         val accountCode = profile.accountCode
         
         // Get real-time balance (snapshot + Redis delta)

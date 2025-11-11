@@ -23,10 +23,7 @@ data class PaymentOrderSucceeded private @JsonCreator constructor(
     @JsonProperty("createdAt") override val createdAt: LocalDateTime = LocalDateTime.now(),
     @JsonProperty("updatedAt") override val updatedAt: LocalDateTime = LocalDateTime.now(),
     // Below are default values for the interface, not used by this event
-    @JsonProperty("retryCount") override val retryCount: Int = 0,
-    @JsonProperty("retryReason") override val retryReason: String? = null,
-    @JsonProperty("lastErrorMessage") override val lastErrorMessage: String? = null
-) : PaymentOrderEvent {
+    @JsonProperty("retryCount") override val retryCount: Int = 0) : PaymentOrderEvent {
     
     companion object {
         /**
@@ -58,10 +55,7 @@ data class PaymentOrderSucceeded private @JsonCreator constructor(
             status: String,
             createdAt: LocalDateTime = LocalDateTime.now(),
             updatedAt: LocalDateTime = LocalDateTime.now(),
-            retryCount: Int = 0,
-            retryReason: String? = null,
-            lastErrorMessage: String? = null
-        ): PaymentOrderSucceeded {
+            retryCount: Int = 0): PaymentOrderSucceeded {
             return PaymentOrderSucceeded(
                 paymentOrderId = paymentOrderId,
                 publicPaymentOrderId = publicPaymentOrderId,
@@ -73,10 +67,7 @@ data class PaymentOrderSucceeded private @JsonCreator constructor(
                 status = status,
                 createdAt = createdAt,
                 updatedAt = updatedAt,
-                retryCount = retryCount,
-                retryReason = retryReason,
-                lastErrorMessage = lastErrorMessage
-            )
+                retryCount = retryCount)
         }
     }
 }

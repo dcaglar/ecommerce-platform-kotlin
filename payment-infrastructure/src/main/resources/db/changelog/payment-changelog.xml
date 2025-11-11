@@ -1,48 +1,97 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <databaseChangeLog
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
-        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
-        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
-    <changeSet id="create-payment-table-table" author="dogancaglar">
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="2025-11-11-create-payments" author="dogancaglar">
+
+        <!-- 1️⃣ Create table -->
         <createTable tableName="payments">
-            <column name="payment_order_id" type="BIGINT">
+
+            <column name="payment_id" type="BIGINT">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
-            <column name="public_payment_order_id" type="VARCHAR(255)">
-                <constraints nullable="false" unique="true"/>
-            </column>
-            <column name="payment_id" type="BIGINT">
-                <constraints nullable="false"/>
-            </column>
-            <column name="public_payment_id" type="VARCHAR(255)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="seller_id" type="VARCHAR(255)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="order_id" type="VARCHAR(255)">
-                <constraints nullable="false"/>
-            </column>
+
             <column name="buyer_id" type="VARCHAR(255)">
                 <constraints nullable="false"/>
             </column>
-            <column name="amount_value" type="DECIMAL(19,2)">
+
+            <column name="order_id" type="VARCHAR(255)">
                 <constraints nullable="false"/>
             </column>
-            <column name="amount_currency" type="VARCHAR(10)">
+
+            <column name="total_amount_value" type="BIGINT">
                 <constraints nullable="false"/>
             </column>
+
+            <column name="captured_amount_value" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="currency" type="CHAR(3)">
+                <constraints nullable="false"/>
+            </column>
+
             <column name="status" type="VARCHAR(50)">
                 <constraints nullable="false"/>
             </column>
-            <column name="created_at" type="TIMESTAMP">
+
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
                 <constraints nullable="false"/>
             </column>
-            <column name="updated_at" type="TIMESTAMP"/>
-            <column name="retry_count" type="INTEGER"/>
-            <column name="retry_reason" type="VARCHAR(255)"/>
-            <column name="last_error_message" type="VARCHAR(255)"/>
+
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
         </createTable>
+
+        <!-- 2️⃣ Constraints via SQL (Liquibase-safe for all 4.x versions) -->
+        <sql>
+            ALTER TABLE payments
+            ADD CONSTRAINT chk_payments_status_valid
+            CHECK (status IN (
+            'PENDING_AUTH',
+            'AUTHORIZED',
+            'DECLINED',
+            'CAPTURED_PARTIALLY',
+            'CAPTURED'
+            ));
+        </sql>
+
+        <sql>
+            ALTER TABLE payments
+            ADD CONSTRAINT chk_payments_currency_3
+            CHECK (currency ~ '^[A-Z]{3}$');
+        </sql>
+
+        <sql>
+            ALTER TABLE payments
+            ADD CONSTRAINT chk_payments_captured_le_total
+            CHECK (
+            captured_amount_value &gt;= 0 AND
+            captured_amount_value &lt;= total_amount_value
+            );
+        </sql>
+
+        <!-- 3️⃣ Helpful indexes -->
+        <createIndex indexName="idx_payments_order_id"
+                     tableName="payments">
+            <column name="order_id"/>
+        </createIndex>
+
+        <createIndex indexName="idx_payments_buyer_id"
+                     tableName="payments">
+            <column name="buyer_id"/>
+        </createIndex>
+
+        <!-- 4️⃣ Rollback -->
+        <rollback>
+            <dropTable tableName="payments"/>
+        </rollback>
+
     </changeSet>
+
 </databaseChangeLog>

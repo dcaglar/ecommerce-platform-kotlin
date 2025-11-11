@@ -10,7 +10,7 @@ import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderFactory
+import com.dogancaglar.paymentservice.application.util.PaymentOrderFactory
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
@@ -53,10 +53,10 @@ class PaymentOrderEnqueuer(
                 return@with
             }
 
-            val work = paymentOrderDomainEventMapper.toPaymentOrderPspCallRequested(order, attempt = 0)
+            val work = paymentOrderDomainEventMapper.toPaymentOrderCaptureCommand(order, attempt = 0)
             val outEnv = DomainEventEnvelopeFactory.envelopeFor(
                 data = work,
-                eventMetaData = EventMetadatas.PaymentOrderPspCallRequestedMetadata,
+                eventMetaData = EventMetadatas.PaymentOrderCaptureRequestedMetadata,
                 aggregateId = work.paymentOrderId, // Kafka key = paymentOrderId
                 traceId = consumed.traceId,
                 parentEventId = consumed.eventId
@@ -66,7 +66,7 @@ class PaymentOrderEnqueuer(
                 publisher.publishSync(
                     preSetEventIdFromCaller = outEnv.eventId,
                     aggregateId = outEnv.aggregateId,
-                    eventMetaData = EventMetadatas.PaymentOrderPspCallRequestedMetadata,
+                    eventMetaData = EventMetadatas.PaymentOrderCaptureRequestedMetadata,
                     data = work,
                     traceId = outEnv.traceId,
                     parentEventId = outEnv.parentEventId

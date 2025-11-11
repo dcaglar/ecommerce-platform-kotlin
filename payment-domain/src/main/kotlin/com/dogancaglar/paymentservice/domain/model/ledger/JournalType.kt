@@ -6,6 +6,6 @@ enum class JournalType {
     SETTLEMENT,
     PAYOUT,
     REFUND,
-    FEE,
+    COMMISSION_FEE,
     ADJUSTMENT
 }

@@ -240,7 +240,7 @@ class OutboxEventTest {
             "PaymentOrderCreated",
             "PaymentOrderSucceeded",
             "PaymentOrderFailed",
-            "PaymentOrderPspCallRequested",
+            "PaymentOrderCaptureCommand",
             "PaymentOrderStatusCheckRequested"
         )
 

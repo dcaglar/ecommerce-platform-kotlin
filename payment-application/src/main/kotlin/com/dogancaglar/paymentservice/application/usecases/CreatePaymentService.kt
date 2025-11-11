@@ -11,9 +11,8 @@ import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
-import com.dogancaglar.paymentservice.domain.util.PaymentFactory
+import com.dogancaglar.paymentservice.application.util.PaymentFactory
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderFactory
 import com.dogancaglar.paymentservice.ports.inbound.CreatePaymentUseCase
 import com.dogancaglar.paymentservice.ports.outbound.OutboxEventPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
@@ -43,7 +42,7 @@ open class CreatePaymentService(
         }
 
         val paymentId = PaymentId(idGeneratorPort.nextId(IdNamespaces.PAYMENT))
-        val payment = paymentFactory.createPayment(command, paymentId, paymentOrderIds)
+        val payment = paymentFactory.createPayment(command, paymentId)
 
         paymentRepository.save(payment)
         paymentOrderRepository.insertAll(payment.paymentOrders)

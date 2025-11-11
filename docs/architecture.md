@@ -2,8 +2,7 @@
 
 ## 1. Purpose
 
-This document summarizes the high-level architecture of the `ecommerce-platform-kotlin` backend. It provides an overview for engineers and contributors to understand how the system is structured, how data flows through it, and how it achieves reliability and scalability through modular design and event-driven principles.
-
+This document provides a high-level overview of the ecommerce-platform-kotlin backend and aligns it with the clarified Merchant-of-Record scope. The platform acts as the Merchant of Record for multi-seller checkouts: it owns shopper payment authorization, expands orders into seller obligations, records every financial movement in a double-entry ledger, and prepares the data needed for settlement and payouts. The sections below explain how the system structures domain boundaries (Payment, PaymentOrder, Ledger), coordinates synchronous PSP authorization with asynchronous capture and settlement flows, and ensures reliability through transactional outbox, idempotent processing, and event-driven orchestration across modular Kotlin services.
 ---
 
 ## 2. Architectural Principles
@@ -23,6 +22,14 @@ This document summarizes the high-level architecture of the `ecommerce-platform-
 ## 3. System Overview
 
 The platform manages payments for multi-seller checkouts, processes them asynchronously, records financial movements in a double-entry ledger, and will later aggregate balances per merchant.
+
+### 3.1 Merchant-of-Record Scope Snapshot
+
+- **Lifecycle Ownership:** One shopper authorization per order at the PSP, automatic expansion into seller-level PaymentOrders, capture orchestration, and ledger postings for every state change.
+- **Accounting Guarantees:** Double-entry ledger enforced by domain invariants and database constraints; every posting is auditable and traceable back to the originating payment order.
+- **Operational Guardrails:** Exactly-once processing (Kafka transactions + outbox), idempotent command handling, and balance surfaces (real-time vs strong consistency) keep financial data trustworthy.
+- **In-Scope Today:** PSP authorization against a mocked connector, PaymentOrder capture pipeline, ledger recording, Redis-backed balance deltas, and Keycloak-secured read APIs.
+- **Not Yet Implemented (Roadmap):** Real PSP integrations, automated settlements/payout instructions, refunds/cancellations, and external webhooks — the ledger and event model already anticipate these additions.
 
 ```mermaid
 
@@ -83,6 +90,7 @@ flowchart LR
 * Inserts corresponding `OutboxEvent` rows atomically.
 * Returns `202 Accepted` immediately (no PSP calls in request thread).
 * Outbox dispatcher asynchronously publishes domain events to Kafka.
+* Payment aggregate enforces lifecycle transitions (`AUTHORIZED → PARTIALLY_CAPTURED → CAPTURED_FINAL`) and is kept in sync via the planned `PaymentCaptureAggregator` consumer that reacts to `PaymentOrder` success events.
 * **Balance Endpoints** with three authentication scenarios:
   * **Case 1**: Seller user via customer-area frontend (`GET /api/v1/sellers/me/balance`) - requires `SELLER` role, OIDC Authorization Code flow
   * **Case 2**: Finance/Admin user via backoffice (`GET /api/v1/sellers/{sellerId}/balance`) - requires `FINANCE`/`ADMIN` role, OIDC Authorization Code flow
@@ -102,10 +110,10 @@ flowchart LR
 ### 4.3 payment-domain
 
 * Defines aggregates: `Payment`, `PaymentOrder`, and `JournalEntry`.
-* Implements business invariants and state transitions through factory-enforced object creation.
+* Implements business invariants and state transitions through factory-enforced object creation (e.g., `Payment.authorize()`, `Payment.capture()` guarding lifecycle, `PaymentOrder.markCaptured()` enforcing terminal transitions).
 * Core domain classes (`Account`, `Amount`, `JournalEntry`, `Posting`) use private constructors with validated factory methods to enforce invariants.
-* Contains value objects (`PaymentId`, `SellerId`, `Amount`, `Currency`, etc.) and domain events.
-* Factory methods: `Account.create()`, `Amount.of()`, `Posting.Debit.create()`, `Posting.Credit.create()`.
+* Domain events include `PaymentAuthorized`, `PaymentOrderCreated`, `PaymentOrderSucceeded`, and `PaymentCaptured`, providing traceability across asynchronous flows.
+* Contains value objects (`PaymentId`, `SellerId`, `Amount`, `Currency`, etc.) and factory helpers such as `Account.create()`, `Amount.of()`, `Posting.Debit.create()`, `Posting.Credit.create()`.
 
 ### 4.4 payment-application
 
@@ -136,27 +144,37 @@ flowchart LR
 
 1. **Payment creation:**
 
-    * `POST /payments` → DB transaction saves `Payment`, `PaymentOrders`, and `OutboxEvent`.
+    * `POST /payments` → synchronous transaction persists the `Payment` aggregate, executes PSP authorization, and stores an `OutboxEvent<PaymentRequestDTO>` for downstream expansion (PaymentOrders are created later).
     * Returns `202 Accepted`.
 
-2. **Outbox dispatch:**
+2. **Outbox dispatch (recursive):**
 
-    * Scheduled dispatcher reads unsent events, publishes `PaymentOrderCreated` to Kafka, marks as sent.
+    * `OutboxDispatcherJob` polls unsent events in small batches.
+    * For `PaymentRequestDTO` rows it:
+        * Hydrates the envelope, expands the payload into seller-level `PaymentOrders`, and inserts them.
+        * Persists nested `OutboxEvent<PaymentOrderCreated>` entries (one per seller) with parent/trace metadata.
+        * Publishes `PaymentAuthorized` for downstream listeners and marks the original row as sent.
+    * For the derived `PaymentOrderCreated` rows it publishes the PSP orchestration event and marks each row as sent.
 
-3. **PSP processing:**
+3. **Authorization ledger posting:**
+
+    * `PaymentAuthorizedConsumer` consumes `PaymentAuthorized` events and records the `AUTH_HOLD` journal entry so the ledger mirrors the authorization lifecycle.
+
+4. **PSP processing:**
 
     * `PaymentOrderEnqueuer` consumes `PaymentOrderCreated`, republishes `PaymentOrderPspCallRequested`.
     * `PaymentOrderPspCallExecutor` calls PSP with timeout, publishes `PaymentOrderPspResultUpdated`.
     * `PaymentOrderPspResultApplier` applies results to DB and schedules retries via Redis if transient.
+    * `PaymentCaptureAggregator` (planned) reacts to successful payment orders to advance the parent `Payment` aggregate and emit `PaymentCaptured` when fully complete.
 
-4. **Ledger recording:**
+5. **Ledger recording:**
 
     * `PaymentOrderFinalized` events trigger `LedgerRecordingRequestDispatcher`.
     * Publishes `LedgerRecordingCommand` (partitioned by sellerId) to `ledger_record_request_queue_topic`.
     * `LedgerRecordingConsumer` writes double-entry records to `journal_entries` and `postings` tables.
     * Publishes confirmation `LedgerEntriesRecorded`.
 
-5. **Balance aggregation:**
+6. **Balance aggregation:**
 
     * `AccountBalanceConsumer` processes `LedgerEntriesRecorded` events in batches (100-500 events, partitioned by `sellerId`, concurrency=4).
     * **Two-Tier Storage Architecture**:

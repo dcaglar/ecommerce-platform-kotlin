@@ -28,7 +28,6 @@ import org.testcontainers.containers.GenericContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
-import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ConcurrentHashMap
@@ -36,24 +35,24 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
- * Integration tests for PaymentRetryQueueAdapter with real Redis (Testcontainers).
+ * Integration tests for PaymentOrderRetryQueueAdapter with real Redis (Testcontainers).
  * 
  * These tests validate:
  * - End-to-end retry scheduling and polling
  * - Real serialization/deserialization
  * - Inflight management with real Redis
- * - Concurrent polling behavior
+ * - Concurrent polling behaviorcle
  * - Poison message handling
  * 
  * Tagged as @integration for selective execution.
  */
 @Tag("integration")
-@SpringBootTest(classes = [PaymentRetryQueueAdapterIntegrationTest.TestConfig::class])
+@SpringBootTest(classes = [PaymentOrderRetryQueueAdapterIntegrationTest.TestConfig::class])
 @Testcontainers
-class PaymentRetryQueueAdapterIntegrationTest {
+class PaymentOrderRetryQueueAdapterIntegrationTest {
 
     @Configuration
-    @Import(RedisAutoConfiguration::class, PaymentRetryRedisCache::class)
+    @Import(RedisAutoConfiguration::class, PaymentOrderRetryRedisCache::class)
     class TestConfig {
         @Bean
         fun objectMapper(): ObjectMapper {
@@ -63,11 +62,11 @@ class PaymentRetryQueueAdapterIntegrationTest {
         }
 
         @Bean
-        fun paymentRetryQueueAdapter(
-            cache: PaymentRetryRedisCache,
+        fun paymentOrderRetryQueueAdapter(
+            cache: PaymentOrderRetryRedisCache,
             objectMapper: ObjectMapper
-        ): PaymentRetryQueueAdapter {
-            return PaymentRetryQueueAdapter(
+        ): PaymentOrderRetryQueueAdapter {
+            return PaymentOrderRetryQueueAdapter(
                 cache,
                 SimpleMeterRegistry(),
                 objectMapper,
@@ -92,10 +91,10 @@ class PaymentRetryQueueAdapterIntegrationTest {
     }
 
     @Autowired
-    private lateinit var adapter: PaymentRetryQueueAdapter
+    private lateinit var adapter: PaymentOrderRetryQueueAdapter
 
     @Autowired
-    private lateinit var cache: PaymentRetryRedisCache
+    private lateinit var cache: PaymentOrderRetryRedisCache
 
     @Autowired
     private lateinit var redisTemplate: StringRedisTemplate
@@ -108,23 +107,20 @@ class PaymentRetryQueueAdapterIntegrationTest {
     private fun createTestPaymentOrder(
         id: Long = 123L,
         retryCount: Int = 0,
-        status: PaymentOrderStatus = PaymentOrderStatus.INITIATED_PENDING
-    ): PaymentOrder {
-        return PaymentOrder.builder()
-            .paymentOrderId(PaymentOrderId(id))
-            .publicPaymentOrderId("po-$id")
-            .paymentId(PaymentId(999L))
-            .publicPaymentId("pay-999")
-            .sellerId(SellerId("111"))
-            .amount(Amount.of(10000L, Currency("USD"))) // 100.00 in cents
-            .status(status)
-            .createdAt(LocalDateTime.now())
-            .updatedAt(LocalDateTime.now())
-            .retryCount(retryCount)
-            .retryReason(null)
-            .lastErrorMessage(null)
-            .buildFromPersistence()
-    }
+        status: PaymentOrderStatus = PaymentOrderStatus.INITIATED_PENDING,
+        createdAt: LocalDateTime = LocalDateTime.now(),
+        updatedAt: LocalDateTime = createdAt
+    ): PaymentOrder =
+        PaymentOrder.rehydrate(
+            paymentOrderId = PaymentOrderId(id),
+            paymentId = PaymentId(999L),
+            sellerId = SellerId("111"),
+            amount = Amount.of(10000L, Currency("USD")),
+            status = status,
+            retryCount = retryCount,
+            createdAt = createdAt,
+            updatedAt = updatedAt
+        )
 
     // ==================== End-to-End Retry Flow ====================
 
@@ -135,7 +131,7 @@ class PaymentRetryQueueAdapterIntegrationTest {
         val backOffMillis = 100L // Short delay for testing
 
         // When - schedule retry
-        adapter.scheduleRetry(paymentOrder, backOffMillis, "PSP_TIMEOUT", "Connection failed")
+        adapter.scheduleRetry(paymentOrder, backOffMillis)
 
         // Wait for retry to become due
         Thread.sleep(150)
@@ -156,7 +152,7 @@ class PaymentRetryQueueAdapterIntegrationTest {
         val backOffMillis = 10_000L // 10 seconds in future
 
         // When - schedule future retry
-        adapter.scheduleRetry(paymentOrder, backOffMillis, null, null)
+        adapter.scheduleRetry(paymentOrder, backOffMillis)
 
         // Then - immediate poll should return nothing
         val polled = adapter.pollDueRetriesToInflight(10)
@@ -170,8 +166,8 @@ class PaymentRetryQueueAdapterIntegrationTest {
         val paymentOrder2 = createTestPaymentOrder(id = 100L, retryCount = 2)
         
         // When - schedule two retries for same order
-        adapter.scheduleRetry(paymentOrder1, 100L, null, null)
-        adapter.scheduleRetry(paymentOrder2, 100L, null, null)
+        adapter.scheduleRetry(paymentOrder1, 100L)
+        adapter.scheduleRetry(paymentOrder2, 100L)
 
         Thread.sleep(150)
 
@@ -186,7 +182,7 @@ class PaymentRetryQueueAdapterIntegrationTest {
     fun `polled items should be in inflight queue`() {
         // Given
         val paymentOrder = createTestPaymentOrder()
-        adapter.scheduleRetry(paymentOrder, 100L, null, null)
+        adapter.scheduleRetry(paymentOrder, 100L)
         Thread.sleep(150)
 
         assertEquals(0L, cache.inflightSize())
@@ -204,7 +200,7 @@ class PaymentRetryQueueAdapterIntegrationTest {
     fun `removeFromInflight should remove item from inflight queue`() {
         // Given
         val paymentOrder = createTestPaymentOrder()
-        adapter.scheduleRetry(paymentOrder, 100L, null, null)
+        adapter.scheduleRetry(paymentOrder, 100L)
         Thread.sleep(150)
         
         val polled = adapter.pollDueRetriesToInflight(10)
@@ -221,7 +217,7 @@ class PaymentRetryQueueAdapterIntegrationTest {
     fun `reclaimInflight should move stale items back to queue`() {
         // Given
         val paymentOrder = createTestPaymentOrder()
-        adapter.scheduleRetry(paymentOrder, 100L, null, null)
+        adapter.scheduleRetry(paymentOrder, 100L)
         Thread.sleep(150)
         
         adapter.pollDueRetriesToInflight(10)
@@ -271,7 +267,7 @@ class PaymentRetryQueueAdapterIntegrationTest {
         val count = 100
         repeat(count) { i ->
             val paymentOrder = createTestPaymentOrder(id = i.toLong())
-            adapter.scheduleRetry(paymentOrder, 100L, null, null)
+            adapter.scheduleRetry(paymentOrder, 100L)
         }
 
         Thread.sleep(150)
@@ -316,7 +312,7 @@ class PaymentRetryQueueAdapterIntegrationTest {
             executor.submit {
                 try {
                     val paymentOrder = createTestPaymentOrder(id = i.toLong())
-                    adapter.scheduleRetry(paymentOrder, 50L, null, null)
+                    adapter.scheduleRetry(paymentOrder, 50L)
                 } finally {
                     latch.countDown()
                 }
@@ -352,7 +348,7 @@ class PaymentRetryQueueAdapterIntegrationTest {
     fun `should handle poison messages gracefully in real Redis`() {
         // Given - manually inject invalid JSON into Redis
         val validOrder = createTestPaymentOrder(id = 100L)
-        adapter.scheduleRetry(validOrder, 100L, null, null)
+        adapter.scheduleRetry(validOrder, 100L)
 
         // Inject poison message directly into Redis
         val poisonJson = "{ invalid json }"
@@ -378,14 +374,14 @@ class PaymentRetryQueueAdapterIntegrationTest {
         val paymentOrder = createTestPaymentOrder(id = 789L, retryCount = 3)
 
         // When
-        adapter.scheduleRetry(paymentOrder, 100L, "TEST_REASON", "Test error")
+        adapter.scheduleRetry(paymentOrder, 100L)
         Thread.sleep(150)
         val polled = adapter.pollDueRetriesToInflight(10)
 
         // Then - verify envelope structure
         val envelope = polled[0].envelope
         assertNotNull(envelope.eventId)
-        assertEquals("payment_order_psp_call_requested", envelope.eventType)
+        assertEquals("payment_order_capture_requested", envelope.eventType)
         assertEquals("789", envelope.aggregateId)
         assertNotNull(envelope.traceId)
         assertNotNull(envelope.timestamp)
@@ -393,7 +389,7 @@ class PaymentRetryQueueAdapterIntegrationTest {
         // Verify data
         val data = envelope.data
         assertEquals("789", data.paymentOrderId)
-        assertEquals("po-789", data.publicPaymentOrderId)
+        assertEquals("paymentorder-789", data.publicPaymentOrderId)
         assertEquals(3, data.retryCount)
     }
 }

@@ -1,7 +1,10 @@
 package com.dogancaglar.paymentservice.domain.model
 
+//status of an (Payment aggregate)
 enum class PaymentStatus {
-    INITIATED,
-    SUCCESS,
-    FAILED
+    PENDING_AUTH,
+    AUTHORIZED,
+    DECLINED,
+    CAPTURED_PARTIALLY,
+    CAPTURED
 }

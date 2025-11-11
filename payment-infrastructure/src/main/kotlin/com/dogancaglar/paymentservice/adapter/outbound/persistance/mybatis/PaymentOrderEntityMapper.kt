@@ -10,36 +10,30 @@ import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 
 object PaymentOrderEntityMapper {
 
+    /** Domain → Entity */
     fun toEntity(order: PaymentOrder): PaymentOrderEntity =
         PaymentOrderEntity(
             paymentOrderId = order.paymentOrderId.value,
-            publicPaymentOrderId = order.publicPaymentOrderId,
             paymentId = order.paymentId.value,
-            publicPaymentId = order.publicPaymentId,
             sellerId = order.sellerId.value,
             amountValue = order.amount.quantity,
             amountCurrency = order.amount.currency.currencyCode,
             status = order.status,
             createdAt = order.createdAt,
             updatedAt = order.updatedAt,
-            retryCount = order.retryCount,
-            retryReason = order.retryReason,
-            lastErrorMessage = order.lastErrorMessage
+            retryCount = order.retryCount
         )
 
+    /** Entity → Domain */
     fun toDomain(entity: PaymentOrderEntity): PaymentOrder =
-        PaymentOrder.builder()
-            .paymentOrderId(PaymentOrderId(entity.paymentOrderId))
-            .publicPaymentOrderId(entity.publicPaymentOrderId)
-            .paymentId(PaymentId(entity.paymentId))
-            .publicPaymentId(entity.publicPaymentId)
-            .sellerId(SellerId(entity.sellerId))
-            .amount(Amount.of(entity.amountValue, Currency(entity.amountCurrency)))
-            .status(entity.status)
-            .createdAt(entity.createdAt)
-            .updatedAt(entity.updatedAt)
-            .retryCount(entity.retryCount)
-            .retryReason(entity.retryReason)
-            .lastErrorMessage(entity.lastErrorMessage)
-            .buildFromPersistence()
+        PaymentOrder.rehydrate(
+            paymentOrderId = PaymentOrderId(entity.paymentOrderId),
+            paymentId = PaymentId(entity.paymentId),
+            sellerId = SellerId(entity.sellerId),
+            amount = Amount.of(entity.amountValue, Currency(entity.amountCurrency)),
+            status = entity.status,
+            retryCount = entity.retryCount,
+            createdAt = entity.createdAt,
+            updatedAt = entity.updatedAt
+        )
 }
