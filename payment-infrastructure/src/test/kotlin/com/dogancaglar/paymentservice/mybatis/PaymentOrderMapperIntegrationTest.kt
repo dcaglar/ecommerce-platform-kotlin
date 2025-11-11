@@ -1,18 +1,12 @@
 package com.dogancaglar.paymentservice.mybatis
 
 import com.dogancaglar.paymentservice.InfraTestBoot
-import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.PaymentOrderEntityMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentEntity
+import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentOrderEntity
+import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.PaymentMapper
 import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.PaymentOrderMapper
-import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.Currency
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
-import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeAll
@@ -26,48 +20,11 @@ import org.springframework.test.context.ContextConfiguration
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.TestPropertySource
-import org.springframework.transaction.annotation.Transactional
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import java.time.LocalDateTime
-import java.time.temporal.ChronoUnit
 
-/**
- * Helper function to truncate LocalDateTime to microseconds (PostgreSQL precision).
- * PostgreSQL TIMESTAMP has microsecond precision, but Kotlin LocalDateTime has nanosecond precision.
- */
-private fun LocalDateTime.truncateToMicros(): LocalDateTime = this.truncatedTo(ChronoUnit.MICROS)
-
-/**
- * Asserts that two LocalDateTime values are equal within 1 microsecond tolerance.
- * PostgreSQL TIMESTAMP has microsecond precision, but rounding during truncation can cause 1 microsecond differences.
- */
-private fun assertEqualsWithMicrosecondTolerance(expected: LocalDateTime?, actual: LocalDateTime?, message: String? = null) {
-    if (expected == null || actual == null) {
-        assertEquals(expected, actual, message)
-        return
-    }
-    val expectedMicros = expected.truncateToMicros()
-    val actualMicros = actual.truncateToMicros()
-    val diff = kotlin.math.abs(java.time.Duration.between(expectedMicros, actualMicros).toNanos())
-    assertTrue(diff <= 1000, message ?: "Expected $expectedMicros but was $actualMicros (difference: ${diff}ns, max allowed: 1000ns)")
-}
-
-/**
- * Integration tests for PaymentOrderMapper with real PostgreSQL (Testcontainers).
- * 
- * These tests validate:
- * - Real database persistence operations
- * - MyBatis mapper integration
- * - Payment order CRUD operations
- * - SQL operations with actual PostgreSQL
- * 
- * Tagged as @integration for selective execution:
- * - mvn test                             -> Runs ALL tests (unit + integration)
- * - mvn test -Dgroups=integration        -> Runs integration tests only
- * - mvn test -DexcludedGroups=integration -> Runs unit tests only (fast)
- */
 @Tag("integration")
 @MybatisTest
 @ContextConfiguration(classes = [InfraTestBoot::class])
@@ -78,6 +35,13 @@ private fun assertEqualsWithMicrosecondTolerance(expected: LocalDateTime?, actua
 class PaymentOrderMapperIntegrationTest {
 
     companion object {
+        @Container
+        @JvmStatic
+        val postgres = PostgreSQLContainer("postgres:15")
+            .withDatabaseName("testdb")
+            .withUsername("test")
+            .withPassword("test")
+
         @BeforeAll
         @JvmStatic
         fun initSchema() {
@@ -85,13 +49,6 @@ class PaymentOrderMapperIntegrationTest {
                 PaymentOrderMapperIntegrationTest::class.java.classLoader.getResource("schema-test.sql")!!.readText()
             postgres.createConnection("").use { c -> c.createStatement().execute(ddl) }
         }
-
-        @Container
-        @JvmStatic
-        val postgres = PostgreSQLContainer("postgres:15")
-            .withDatabaseName("testdb")
-            .withUsername("test")
-            .withPassword("test")
 
         init {
             postgres.start()
@@ -108,291 +65,153 @@ class PaymentOrderMapperIntegrationTest {
     }
 
     @Autowired
+    lateinit var paymentMapper: PaymentMapper
+
+    @Autowired
     lateinit var paymentOrderMapper: PaymentOrderMapper
 
+    private fun upsertPayment(paymentId: Long) {
+        val now = LocalDateTime.now().withNano(0)
+        paymentMapper.insert(
+            PaymentEntity(
+                paymentId = paymentId,
+                buyerId = "buyer-$paymentId",
+                orderId = "order-$paymentId",
+                totalAmountValue = 50_00,
+                capturedAmountValue = 0,
+                currency = "USD",
+                status = "PENDING_AUTH",
+                createdAt = now,
+                updatedAt = now
+            )
+        )
+    }
+
+    private fun paymentOrderEntity(
+        id: Long,
+        paymentId: Long = 1001L,
+        status: PaymentOrderStatus = PaymentOrderStatus.INITIATED_PENDING,
+        retryCount: Int = 0,
+        createdAt: LocalDateTime = LocalDateTime.now().withNano(0),
+        updatedAt: LocalDateTime = createdAt
+    ) = PaymentOrderEntity(
+        paymentOrderId = id,
+        paymentId = paymentId,
+        sellerId = "seller-$paymentId",
+        amountValue = 10_00,
+        amountCurrency = "USD",
+        status = status,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        retryCount = retryCount
+    )
+
     @Test
-    fun `insert operation works correctly`() {
-        val paymentOrderId = PaymentOrderId(2L)
-        val paymentId = PaymentId(200L)
-        val sellerId = SellerId("seller-abc")
-        val now = LocalDateTime.now()
+    fun `basic CRUD and counters`() {
+        upsertPayment(1001L)
 
-        // Test INSERT operation
-        val paymentOrder = PaymentOrder.builder()
-            .paymentOrderId(paymentOrderId)
-            .publicPaymentOrderId("PO-0002")
-            .paymentId(paymentId)
-            .publicPaymentId("PAY-200")
-            .sellerId(sellerId)
-            .amount(Amount.of(2020000L, Currency("USD")))
-            .status(PaymentOrderStatus.INITIATED_PENDING)
-            .createdAt(now.minusDays(1))
-            .updatedAt(now.minusDays(1))
-            .retryCount(0)
-            .retryReason(null)
-            .lastErrorMessage(null)
-            .buildNew()
-        val insertResult = paymentOrderMapper.insertAllIgnore(listOf(PaymentOrderEntityMapper.toEntity(paymentOrder)))
-        assertEquals(1, insertResult, "Insert should succeed")
+        val entity = paymentOrderEntity(201L)
+        val inserted = paymentOrderMapper.insert(entity)
+        assertEquals(1, inserted)
 
-        // Verify data was persisted
-        val persisted = paymentOrderMapper.findByPaymentOrderId(paymentOrderId.value).first()
-        assertEquals(paymentOrderId.value, persisted.paymentOrderId)
-        assertEquals("PO-0002", persisted.publicPaymentOrderId)
-        assertEquals(paymentId.value, persisted.paymentId)
-        assertEquals("PAY-200", persisted.publicPaymentId)
-        assertEquals(sellerId.value, persisted.sellerId)
-        assertEquals(2020000L, persisted.amountValue)
-        assertEquals("USD", persisted.amountCurrency)
+        val byId = paymentOrderMapper.findByPaymentOrderId(201L)
+        assertEquals(1, byId.size)
+        assertEquals(entity, byId.first())
+
+        val byPayment = paymentOrderMapper.findByPaymentId(1001L)
+        assertEquals(1, byPayment.size)
+
+        assertEquals(1L, paymentOrderMapper.countByPaymentId(1001L))
+        assertEquals(
+            1L,
+            paymentOrderMapper.countByPaymentIdAndStatusIn(
+                paymentId = 1001L,
+                statuses = listOf(PaymentOrderStatus.INITIATED_PENDING.name)
+            )
+        )
+        assertEquals(
+            false,
+            paymentOrderMapper.existsByPaymentIdAndStatus(
+                1001L,
+                PaymentOrderStatus.CAPTURED.name
+            )
+        )
+        assertEquals(
+            true,
+            paymentOrderMapper.existsByPaymentIdAndStatus(
+                1001L,
+                PaymentOrderStatus.INITIATED_PENDING.name
+            )
+        )
+
+        assertEquals(201L, paymentOrderMapper.getMaxPaymentOrderId())
     }
 
     @Test
-    fun `update operation works correctly`() {
-        val paymentOrderId = PaymentOrderId(3L)
-        val paymentId = PaymentId(300L)
-        val sellerId = SellerId("seller-xyz")
-        val now = LocalDateTime.now()
+    fun `updateReturningIdempotent respects terminal statuses`() {
+        upsertPayment(2001L)
+        val base = paymentOrderEntity(
+            id = 301L,
+            paymentId = 2001L,
+            status = PaymentOrderStatus.CAPTURE_REQUESTED,
+            retryCount = 1
+        )
+        paymentOrderMapper.insert(base)
 
-        // First INSERT
-        val paymentOrder = PaymentOrder.builder()
-            .paymentOrderId(paymentOrderId)
-            .publicPaymentOrderId("PO-0003")
-            .paymentId(paymentId)
-            .publicPaymentId("PAY-300")
-            .sellerId(sellerId)
-            .amount(Amount.of(3030000L, Currency("USD")))
-            .status(PaymentOrderStatus.INITIATED_PENDING)
-            .createdAt(now.minusDays(1))
-            .updatedAt(now.minusDays(1))
-            .retryCount(0)
-            .retryReason(null)
-            .lastErrorMessage(null)
-            .buildNew()
-        paymentOrderMapper.insertAllIgnore(listOf(PaymentOrderEntityMapper.toEntity(paymentOrder)))
+        val updated = paymentOrderMapper.updateReturningIdempotent(
+            base.copy(
+                status = PaymentOrderStatus.CAPTURE_FAILED,
+                retryCount = 3,
+                updatedAt = base.updatedAt.plusMinutes(5)
+            )
+        )
+        assertNotNull(updated)
+        assertEquals(PaymentOrderStatus.CAPTURE_FAILED, updated!!.status)
+        assertEquals(3, updated.retryCount)
 
-        // Test UPDATE operation
-        val updatedOrder = PaymentOrder.builder()
-            .paymentOrderId(paymentOrderId)
-            .publicPaymentOrderId("PO-0003")
-            .paymentId(paymentId)
-            .publicPaymentId("PAY-300")
-            .sellerId(sellerId)
-            .amount(Amount.of(3030000L, Currency("USD")))
-            .status(PaymentOrderStatus.SUCCESSFUL_FINAL)
-            .createdAt(now.minusDays(1))
-            .updatedAt(now)
-            .retryCount(0)
-            .retryReason(null)
-            .lastErrorMessage(null)
-            .buildFromPersistence()
-        val updateResult = paymentOrderMapper.updateReturningIdempotent(PaymentOrderEntityMapper.toEntity(updatedOrder))
-        assertNotNull(updateResult, "Update should succeed and return updated entity")
+        // Attempt to override terminal status CAPTURED -> should remain CAPTURED
+        val terminal = paymentOrderMapper.updateReturningIdempotent(
+            updated.copy(
+                status = PaymentOrderStatus.CAPTURED,
+                updatedAt = updated.updatedAt.plusMinutes(5)
+            )
+        )
+        assertNotNull(terminal)
+        assertEquals(PaymentOrderStatus.CAPTURED, terminal!!.status)
 
-        // Verify data was updated
-        val persisted = paymentOrderMapper.findByPaymentOrderId(paymentOrderId.value).first()
-        assertEquals(PaymentOrderStatus.SUCCESSFUL_FINAL, persisted.status)
-        assertEqualsWithMicrosecondTolerance(now, persisted.updatedAt)
+        val afterTerminal = paymentOrderMapper.updateReturningIdempotent(
+            terminal.copy(
+                status = PaymentOrderStatus.CAPTURE_FAILED,
+                updatedAt = terminal.updatedAt.plusMinutes(10)
+            )
+        )
+        // status stays CAPTURED but retryCount updates via GREATEST
+        assertNotNull(afterTerminal)
+        assertEquals(PaymentOrderStatus.CAPTURED, afterTerminal!!.status)
+        assertEquals(terminal.retryCount, afterTerminal.retryCount)
     }
 
     @Test
-    fun `bulk insert with ignore works correctly`() {
-        val paymentOrders = (1..5).map { i ->
-            PaymentOrder.builder()
-                .paymentOrderId(PaymentOrderId(100L + i))
-                .publicPaymentOrderId("PO-bulk-$i")
-                .paymentId(PaymentId(200L + i))
-                .publicPaymentId("PAY-bulk-$i")
-                .sellerId(SellerId("seller-bulk"))
-                .amount(Amount.of(10000L * i, Currency("USD")))
-                .status(PaymentOrderStatus.INITIATED_PENDING)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .retryCount(0)
-                .retryReason(null)
-                .lastErrorMessage(null)
-                .buildNew()
-        }
+    fun `insertAllIgnore skips duplicates`() {
+        upsertPayment(3001L)
+        val first = paymentOrderEntity(id = 401L, paymentId = 3001L)
+        val second = paymentOrderEntity(id = 402L, paymentId = 3001L)
+        val inserts = paymentOrderMapper.insertAllIgnore(listOf(first, second))
+        assertEquals(2, inserts)
 
-        val entities = paymentOrders.map { PaymentOrderEntityMapper.toEntity(it) }
-        val insertedCount = paymentOrderMapper.insertAllIgnore(entities)
-
-        assertEquals(5, insertedCount)
-
-        // Verify all were inserted by checking each ID
-        val allOrders = (101L..105L).flatMap { paymentOrderMapper.findByPaymentOrderId(it) }
-        assertTrue(allOrders.isNotEmpty())
-        assertEquals(5, allOrders.size)
+        val retry = paymentOrderMapper.insertAllIgnore(listOf(first))
+        assertEquals(0, retry)
     }
 
     @Test
-    fun `duplicate insert with ignore does not fail`() {
-        val paymentOrder = PaymentOrder.builder()
-            .paymentOrderId(PaymentOrderId(500L))
-            .publicPaymentOrderId("PO-duplicate")
-            .paymentId(PaymentId(600L))
-            .publicPaymentId("PAY-duplicate")
-            .sellerId(SellerId("seller-duplicate"))
-            .amount(Amount.of(50000L, Currency("USD")))
-            .status(PaymentOrderStatus.INITIATED_PENDING)
-            .createdAt(LocalDateTime.now())
-            .updatedAt(LocalDateTime.now())
-            .retryCount(0)
-            .retryReason(null)
-            .lastErrorMessage(null)
-            .buildNew()
+    fun `deleteAll clears table`() {
+        upsertPayment(4001L)
+        paymentOrderMapper.insert(paymentOrderEntity(id = 501L, paymentId = 4001L))
+        assertEquals(1, paymentOrderMapper.countAll())
 
-        val entity = PaymentOrderEntityMapper.toEntity(paymentOrder)
-
-        // First insert should succeed
-        val firstInsert = paymentOrderMapper.insertAllIgnore(listOf(entity))
-        assertEquals(1, firstInsert)
-
-        // Second insert with same ID should be ignored
-        val secondInsert = paymentOrderMapper.insertAllIgnore(listOf(entity))
-        assertEquals(0, secondInsert) // No rows inserted due to ignore
-
-        // Should still have only one record
-        val orders = paymentOrderMapper.findByPaymentOrderId(500L)
-        assertEquals(1, orders.size)
-    }
-
-    @Test
-    fun `findByPaymentOrderId returns correct data`() {
-        val paymentOrderId = PaymentOrderId(700L)
-        val paymentId = PaymentId(800L)
-        val sellerId = SellerId("seller-find")
-        val amount = Amount.of(75000L, Currency("EUR"))
-        val now = LocalDateTime.now()
-
-        val paymentOrder = PaymentOrder.builder()
-            .paymentOrderId(paymentOrderId)
-            .publicPaymentOrderId("PO-find-700")
-            .paymentId(paymentId)
-            .publicPaymentId("PAY-find-800")
-            .sellerId(sellerId)
-            .amount(amount)
-            .status(PaymentOrderStatus.INITIATED_PENDING)
-            .createdAt(now)
-            .updatedAt(now)
-            .retryCount(0)
-            .retryReason(null)
-            .lastErrorMessage(null)
-            .buildNew()
-
-        paymentOrderMapper.insertAllIgnore(listOf(PaymentOrderEntityMapper.toEntity(paymentOrder)))
-
-        val found = paymentOrderMapper.findByPaymentOrderId(paymentOrderId.value)
-        assertEquals(1, found.size)
-
-        val entity = found.first()
-        assertEquals(paymentOrderId.value, entity.paymentOrderId)
-        assertEquals("PO-find-700", entity.publicPaymentOrderId)
-        assertEquals(paymentId.value, entity.paymentId)
-        assertEquals("PAY-find-800", entity.publicPaymentId)
-        assertEquals(sellerId.value, entity.sellerId)
-        assertEquals(amount.quantity, entity.amountValue)
-        assertEquals(amount.currency.currencyCode, entity.amountCurrency)
-        assertEquals(PaymentOrderStatus.INITIATED_PENDING, entity.status)
-    }
-
-    @Test
-    fun `updateReturningIdempotent handles multiple updates correctly`() {
-        val paymentOrderId = PaymentOrderId(900L)
-        val paymentId = PaymentId(1000L)
-        val sellerId = SellerId("seller-concurrent")
-        val now = LocalDateTime.now()
-
-        // First INSERT
-        val init = PaymentOrder.builder()
-            .paymentOrderId(paymentOrderId)
-            .publicPaymentOrderId("PO-concurrent-900")
-            .paymentId(paymentId)
-            .publicPaymentId("PAY-concurrent-1000")
-            .sellerId(sellerId)
-            .amount(Amount.of(90000L, Currency("USD")))
-            .status(PaymentOrderStatus.INITIATED_PENDING)
-            .createdAt(now)
-            .updatedAt(now)
-            .retryCount(0)
-            .retryReason(null)
-            .lastErrorMessage(null)
-            .buildNew()
-        paymentOrderMapper.insertAllIgnore(listOf(PaymentOrderEntityMapper.toEntity(init)))
-
-        // First UPDATE
-        val firstUpdate = PaymentOrder.builder()
-            .paymentOrderId(paymentOrderId)
-            .publicPaymentOrderId("PO-concurrent-900")
-            .paymentId(paymentId)
-            .publicPaymentId("PAY-concurrent-1000")
-            .sellerId(sellerId)
-            .amount(Amount.of(90000L, Currency("USD")))
-            .status(PaymentOrderStatus.SUCCESSFUL_FINAL)
-            .createdAt(now)
-            .updatedAt(now.plusMinutes(1))
-            .retryCount(0)
-            .retryReason(null)
-            .lastErrorMessage(null)
-            .buildFromPersistence()
-        val firstResult = paymentOrderMapper.updateReturningIdempotent(PaymentOrderEntityMapper.toEntity(firstUpdate))
-        assertNotNull(firstResult, "First update should succeed")
-
-        // Second UPDATE (should be ignored due to idempotent behavior)
-        val secondUpdate = PaymentOrder.builder()
-            .paymentOrderId(paymentOrderId)
-            .publicPaymentOrderId("PO-concurrent-900")
-            .paymentId(paymentId)
-            .publicPaymentId("PAY-concurrent-1000")
-            .sellerId(sellerId)
-            .amount(Amount.of(90000L, Currency("USD")))
-            .status(PaymentOrderStatus.FAILED_FINAL)
-            .createdAt(now)
-            .updatedAt(now.plusMinutes(2))
-            .retryCount(0)
-            .retryReason(null)
-            .lastErrorMessage(null)
-            .buildFromPersistence()
-        val secondResult = paymentOrderMapper.updateReturningIdempotent(PaymentOrderEntityMapper.toEntity(secondUpdate))
-        assertNull(secondResult, "Second update should be ignored (idempotent)")
-
-        // Verify final state
-        val finalEntity = paymentOrderMapper.findByPaymentOrderId(paymentOrderId.value).first()
-        assertEquals(PaymentOrderStatus.SUCCESSFUL_FINAL, finalEntity.status)
-        assertEqualsWithMicrosecondTolerance(now.plusMinutes(1), finalEntity.updatedAt)
-    }
-
-    @Test
-    fun `database insert and query operations work correctly`() {
-        val paymentOrderId = PaymentOrderId(1100L)
-        val paymentId = PaymentId(1200L)
-        val sellerId = SellerId("seller-transaction")
-
-        val paymentOrder = PaymentOrder.builder()
-            .paymentOrderId(paymentOrderId)
-            .publicPaymentOrderId("PO-transaction-1100")
-            .paymentId(paymentId)
-            .publicPaymentId("PAY-transaction-1200")
-            .sellerId(sellerId)
-            .amount(Amount.of(110000L, Currency("USD")))
-            .status(PaymentOrderStatus.INITIATED_PENDING)
-            .createdAt(LocalDateTime.now())
-            .updatedAt(LocalDateTime.now())
-            .retryCount(0)
-            .retryReason(null)
-            .lastErrorMessage(null)
-            .buildNew()
-
-        // Test that we can insert data
-        paymentOrderMapper.insertAllIgnore(listOf(PaymentOrderEntityMapper.toEntity(paymentOrder)))
-
-        // Verify data was inserted
-        val found = paymentOrderMapper.findByPaymentOrderId(paymentOrderId.value)
-        assertEquals(1, found.size, "Expected 1 record to be inserted")
-
-        // Verify the data has correct values
-        val entity = found.first()
-        assertEquals(paymentOrderId.value, entity.paymentOrderId)
-        assertEquals("PO-transaction-1100", entity.publicPaymentOrderId)
-        assertEquals(PaymentOrderStatus.INITIATED_PENDING, entity.status)
+        paymentOrderMapper.deleteAll()
+        assertEquals(0, paymentOrderMapper.countAll())
+        assertNull(paymentOrderMapper.updateReturningIdempotent(paymentOrderEntity(501L)))
     }
 }
+
