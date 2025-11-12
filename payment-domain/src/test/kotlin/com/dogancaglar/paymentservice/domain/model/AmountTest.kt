@@ -69,7 +69,6 @@ class AmountTest {
     fun `equals should return false for different currencies`() {
         val amount1 = Amount.of(100000L, Currency("USD"))
         val amount2 = Amount.of(100000L, Currency("EUR"))
-
         assertNotEquals(amount1, amount2)
     }
 

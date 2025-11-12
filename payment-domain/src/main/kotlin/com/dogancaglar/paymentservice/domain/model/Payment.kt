@@ -3,84 +3,131 @@ package com.dogancaglar.paymentservice.domain.model
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import java.time.Clock
 import java.time.LocalDateTime
+import kotlin.collections.plus
+
 
 class Payment private constructor(
     val paymentId: PaymentId,
-    val publicPaymentId: String,
     val buyerId: BuyerId,
     val orderId: OrderId,
     val totalAmount: Amount,
+    val capturedAmount: Amount,
     val status: PaymentStatus,
+    val idempotencyKey: String,            // <-- internal business idempotency
     val createdAt: LocalDateTime,
+    val updatedAt: LocalDateTime,
     val paymentOrders: List<PaymentOrder>
 ) {
 
-    fun markAsPaid() = copy(status = PaymentStatus.SUCCESS)
-    fun markAsFailed() = copy(status = PaymentStatus.FAILED)
+    val publicPaymentId: String
+        get() = "payment-${paymentId.value}"
 
-    fun addPaymentOrder(paymentOrder: PaymentOrder): Payment =
-        copy(paymentOrders = this.paymentOrders + paymentOrder)
+    // --- Domain Behavior ---
 
-    private fun copy(
+    fun authorize(updatedAt: LocalDateTime= LocalDateTime.now(Clock.systemUTC())): Payment {
+        require(status == PaymentStatus.PENDING_AUTH) { "Payment can only be authorized from PENDING_AUTH" }
+        return copy(status = PaymentStatus.AUTHORIZED, updatedAt = updatedAt )
+    }
+
+
+    fun decline(updatedAt: LocalDateTime= LocalDateTime.now(Clock.systemUTC())): Payment {
+        require(status == PaymentStatus.PENDING_AUTH) { "Payment can only be declined from PENDING_AUTH" }
+        return copy(status = PaymentStatus.DECLINED, updatedAt = updatedAt)
+    }
+
+
+    fun addCapturedAmount(amount: Amount): Payment {
+        val newCaptured = this.capturedAmount + amount
+        require(newCaptured <= totalAmount) { "Captured amount cannot exceed total" }
+
+        val newStatus = when {
+            newCaptured == totalAmount -> PaymentStatus.CAPTURED
+            newCaptured < totalAmount -> PaymentStatus.CAPTURED_PARTIALLY
+            else -> status
+        }
+
+        return copy(capturedAmount = newCaptured, status = newStatus,updatedAt=updatedAt)
+    }
+
+    fun addPaymentOrder(paymentOrder: PaymentOrder): Payment {
+        require(paymentOrder.paymentId == paymentId) {
+            "PaymentOrder must reference the same Payment"
+        }
+        require(paymentOrder.amount.currency == totalAmount.currency) {
+            "Currency mismatch between Payment and PaymentOrder"
+        }
+        return copy(paymentOrders = paymentOrders + paymentOrder, updatedAt = updatedAt)
+    }
+
+
+    // --- Internal copy (immutability) ---
+    private fun  copy(
+        capturedAmount: Amount = this.capturedAmount,
         status: PaymentStatus = this.status,
-        paymentOrders: List<PaymentOrder> = this.paymentOrders
-    ): Payment = Builder()
-        .paymentId(paymentId)
-        .publicPaymentId(publicPaymentId)
-        .buyerId(buyerId)
-        .orderId(orderId)
-        .totalAmount(totalAmount)
-        .status(status)
-        .createdAt(createdAt)
-        .paymentOrders(paymentOrders)
-        .build()
+        paymentOrders: List<PaymentOrder> = this.paymentOrders,
+        updatedAt: LocalDateTime
+    ): Payment = Payment(
+        paymentId = paymentId,
+        buyerId = buyerId,
+        orderId = orderId,
+        totalAmount = totalAmount,
+        capturedAmount = capturedAmount,
+        status = status,
+        idempotencyKey = idempotencyKey,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        paymentOrders = paymentOrders
+    )
 
     companion object {
-        fun builder(): Builder = Builder()
+        fun createNew(
+            paymentId: PaymentId,
+            buyerId: BuyerId,
+            orderId: OrderId,
+            totalAmount: Amount,
+            clock: Clock = Clock.systemUTC()
+        ): Payment {
+            require(totalAmount.isPositive()) { "Total amount must be positive" }
+            val idempotencyKeyGenerated = "${buyerId.value}:${orderId.value}:${totalAmount.quantity}:${totalAmount.currency.currencyCode}"
+            return Payment(
+                paymentId = paymentId,
+                buyerId = buyerId,
+                orderId = orderId,
+                totalAmount = totalAmount,
+                capturedAmount = Amount.zero(totalAmount.currency),
+                status = PaymentStatus.PENDING_AUTH,
+                idempotencyKey = idempotencyKeyGenerated,
+                createdAt = LocalDateTime.now(clock),
+                updatedAt = LocalDateTime.now(clock),
+                paymentOrders = emptyList()
+            )
+
+        }
+
+        fun rehydrate(
+            paymentId: PaymentId,
+            buyerId: BuyerId,
+            orderId: OrderId,
+            totalAmount: Amount,
+            capturedAmount: Amount,
+            status: PaymentStatus,
+            idempotencyKey: String,
+            createdAt: LocalDateTime,
+            updatedAt: LocalDateTime
+        ): Payment = Payment(
+            paymentId,
+            buyerId,
+            orderId,
+            totalAmount,
+            capturedAmount,
+            status,
+            idempotencyKey,
+            createdAt,
+            updatedAt,
+            emptyList()
+        )
     }
 
-    class Builder {
-        private var paymentId: PaymentId? = null
-        private var publicPaymentId: String? = null
-        private var buyerId: BuyerId? = null
-        private var orderId: OrderId? = null
-        private var totalAmount: Amount? = null
-        private var status: PaymentStatus = PaymentStatus.INITIATED
-        private var createdAt: LocalDateTime = LocalDateTime.now()
-        private var paymentOrders: List<PaymentOrder> = listOf()
-
-        fun paymentId(value: PaymentId) = apply { this.paymentId = value }
-        fun publicPaymentId(value: String) = apply { this.publicPaymentId = value }
-        fun buyerId(value: BuyerId) = apply { this.buyerId = value }
-        fun orderId(value: OrderId) = apply { this.orderId = value }
-        fun totalAmount(value: Amount) = apply { this.totalAmount = value }
-        fun status(value: PaymentStatus) = apply { this.status = value }
-        fun createdAt(value: LocalDateTime) = apply { this.createdAt = value }
-        fun paymentOrders(value: List<PaymentOrder>) = apply { this.paymentOrders = value }
-
-        fun buildNew(): Payment = Payment(
-            paymentId = requireNotNull(paymentId),
-            publicPaymentId = requireNotNull(publicPaymentId),
-            buyerId = requireNotNull(buyerId),
-            orderId = requireNotNull(orderId),
-            totalAmount = requireNotNull(totalAmount),
-            status = PaymentStatus.INITIATED,
-            createdAt = createdAt,
-            paymentOrders = paymentOrders
-        )
-
-        fun buildFromPersistence(): Payment = Payment(
-            paymentId = requireNotNull(paymentId),
-            publicPaymentId = requireNotNull(publicPaymentId),
-            buyerId = requireNotNull(buyerId),
-            orderId = requireNotNull(orderId),
-            totalAmount = requireNotNull(totalAmount),
-            status = status,
-            createdAt = createdAt,
-            paymentOrders = paymentOrders
-        )
-
-        fun build(): Payment = buildFromPersistence()
-    }
 }

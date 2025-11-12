@@ -8,7 +8,7 @@ import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
  * This class is only created through the factory method to ensure invariants are maintained.
  */
 data class PostingEventData private constructor(
-    val accountCode: String, // e.g., "MERCHANT_ACCOUNT.MERCHANT-456"
+    val accountCode: String, // e.g., "MERCHANT_PAYABLE.MERCHANT-456"
     val accountType: AccountType,
     val amount: Long, // quantity in minor currency units
     val currency: String, // e.g., "USD"
@@ -18,7 +18,7 @@ data class PostingEventData private constructor(
         /**
          * Factory method to create PostingEventData.
          * 
-         * @param accountCode Account code (e.g., "MERCHANT_ACCOUNT.MERCHANT-456")
+         * @param accountCode Account code (e.g., "MERCHANT_PAYABLE.MERCHANT-456")
          * @param accountType Account type
          * @param amount Amount in minor currency units
          * @param currency Currency code (e.g., "USD")

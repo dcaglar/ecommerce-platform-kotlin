@@ -27,19 +27,6 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
         }
 
 
-    @Bean("paymentStatusPspPool")
-    fun paymentStatusPspPool(decorator: TaskDecorator): ThreadPoolTaskExecutor =
-        ThreadPoolTaskExecutor().apply {
-            corePoolSize = 1
-            maxPoolSize = 2
-            queueCapacity = 4
-            setThreadNamePrefix("ps-psp-")
-            setTaskDecorator(decorator)
-            setRejectedExecutionHandler(ThreadPoolExecutor.AbortPolicy())
-            setWaitForTasksToCompleteOnShutdown(true)
-            initialize()
-        }
-
 
     @Bean("taskScheduler")
     fun defaultSpringScheduler(): ThreadPoolTaskScheduler =

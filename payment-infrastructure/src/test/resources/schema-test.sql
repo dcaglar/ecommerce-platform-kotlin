@@ -7,6 +7,7 @@ CREATE TABLE outbox_event (
   payload     TEXT         NOT NULL,
   status      VARCHAR(50)  NOT NULL,
   created_at  TIMESTAMP    NOT NULL,
+  updated_at  TIMESTAMP    NOT NULL,
   claimed_at  TIMESTAMP NULL,
   claimed_by  VARCHAR(128) NULL,
   PRIMARY KEY (oeid, created_at)
@@ -18,44 +19,36 @@ CREATE INDEX IF NOT EXISTS idx_outbox_event_status    ON outbox_event (status);
 CREATE INDEX IF NOT EXISTS idx_outbox_status_claimed_at ON outbox_event (status, claimed_at);
 
 
--- public.payment_orders definition
+-- payments + payment_orders tables used across mapper integration tests
 
--- Drop table
-
+DROP TABLE IF EXISTS payment_orders;
 DROP TABLE IF EXISTS payments;
 
 CREATE TABLE payments (
-	id BIGSERIAL PRIMARY KEY,
-	payment_id BIGINT NOT NULL,
-	public_payment_id VARCHAR(255) NOT NULL UNIQUE,
-	buyer_id VARCHAR(255) NOT NULL,
-	order_id VARCHAR(255) NOT NULL,
-	amount_value BIGINT NOT NULL,
-	amount_currency VARCHAR(3) NOT NULL,
-	status VARCHAR(50) NOT NULL,
-	created_at TIMESTAMP NOT NULL,
-	updated_at TIMESTAMP NULL,
-	retry_count INT NULL,
-	retry_reason VARCHAR(255) NULL,
-	last_error_message VARCHAR(255) NULL
+    payment_id BIGINT PRIMARY KEY,
+    idempotency_key VARCHAR(128) NOT NULL,
+    buyer_id VARCHAR(255) NOT NULL,
+    order_id VARCHAR(255) NOT NULL,
+    total_amount_value BIGINT NOT NULL,
+    captured_amount_value BIGINT NOT NULL DEFAULT 0,
+    currency CHAR(3) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    CONSTRAINT uq_payment_idempotency_key UNIQUE(idempotency_key)
+
 );
-DROP TABLE IF EXISTS  payment_orders;
+
 CREATE TABLE payment_orders (
-	payment_order_id int8 NOT NULL,
-	public_payment_order_id varchar(255) NOT NULL,
-	payment_id int8 NOT NULL,
-	public_payment_id varchar(255) NOT NULL,
-	seller_id varchar(255) NOT NULL,
-	amount_value numeric(19, 2) NOT NULL,
-	amount_currency varchar(10) NOT NULL,
-	status varchar(50) NOT NULL,
-	created_at timestamp NOT NULL,
-	updated_at timestamp NULL,
-	retry_count int4 NULL,
-	retry_reason varchar(255) NULL,
-	last_error_message varchar(255) NULL,
-	CONSTRAINT payment_orders_pkey PRIMARY KEY (payment_order_id),
-	CONSTRAINT payment_orders_public_payment_order_id_key UNIQUE (public_payment_order_id)
+    payment_order_id BIGINT PRIMARY KEY,
+    payment_id BIGINT NOT NULL REFERENCES payments(payment_id) ON DELETE CASCADE,
+    seller_id VARCHAR(255) NOT NULL,
+    amount_value BIGINT NOT NULL,
+    amount_currency CHAR(3) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    retry_count INTEGER NOT NULL DEFAULT 0
 );
 
 -- ========== JOURNAL ENTRIES TABLE ==========

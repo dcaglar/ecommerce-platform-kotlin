@@ -1,251 +1,172 @@
 package com.dogancaglar.paymentservice.domain.model
 
-import com.dogancaglar.paymentservice.domain.model.Currency
-
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
-import com.dogancaglar.paymentservice.domain.model.vo.SellerId
+import com.dogancaglar.paymentservice.domain.model.vo.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import java.time.LocalDateTime
 
 class PaymentOrderTest {
 
+    private val paymentOrderId = PaymentOrderId(1L)
+    private val publicPaymentOrderId ="paymentorder-1"
+    private val paymentId = PaymentId(10L)
+    private val publicPaymentId = "payment-10"
+    private val sellerId = SellerId("seller-abc")
+    private val amount = Amount.of(1000L, Currency("EUR")) // €10.00
+
+    // --- ✅ Creation tests ---
+
     @Test
-    fun `PaymentOrder builder should create PaymentOrder with INITIATED_PENDING status`() {
-        val now = LocalDateTime.now()
-        val paymentOrderId = PaymentOrderId(1L)
-        val paymentId = PaymentId(100L)
-        val sellerId = SellerId("seller-123")
-        val amount = Amount.of(100000L, Currency("USD")) // $1000.00 = 100000 cents
+    fun `should create new PaymentOrder successfully`() {
+        val order = PaymentOrder.createNew(
+            paymentOrderId,
+            paymentId,
+            sellerId,
+            amount
+        )
 
-        val paymentOrder = PaymentOrder.builder()
-            .paymentOrderId(paymentOrderId)
-            .publicPaymentOrderId("paymentorder-1")
-            .paymentId(paymentId)
-            .publicPaymentId("payment-100")
-            .sellerId(sellerId)
-            .amount(amount)
-            .createdAt(now)
-            .updatedAt(now)
-            .buildNew()
-
-        assertEquals(paymentOrderId, paymentOrder.paymentOrderId)
-        assertEquals("paymentorder-1", paymentOrder.publicPaymentOrderId)
-        assertEquals(paymentId, paymentOrder.paymentId)
-        assertEquals("payment-100", paymentOrder.publicPaymentId)
-        assertEquals(sellerId, paymentOrder.sellerId)
-        assertEquals(amount, paymentOrder.amount)
-        assertEquals(PaymentOrderStatus.INITIATED_PENDING, paymentOrder.status)
-        assertEquals(now, paymentOrder.createdAt)
-        assertEquals(now, paymentOrder.updatedAt)
-        assertEquals(0, paymentOrder.retryCount)
-        assertNull(paymentOrder.retryReason)
-        assertNull(paymentOrder.lastErrorMessage)
+        assertEquals(paymentOrderId, order.paymentOrderId)
+        assertEquals(publicPaymentOrderId, order.publicPaymentOrderId)
+        assertEquals(paymentId, order.paymentId)
+        assertEquals(publicPaymentId, order.publicPaymentId)
+        assertEquals(sellerId, order.sellerId)
+        assertEquals(amount, order.amount)
+        assertEquals(PaymentOrderStatus.INITIATED_PENDING, order.status)
+        assertEquals(0, order.retryCount)
+        assertNotNull(order.createdAt)
+        assertNotNull(order.updatedAt)
     }
 
     @Test
-    fun `PaymentOrder builder should recreate PaymentOrder with all fields from persistence`() {
-        val now = LocalDateTime.now()
-        val updatedAt = now.plusHours(1)
-        val paymentOrderId = PaymentOrderId(1L)
-        val paymentId = PaymentId(100L)
-        val sellerId = SellerId("seller-123")
-        val amount = Amount.of(100000L, Currency("USD")) // $1000.00 = 100000 cents
-
-        val paymentOrder = PaymentOrder.builder()
-            .paymentOrderId(paymentOrderId)
-            .publicPaymentOrderId("paymentorder-1")
-            .paymentId(paymentId)
-            .publicPaymentId("payment-100")
-            .sellerId(sellerId)
-            .amount(amount)
-            .status(PaymentOrderStatus.FAILED_TRANSIENT_ERROR)
-            .createdAt(now)
-            .updatedAt(updatedAt)
-            .retryCount(3)
-            .retryReason("PSP timeout")
-            .lastErrorMessage("Connection timeout")
-            .buildFromPersistence()
-
-        assertEquals(paymentOrderId, paymentOrder.paymentOrderId)
-        assertEquals(PaymentOrderStatus.FAILED_TRANSIENT_ERROR, paymentOrder.status)
-        assertEquals(now, paymentOrder.createdAt)
-        assertEquals(updatedAt, paymentOrder.updatedAt)
-        assertEquals(3, paymentOrder.retryCount)
-        assertEquals("PSP timeout", paymentOrder.retryReason)
-        assertEquals("Connection timeout", paymentOrder.lastErrorMessage)
+    fun `should reject PaymentOrder with zero or negative amount`() {
+        val ex = assertThrows<IllegalArgumentException> {
+            PaymentOrder.createNew(
+                paymentOrderId,
+                paymentId,
+                sellerId,
+                Amount.of(-1000, Currency("EUR"))
+            )
+        }
+        assertTrue(ex.message!!.contains("greater than zero"))
     }
 
     @Test
-    fun `markAsFailed should change PaymentOrder status to FAILED_TRANSIENT_ERROR`() {
-        val paymentOrder = createTestPaymentOrder(status = PaymentOrderStatus.INITIATED_PENDING)
+    fun `should reject PaymentOrder with blank seller id`() {
+        val ex = assertThrows<IllegalArgumentException> {
+            PaymentOrder.createNew(
+                paymentOrderId,
+                paymentId,
+                SellerId(""),
+                amount
+            )
+        }
+        assertTrue(ex.message!!.contains("Seller id cant be blank"))
+    }
 
-        val updated = paymentOrder.markAsFailed()
+    // --- ✅ State transition tests ---
 
-        assertEquals(PaymentOrderStatus.FAILED_TRANSIENT_ERROR, updated.status)
-        assertEquals(paymentOrder.paymentOrderId, updated.paymentOrderId)
-        assertEquals(paymentOrder.amount, updated.amount)
+    @Test
+    fun `should transition from INITIATED_PENDING to CAPTURE_REQUESTED`() {
+        val order = PaymentOrder.createNew(
+            paymentOrderId,
+            paymentId,
+            sellerId,
+            amount
+        )
+
+        val updated = order.markCaptureRequested()
+
+        assertEquals(PaymentOrderStatus.CAPTURE_REQUESTED, updated.status)
+        assertTrue(updated.updatedAt.isAfter(order.updatedAt))
     }
 
     @Test
-    fun `markAsPaid should change PaymentOrder status to SUCCESSFUL_FINAL`() {
-        val paymentOrder = createTestPaymentOrder(status = PaymentOrderStatus.INITIATED_PENDING)
+    fun `should fail to request capture if not INITIATED_PENDING`() {
+        val order = PaymentOrder.createNew(
+            paymentOrderId,
+            paymentId,
+            sellerId,
+            amount
+        ).markCaptureRequested()
 
-        val updated = paymentOrder.markAsPaid()
-
-        assertEquals(PaymentOrderStatus.SUCCESSFUL_FINAL, updated.status)
+        val ex = assertThrows<IllegalArgumentException> { order.markCaptureRequested() }
+        assertTrue(ex.message!!.contains("Invalid transtion"))
     }
 
     @Test
-    fun `markAsPending should change PaymentOrder status to PENDING_STATUS_CHECK_LATER`() {
-        val paymentOrder = createTestPaymentOrder(status = PaymentOrderStatus.INITIATED_PENDING)
+    fun `should transition from CAPTURE_REQUESTED to CAPTURED`() {
+        val order = PaymentOrder.createNew(
+            paymentOrderId,
+            paymentId,
+            sellerId,
+            amount
+        ).markCaptureRequested()
 
-        val updated = paymentOrder.markAsPending()
+        val captured = order.markAsCaptured()
 
-        assertEquals(PaymentOrderStatus.PENDING_STATUS_CHECK_LATER, updated.status)
+        assertEquals(PaymentOrderStatus.CAPTURED, captured.status)
+        assertTrue(captured.updatedAt.isAfter(order.updatedAt))
     }
 
     @Test
-    fun `markAsFinalizedFailed should change PaymentOrder status to FAILED_FINAL`() {
-        val paymentOrder = createTestPaymentOrder(status = PaymentOrderStatus.INITIATED_PENDING)
+    fun `should fail to mark captured if not CAPTURE_REQUESTED`() {
+        val order = PaymentOrder.createNew(
+            paymentOrderId,
+            paymentId,
+            sellerId,
+            amount
+        )
 
-        val updated = paymentOrder.markAsFinalizedFailed()
-
-        assertEquals(PaymentOrderStatus.FAILED_FINAL, updated.status)
+        val ex = assertThrows<IllegalArgumentException> { order.markAsCaptured() }
+        assertTrue(ex.message!!.contains("Invalid transtion"))
     }
 
     @Test
-    fun `incrementRetry should increase retry count by 1`() {
-        val paymentOrder = createTestPaymentOrder(retryCount = 2)
+    fun `should transition from CAPTURE_REQUESTED to CAPTURE_DECLINED`() {
+        val order = PaymentOrder.createNew(
+            paymentOrderId,
+            paymentId,
+            sellerId,
+            amount
+        ).markCaptureRequested()
 
-        val updated = paymentOrder.incrementRetry()
+        val declined = order.markCaptureDeclined()
 
-        assertEquals(3, updated.retryCount)
-        assertEquals(paymentOrder.status, updated.status)
+        assertEquals(PaymentOrderStatus.CAPTURE_FAILED, declined.status)
+        assertTrue(declined.updatedAt.isAfter(order.updatedAt))
     }
 
     @Test
-    fun `withRetryReason should set retry reason`() {
-        val paymentOrder = createTestPaymentOrder()
+    fun `should fail to mark capture declined if not CAPTURE_REQUESTED`() {
+        val order = PaymentOrder.createNew(
+            paymentOrderId,
+            paymentId,
+            sellerId,
+            amount
+        )
 
-        val updated = paymentOrder.withRetryReason("PSP unavailable")
-
-        assertEquals("PSP unavailable", updated.retryReason)
-        assertEquals(paymentOrder.retryCount, updated.retryCount)
+        val ex = assertThrows<IllegalArgumentException> { order.markCaptureDeclined() }
+        assertTrue(ex.message!!.contains("Invalid transtion"))
     }
+
+    // --- ✅ buildFromPersistence test ---
 
     @Test
-    fun `withLastError should set last error message`() {
-        val paymentOrder = createTestPaymentOrder()
+    fun `should build from persistence without validation`() {
+        val persisted = PaymentOrder.rehydrate(
+            paymentOrderId,
+            paymentId,
+            SellerId("seller-x"),
+            Amount.of(2000L, Currency("USD")),
+            PaymentOrderStatus.CAPTURED,
+            retryCount = 2,
+            createdAt = LocalDateTime.now().minusDays(1),
+            updatedAt = LocalDateTime.now()
+        )
 
-        val updated = paymentOrder.withLastError("Network timeout")
-
-        assertEquals("Network timeout", updated.lastErrorMessage)
-    }
-
-    @Test
-    fun `withUpdatedAt should set updated timestamp`() {
-        val paymentOrder = createTestPaymentOrder()
-        val newTimestamp = LocalDateTime.now().plusHours(2)
-
-        val updated = paymentOrder.withUpdatedAt(newTimestamp)
-
-        assertEquals(newTimestamp, updated.updatedAt)
-        assertNotEquals(paymentOrder.updatedAt, updated.updatedAt)
-    }
-
-    @Test
-    fun `isTerminal should return true for SUCCESSFUL_FINAL status`() {
-        val paymentOrder = createTestPaymentOrder(status = PaymentOrderStatus.SUCCESSFUL_FINAL)
-
-        assertTrue(paymentOrder.isTerminal())
-    }
-
-    @Test
-    fun `isTerminal should return true for FAILED_FINAL status`() {
-        val paymentOrder = createTestPaymentOrder(status = PaymentOrderStatus.FAILED_FINAL)
-
-        assertTrue(paymentOrder.isTerminal())
-    }
-
-    @Test
-    fun `isTerminal should return false for INITIATED_PENDING status`() {
-        val paymentOrder = createTestPaymentOrder(status = PaymentOrderStatus.INITIATED_PENDING)
-
-        assertFalse(paymentOrder.isTerminal())
-    }
-
-    @Test
-    fun `isTerminal should return false for FAILED_TRANSIENT_ERROR status`() {
-        val paymentOrder = createTestPaymentOrder(status = PaymentOrderStatus.FAILED_TRANSIENT_ERROR)
-
-        assertFalse(paymentOrder.isTerminal())
-    }
-
-    @Test
-    fun `isTerminal should return false for PENDING_STATUS_CHECK_LATER status`() {
-        val paymentOrder = createTestPaymentOrder(status = PaymentOrderStatus.PENDING_STATUS_CHECK_LATER)
-
-        assertFalse(paymentOrder.isTerminal())
-    }
-
-    @Test
-    fun `chaining operations should work correctly`() {
-        val paymentOrder = createTestPaymentOrder()
-        val newTimestamp = LocalDateTime.now().plusHours(1)
-
-        val updated = paymentOrder
-            .incrementRetry()
-            .withRetryReason("Timeout")
-            .withLastError("Connection error")
-            .withUpdatedAt(newTimestamp)
-            .markAsFailed()
-
-        assertEquals(1, updated.retryCount)
-        assertEquals("Timeout", updated.retryReason)
-        assertEquals("Connection error", updated.lastErrorMessage)
-        assertEquals(newTimestamp, updated.updatedAt)
-        assertEquals(PaymentOrderStatus.FAILED_TRANSIENT_ERROR, updated.status)
-    }
-
-    @Test
-    fun `copy should preserve immutability`() {
-        val original = createTestPaymentOrder()
-        val updated = original.markAsFailed()
-
-        assertNotEquals(original.status, updated.status)
-        assertEquals(PaymentOrderStatus.INITIATED_PENDING, original.status)
-        assertEquals(PaymentOrderStatus.FAILED_TRANSIENT_ERROR, updated.status)
-    }
-
-    private fun createTestPaymentOrder(
-        paymentOrderId: PaymentOrderId = PaymentOrderId(1L),
-        publicPaymentOrderId: String = "paymentorder-1",
-        paymentId: PaymentId = PaymentId(100L),
-        publicPaymentId: String = "payment-100",
-        sellerId: SellerId = SellerId("seller-123"),
-        amount: Amount = Amount.of(100000L, Currency("USD")), // $1000.00 = 100000 cents
-        status: PaymentOrderStatus = PaymentOrderStatus.INITIATED_PENDING,
-        createdAt: LocalDateTime = LocalDateTime.now(),
-        updatedAt: LocalDateTime = LocalDateTime.now(),
-        retryCount: Int = 0,
-        retryReason: String? = null,
-        lastErrorMessage: String? = null
-    ): PaymentOrder {
-        return PaymentOrder.builder()
-            .paymentOrderId(paymentOrderId)
-            .publicPaymentOrderId(publicPaymentOrderId)
-            .paymentId(paymentId)
-            .publicPaymentId(publicPaymentId)
-            .sellerId(sellerId)
-            .amount(amount)
-            .status(status)
-            .createdAt(createdAt)
-            .updatedAt(updatedAt)
-            .retryCount(retryCount)
-            .retryReason(retryReason)
-            .lastErrorMessage(lastErrorMessage)
-            .buildFromPersistence()
+        assertEquals(PaymentOrderStatus.CAPTURED, persisted.status)
+        assertEquals(2, persisted.retryCount)
+        assertEquals("USD", persisted.amount.currency.currencyCode)
     }
 }

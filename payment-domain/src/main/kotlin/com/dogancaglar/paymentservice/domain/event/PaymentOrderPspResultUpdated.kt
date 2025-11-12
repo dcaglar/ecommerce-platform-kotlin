@@ -24,8 +24,6 @@ data class PaymentOrderPspResultUpdated private @JsonCreator constructor(
     @JsonProperty("createdAt") override val createdAt: LocalDateTime,
     @JsonProperty("updatedAt") override val updatedAt: LocalDateTime,
     @JsonProperty("retryCount") override val retryCount: Int, // attempt index (0..n)
-    @JsonProperty("retryReason") override val retryReason: String? = null,
-    @JsonProperty("lastErrorMessage") override val lastErrorMessage: String? = null,
     // PSP result payload (minimal, enough for Applier to decide)
     @JsonProperty("pspStatus") val pspStatus: String, // maps to PaymentOrderStatus via PSPStatusMapper
     @JsonProperty("pspErrorCode") val pspErrorCode: String? = null,
@@ -87,8 +85,6 @@ data class PaymentOrderPspResultUpdated private @JsonCreator constructor(
                 createdAt = createdAt,
                 updatedAt = updatedAt,
                 retryCount = retryCount,
-                retryReason = retryReason,
-                lastErrorMessage = lastErrorMessage,
                 pspStatus = pspStatus,
                 pspErrorCode = pspErrorCode,
                 pspErrorDetail = pspErrorDetail,

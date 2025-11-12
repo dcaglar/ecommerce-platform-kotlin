@@ -2,6 +2,7 @@
 # Usage: build-and-push-consumers.sh <dockerhub-username> <tag>
 # Example: ./build-and-push-consumers.sh mydockeruser v1.0.0
 set -e
+export DOCKER_BUILDKIT=1
 
 # Set fallback values
 default_user="dcaglar1987"

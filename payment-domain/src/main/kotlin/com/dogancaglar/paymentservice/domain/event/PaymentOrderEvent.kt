@@ -14,6 +14,4 @@ interface PaymentOrderEvent {
     val createdAt: LocalDateTime
     val updatedAt: LocalDateTime
     val retryCount: Int
-    val retryReason: String?
-    val lastErrorMessage: String?
 }

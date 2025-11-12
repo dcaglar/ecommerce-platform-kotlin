@@ -58,7 +58,7 @@ object LedgerEntriesRecordedTestHelper {
      * @param currency Currency code (e.g., "USD", "EUR")
      * @param amount Amount in minor currency units (default: 10000L)
      * @param direction Posting direction (default: CREDIT for merchant account)
-     * @return LedgerEntryEventData with single MERCHANT_ACCOUNT posting
+     * @return LedgerEntryEventData with single MERCHANT_PAYABLE posting
      */
     fun createSimpleLedgerEntryEventData(
         ledgerEntryId: Long,
@@ -75,8 +75,8 @@ object LedgerEntriesRecordedTestHelper {
             createdAt = java.time.LocalDateTime.now(),
             postings = listOf(
                 PostingEventData.create(
-                    accountCode = "MERCHANT_ACCOUNT.$sellerId",
-                    accountType = AccountType.MERCHANT_ACCOUNT,
+                    accountCode = "MERCHANT_PAYABLE.$sellerId",
+                    accountType = AccountType.MERCHANT_PAYABLE,
                     amount = amount,
                     currency = currency,
                     direction = direction
@@ -118,7 +118,6 @@ object LedgerEntriesRecordedTestHelper {
         return LedgerEntriesRecorded.create(
             ledgerBatchId = batchId,
             paymentOrderId = paymentOrderId,
-            publicPaymentOrderId = publicPaymentOrderId,
             sellerId = sellerId,
             currency = currency,
             status = status,
@@ -150,7 +149,6 @@ object LedgerEntriesRecordedTestHelper {
      */
     fun expectedAuthHoldAndCaptureEvent(
         paymentOrderId: String,
-        publicPaymentOrderId: String,
         sellerId: String,
         amount: Long,
         currency: String,
@@ -169,7 +167,6 @@ object LedgerEntriesRecordedTestHelper {
         return LedgerEntriesRecorded.create(
             ledgerBatchId = batchId,
             paymentOrderId = paymentOrderId,
-            publicPaymentOrderId = publicPaymentOrderId,
             sellerId = sellerId,
             currency = currency,
             status = status,
@@ -178,7 +175,7 @@ object LedgerEntriesRecordedTestHelper {
                 // First LedgerEntryEventData: AUTH_HOLD
                 LedgerEntryEventData.create(
                     ledgerEntryId = authLedgerEntryId,
-                    journalEntryId = "AUTH:$publicPaymentOrderId",
+                    journalEntryId = "AUTH:$paymentOrderId",
                     journalType = JournalType.AUTH_HOLD,
                     journalName = "Authorization Hold",
                     createdAt = authCreatedAt,
@@ -204,7 +201,7 @@ object LedgerEntriesRecordedTestHelper {
                 // Second LedgerEntryEventData: CAPTURE
                 LedgerEntryEventData.create(
                     ledgerEntryId = captureLedgerEntryId,
-                    journalEntryId = "CAPTURE:$publicPaymentOrderId",
+                    journalEntryId = "CAPTURE:$paymentOrderId",
                     journalType = JournalType.CAPTURE,
                     journalName = "Payment Capture",
                     createdAt = captureCreatedAt,
@@ -225,10 +222,10 @@ object LedgerEntriesRecordedTestHelper {
                             currency = currency,
                             direction = PostingDirection.DEBIT
                         ),
-                        // CAPTURE Posting 3: MERCHANT_ACCOUNT.{sellerId}.{currency} CREDIT
+                        // CAPTURE Posting 3: MERCHANT_PAYABLE.{sellerId}.{currency} CREDIT
                         PostingEventData.create(
-                            accountCode = "MERCHANT_ACCOUNT.$sellerId.$currency",
-                            accountType = AccountType.MERCHANT_ACCOUNT,
+                            accountCode = "MERCHANT_PAYABLE.$sellerId.$currency",
+                            accountType = AccountType.MERCHANT_PAYABLE,
                             amount = amount,
                             currency = currency,
                             direction = PostingDirection.CREDIT

@@ -39,18 +39,18 @@ class PaymentValidatorTest {
             )
         )
 
-        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_ACCOUNT, "seller-1") } returns AccountProfile(
-            accountCode = "MERCHANT_ACCOUNT.seller-1.EUR",
-            type = AccountType.MERCHANT_ACCOUNT,
+        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, "seller-1") } returns AccountProfile(
+            accountCode = "MERCHANT_PAYABLE.seller-1.EUR",
+            type = AccountType.MERCHANT_PAYABLE,
             entityId = "seller-1",
             currency = Currency("EUR"),
             category = AccountCategory.LIABILITY,
             country = "NL",
             status = AccountStatus.ACTIVE
         )
-        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_ACCOUNT, "seller-2") } returns AccountProfile(
-            accountCode = "MERCHANT_ACCOUNT.seller-2.EUR",
-            type = AccountType.MERCHANT_ACCOUNT,
+        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, "seller-2") } returns AccountProfile(
+            accountCode = "MERCHANT_PAYABLE.seller-2.EUR",
+            type = AccountType.MERCHANT_PAYABLE,
             entityId = "seller-2",
             currency = Currency("EUR"),
             category = AccountCategory.LIABILITY,
@@ -95,9 +95,9 @@ class PaymentValidatorTest {
             )
         )
 
-        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_ACCOUNT, any()) } returns AccountProfile(
-            accountCode = "MERCHANT_ACCOUNT.test.EUR",
-            type = AccountType.MERCHANT_ACCOUNT,
+        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, any()) } returns AccountProfile(
+            accountCode = "MERCHANT_PAYABLE.test.EUR",
+            type = AccountType.MERCHANT_PAYABLE,
             entityId = "test",
             currency = Currency("EUR"),
             category = AccountCategory.LIABILITY,
@@ -150,9 +150,9 @@ class PaymentValidatorTest {
             )
         )
 
-        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_ACCOUNT, "seller-1") } returns AccountProfile(
-            accountCode = "MERCHANT_ACCOUNT.seller-1.USD",
-            type = AccountType.MERCHANT_ACCOUNT,
+        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, "seller-1") } returns AccountProfile(
+            accountCode = "MERCHANT_PAYABLE.seller-1.USD",
+            type = AccountType.MERCHANT_PAYABLE,
             entityId = "seller-1",
             currency = Currency("USD"),
             category = AccountCategory.LIABILITY,
@@ -184,9 +184,9 @@ class PaymentValidatorTest {
             )
         )
 
-        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_ACCOUNT, "seller-1") } returns AccountProfile(
-            accountCode = "MERCHANT_ACCOUNT.seller-1.EUR",
-            type = AccountType.MERCHANT_ACCOUNT,
+        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, "seller-1") } returns AccountProfile(
+            accountCode = "MERCHANT_PAYABLE.seller-1.EUR",
+            type = AccountType.MERCHANT_PAYABLE,
             entityId = "seller-1",
             currency = Currency("EUR"),
             category = AccountCategory.LIABILITY,
@@ -213,9 +213,9 @@ class PaymentValidatorTest {
             )
         )
 
-        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_ACCOUNT, "seller-1") } returns AccountProfile(
-            accountCode = "MERCHANT_ACCOUNT.seller-1.EUR",
-            type = AccountType.MERCHANT_ACCOUNT,
+        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, "seller-1") } returns AccountProfile(
+            accountCode = "MERCHANT_PAYABLE.seller-1.EUR",
+            type = AccountType.MERCHANT_PAYABLE,
             entityId = "seller-1",
             currency = Currency("EUR"),
             category = AccountCategory.LIABILITY,
@@ -244,27 +244,27 @@ class PaymentValidatorTest {
             )
         )
 
-        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_ACCOUNT, "seller-1") } returns AccountProfile(
-            accountCode = "MERCHANT_ACCOUNT.seller-1.EUR",
-            type = AccountType.MERCHANT_ACCOUNT,
+        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, "seller-1") } returns AccountProfile(
+            accountCode = "MERCHANT_PAYABLE.seller-1.EUR",
+            type = AccountType.MERCHANT_PAYABLE,
             entityId = "seller-1",
             currency = Currency("EUR"),
             category = AccountCategory.LIABILITY,
             country = "NL",
             status = AccountStatus.ACTIVE
         )
-        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_ACCOUNT, "seller-2") } returns AccountProfile(
-            accountCode = "MERCHANT_ACCOUNT.seller-2.EUR",
-            type = AccountType.MERCHANT_ACCOUNT,
+        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, "seller-2") } returns AccountProfile(
+            accountCode = "MERCHANT_PAYABLE.seller-2.EUR",
+            type = AccountType.MERCHANT_PAYABLE,
             entityId = "seller-2",
             currency = Currency("EUR"),
             category = AccountCategory.LIABILITY,
             country = "NL",
             status = AccountStatus.ACTIVE
         )
-        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_ACCOUNT, "seller-3") } returns AccountProfile(
-            accountCode = "MERCHANT_ACCOUNT.seller-3.EUR",
-            type = AccountType.MERCHANT_ACCOUNT,
+        every { accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, "seller-3") } returns AccountProfile(
+            accountCode = "MERCHANT_PAYABLE.seller-3.EUR",
+            type = AccountType.MERCHANT_PAYABLE,
             entityId = "seller-3",
             currency = Currency("EUR"),
             category = AccountCategory.LIABILITY,
@@ -276,9 +276,9 @@ class PaymentValidatorTest {
         assertDoesNotThrow { validator.validate(request) }
 
         // Verify all sellers were checked
-        verify(exactly = 1) { accountDirectory.getAccountProfile(AccountType.MERCHANT_ACCOUNT, "seller-1") }
-        verify(exactly = 1) { accountDirectory.getAccountProfile(AccountType.MERCHANT_ACCOUNT, "seller-2") }
-        verify(exactly = 1) { accountDirectory.getAccountProfile(AccountType.MERCHANT_ACCOUNT, "seller-3") }
+        verify(exactly = 1) { accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, "seller-1") }
+        verify(exactly = 1) { accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, "seller-2") }
+        verify(exactly = 1) { accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, "seller-3") }
     }
 }
 

@@ -12,7 +12,7 @@ class DummyClass
 
 object DummyClassEventMetadata : EventMetadata<DummyClass> {
     override val topic = Topics.PAYMENT_ORDER_CREATED
-    override val eventType = EVENT_TYPE.PAYMENT_ORDER_CREATED   // ← FIX: use EVENT_TYPE
+    override val eventType = EVENT_TYPE.PAYMENT_AUTHORIZED   // ← FIX: use EVENT_TYPE
     override val clazz = DummyClass::class.java
     override val typeRef = object : com.fasterxml.jackson.core.type.TypeReference<EventEnvelope<DummyClass>>() {}
 }
@@ -22,7 +22,7 @@ class DummyClassEventMetadataTest {
     fun `DummyClassEventMetadata has correct topic and eventType`() {
         val meta = DummyClassEventMetadata
         assertEquals(Topics.PAYMENT_ORDER_CREATED, meta.topic)
-        assertEquals(EVENT_TYPE.PAYMENT_ORDER_CREATED, meta.eventType) // ← FIX
+        assertEquals(EVENT_TYPE.PAYMENT_AUTHORIZED, meta.eventType) // ← FIX
     }
 
     @Test

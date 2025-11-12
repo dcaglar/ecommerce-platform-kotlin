@@ -68,8 +68,7 @@ It captures **why** and **how** we build a modular, event‑driven, cloud‑nati
 high‑throughput workloads while remaining observable, resilient, and easy to evolve.
 
 - **Audience**: Backend engineers, SREs, architects, and contributors who need to understand the big picture.
-- **Scope**: JVM services (REST APIs and async executors) plus the infrastructure they rely on.
-
+- **Scope**: This is a Payment Platform of a Merchant Of Record commerce business, where we only use psp as gateway in authorization, and relate payment to psp calls, and afterwards asyncroonusly process captures
 ---
 
 ## 2 · System Context
@@ -113,9 +112,9 @@ flowchart TB
     classDef planned fill:#E0E0E0,stroke:#9E9E9E,stroke-width:2px,stroke-dasharray: 5 5;
 
     subgraph Payment_BC["Payment Bounded Context - Core Domain"]
-        Payment_Agg["Payment<br/>Coordination Aggregate<br/>Multi-seller checkout container"]
-        PaymentOrder_Agg["PaymentOrder<br/>Processing Aggregate<br/>Independent PSP processing per seller"]
-        Ledger_Subdomain["Ledger Subdomain<br/>Double-entry accounting<br/>JournalEntry + Postings"]
+        Payment_Agg["Payment<br/>Coordination Aggregate<br/>• Synchronous PSP authorization (captures pspRef)<br/>• Tracks shopper order + totalAmount<br/>• Status transitions: AUTHORIZED / FAILED"]
+        PaymentOrder_Agg["PaymentOrder<br/>Processing Aggregate<br/>• Created only after auth success<br/>• Drives capture/settlement per seller"]
+        Ledger_Subdomain["Ledger Subdomain<br/>Double-entry accounting<br/>• AUTH_HOLD, CAPTURE, SETTLEMENT, PAYOUT, FEES<br/>• Uses AccountType + JournalEntryFactory"]
     end
 
     subgraph Integration["Integration Layer - Kafka Event Bus"]
@@ -143,10 +142,11 @@ flowchart TB
 ```
 
 **Key Points:**
-- **Payment** is a coordination aggregate containing multiple **PaymentOrder** processing aggregates
-- **PaymentOrder** emits events immediately when its payment succeeds (per seller)
-- **Shipment** listens to individual `PaymentOrderSucceeded` events for immediate fulfillment
-- All integration is event-driven via Kafka (no direct dependencies)
+- **Payment** stores the synchronous authorization outcome (`pspRef`, `AUTHORIZED` / `FAILED`) and coordinates downstream seller captures.
+- **PaymentOrder** is instantiated only after the parent payment is authorized and emits events as each seller capture/settlement progresses.
+- **Ledger Subdomain** uses `AccountType` (auth hold, receivable/payable, scheme fees, commission) and the `JournalEntryFactory` (`authHold`, `releaseHoldOnCapture`, `capture`, `settlement`, `recognizePspFee`, `recognizeCommissionFee`, `payoutToMerchant`, `refundPrePayout`) to enforce balanced postings.
+- **Shipment** listens to individual `PaymentOrderSucceeded` events for immediate fulfillment.
+- All integration remains event-driven via Kafka (no direct dependencies).
 
 ### 2.3 Payment Bounded Context Domain Model
 
@@ -230,6 +230,11 @@ flowchart TB
     style Amount_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
     style Account_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
 ```
+
+In the refreshed Merchant-of-Record scope:
+- `Payment` captures the shopper-level authorization synchronously (stores PSP auth id, status) and acts as the coordination point for all downstream seller obligations.
+- `PaymentOrder` represents each seller capture obligation that will be executed asynchronously via the PSP capture endpoint, independent per seller.
+- The ledger subdomain remains unchanged, recording AUTH_HOLD during authorization and subsequent capture/settlement postings as events progress.
 
 ### 2.4 Aggregate Boundaries & Consistency
 
@@ -316,7 +321,7 @@ flowchart TB
 | **Hexagonal Architecture** | Domain code depends on *ports* (interfaces); adapters implement them (JPA, Kafka, Redis, PSP, …).                                 |
 | **Event‑Driven**           | Kafka is the backbone; every state change is emitted as an `EventEnvelope<T>`.                                                    |
 | **Outbox Pattern**         | Events are written atomically with DB changes and reliably published by dispatchers.                                              |
-| **API Isolation from External Dependencies** | **Critical Design Principle**: PSP calls are completely separated from the web layer. `payment-service` returns `202 Accepted` immediately after persisting payment state; actual PSP calls execute asynchronously in `payment-consumers`. This ensures user-facing API performance is never impacted by external PSP latency, timeouts, or outages. Even if PSP is down or slow, API remains fast and responsive. |
+| **API Isolation from External Dependencies** | **Critical Design Principle**: PSP capture/settlement operations remain fully asynchronous in `payment-consumers`, isolating user traffic from long-running work. The web layer now performs a **synchronous authorization** call (fast, single-shot) during payment creation to guarantee an auth hold exists before expanding into seller obligations. All follow-up PSP interactions (capture, retries, settlements) execute asynchronously, so PSP latency still cannot stall post-authorization flows. |
 | **Observability First**    | JSON logs with `traceId`, Prometheus metrics, and OpenTelemetry (planned) tracing.                                                |
 | **Cloud‑Native**           | Containerized apps, Helm charts, Kubernetes HPA, externalized configuration.                                                      |
 
@@ -365,7 +370,7 @@ flowchart LR
 > **Current Architecture (Jan‑2025):** `payment-consumers` contains six specialized consumers organized into **three independent flows**:
 > - **PSP Flow** (3 consumers):
 >   - **PaymentOrderEnqueuer** *(reads `payment_order_created_topic` and enqueues PSP call tasks)*
->   - **PaymentOrderPspCallExecutor** *(performs PSP calls and publishes results)*
+>   - **PaymentOrderPspCallExecutor** *(invokes PSP **capture** endpoint and publishes results)*
 >   - **PaymentOrderPspResultApplier** *(applies PSP results and manages retries)*
 > - **Status Check Flow** (1 consumer):
 >   - **ScheduledPaymentStatusCheckExecutor** *(handles async status check requests)*
@@ -385,6 +390,7 @@ flowchart LR
 sequenceDiagram
     participant Client
     participant PaymentService
+    participant PSPAuth as PSP (Authorization)
     participant DB
     participant OutboxDispatcher
     participant Kafka
@@ -394,20 +400,24 @@ sequenceDiagram
     participant PSP
 
     Client->>PaymentService: POST /payments
-    PaymentService->>DB: Save Payment + PaymentOrders + OutboxEvent
-    Note over PaymentService: No PSP call here!<br/>PSP isolation from web layer
-    PaymentService-->>Client: 202 Accepted
-    Note over Client: User gets immediate response<br/>PSP processing happens async
+    PaymentService->>PSPAuth: Authorize shopper payment (sync, single PSP call)
+    PSPAuth-->>PaymentService: Auth result (approved/declined)
+    PaymentService->>DB: Persist Payment aggregate + Outbox<PaymentRequestDTO>
+    Note over PaymentService: Authorization completes inside request;<br/>captures remain async
+    PaymentService-->>Client: 202 Accepted (contains auth reference)
+    Note over Client: Shopper receives immediate response;<br/>seller processing continues async
     
     OutboxDispatcher->>DB: Read NEW outbox events
-    OutboxDispatcher->>Kafka: Publish PaymentOrderCreated
-    OutboxDispatcher->>DB: Mark events as SENT
+    OutboxDispatcher->>OutboxDispatcher: Expand PaymentRequestDTO → PaymentOrders<br/>+ nested Outbox<PaymentOrderCreated>
+    OutboxDispatcher->>Kafka: Publish PaymentAuthorized event
+    OutboxDispatcher->>Kafka: Publish PaymentOrderCreated events (per seller)
+    OutboxDispatcher->>DB: Mark processed outbox rows as SENT
     
     Enqueuer->>Kafka: Consume PaymentOrderCreated
     Enqueuer->>Kafka: Publish PaymentOrderPspCallRequested
     
     PspCallExecutor->>Kafka: Consume PaymentOrderPspCallRequested
-    PspCallExecutor->>PSP: Call PSP.charge()
+    PspCallExecutor->>PSP: Call PSP.capture()
     PspCallExecutor->>Kafka: Publish PaymentOrderPspResultUpdated
     
     PspResultApplier->>Kafka: Consume PaymentOrderPspResultUpdated
@@ -458,7 +468,7 @@ flowchart TB
         T1[payment_order_created_topic<br/>🔑 key: paymentOrderId<br/>📊 48 partitions]:::kafka
         ENQ["PaymentOrderEnqueuer<br/>👥 concurrency: 8"]:::consumer
         T2[payment_order_psp_call_requested_topic<br/>🔑 key: paymentOrderId<br/>📊 48 partitions]:::kafka
-        EXEC["PaymentOrderPspCallExecutor<br/>👥 concurrency: 8"]:::consumer
+        EXEC["PaymentOrderPspCallExecutor<br/>👥 concurrency: 8<br/>Calls PSP capture"]:::consumer
         PSP_EXT["PSP Client<br/>(Mock Simulator)"]:::psp
         T3[payment_order_psp_result_updated_topic<br/>🔑 key: paymentOrderId<br/>📊 48 partitions]:::kafka
         APPLY["PaymentOrderPspResultApplier<br/>👥 concurrency: 8"]:::consumer
@@ -485,7 +495,7 @@ flowchart TB
         SNAPSHOT_JOB["AccountBalanceSnapshotJob<br/>⏰ Every 1 minute<br/>Merge dirty deltas → snapshots"]:::consumer
     end
 
-    REST -->|"1. Persist + Outbox<br/>(Atomic DB Tx)"| DB
+    REST -->|"1. PSP auth (sync) + Persist Payment + Outbox<br/>(Atomic DB Tx)"| DB
     REST -->|"2. 202 Accepted<br/>(Immediate)"| CLIENT["👤 Client"]
     OUTBOX -->|"3. Read NEW events"| DB
     OUTBOX -->|"4. Publish"| T1
@@ -529,7 +539,7 @@ flowchart TB
 ```
 
 **Key Design Points Illustrated:**
-- **API Isolation**: REST controller returns `202 Accepted` immediately, no PSP calls in request thread
+- **Auth + API Isolation**: REST controller performs a bounded PSP authorization, then returns `202 Accepted` while all captures remain asynchronous.
 - **Flow Independence**: PSP Flow (concurrency=8) completely separate from Ledger Flow (concurrency=4)
 - **Partition Key Switch**: Payment flow uses `paymentOrderId`, Ledger flow switches to `sellerId` at dispatcher
 - **Kafka Transactions**: All consumers use `KafkaTxExecutor` for atomic offset commit + DB writes + event publish
@@ -953,7 +963,11 @@ sequenceDiagram
 ### 5.1 Outbox Pattern
 
 - Atomic write of domain state **and** outbox rows inside the same DB transaction.
-- **OutboxDispatcherJob** (scheduled workers) reads `NEW` rows, publishes to Kafka, marks them `SENT`.
+- `CreatePaymentService` persists the `Payment` aggregate (post-authorization) together with a single `OutboxEvent<PaymentRequestDTO>` — no `PaymentOrder` rows exist yet.
+- **OutboxDispatcherJob** polls `NEW` rows and behaves recursively:
+  1. For `PaymentRequestDTO` rows it hydrates the envelope, materializes seller-level `PaymentOrder` aggregates, inserts them, persists nested `OutboxEvent<PaymentOrderCreated>` rows, publishes `PaymentAuthorized`, and marks the original row `SENT`.
+  2. For derived `PaymentOrderCreated` rows it publishes PSP orchestration events and marks each row `SENT`.
+- This recursion lets one dispatcher expand the payment tree (authorization → seller captures) without multiple schedulers, while ensuring each step is idempotent.
 - Metrics: `outbox_event_backlog` (gauge), `outbox_dispatched_total`, `outbox_dispatch_failed_total`,
   `outbox_dispatcher_duration_seconds{worker=…}`.
 
@@ -1061,7 +1075,7 @@ The system ensures **no duplicate records** are created through a combination of
     - No duplicate records created
     - State remains consistent
 
-- **Stale Event Filtering** (PaymentOrderPspCallExecutor):
+- **Stale Event Filtering** (PaymentOrderPspCallExecutor – PSP **capture** endpoint):
   ```kotlin
   if (current.retryCount > attempt) {
       // Drop stale retry attempt - already processed more recent retry
@@ -1641,7 +1655,7 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 - Use cases, orchestrators, and application‑level services.
 - Depends on `payment-domain` and defines the **inbound/outbound ports** it needs.
 - Services: 
-  - `CreatePaymentService` - Payment creation orchestration
+  - `CreatePaymentService` - Payment creation orchestration (performs synchronous PSP authorization, persists `Payment`, enqueues `OutboxEvent<PaymentRequestDTO>`)
   - `ProcessPaymentService` - PSP result processing + retry logic
   - `RecordLedgerEntriesService` - Ledger entry recording
   - `RequestLedgerRecordingService` - Ledger recording request transformation
@@ -1670,9 +1684,9 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
     - **Controllers**: 
       - `PaymentController` - REST endpoints that return `202 Accepted` immediately
       - `BalanceController` - Balance query endpoints with role-based access control
-    - **Services**: `PaymentService` - REST service layer (no PSP calls in request thread)
-    - **API Isolation**: Payment state persisted, then returns immediately; PSP calls happen asynchronously in `payment-consumers`
-    - **Design**: User-facing API completely isolated from external PSP latency/availability
+    - **Services**: `PaymentService` - REST service layer (performs synchronous authorization, then persists state)
+    - **API Isolation**: Authorization is a single guarded call; all subsequent PSP work (capture, retries) happens asynchronously in `payment-consumers`
+    - **Design**: User-facing API remains isolated from long-running PSP latency/availability after the initial authorization
     - **Config**: Spring configuration (Kafka topics, datasources, MyBatis, security)
     - **Maintenance Jobs**: `OutboxDispatcherJob`, `OutboxPartitionCreator`, `IdResyncStartup`
     - **Security**: `SecurityConfig` (OAuth2/JWT with three authentication scenarios), `TraceFilter` (request tracing)
@@ -1680,10 +1694,10 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
       - `GET /api/v1/sellers/me/balance` - Seller self-service (Case 1: SELLER role, Case 3: SELLER_API role)
       - `GET /api/v1/sellers/{sellerId}/balance` - Finance/Admin query (Case 2: FINANCE/ADMIN role)
 
-- **payment-consumers**: Kafka-driven async processing workers. **All PSP calls execute here, completely decoupled from HTTP request lifecycle**.
+- **payment-consumers**: Kafka-driven async processing workers. **All PSP capture/settlement calls execute here, completely decoupled from HTTP request lifecycle (authorization already happened in the web flow).**
     - **Consumers**:
     - `PaymentOrderEnqueuer` → reads `payment_order_created`, prepares PSP call requests.
-        - `PaymentOrderPspCallExecutor` → **Performs actual PSP calls** (isolated from web layer, executes in background)
+    - `PaymentOrderPspCallExecutor` → **Performs PSP capture calls** (isolated from web layer, executes in background)
     - `PaymentOrderPspResultApplier` → applies PSP results and manages retries/status checks.
     - `ScheduledPaymentStatusCheckExecutor` → handles status check requests.
     - `LedgerRecordingRequestDispatcher` → consumes finalized payment orders, publishes ledger recording commands.
@@ -1871,16 +1885,15 @@ verify(exactly = 1) {
 ### 11.1 Reliability & Resilience
 
 - **API Isolation from External Dependencies**: 
-  - PSP calls are completely separated from the web layer (`payment-service`)
-  - `payment-service` returns `202 Accepted` immediately after persisting state
-  - All PSP calls execute asynchronously in `payment-consumers`, decoupled from HTTP request lifecycle
-  - **Benefits**: User-facing API performance never impacted by PSP latency, timeouts, or outages
-  - Even if PSP is slow or down, users still get immediate acceptance and API remains responsive
-  - Processing continues in background via Kafka; results delivered via domain events
+  - The web layer performs a fast, synchronous PSP authorization to secure the shopper auth hold before persisting payment state.
+  - `payment-service` still returns `202 Accepted` immediately after the authorization+persist step and enqueues seller expansion work.
+  - All long-running PSP work (capture, retries, settlements) executes asynchronously in `payment-consumers`, decoupled from HTTP request lifecycle.
+  - **Benefits**: Capture latency, timeouts, or outages never impact API responsiveness; only the bounded authorization call runs inline, guarded by aggressive timeouts/circuit breakers.
+  - Even if downstream PSP capture flows are slow or fail, shoppers still receive immediate acceptance and Kafka-driven retries recover work.
 
 - Outbox + event keys keep publishing safe.
 - Retries with jitter and fenced attempts avoid duplicate external actions.
-- Circuit breakers and timeout handling for external PSP calls (within async consumers, not blocking API).
+- Circuit breakers and timeout handling for external PSP calls (within async consumers, plus inline auth guardrails).
 
 ### 11.2 Security
 

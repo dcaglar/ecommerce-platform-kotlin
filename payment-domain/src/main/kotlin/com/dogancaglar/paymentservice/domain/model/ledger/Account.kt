@@ -20,20 +20,21 @@ enum class AuthType{
 }
 enum class AccountType(val normalBalance: NormalBalance, val category: AccountCategory) {
     // Assets
-    CASH(NormalBalance.DEBIT, AccountCategory.ASSET),
+    PLATFORM_CASH(NormalBalance.DEBIT, AccountCategory.ASSET),
     PSP_RECEIVABLES(NormalBalance.DEBIT, AccountCategory.ASSET),
-    SHOPPER_RECEIVABLES(NormalBalance.DEBIT, AccountCategory.ASSET),
     AUTH_RECEIVABLE(NormalBalance.DEBIT, AccountCategory.ASSET),
-    ACQUIRER_ACCOUNT(NormalBalance.DEBIT, AccountCategory.ASSET),
 
     // Liabilities
-    AUTH_LIABILITY(NormalBalance.CREDIT, AccountCategory.LIABILITY),
-    MERCHANT_ACCOUNT(NormalBalance.CREDIT, AccountCategory.LIABILITY),
+    AUTH_LIABILITY(NormalBalance.CREDIT, AccountCategory.LIABILITY), //during auth this increases
+    MERCHANT_PAYABLE(NormalBalance.CREDIT, AccountCategory.LIABILITY), //during capture this increases
 
-    // Revenue
-    PROCESSING_FEE_REVENUE(NormalBalance.CREDIT, AccountCategory.REVENUE),
+    // Revenue we get from seller/merchant we keep here
+    PLATFORM_COMMISSION_REVENUE(NormalBalance.CREDIT, AccountCategory.REVENUE),
 
-    // Expenses
+    // Expenses- incurred by the PSP
+    PSP_FEE_EXPENSE(NormalBalance.DEBIT, AccountCategory.EXPENSE),
+
+    //we might not need those
     INTERCHANGE_FEES(NormalBalance.DEBIT, AccountCategory.EXPENSE),
     SCHEME_FEES(NormalBalance.DEBIT, AccountCategory.EXPENSE),
     BANK_FEES(NormalBalance.DEBIT, AccountCategory.EXPENSE)

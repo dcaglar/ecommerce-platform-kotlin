@@ -56,13 +56,11 @@ class LedgerRecordingConsumerTest {
         
         val command = LedgerRecordingCommand(
             paymentOrderId = paymentOrderId.value.toString(),
-            publicPaymentOrderId = "public-123",
             paymentId = PaymentId(456L).value.toString(),
-            publicPaymentId = "public-payment-456",
             sellerId = SellerId("seller-789").value,
             amountValue = 10000L,
             currency = "EUR",
-            status = PaymentOrderStatus.SUCCESSFUL_FINAL.name,
+            status = PaymentOrderStatus.CAPTURED.name,
             createdAt = expectedCreatedAt,
             updatedAt = expectedCreatedAt
         )
@@ -108,13 +106,11 @@ class LedgerRecordingConsumerTest {
                 event = match { cmd ->
                     cmd is LedgerRecordingCommand &&
                     cmd.paymentOrderId == paymentOrderId.value.toString() &&
-                    cmd.publicPaymentOrderId == "public-123" &&
                     cmd.paymentId == PaymentId(456L).value.toString() &&
-                    cmd.publicPaymentId == "public-payment-456" &&
                     cmd.sellerId == SellerId("seller-789").value &&
                     cmd.amountValue == 10000L &&
                     cmd.currency == "EUR" &&
-                    cmd.status == PaymentOrderStatus.SUCCESSFUL_FINAL.name
+                    cmd.status == PaymentOrderStatus.CAPTURED.name
                 }
             )
         }
@@ -147,13 +143,11 @@ class LedgerRecordingConsumerTest {
         
         val command = LedgerRecordingCommand(
             paymentOrderId = paymentOrderId.value.toString(),
-            publicPaymentOrderId = "public-456",
             paymentId = PaymentId(789L).value.toString(),
-            publicPaymentId = "public-payment-789",
             sellerId = SellerId("seller-101").value,
             amountValue = 5000L,
             currency = "USD",
-            status = PaymentOrderStatus.FAILED_FINAL.name,
+            status = PaymentOrderStatus.CAPTURE_FAILED.name,
             createdAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
             updatedAt = clock.instant().atZone(clock.zone).toLocalDateTime()
         )
@@ -197,7 +191,7 @@ class LedgerRecordingConsumerTest {
             recordLedgerEntriesUseCase.recordLedgerEntries(
                 event = match { cmd ->
                     cmd is LedgerRecordingCommand &&
-                    cmd.status == PaymentOrderStatus.FAILED_FINAL.name &&
+                    cmd.status == PaymentOrderStatus.CAPTURE_FAILED.name &&
                     cmd.amountValue == 5000L &&
                     cmd.currency == "USD"
                 }
@@ -228,13 +222,11 @@ class LedgerRecordingConsumerTest {
         val paymentOrderId = PaymentOrderId(789L)
         val command = LedgerRecordingCommand(
             paymentOrderId = paymentOrderId.value.toString(),
-            publicPaymentOrderId = "public-789",
             paymentId = PaymentId(101L).value.toString(),
-            publicPaymentId = "public-payment-101",
             sellerId = SellerId("seller-202").value,
             amountValue = 10000L,
             currency = "EUR",
-            status = PaymentOrderStatus.SUCCESSFUL_FINAL.name,
+            status = PaymentOrderStatus.CAPTURED.name,
             createdAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
             updatedAt = clock.instant().atZone(clock.zone).toLocalDateTime()
         )

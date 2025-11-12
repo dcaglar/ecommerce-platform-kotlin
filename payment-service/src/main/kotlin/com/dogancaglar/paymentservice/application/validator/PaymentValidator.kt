@@ -37,7 +37,7 @@ class PaymentValidator(private val accountDirectory: AccountDirectoryPort) {
                         "but payment currency is $paymentCurrency"
             }
 
-            val profile = accountDirectory.getAccountProfile(AccountType.MERCHANT_ACCOUNT, order.sellerId)
+            val profile = accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, order.sellerId)
             require(profile.currency == paymentCurrency) {
                 "Seller ${order.sellerId} settles in ${profile.currency}, " +
                         "but payment is in $paymentCurrency"

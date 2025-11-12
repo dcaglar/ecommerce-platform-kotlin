@@ -24,17 +24,16 @@ object LedgerEntryTestHelper {
      */
     fun createAuthHoldLedgerEntry(
         ledgerEntryId: Long,
-        paymentOrderId: String = "PO-$ledgerEntryId",
-        amountMinor: Long = 1_000L,
-        currency: String = "EUR"
+        paymentId: String = "PO-$ledgerEntryId",
+        amount: Amount
     ): LedgerEntry {
         val authReceivable = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
         val authLiability = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
         val journal = JournalEntry.authHold(
-            paymentOrderId, 
-            Amount.of(amountMinor, Currency(currency)),
-            authReceivable,
-            authLiability
+            journalIdentifier = paymentId,
+            authorizedAmount = amount,
+            authReceivable = authReceivable,
+            authLiability = authLiability
         ).first()
         return LedgerEntry.create(ledgerEntryId, journal, LocalDateTime.now())
     }
@@ -47,78 +46,21 @@ object LedgerEntryTestHelper {
         ledgerEntryId: Long,
         paymentOrderId: String = "PO-$ledgerEntryId",
         merchantId: String = "SELLER-1",
-        amountMinor: Long = 1_000L,
-        currency: String = "EUR"
+        amount: Amount = Amount.of(1000, Currency( "EUR"))
     ): LedgerEntry {
         val authReceivable = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
         val authLiability = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
-        val merchantAccount = Account.create(AccountType.MERCHANT_ACCOUNT, merchantId)
+        val merchantAccount = Account.create(AccountType.MERCHANT_PAYABLE, merchantId)
         val pspReceivable = Account.create(AccountType.PSP_RECEIVABLES, "GLOBAL")
         val journal = JournalEntry.capture(
-            paymentOrderId, 
-            Amount.of(amountMinor, Currency(currency)),
-            authReceivable,
-            authLiability,
-            merchantAccount,
-            pspReceivable
+            journalIdentifier = paymentOrderId,
+            capturedAmount = amount,
+            authReceivable = authReceivable,
+            authLiability = authLiability,
+            merchantAccount = merchantAccount,
+            pspReceivable = pspReceivable
         ).first()
         return LedgerEntry.create(ledgerEntryId, journal, LocalDateTime.now())
-    }
-
-    /**
-     * Combined AUTH_HOLD + CAPTURE flow for integration-like tests.
-     */
-    fun createAuthHoldAndCaptureLedgerEntries(
-        paymentOrderId: String = "PO-TEST",
-        merchantId: String = "SELLER-1",
-        amountMinor: Long = 1_000L,
-        currency: String = "EUR"
-    ): List<LedgerEntry> {
-        val authReceivable = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
-        val authLiability = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
-        val merchantAccount = Account.create(AccountType.MERCHANT_ACCOUNT, merchantId)
-        val pspReceivable = Account.create(AccountType.PSP_RECEIVABLES, "GLOBAL")
-        val journals = JournalEntry.authHoldAndCapture(
-            paymentOrderId, 
-            Amount.of(amountMinor, Currency(currency)),
-            authReceivable,
-            authLiability,
-            merchantAccount,
-            pspReceivable
-        )
-        return journals.mapIndexed { i, j ->
-            LedgerEntry.create(100L + i, j, LocalDateTime.now())
-        }
-    }
-
-    /**
-     * Full accounting lifecycle for a PSP transaction:
-     * AUTH → CAPTURE → SETTLEMENT → FEE → PAYOUT
-     */
-    fun createFullFlowLedgerEntries(
-        paymentOrderId: String = "PO-FULL",
-        merchantId: String = "SELLER-1",
-        acquirerId: String = "ACQ-1",
-        amountMinor: Long = 1_000L,
-        currency: String = "EUR"
-    ): List<LedgerEntry> {
-        val authReceivable = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
-        val authLiability = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
-        val merchant = Account.create(AccountType.MERCHANT_ACCOUNT, merchantId)
-        val pspReceivable = Account.create(AccountType.PSP_RECEIVABLES, "GLOBAL")
-        val acquirer = Account.create(AccountType.ACQUIRER_ACCOUNT, acquirerId)
-        val journals = JournalEntry.fullFlow(
-            paymentOrderId, 
-            Amount.of(amountMinor, Currency(currency)),
-            authReceivable,
-            authLiability,
-            pspReceivable,
-            merchant,
-            acquirer
-        )
-        return journals.mapIndexed { i, j ->
-            LedgerEntry.create(200L + i, j, LocalDateTime.now())
-        }
     }
 
     /**

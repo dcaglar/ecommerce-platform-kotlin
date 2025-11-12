@@ -29,7 +29,7 @@ class BalanceControllerTest {
         val expectedBalance = BalanceDto(
             balance = 50000L,
             currency = CurrencyEnum.EUR,
-            accountCode = "MERCHANT_ACCOUNT.seller-123.EUR",
+            accountCode = "MERCHANT_PAYABLE.seller-123.EUR",
             sellerId = sellerId
         )
 
@@ -56,7 +56,7 @@ class BalanceControllerTest {
         val expectedBalance = BalanceDto(
             balance = 123456L,
             currency = CurrencyEnum.USD,
-            accountCode = "MERCHANT_ACCOUNT.seller-456.USD",
+            accountCode = "MERCHANT_PAYABLE.seller-456.USD",
             sellerId = sellerId
         )
 
@@ -78,7 +78,7 @@ class BalanceControllerTest {
         val expectedBalance = BalanceDto(
             balance = 0L,
             currency = CurrencyEnum.EUR,
-            accountCode = "MERCHANT_ACCOUNT.seller-789.EUR",
+            accountCode = "MERCHANT_PAYABLE.seller-789.EUR",
             sellerId = sellerId
         )
 
@@ -123,7 +123,7 @@ class BalanceControllerTest {
         val expectedBalance = BalanceDto(
             balance = 75000L,
             currency = CurrencyEnum.EUR,
-            accountCode = "MERCHANT_ACCOUNT.seller-me.EUR",
+            accountCode = "MERCHANT_PAYABLE.seller-me.EUR",
             sellerId = sellerId
         )
 
@@ -192,7 +192,7 @@ class BalanceControllerTest {
         val expectedBalance = BalanceDto(
             balance = 99999L,
             currency = CurrencyEnum.GBP,
-            accountCode = "MERCHANT_ACCOUNT.seller-gbp.GBP",
+            accountCode = "MERCHANT_PAYABLE.seller-gbp.GBP",
             sellerId = sellerId
         )
 

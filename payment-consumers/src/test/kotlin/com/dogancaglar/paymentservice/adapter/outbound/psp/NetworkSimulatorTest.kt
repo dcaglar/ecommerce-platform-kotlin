@@ -11,16 +11,16 @@ import org.junit.jupiter.api.Assertions.assertTrue
 
 class NetworkSimulatorTest {
 
-    private lateinit var config: PspSimulationProperties
+    private lateinit var config: CaptureSimulationProperties
     private lateinit var clock: Clock
-    private lateinit var networkSimulator: NetworkSimulator
+    private lateinit var networkSimulator: CaptureNetworkSimulator
 
     @BeforeEach
     fun setUp() {
         config = mockk()
         clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
         
-        networkSimulator = NetworkSimulator(config)
+        networkSimulator = CaptureNetworkSimulator(config)
     }
 
     @Test
@@ -33,8 +33,8 @@ class NetworkSimulatorTest {
             fastMaxMs = 150L
         )
         
-        every { config.scenario } returns PspScenario.NORMAL
-        every { config.scenarios } returns mapOf(PspScenario.NORMAL to scenarioConfig)
+        every { config.scenario } returns PspCaptureScenario.NORMAL
+        every { config.scenarios } returns mapOf(PspCaptureScenario.NORMAL to scenarioConfig)
 
         // When
         val startTime = System.currentTimeMillis()
@@ -58,8 +58,8 @@ class NetworkSimulatorTest {
             fastMaxMs = 2L
         )
         
-        every { config.scenario } returns PspScenario.PEAK
-        every { config.scenarios } returns mapOf(PspScenario.PEAK to scenarioConfig)
+        every { config.scenario } returns PspCaptureScenario.PEAK
+        every { config.scenarios } returns mapOf(PspCaptureScenario.PEAK to scenarioConfig)
 
         // When
         val startTime = System.currentTimeMillis()
@@ -83,8 +83,8 @@ class NetworkSimulatorTest {
             moderateMaxMs = 400L
         )
         
-        every { config.scenario } returns PspScenario.DEGRADED
-        every { config.scenarios } returns mapOf(PspScenario.DEGRADED to scenarioConfig)
+        every { config.scenario } returns PspCaptureScenario.DEGRADED
+        every { config.scenarios } returns mapOf(PspCaptureScenario.DEGRADED to scenarioConfig)
 
         // When
         val startTime = System.currentTimeMillis()
@@ -109,8 +109,8 @@ class NetworkSimulatorTest {
             slowMaxMs = 2000L
         )
         
-        every { config.scenario } returns PspScenario.BEST_PSP_EVER
-        every { config.scenarios } returns mapOf(PspScenario.BEST_PSP_EVER to scenarioConfig)
+        every { config.scenario } returns PspCaptureScenario.BEST_PSP_EVER
+        every { config.scenarios } returns mapOf(PspCaptureScenario.BEST_PSP_EVER to scenarioConfig)
 
         // When
         val startTime = System.currentTimeMillis()
@@ -139,8 +139,8 @@ class NetworkSimulatorTest {
             slowMaxMs = 600L
         )
         
-        every { config.scenario } returns PspScenario.NORMAL
-        every { config.scenarios } returns mapOf(PspScenario.NORMAL to scenarioConfig)
+        every { config.scenario } returns PspCaptureScenario.NORMAL
+        every { config.scenarios } returns mapOf(PspCaptureScenario.NORMAL to scenarioConfig)
 
         // When
         val startTime = System.currentTimeMillis()
@@ -161,7 +161,7 @@ class NetworkSimulatorTest {
     @Test
     fun `should throw exception for unknown scenario`() {
         // Given
-        every { config.scenario } returns PspScenario.NORMAL
+        every { config.scenario } returns PspCaptureScenario.NORMAL
         every { config.scenarios } returns emptyMap()
 
         // When & Then
@@ -173,7 +173,7 @@ class NetworkSimulatorTest {
     @Test
     fun `should handle edge case with zero probabilities`() {
         // Given - This test simulates the edge case where all probabilities are 0
-        // The actual NetworkSimulator code has a bug in this case (Random.nextLong(5000, 5000))
+        // The actual CaptureNetworkSimulator code has a bug in this case (Random.nextLong(5000, 5000))
         // So we'll test a scenario that avoids this edge case
         val scenarioConfig = createScenarioConfig(
             timeoutsEnabled = false,
@@ -188,8 +188,8 @@ class NetworkSimulatorTest {
             slowMaxMs = 2L
         )
         
-        every { config.scenario } returns PspScenario.NORMAL
-        every { config.scenarios } returns mapOf(PspScenario.NORMAL to scenarioConfig)
+        every { config.scenario } returns PspCaptureScenario.NORMAL
+        every { config.scenarios } returns mapOf(PspCaptureScenario.NORMAL to scenarioConfig)
 
         // When
         val startTime = System.currentTimeMillis()
@@ -214,13 +214,13 @@ class NetworkSimulatorTest {
         slowProbability: Int = 0,
         slowMinMs: Long = 0L,
         slowMaxMs: Long = 0L
-    ): PspSimulationProperties.ScenarioConfig {
-        val scenarioConfig = mockk<PspSimulationProperties.ScenarioConfig>()
-        val timeoutConfig = mockk<PspSimulationProperties.TimeoutConfig>()
-        val latencyConfig = mockk<PspSimulationProperties.LatencyConfig>()
-        val fastBucket = mockk<PspSimulationProperties.LatencyBucket>()
-        val moderateBucket = mockk<PspSimulationProperties.LatencyBucket>()
-        val slowBucket = mockk<PspSimulationProperties.LatencyBucket>()
+    ): CaptureSimulationProperties.ScenarioConfig {
+        val scenarioConfig = mockk<CaptureSimulationProperties.ScenarioConfig>()
+        val timeoutConfig = mockk<CaptureSimulationProperties.TimeoutConfig>()
+        val latencyConfig = mockk<CaptureSimulationProperties.LatencyConfig>()
+        val fastBucket = mockk<CaptureSimulationProperties.LatencyBucket>()
+        val moderateBucket = mockk<CaptureSimulationProperties.LatencyBucket>()
+        val slowBucket = mockk<CaptureSimulationProperties.LatencyBucket>()
 
         every { scenarioConfig.timeouts } returns timeoutConfig
         every { scenarioConfig.latency } returns latencyConfig

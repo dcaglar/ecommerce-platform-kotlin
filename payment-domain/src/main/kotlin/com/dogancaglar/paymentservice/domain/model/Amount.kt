@@ -21,7 +21,7 @@ value class Currency(val currencyCode: String){
     }
 }
 
-data class Amount private constructor(val quantity: Long,val currency: Currency){
+data class Amount private constructor(val quantity: Long,val currency: Currency) : Comparable<Amount>{
     
 
     companion object {
@@ -29,7 +29,12 @@ data class Amount private constructor(val quantity: Long,val currency: Currency)
             require(quantity > 0) { "Amount quantity must be greater than zero, but was: $quantity" }
             return Amount(quantity, currency)
         }
+
+        fun zero(currency: Currency): Amount {
+            return Amount(0, currency)
+        }
     }
+
 
     operator fun  plus(other: Amount): Amount{
         require(other.currency == currency){
@@ -45,10 +50,18 @@ data class Amount private constructor(val quantity: Long,val currency: Currency)
         return Amount(quantity-other.quantity,currency)
     }
 
+    private fun requireSameCurrency(other: Amount) {
+        require(currency == other.currency) { "Currency mismatch: $currency vs ${other.currency}" }
+    }
+
     fun negate(): Amount = Amount(-quantity,currency)
 
     fun isPositive(): Boolean = quantity > 0
 
     fun isNegative(): Boolean = quantity<0
+    override fun compareTo(other: Amount): Int {
+        requireSameCurrency(other);
+        return quantity.compareTo(other.quantity)
+    }
 
 }

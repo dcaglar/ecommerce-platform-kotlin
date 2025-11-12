@@ -1,5 +1,5 @@
 mybatis:
   mapper-locations: classpath:mapper/*.xml
-  type-aliases-package: com.dogancaglar.paymentservice.adapter.outbound.persistance.entity
-  type-handlers-package: com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.typehandler
+  type-aliases-package: com.dogancaglar.paymentservice.adapter.outbound.persistence.entity
+  type-handlers-package: com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler
 spring.jackson.time-zone: UTC

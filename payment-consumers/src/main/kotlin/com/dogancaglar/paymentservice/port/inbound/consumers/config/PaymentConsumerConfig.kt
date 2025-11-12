@@ -2,22 +2,17 @@ package com.dogancaglar.paymentservice.port.inbound.consumers.config
 
 
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.PaymentEventPublisher
-import com.dogancaglar.paymentservice.adapter.outbound.persistance.AccountBalanceSnapshotAdapter
-import com.dogancaglar.paymentservice.adapter.outbound.redis.AccountBalanceRedisCacheAdapter
-import com.dogancaglar.paymentservice.adapter.outbound.redis.PaymentRetryQueueAdapter
-import com.dogancaglar.paymentservice.adapter.outbound.redis.PspResultRedisCacheAdapter
+import com.dogancaglar.paymentservice.adapter.outbound.redis.PaymentOrderRetryQueueAdapter
 import com.dogancaglar.paymentservice.application.usecases.ProcessPaymentService
 import com.dogancaglar.paymentservice.application.usecases.RecordLedgerEntriesService
 import com.dogancaglar.paymentservice.application.usecases.RequestLedgerRecordingService
-import com.dogancaglar.paymentservice.domain.util.PaymentFactory
+import com.dogancaglar.paymentservice.application.util.PaymentFactory
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderFactory
+import com.dogancaglar.paymentservice.application.util.PaymentOrderFactory
 import com.dogancaglar.paymentservice.application.usecases.AccountBalanceService
-import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceUseCase
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
-import com.dogancaglar.paymentservice.ports.outbound.BalanceIdempotencyPort
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
 import org.springframework.beans.factory.annotation.Qualifier
@@ -42,7 +37,7 @@ class PaymentConsumerConfig {
     fun processPaymentService(
         paymentOrderModificationPort: PaymentOrderModificationPort,
         @Qualifier("syncPaymentEventPublisher") syncPaymentEventPublisher: PaymentEventPublisher,
-        paymentRetryQueueAdapter: PaymentRetryQueueAdapter,
+        paymentOrderRetryQueueAdapter: PaymentOrderRetryQueueAdapter,
         clock: Clock,
         paymentOrderFactory: PaymentOrderFactory,
         paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
@@ -50,7 +45,7 @@ class PaymentConsumerConfig {
         return ProcessPaymentService(
             paymentOrderModificationPort = paymentOrderModificationPort,
             eventPublisher = syncPaymentEventPublisher,
-            retryQueuePort = paymentRetryQueueAdapter,
+            retryQueuePort = paymentOrderRetryQueueAdapter,
             clock = clock,
             paymentOrderFactory = paymentOrderFactory,
             paymentOrderDomainEventMapper = paymentOrderDomainEventMapper

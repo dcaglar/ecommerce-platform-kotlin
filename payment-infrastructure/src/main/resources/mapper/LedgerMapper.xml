@@ -3,10 +3,10 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.LedgerMapper">
+<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.LedgerMapper">
 
     <resultMap id="JournalEntryResultMap"
-               type="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.JournalEntryEntity">
+               type="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.JournalEntryEntity">
         <id property="id" column="id"/>
         <result property="txType" column="tx_type"/>
         <result property="name" column="name"/>
@@ -16,14 +16,14 @@
     </resultMap>
 
     <resultMap id="LedgerEntryResultMap"
-               type="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.LedgerEntryEntity">
+               type="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.LedgerEntryEntity">
         <id property="id" column="id"/>
         <result property="journalId" column="journal_id"/>
         <result property="createdAt" column="created_at"/>
     </resultMap>
 
     <resultMap id="PostingResultMap"
-               type="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PostingEntity">
+               type="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PostingEntity">
         <id property="id" column="id"/>
         <result property="journalId" column="journal_id"/>
         <result property="accountCode" column="account_code"/>
@@ -34,19 +34,19 @@
         <result property="createdAt" column="created_at"/>
     </resultMap>
 
-    <insert id="insertJournalEntry" parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.JournalEntryEntity">
+    <insert id="insertJournalEntry" parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.JournalEntryEntity">
         INSERT INTO journal_entries (id, tx_type, name, reference_type, reference_id, created_at)
         VALUES (#{id}, #{txType}, #{name}, #{referenceType}, #{referenceId}, #{createdAt})
         ON CONFLICT (id) DO NOTHING
     </insert>
 
-    <insert id="insertLedgerEntry" parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.LedgerEntryEntity"
+    <insert id="insertLedgerEntry" parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.LedgerEntryEntity"
             useGeneratedKeys="true" keyProperty="id" keyColumn="id">
         INSERT INTO ledger_entries (journal_id, created_at)
         VALUES (#{journalId}, #{createdAt})
     </insert>
 
-    <insert id="insertPosting" parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PostingEntity">
+    <insert id="insertPosting" parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PostingEntity">
         INSERT INTO postings (journal_id, account_code, account_type, amount, direction, currency, created_at)
         VALUES (#{journalId}, #{accountCode}, #{accountType}, #{amount}, #{direction}, #{currency}, #{createdAt})
         ON CONFLICT (journal_id, account_code) DO NOTHING

@@ -5,7 +5,7 @@ import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.PaymentStatus
+import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
@@ -14,6 +14,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.port.out.web.dto.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Order
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -84,50 +85,60 @@ class PaymentRequestMapperTest {
 
     @Test
     fun `should map Payment to PaymentResponseDTO correctly`() {
-        // Given
-        val payment = Payment.builder()
-            .paymentId(PaymentId(123L))
-            .publicPaymentId("payment-123")
-            .orderId(OrderId("order-123"))
-            .buyerId(BuyerId("buyer-456"))
-            .totalAmount(Amount.of(10000L, Currency("USD")))
-            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
-            .paymentOrders(listOf())
-            .buildNew()
+        val createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
 
-        // When
+        val basePayment = Payment.createNew(
+            paymentId = PaymentId(123L),
+            buyerId = BuyerId("buyer-456"),
+            orderId = OrderId("order-123"),
+            totalAmount = Amount.of(10000L, Currency("USD")),
+            clock = clock
+        )
+
+        val paymentOrder = PaymentOrder.rehydrate(
+            paymentOrderId = PaymentOrderId(1L),
+            paymentId = PaymentId(123L),
+            sellerId = SellerId("seller-789"),
+            amount = Amount.of(10000L, Currency("USD")),
+            status = PaymentOrderStatus.INITIATED_PENDING,
+            retryCount = 0,
+            createdAt = createdAt,
+            updatedAt = createdAt
+        )
+
+        val payment = basePayment.addPaymentOrder(paymentOrder)
+
         val response = PaymentRequestMapper.toResponse(payment)
 
-        // Then
         assertEquals("payment-123", response.paymentId)
         assertEquals("payment-123", response.id)
-        assertEquals("INITIATED", response.status)
+        assertEquals("PENDING_AUTH", response.status)
         assertEquals("buyer-456", response.buyerId)
         assertEquals("order-123", response.orderId)
         assertEquals(10000L, response.totalAmount.quantity)
         assertEquals(CurrencyEnum.USD, response.totalAmount.currency)
-        assertNotNull(response.createdAt)
+        assertEquals(createdAt.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME), response.createdAt)
+        assertEquals(1, response.paymentOrders.size)
+        val orderDto = response.paymentOrders.first()
+        assertEquals("seller-789", orderDto.sellerId)
+        assertEquals(10000L, orderDto.amount.quantity)
+        assertEquals(CurrencyEnum.USD, orderDto.amount.currency)
     }
 
     @Test
     fun `should map Payment with different status correctly`() {
-        // Given
-        val payment = Payment.builder()
-            .paymentId(PaymentId(456L))
-            .publicPaymentId("payment-456")
-            .orderId(OrderId("order-456"))
-            .buyerId(BuyerId("buyer-789"))
-            .totalAmount(Amount.of(5000L, Currency("EUR")))
-            .createdAt(clock.instant().atZone(clock.zone).toLocalDateTime())
-            .paymentOrders(listOf())
-            .buildNew()
+        val payment = Payment.createNew(
+            paymentId = PaymentId(456L),
+            buyerId = BuyerId("buyer-789"),
+            orderId = OrderId("order-456"),
+            totalAmount = Amount.of(5000L, Currency("EUR")),
+            clock = clock
+        ).authorize()
 
-        // When
         val response = PaymentRequestMapper.toResponse(payment)
 
-        // Then
         assertEquals("payment-456", response.paymentId)
-        assertEquals("INITIATED", response.status)
+        assertEquals("AUTHORIZED", response.status)
         assertEquals(5000L, response.totalAmount.quantity)
         assertEquals(CurrencyEnum.EUR, response.totalAmount.currency)
     }

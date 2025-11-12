@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.PaymentOrderStatusCheckMapper">
+<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentOrderStatusCheckMapper">
     <resultMap id="PaymentOrderStatusCheckResultMap"
-               type="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentOrderStatusCheckEntity">
+               type="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentOrderStatusCheckEntity">
         <!-- Map your columns to fields here -->
         <id property="id" column="id"/>
         <result property="scheduledAt" column="scheduled_at"/>
@@ -25,7 +25,7 @@
     </update>
 
     <insert id="insert"
-            parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentOrderStatusCheckEntity">
+            parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentOrderStatusCheckEntity">
         INSERT INTO payment_order_status_checks (
         payment_order_id, scheduled_at, attempt, status, created_at, updated_at
         ) VALUES (

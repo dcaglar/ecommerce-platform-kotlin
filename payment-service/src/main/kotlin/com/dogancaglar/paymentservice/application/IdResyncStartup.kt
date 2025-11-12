@@ -9,7 +9,7 @@ import org.springframework.boot.ApplicationRunner
 import org.springframework.context.annotation.DependsOn
 import org.springframework.jdbc.BadSqlGrammarException
 import org.springframework.stereotype.Component
-import paymentservice.port.outbound.IdGeneratorPort
+import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 
 @Component
 @DependsOn("liquibase") // ensure migrations done

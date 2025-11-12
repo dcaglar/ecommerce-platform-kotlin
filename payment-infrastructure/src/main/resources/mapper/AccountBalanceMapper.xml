@@ -3,11 +3,11 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.AccountBalanceMapper">
+<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.AccountBalanceMapper">
 
 
     <resultMap id="AccountBalanceResultMap"
-               type="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.AccountBalanceEntity">
+               type="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.AccountBalanceEntity">
         <id property="accountCode" column="account_code"/>
         <result property="balance" column="balance"/>
         <result property="lastAppliedEntryId" column="last_applied_entry_id"/>

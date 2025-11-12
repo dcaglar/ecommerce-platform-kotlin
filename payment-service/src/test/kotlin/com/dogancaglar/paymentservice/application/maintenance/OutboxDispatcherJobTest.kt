@@ -2,9 +2,13 @@ package com.dogancaglar.paymentservice.application.maintenance
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.OutboxOutboundAdapter
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentOrderOutboundAdapter
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.event.OutboxEvent
+import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
+import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
@@ -14,6 +18,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
+import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
+import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -21,25 +27,34 @@ import java.time.ZoneOffset
 
 class OutboxDispatcherJobTest {
 
-    private lateinit var outboxEventPort: OutboxJobMyBatisAdapter
+    private lateinit var outboxEventRepository: OutboxOutboundAdapter
+    private lateinit var paymentOrderRepository: PaymentOrderOutboundAdapter
     private lateinit var eventPublisherPort: EventPublisherPort
     private lateinit var meterRegistry: MeterRegistry
     private lateinit var objectMapper: ObjectMapper
     private lateinit var taskScheduler: ThreadPoolTaskScheduler
+    private lateinit var serializationPort: SerializationPort
+    private lateinit var paymentOrderDomaainEventMapper: PaymentOrderDomainEventMapper
+    private lateinit var idGeneratorPort: IdGeneratorPort
     private lateinit var clock: Clock
     private lateinit var outboxDispatcherJob: OutboxDispatcherJob
 
     @BeforeEach
     fun setUp() {
-        outboxEventPort = mockk<OutboxJobMyBatisAdapter>(relaxed = true)
+        outboxEventRepository = mockk<OutboxOutboundAdapter>(relaxed = true)
+        paymentOrderRepository = mockk<PaymentOrderOutboundAdapter>(relaxed = true)
         eventPublisherPort = mockk(relaxed = true)
         meterRegistry = mockk(relaxed = true)
+        serializationPort = mockk(relaxed = true)
+        paymentOrderDomaainEventMapper = mockk(relaxed = true)
+        idGeneratorPort = mockk(relaxed = true)
         objectMapper = ObjectMapper().registerModule(KotlinModule.Builder().build()).registerModule(JavaTimeModule())
         taskScheduler = mockk()
         clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
         
         outboxDispatcherJob = OutboxDispatcherJob(
-            outboxEventPort = outboxEventPort,
+            outboxEventRepository = outboxEventRepository,
+            paymentOrderRepository = paymentOrderRepository,
             syncPaymentEventPublisher = eventPublisherPort,
             meterRegistry = meterRegistry,
             objectMapper = objectMapper,
@@ -48,7 +63,10 @@ class OutboxDispatcherJobTest {
             batchSize = 10,
             appInstanceId = "test-instance",
             clock = clock,
-            backlogResyncInterval = "PT5M"
+            backlogResyncInterval = "PT5M",
+            serializationPort = serializationPort,
+            paymentOrderDomainEventMapper = paymentOrderDomaainEventMapper,
+            idGeneratorPort = idGeneratorPort,
         )
     }
 
@@ -60,7 +78,7 @@ class OutboxDispatcherJobTest {
             createOutboxEvent(2L, "event2")
         )
         
-        every { outboxEventPort.findBatchForDispatch(10, any<String>()) } returns outboxEvents
+        every { outboxEventRepository.findBatchForDispatch(10, any<String>()) } returns outboxEvents
 
         // When
         val result = outboxDispatcherJob.claimBatch(10, "test-worker")
@@ -69,20 +87,20 @@ class OutboxDispatcherJobTest {
         assertEquals(2, result.size)
         assertEquals(1L, result[0].oeid)
         assertEquals(2L, result[1].oeid)
-        verify { outboxEventPort.findBatchForDispatch(10, "test-worker") }
+        verify { outboxEventRepository.findBatchForDispatch(10, "test-worker") }
     }
 
     @Test
     fun `should return empty list when no events to claim`() {
         // Given
-        every { outboxEventPort.findBatchForDispatch(10, any<String>()) } returns emptyList()
+        every { outboxEventRepository.findBatchForDispatch(10, any<String>()) } returns emptyList()
 
         // When
         val result = outboxDispatcherJob.claimBatch(10, "test-worker")
 
         // Then
         assertTrue(result.isEmpty())
-        verify { outboxEventPort.findBatchForDispatch(10, any<String>()) }
+        verify { outboxEventRepository.findBatchForDispatch(10, any<String>()) }
     }
 
     @Test
@@ -153,13 +171,13 @@ class OutboxDispatcherJobTest {
             createOutboxEvent(2L, "event2").apply { markAsSent() }
         )
         
-        every { outboxEventPort.updateAll(succeededEvents) } returns Unit
+        every { outboxEventRepository.updateAll(succeededEvents) } returns Unit
 
         // When
         outboxDispatcherJob.persistResults(succeededEvents)
 
         // Then
-        verify { outboxEventPort.updateAll(succeededEvents) }
+        verify { outboxEventRepository.updateAll(succeededEvents) }
     }
 
     @Test
@@ -170,25 +188,25 @@ class OutboxDispatcherJobTest {
             createOutboxEvent(2L, "event2")
         )
         
-        every { outboxEventPort.unclaimSpecific("test-worker", listOf(1L, 2L)) } returns 2
+        every { outboxEventRepository.unclaimSpecific("test-worker", listOf(1L, 2L)) } returns 2
 
         // When
         outboxDispatcherJob.unclaimFailedNow("test-worker", failedEvents)
 
         // Then
-        verify { outboxEventPort.unclaimSpecific("test-worker", listOf(1L, 2L)) }
+        verify { outboxEventRepository.unclaimSpecific("test-worker", listOf(1L, 2L)) }
     }
 
     @Test
     fun `should reclaim stuck events`() {
         // Given
-        every { outboxEventPort.reclaimStuckClaims(600) } returns 5
+        every { outboxEventRepository.reclaimStuckClaims(600) } returns 5
 
         // When
         outboxDispatcherJob.reclaimStuck()
 
         // Then
-        verify { outboxEventPort.reclaimStuckClaims(600) }
+        verify { outboxEventRepository.reclaimStuckClaims(600) }
     }
 
     @Test

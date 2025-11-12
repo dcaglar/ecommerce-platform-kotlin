@@ -24,9 +24,7 @@ open class RequestLedgerRecordingService(
         }
         val requested = LedgerRecordingCommand(
             paymentOrderId = event.paymentOrderId,
-            publicPaymentOrderId = event.publicPaymentOrderId,
             paymentId = event.paymentId,
-            publicPaymentId = event.publicPaymentId,
             sellerId = event.sellerId,
             amountValue = event.amountValue,
             currency = event.currency,

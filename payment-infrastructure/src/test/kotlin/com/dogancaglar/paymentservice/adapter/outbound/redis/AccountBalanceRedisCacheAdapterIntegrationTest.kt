@@ -79,7 +79,7 @@ class AccountBalanceRedisCacheAdapterIntegrationTest {
     @Test
     fun `addDeltaAndWatermark should atomically update delta and watermark and mark dirty`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.seller-1"
+        val accountCode = "MERCHANT_PAYABLE.seller-1"
         val initialDelta = 100L
         val initialWatermark = 50L
         val newDelta = 200L
@@ -107,7 +107,7 @@ class AccountBalanceRedisCacheAdapterIntegrationTest {
     @Test
     fun `addDeltaAndWatermark should only update watermark when new watermark is higher`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.seller-2"
+        val accountCode = "MERCHANT_PAYABLE.seller-2"
         val highWatermark = 200L
         val lowWatermark = 100L
 
@@ -127,7 +127,7 @@ class AccountBalanceRedisCacheAdapterIntegrationTest {
     @Test
     fun `getAndResetDeltaWithWatermark should read and reset delta atomically`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.seller-3"
+        val accountCode = "MERCHANT_PAYABLE.seller-3"
         val delta = 5000L
         val watermark = 150L
 
@@ -164,8 +164,8 @@ class AccountBalanceRedisCacheAdapterIntegrationTest {
     @Test
     fun `markDirty should add account to dirty set`() {
         // Given
-        val accountCode1 = "MERCHANT_ACCOUNT.seller-4"
-        val accountCode2 = "CASH.GLOBAL"
+        val accountCode1 = "MERCHANT_PAYABLE.seller-4"
+        val accountCode2 = "PLATFORM_CASH.GLOBAL"
 
         // When
         adapter.markDirty(accountCode1)
@@ -181,8 +181,8 @@ class AccountBalanceRedisCacheAdapterIntegrationTest {
     fun `getDirtyAccounts should return all accounts in dirty set`() {
         // Given
         val accountCodes = setOf(
-            "MERCHANT_ACCOUNT.seller-5",
-            "MERCHANT_ACCOUNT.seller-6",
+            "MERCHANT_PAYABLE.seller-5",
+            "MERCHANT_PAYABLE.seller-6",
             "PSP_RECEIVABLES.GLOBAL"
         )
 
@@ -209,7 +209,7 @@ class AccountBalanceRedisCacheAdapterIntegrationTest {
     @Test
     fun `getRealTimeBalance should return snapshot plus delta`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.seller-7"
+        val accountCode = "MERCHANT_PAYABLE.seller-7"
         val snapshotBalance = 100000L
         val delta = 5000L
         val watermark = 200L
@@ -226,7 +226,7 @@ class AccountBalanceRedisCacheAdapterIntegrationTest {
     @Test
     fun `getRealTimeBalance should return snapshot when no delta exists`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.seller-8"
+        val accountCode = "MERCHANT_PAYABLE.seller-8"
         val snapshotBalance = 100000L
 
         // When - No delta added
@@ -239,7 +239,7 @@ class AccountBalanceRedisCacheAdapterIntegrationTest {
     @Test
     fun `getRealTimeBalance should handle negative deltas`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.seller-9"
+        val accountCode = "MERCHANT_PAYABLE.seller-9"
         val snapshotBalance = 100000L
         val negativeDelta = -5000L
         val watermark = 250L
@@ -257,7 +257,7 @@ class AccountBalanceRedisCacheAdapterIntegrationTest {
     @Test
     fun `addDeltaAndWatermark should accumulate deltas correctly`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.seller-10"
+        val accountCode = "MERCHANT_PAYABLE.seller-10"
 
         // When - Add multiple deltas
         adapter.addDeltaAndWatermark(accountCode, 100L, 10L)
@@ -273,8 +273,8 @@ class AccountBalanceRedisCacheAdapterIntegrationTest {
     @Test
     fun `addDeltaAndWatermark should handle multiple accounts independently`() {
         // Given
-        val accountCode1 = "MERCHANT_ACCOUNT.seller-11"
-        val accountCode2 = "MERCHANT_ACCOUNT.seller-12"
+        val accountCode1 = "MERCHANT_PAYABLE.seller-11"
+        val accountCode2 = "MERCHANT_PAYABLE.seller-12"
 
         // When - Add deltas to different accounts
         adapter.addDeltaAndWatermark(accountCode1, 1000L, 100L)
@@ -293,7 +293,7 @@ class AccountBalanceRedisCacheAdapterIntegrationTest {
     @Test
     fun `addDeltaAndWatermark should set TTL on account key`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.seller-13"
+        val accountCode = "MERCHANT_PAYABLE.seller-13"
         val delta = 100L
         val watermark = 50L
 
@@ -308,7 +308,7 @@ class AccountBalanceRedisCacheAdapterIntegrationTest {
     @Test
     fun `getAndResetDeltaWithWatermark should preserve watermark when delta is zero`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.seller-14"
+        val accountCode = "MERCHANT_PAYABLE.seller-14"
         val watermark = 500L
 
         // When - Add with zero delta (e.g., balanced transaction)

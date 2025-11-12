@@ -10,7 +10,6 @@ import java.time.LocalDateTime
 data class LedgerEntriesRecorded private constructor(
     override val ledgerBatchId: String,
     override val paymentOrderId: String,
-    override val publicPaymentOrderId: String,
     override val sellerId: String,
     override val currency: String,
     override val status: String,
@@ -42,7 +41,6 @@ data class LedgerEntriesRecorded private constructor(
         fun create(
             ledgerBatchId: String,
             paymentOrderId: String,
-            publicPaymentOrderId: String,
             sellerId: String,
             currency: String,
             status: String,
@@ -57,7 +55,6 @@ data class LedgerEntriesRecorded private constructor(
             return LedgerEntriesRecorded(
                 ledgerBatchId = ledgerBatchId,
                 paymentOrderId = paymentOrderId,
-                publicPaymentOrderId = publicPaymentOrderId,
                 sellerId = sellerId,
                 currency = currency,
                 status = status,

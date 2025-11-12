@@ -1,5 +1,7 @@
 package com.dogancaglar.paymentservice.domain.event
 
+import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.domain.event.OutboxEvent.Status
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.time.LocalDateTime
@@ -40,10 +42,10 @@ class OutboxEventTest {
             payload = testPayload,
             createdAt = testCreatedAt
         )
+        assertEquals(OutboxEvent.Status.NEW, outboxEvent.status)
+        val updatedOutboxEvent = outboxEvent.markAsProcessing()
 
-        outboxEvent.markAsProcessing()
-
-        assertEquals(OutboxEvent.Status.PROCESSING, outboxEvent.status)
+        assertEquals(OutboxEvent.Status.PROCESSING, updatedOutboxEvent.status)
         assertEquals(testOeid, outboxEvent.oeid)
         assertEquals(testEventType, outboxEvent.eventType)
         assertEquals(testAggregateId, outboxEvent.aggregateId)
@@ -59,28 +61,15 @@ class OutboxEventTest {
             aggregateId = testAggregateId,
             payload = testPayload,
             createdAt = testCreatedAt
-        )
+        ).markAsProcessing()
 
-        outboxEvent.markAsProcessing()
-        outboxEvent.markAsSent()
+        val updatedOutBoxEvent = outboxEvent.markAsSent()
 
-        assertEquals(OutboxEvent.Status.SENT, outboxEvent.status)
+        assertEquals(OutboxEvent.Status.PROCESSING, outboxEvent.status)
+
+        assertEquals(OutboxEvent.Status.SENT, updatedOutBoxEvent.status)
     }
 
-    @Test
-    fun `markAsSent should change status from NEW to SENT`() {
-        val outboxEvent = OutboxEvent.createNew(
-            oeid = testOeid,
-            eventType = testEventType,
-            aggregateId = testAggregateId,
-            payload = testPayload,
-            createdAt = testCreatedAt
-        )
-
-        outboxEvent.markAsSent()
-
-        assertEquals(OutboxEvent.Status.SENT, outboxEvent.status)
-    }
 
     @Test
     fun `markAsProcessing should throw exception when status is not NEW`() {
@@ -90,15 +79,14 @@ class OutboxEventTest {
             aggregateId = testAggregateId,
             payload = testPayload,
             createdAt = testCreatedAt
-        )
+        ).markAsSent()
 
-        outboxEvent.markAsProcessing()
 
         val exception = assertThrows(IllegalArgumentException::class.java) {
             outboxEvent.markAsProcessing()
         }
 
-        assertTrue(exception.message!!.contains("Expected status NEW, was PROCESSING"))
+        assertTrue(exception.message!!.contains("Invalid transition from SENT to PROCESSING"))
     }
 
     @Test
@@ -109,26 +97,26 @@ class OutboxEventTest {
             aggregateId = testAggregateId,
             payload = testPayload,
             createdAt = testCreatedAt
-        )
+        ).markAsSent()
 
-        outboxEvent.markAsSent()
 
         val exception = assertThrows(IllegalArgumentException::class.java) {
             outboxEvent.markAsSent()
         }
 
-        assertTrue(exception.message!!.contains("Expected status NEW or PROCESSING"))
+        assertTrue(exception.message!!.contains("Invalid transition from SENT"))
     }
 
     @Test
     fun `restore should recreate OutboxEvent with provided status`() {
-        val outboxEvent = OutboxEvent.restore(
+        val outboxEvent = OutboxEvent.rehydrate(
             oeid = testOeid,
             eventType = testEventType,
             aggregateId = testAggregateId,
             payload = testPayload,
             status = "PROCESSING",
-            createdAt = testCreatedAt
+            createdAt = testCreatedAt,
+            updatedAt = testCreatedAt
         )
 
         assertEquals(testOeid, outboxEvent.oeid)
@@ -141,13 +129,14 @@ class OutboxEventTest {
 
     @Test
     fun `restore should handle SENT status`() {
-        val outboxEvent = OutboxEvent.restore(
+        val outboxEvent = OutboxEvent.rehydrate(
             oeid = testOeid,
             eventType = testEventType,
             aggregateId = testAggregateId,
             payload = testPayload,
             status = "SENT",
-            createdAt = testCreatedAt
+            createdAt = testCreatedAt,
+            updatedAt = testCreatedAt
         )
 
         assertEquals(OutboxEvent.Status.SENT, outboxEvent.status)
@@ -155,13 +144,14 @@ class OutboxEventTest {
 
     @Test
     fun `restore should handle NEW status`() {
-        val outboxEvent = OutboxEvent.restore(
+        val outboxEvent = OutboxEvent.rehydrate(
             oeid = testOeid,
             eventType = testEventType,
             aggregateId = testAggregateId,
             payload = testPayload,
             status = "NEW",
-            createdAt = testCreatedAt
+            createdAt = testCreatedAt,
+            updatedAt = testCreatedAt
         )
 
         assertEquals(OutboxEvent.Status.NEW, outboxEvent.status)
@@ -181,43 +171,11 @@ class OutboxEventTest {
 
         assertEquals(OutboxEvent.Status.NEW, outboxEvent.status)
 
-        outboxEvent.markAsProcessing()
-        assertEquals(OutboxEvent.Status.PROCESSING, outboxEvent.status)
+        val processing = outboxEvent.markAsProcessing()
+        assertEquals(OutboxEvent.Status.PROCESSING, processing.status)
 
-        outboxEvent.markAsSent()
-        assertEquals(OutboxEvent.Status.SENT, outboxEvent.status)
-    }
-
-    @Test
-    fun `should support direct transition NEW to SENT`() {
-        val outboxEvent = OutboxEvent.createNew(
-            oeid = testOeid,
-            eventType = testEventType,
-            aggregateId = testAggregateId,
-            payload = testPayload,
-            createdAt = testCreatedAt
-        )
-
-        assertEquals(OutboxEvent.Status.NEW, outboxEvent.status)
-
-        outboxEvent.markAsSent()
-        assertEquals(OutboxEvent.Status.SENT, outboxEvent.status)
-    }
-
-    // Edge Cases
-
-    @Test
-    fun `should handle large oeid values`() {
-        val largeOeid = 999999999L
-        val outboxEvent = OutboxEvent.createNew(
-            oeid = largeOeid,
-            eventType = testEventType,
-            aggregateId = testAggregateId,
-            payload = testPayload,
-            createdAt = testCreatedAt
-        )
-
-        assertEquals(largeOeid, outboxEvent.oeid)
+        val newoutbox =processing.markAsSent()
+        assertEquals(OutboxEvent.Status.SENT, newoutbox.status)
     }
 
     @Test
@@ -237,11 +195,9 @@ class OutboxEventTest {
     @Test
     fun `should handle different event types`() {
         val eventTypes = listOf(
+            "PaymentAuthorized",
             "PaymentOrderCreated",
-            "PaymentOrderSucceeded",
-            "PaymentOrderFailed",
-            "PaymentOrderPspCallRequested",
-            "PaymentOrderStatusCheckRequested"
+            "PaymentOrderCaptureCommand",
         )
 
         eventTypes.forEach { eventType ->
@@ -358,27 +314,6 @@ class OutboxEventTest {
         assertEquals(originalCreatedAt, outboxEvent.createdAt)
     }
 
-    // Error Handling Tests
-
-    @Test
-    fun `markAsProcessing should provide clear error message for invalid status`() {
-        val outboxEvent = OutboxEvent.createNew(
-            oeid = testOeid,
-            eventType = testEventType,
-            aggregateId = testAggregateId,
-            payload = testPayload,
-            createdAt = testCreatedAt
-        )
-
-        outboxEvent.markAsProcessing()
-
-        val exception = assertThrows(IllegalArgumentException::class.java) {
-            outboxEvent.markAsProcessing()
-        }
-
-        assertEquals("Expected status NEW, was PROCESSING", exception.message)
-    }
-
     @Test
     fun `markAsSent should provide clear error message for invalid status`() {
         val outboxEvent = OutboxEvent.createNew(
@@ -387,14 +322,13 @@ class OutboxEventTest {
             aggregateId = testAggregateId,
             payload = testPayload,
             createdAt = testCreatedAt
-        )
+        ).markAsSent()
 
-        outboxEvent.markAsSent()
 
         val exception = assertThrows(IllegalArgumentException::class.java) {
             outboxEvent.markAsSent()
         }
 
-        assertTrue(exception.message!!.contains("Expected status NEW or PROCESSING"))
+        assertTrue(exception.message!!.contains("Invalid transition from SENT to ${Status.SENT}"))
     }
 }

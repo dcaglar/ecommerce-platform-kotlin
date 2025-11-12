@@ -9,7 +9,6 @@ import java.time.LocalDateTime
 interface LedgerEvent {
     val ledgerBatchId: String
     val paymentOrderId: String
-    val publicPaymentOrderId: String
     val sellerId: String
     val currency: String
     val status: String

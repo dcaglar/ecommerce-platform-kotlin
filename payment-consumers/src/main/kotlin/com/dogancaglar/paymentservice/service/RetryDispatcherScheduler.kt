@@ -2,9 +2,9 @@ package com.dogancaglar.paymentservice.service
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.PaymentEventPublisher
-import com.dogancaglar.paymentservice.adapter.outbound.redis.PaymentRetryQueueAdapter
+import com.dogancaglar.paymentservice.adapter.outbound.redis.PaymentOrderRetryQueueAdapter
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspCallRequested
+import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
 import io.micrometer.core.instrument.*
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
@@ -16,7 +16,7 @@ import kotlin.math.min
 
 @Component
 class RetryDispatcherScheduler(
-    private val retryQueue: PaymentRetryQueueAdapter,
+    private val retryQueue: PaymentOrderRetryQueueAdapter,
     @param:Qualifier("batchPaymentEventPublisher") private val publisher: PaymentEventPublisher,
     private val meterRegistry: MeterRegistry,
     @param:Qualifier("retryDispatcherSpringScheduler") private val scheduler: ThreadPoolTaskScheduler
@@ -31,7 +31,7 @@ class RetryDispatcherScheduler(
     private val running = java.util.concurrent.atomic.AtomicBoolean(false)
 
     // Static tag for your topic (so dashboards can filter/group)
-    private val topicTag = Tag.of("topic", EventMetadatas.PaymentOrderPspCallRequestedMetadata.topic)
+    private val topicTag = Tag.of("topic", EventMetadatas.PaymentOrderCaptureCommandMetadata.topic)
 
     private val processedCounter = Counter.builder("redis_retry_events_total")
         .description("Total retry events successfully re-published")
@@ -100,11 +100,11 @@ class RetryDispatcherScheduler(
 
             try {
                 // Build the envelopes list for ONE atomic TX
-                val envs = ArrayList<EventEnvelope<PaymentOrderPspCallRequested>>(chunkCount)
+                val envs = ArrayList<EventEnvelope<PaymentOrderCaptureCommand>>(chunkCount)
                 for (item in chunk) {
                     val t = Timer.start(meterRegistry)
                     @Suppress("UNCHECKED_CAST")
-                    val env = item.envelope as EventEnvelope<PaymentOrderPspCallRequested>
+                    val env = item.envelope as EventEnvelope<PaymentOrderCaptureCommand>
                     envs.add(env)
                     t.stop(perEventTimer)
                 }
@@ -112,7 +112,7 @@ class RetryDispatcherScheduler(
                 // Send the whole chunk atomically (one Kafka transaction)
                 val txOk = publisher.publishBatchAtomically(
                     envelopes = envs,
-                    eventMetaData = EventMetadatas.PaymentOrderPspCallRequestedMetadata,
+                    eventMetaData = EventMetadatas.PaymentOrderCaptureCommandMetadata,
                     timeout = java.time.Duration.ofSeconds(30)
                 )
 

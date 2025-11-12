@@ -4,52 +4,54 @@
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+        <!-- =============================================================
+             01. Create main partitioned outbox_event table
+             ============================================================= -->
+        <changeSet id="20251112-01-create-outbox-event-parent" author="dogancaglar">
+            <sql>
+                CREATE TABLE outbox_event (
+                oeid           BIGINT NOT NULL,
+                event_type     VARCHAR(255) NOT NULL,
+                aggregate_id   VARCHAR(255) NOT NULL,
+                payload        TEXT NOT NULL,
+                status         VARCHAR(50) NOT NULL,
+                created_at     TIMESTAMP NOT NULL,
+                updated_at     TIMESTAMP NOT NULL,
+                claimed_at     TIMESTAMPTZ,
+                claimed_by     VARCHAR(128),
+                PRIMARY KEY (oeid, created_at)
+                )
+                PARTITION BY RANGE (created_at);
+            </sql>
+        </changeSet>
 
-    <changeSet id="01-create-outbox-parent" author="dogancaglar">
-        <sql>
-            CREATE TABLE outbox_event (
-            oeid BIGINT NOT NULL,
-            event_type VARCHAR(255) NOT NULL,
-            aggregate_id VARCHAR(255) NOT NULL,
-            payload TEXT NOT NULL,
-            status VARCHAR(50) NOT NULL,
-            created_at TIMESTAMP NOT NULL,
-            PRIMARY KEY (oeid,created_at)
-            ) PARTITION BY RANGE (created_at);
-        </sql>
-    </changeSet>
-    <changeSet id="02-create-index-outbox-event-createdat" author="dogancaglar">
-        <createIndex indexName="idx_outbox_event_createdat" tableName="outbox_event">
-            <column name="created_at"/>
-        </createIndex>
-    </changeSet>
+        <!-- =============================================================
+             02. Helpful indexes for filtering, ordering, claiming
+             ============================================================= -->
+        <changeSet id="20251112-02-create-index-outbox-event-createdat" author="dogancaglar">
+            <createIndex indexName="idx_outbox_event_createdat" tableName="outbox_event">
+                <column name="created_at"/>
+            </createIndex>
+        </changeSet>
 
-    <changeSet id="03-create-index-outbox-event-status" author="dogancaglar">
-        <createIndex indexName="idx_outbox_event_status" tableName="outbox_event">
-            <column name="status"/>
-        </createIndex>
-    </changeSet>
+        <changeSet id="20251112-03-create-index-outbox-event-status" author="dogancaglar">
+            <createIndex indexName="idx_outbox_event_status" tableName="outbox_event">
+                <column name="status"/>
+            </createIndex>
+        </changeSet>
 
-    <changeSet id="04-create-index-outbox-status-createdat" author="dogancaglar">
-        <createIndex indexName="idx_outbox_status_createdat" tableName="outbox_event">
-            <column name="status"/>
-            <column name="created_at"/>
-        </createIndex>
-    </changeSet>
+        <changeSet id="20251112-04-create-index-outbox-status-createdat" author="dogancaglar">
+            <createIndex indexName="idx_outbox_status_createdat" tableName="outbox_event">
+                <column name="status"/>
+                <column name="created_at"/>
+            </createIndex>
+        </changeSet>
 
-    <changeSet id="05-add-claim-columns" author="dogancaglar">
-        <addColumn tableName="outbox_event">
-            <column name="claimed_at" type="TIMESTAMP WITH TIME ZONE"/>
-            <column name="claimed_by" type="VARCHAR(128)"/>
-        </addColumn>
-    </changeSet>
+        <changeSet id="20251112-05-create-index-outbox-status-claimedat" author="dogancaglar">
+            <createIndex indexName="idx_outbox_status_claimed_at" tableName="outbox_event">
+                <column name="status"/>
+                <column name="claimed_at"/>
+            </createIndex>
+        </changeSet>
 
-    <!-- speeds up: WHERE status='PROCESSING' AND claimed_at < now() - X -->
-    <changeSet id="06-index-status-claimed_at" author="dogancaglar">
-        <createIndex indexName="idx_outbox_status_claimed_at" tableName="outbox_event">
-            <column name="status"/>
-            <column name="claimed_at"/>
-        </createIndex>
-    </changeSet>
-
-</databaseChangeLog>
+    </databaseChangeLog>

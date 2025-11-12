@@ -13,7 +13,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Component
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.ScheduledExecutorService
-
+import java.util.concurrent.ThreadPoolExecutor
 
 
 @Configuration
@@ -51,48 +51,19 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
         return scheduler
     }
 
-    @Bean("paymentsTimeoutScheduler")
-    fun paymentsTimeoutScheduler(
-        @Value("\${payments.timeouts.scheduler.size:2}") poolSize: Int
-    ): ThreadPoolTaskScheduler {
-        val scheduler = ThreadPoolTaskScheduler()
-        scheduler.poolSize = poolSize
-        scheduler.setThreadNamePrefix("payments-timeouts-")
-        scheduler.setTaskDecorator(decorator)
-        scheduler.setWaitForTasksToCompleteOnShutdown(true)
-        scheduler.setRemoveOnCancelPolicy(true) // drop cancelled timeout tasks from queue
-        scheduler.initialize()
-        return scheduler
-    }
 
-    /**
-     * Resilience4j needs a ScheduledExecutorService; expose the underlying executor.
-     */
-    @Bean("paymentsTimeoutExecutor")
-    fun paymentsTimeoutExecutor(
-        @Qualifier("paymentsTimeoutScheduler") paymentsTimeoutScheduler: ThreadPoolTaskScheduler
-    ): ScheduledExecutorService =
-        paymentsTimeoutScheduler.scheduledThreadPoolExecutor
-
-    /**
-     * Tiny work executor that actually runs the guarded function.
-     * Size MUST match Bulkhead max-concurrent-calls (no queue).
-     */
-    @Bean("paymentsExecutor")
-    fun paymentsExecutor(
-        @Value("\${bulkhead.instances.payments-web.max-concurrent-calls:8}") concurrency: Int
-    ): ExecutorService {
-        val t = ThreadPoolTaskExecutor().apply {
-            corePoolSize = concurrency
-            maxPoolSize  = concurrency
-            setQueueCapacity(0) // no queue—aligns with semaphore behavior
-            setThreadNamePrefix("payments-exec-")
+    @Bean("pspAuthExecutor")
+    fun pspAuthExecutor(decorator: TaskDecorator): ThreadPoolTaskExecutor =
+        ThreadPoolTaskExecutor().apply {
+            corePoolSize = 8          // match per-pod listener concurrency
+            maxPoolSize = 8
+            queueCapacity = 64       // or 16; keeps back-pressure tight
+            setThreadNamePrefix("po-psp-")
             setTaskDecorator(decorator)
-            setWaitForTasksToCompleteOnShutdown(true)
+            setRejectedExecutionHandler(ThreadPoolExecutor.AbortPolicy())
             initialize()
         }
-        return t.threadPoolExecutor
-    }
+
 
     @Bean
     fun outboxEventPartitionMaintenanceScheduler(): ThreadPoolTaskScheduler {

@@ -27,7 +27,7 @@ class LedgerDomainEventMapperTest {
     private val ledgerEntryFactory = LedgerEntryFactory(clock)
 
     private fun sampleLedgerEntry(): LedgerEntry {
-        val merchantAccount = Account.mock(AccountType.MERCHANT_ACCOUNT, "SELLER-333", "EUR")
+        val merchantAccount = Account.mock(AccountType.MERCHANT_PAYABLE, "SELLER-333", "EUR")
         val pspReceivable = Account.mock(AccountType.PSP_RECEIVABLES, "GLOBAL", "EUR")
         val debitPosting = Posting.Debit.create(merchantAccount, Amount.of(1000, Currency("EUR")))
         val creditPosting = Posting.Credit.create(pspReceivable, Amount.of(1000, Currency("EUR")))
@@ -49,8 +49,8 @@ class LedgerDomainEventMapperTest {
 
     private fun sampleLedgerEntryEventData(): LedgerEntryEventData {
         val debitEvent = PostingEventData.create(
-            accountCode = "MERCHANT_ACCOUNT.SELLER-333.EUR",
-            accountType = AccountType.MERCHANT_ACCOUNT,
+            accountCode = "MERCHANT_PAYABLE.SELLER-333.EUR",
+            accountType = AccountType.MERCHANT_PAYABLE,
             amount = 1000,
             currency = "EUR",
             direction = PostingDirection.DEBIT
@@ -97,8 +97,8 @@ class LedgerDomainEventMapperTest {
     @Test
     fun `PostingEventData toDomain round-trips account entity without duplicating currency`() {
         val postingEvent = PostingEventData.create(
-            accountCode = "MERCHANT_ACCOUNT.SELLER-333.EUR",
-            accountType = AccountType.MERCHANT_ACCOUNT,
+            accountCode = "MERCHANT_PAYABLE.SELLER-333.EUR",
+            accountType = AccountType.MERCHANT_PAYABLE,
             amount = 1000,
             currency = "EUR",
             direction = PostingDirection.CREDIT
@@ -106,9 +106,9 @@ class LedgerDomainEventMapperTest {
 
         val postingDomain = postingEvent.toDomain()
 
-        assertEquals("MERCHANT_ACCOUNT.SELLER-333.EUR", postingDomain.account.accountCode)
+        assertEquals("MERCHANT_PAYABLE.SELLER-333.EUR", postingDomain.account.accountCode)
         assertEquals("SELLER-333", postingDomain.account.entityId)
-        assertEquals(AccountType.MERCHANT_ACCOUNT, postingDomain.account.type)
+        assertEquals(AccountType.MERCHANT_PAYABLE, postingDomain.account.type)
         assertEquals("EUR", postingDomain.account.currency.currencyCode)
         assertTrue(postingDomain is Posting.Credit)
     }
@@ -128,8 +128,8 @@ class LedgerDomainEventMapperTest {
         assertEquals(2, postings.size)
 
         val debitPosting = postings.first { it is Posting.Debit }
-        assertEquals("MERCHANT_ACCOUNT.SELLER-333.EUR", debitPosting.account.accountCode)
-        assertEquals(AccountType.MERCHANT_ACCOUNT, debitPosting.account.type)
+        assertEquals("MERCHANT_PAYABLE.SELLER-333.EUR", debitPosting.account.accountCode)
+        assertEquals(AccountType.MERCHANT_PAYABLE, debitPosting.account.type)
         assertEquals("SELLER-333", debitPosting.account.entityId)
         assertEquals("EUR", debitPosting.account.currency.currencyCode)
         assertEquals(1000, debitPosting.amount.quantity)

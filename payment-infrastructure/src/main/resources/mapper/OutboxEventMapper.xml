@@ -2,26 +2,49 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.OutboxEventMapper">
+<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.OutboxEventMapper">
+
+    <!-- ============================================================
+         RESULT MAP: Must include all columns returned by queries
+         ============================================================ -->
     <resultMap id="OutboxEventResultMap"
-               type="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.OutboxEventEntity">
+               type="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.OutboxEventEntity">
         <id property="oeid" column="oeid"/>
         <result property="eventType" column="event_type"/>
         <result property="aggregateId" column="aggregate_id"/>
         <result property="payload" column="payload"/>
         <result property="status" column="status"/>
         <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="claimedAt" column="claimed_at"/>
+        <result property="claimedBy" column="claimed_by"/>
     </resultMap>
 
+    <!-- ============================================================
+         QUERIES
+         ============================================================ -->
+
     <select id="findByStatus" resultMap="OutboxEventResultMap">
-        SELECT oeid, event_type, aggregate_id, payload, status, created_at FROM outbox_event WHERE status = #{status}
+        SELECT oeid,
+        event_type,
+        aggregate_id,
+        payload,
+        status,
+        created_at,
+        updated_at,
+        claimed_at,
+        claimed_by
+        FROM outbox_event
+        WHERE status = #{status}
     </select>
 
     <select id="countByStatus" resultType="long">
         SELECT COUNT(*) FROM outbox_event WHERE status = #{status}
     </select>
 
-
+    <!-- ============================================================
+         BATCH CLAIM QUERY
+         ============================================================ -->
     <select id="findBatchForDispatch" resultMap="OutboxEventResultMap">
         WITH claimed AS (
         UPDATE outbox_event
@@ -36,21 +59,48 @@
         LIMIT #{batchSize}
         FOR UPDATE SKIP LOCKED
         )
-        RETURNING oeid, event_type, aggregate_id, payload, status, created_at
+        RETURNING oeid,
+        event_type,
+        aggregate_id,
+        payload,
+        status,
+        created_at,
+        updated_at,
+        claimed_at,
+        claimed_by
         )
-        SELECT oeid, event_type, aggregate_id, payload, status, created_at
+        SELECT oeid,
+        event_type,
+        aggregate_id,
+        payload,
+        status,
+        created_at,
+        updated_at,
+        claimed_at,
+        claimed_by
         FROM claimed
     </select>
 
+    <!-- ============================================================
+         INSERTS
+         ============================================================ -->
     <insert id="insertOutboxEvent"
-            parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.OutboxEventEntity">
-        INSERT INTO outbox_event (oeid, event_type, aggregate_id, payload, status, created_at)
-        VALUES
-        (#{oeid}, #{eventType}, #{aggregateId}, #{payload}, #{status}, #{createdAt})
+            parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.OutboxEventEntity">
+        INSERT INTO outbox_event (
+        oeid, event_type, aggregate_id, payload, status,
+        created_at, updated_at, claimed_at, claimed_by
+        )
+        VALUES (
+        #{oeid}, #{eventType}, #{aggregateId}, #{payload}, #{status},
+        #{createdAt}, #{updatedAt}, #{claimedAt}, #{claimedBy}
+        )
     </insert>
 
     <insert id="insertAllOutboxEvents" parameterType="java.util.List">
-        INSERT INTO outbox_event (oeid, event_type, aggregate_id, payload, status, created_at)
+        INSERT INTO outbox_event (
+        oeid, event_type, aggregate_id, payload, status,
+        created_at, updated_at, claimed_at, claimed_by
+        )
         VALUES
         <foreach collection="list" item="event" separator=",">
             (#{event.oeid},
@@ -58,19 +108,26 @@
             #{event.aggregateId},
             #{event.payload},
             #{event.status},
-            #{event.createdAt})
+            #{event.createdAt},
+            #{event.updatedAt},
+            #{event.claimedAt},
+            #{event.claimedBy})
         </foreach>
     </insert>
 
+    <!-- ============================================================
+         UPDATES
+         ============================================================ -->
     <update id="updateOutboxEventStatus">
         UPDATE outbox_event
-        SET status = #{status}
+        SET status = #{status},
+        updated_at = clock_timestamp()
         WHERE oeid = #{oeid}
     </update>
 
     <update id="unclaimSpecific" parameterType="map">
         UPDATE outbox_event
-        SET status    = 'NEW',
+        SET status = 'NEW',
         claimed_at = NULL,
         claimed_by = NULL
         WHERE status = 'PROCESSING'
@@ -81,8 +138,6 @@
         </foreach>
     </update>
 
-
-
     <update id="reclaimStuckClaims" parameterType="int">
         UPDATE outbox_event
         SET status = 'NEW',
@@ -91,9 +146,6 @@
         WHERE status = 'PROCESSING'
         AND claimed_at &lt; (clock_timestamp() - (#{olderThanSeconds} || ' seconds')::interval)
     </update>
-
-
-
 
     <update id="batchUpdate" parameterType="java.util.List">
         WITH rows(oeid, created_at, status) AS (
@@ -105,7 +157,8 @@
         UPDATE outbox_event o
         SET status = rows.status,
         claimed_at = NULL,
-        claimed_by = NULL
+        claimed_by = NULL,
+        updated_at = clock_timestamp()
         FROM rows
         WHERE o.oeid = rows.oeid
         AND o.created_at = rows.created_at

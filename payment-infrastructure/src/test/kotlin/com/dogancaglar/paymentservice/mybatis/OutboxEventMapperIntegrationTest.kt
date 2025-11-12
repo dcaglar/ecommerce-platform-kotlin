@@ -2,10 +2,10 @@ package com.dogancaglar.paymentservice.mybatis
 
 
 import com.dogancaglar.paymentservice.InfraTestBoot
-import com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.OutboxEventEntity
-import com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.OutboxEventMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.OutboxEventEntity
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.OutboxEventMapper
 import com.dogancaglar.paymentservice.application.usecases.ProcessPaymentService
-import com.dogancaglar.paymentservice.ports.inbound.CreatePaymentUseCase
+import com.dogancaglar.paymentservice.ports.inbound.AuthorizePaymentUseCase
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -47,7 +47,7 @@ import java.time.LocalDateTime
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers
 @TestPropertySource(properties = ["spring.liquibase.enabled=false"])
-@MapperScan("com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis")
+@MapperScan("com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis")
 class OutboxEventMapperIntegrationTest {
 
     companion object {
@@ -85,7 +85,7 @@ class OutboxEventMapperIntegrationTest {
     lateinit var outboxEventMapper: OutboxEventMapper
 
     @MockkBean
-    lateinit var createPaymentService: CreatePaymentUseCase
+    lateinit var authorizePaymentUseCase: AuthorizePaymentUseCase
 
     @MockkBean
     lateinit var processPaymentService: ProcessPaymentService
@@ -110,7 +110,8 @@ class OutboxEventMapperIntegrationTest {
         aggregateId = "agg-1",
         payload = "{\"foo\": \"bar\"}",
         status = status,
-        createdAt = createdAt
+        createdAt = createdAt,
+        updatedAt = createdAt
     )
 
 

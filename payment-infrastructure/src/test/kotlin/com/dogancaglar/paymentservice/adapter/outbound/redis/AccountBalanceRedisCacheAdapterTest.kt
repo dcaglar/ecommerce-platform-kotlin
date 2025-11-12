@@ -47,7 +47,7 @@ class AccountBalanceRedisCacheAdapterTest {
     @Test
     fun `addDeltaAndWatermark should execute Lua script with correct parameters`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
+        val accountCode = "MERCHANT_PAYABLE.MERCHANT-456"
         val delta = 10000L
         val upToEntryId = 100L
         
@@ -67,7 +67,7 @@ class AccountBalanceRedisCacheAdapterTest {
     @Test
     fun `getAndResetDeltaWithWatermark should execute Lua script and return delta and watermark`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
+        val accountCode = "MERCHANT_PAYABLE.MERCHANT-456"
         val expectedDelta = 5000L
         val expectedWatermark = 150L
         
@@ -89,7 +89,7 @@ class AccountBalanceRedisCacheAdapterTest {
     @Test
     fun `getAndResetDeltaWithWatermark should return zero when Lua script returns null`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
+        val accountCode = "MERCHANT_PAYABLE.MERCHANT-456"
         
         every { redisTemplate.execute<Any?>(any<org.springframework.data.redis.core.RedisCallback<Any?>>()) } returns null
 
@@ -104,7 +104,7 @@ class AccountBalanceRedisCacheAdapterTest {
     @Test
     fun `getAndResetDeltaWithWatermark should handle invalid result type gracefully`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
+        val accountCode = "MERCHANT_PAYABLE.MERCHANT-456"
         
         every { redisTemplate.execute<Any?>(any<org.springframework.data.redis.core.RedisCallback<Any?>>()) } returns "invalid-result"
 
@@ -119,7 +119,7 @@ class AccountBalanceRedisCacheAdapterTest {
     @Test
     fun `markDirty should add account to dirty set and set TTL`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
+        val accountCode = "MERCHANT_PAYABLE.MERCHANT-456"
         val expectedKey = "balance:acc:$accountCode"
         
         every { setOperations.add("balances:dirty", expectedKey) } returns 1L
@@ -135,7 +135,7 @@ class AccountBalanceRedisCacheAdapterTest {
     @Test
     fun `getRealTimeBalance should return snapshot plus delta from hash`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
+        val accountCode = "MERCHANT_PAYABLE.MERCHANT-456"
         val snapshotBalance = 100000L
         val delta = 5000L
         val expectedKey = "balance:acc:$accountCode"
@@ -153,7 +153,7 @@ class AccountBalanceRedisCacheAdapterTest {
     @Test
     fun `getRealTimeBalance should return snapshot when delta is null`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
+        val accountCode = "MERCHANT_PAYABLE.MERCHANT-456"
         val snapshotBalance = 100000L
         val expectedKey = "balance:acc:$accountCode"
         
@@ -169,7 +169,7 @@ class AccountBalanceRedisCacheAdapterTest {
     @Test
     fun `getRealTimeBalance should handle invalid delta string gracefully`() {
         // Given
-        val accountCode = "MERCHANT_ACCOUNT.MERCHANT-456"
+        val accountCode = "MERCHANT_PAYABLE.MERCHANT-456"
         val snapshotBalance = 100000L
         val expectedKey = "balance:acc:$accountCode"
         
@@ -186,9 +186,9 @@ class AccountBalanceRedisCacheAdapterTest {
     fun `getDirtyAccounts should return set of account codes from dirty set`() {
         // Given
         val dirtyKeys = setOf(
-            "balance:acc:MERCHANT_ACCOUNT.MERCHANT-1",
-            "balance:acc:MERCHANT_ACCOUNT.MERCHANT-2",
-            "balance:acc:CASH.GLOBAL"
+            "balance:acc:MERCHANT_PAYABLE.MERCHANT-1",
+            "balance:acc:MERCHANT_PAYABLE.MERCHANT-2",
+            "balance:acc:PLATFORM_CASH.GLOBAL"
         )
         
         every { setOperations.members("balances:dirty") } returns dirtyKeys
@@ -198,7 +198,7 @@ class AccountBalanceRedisCacheAdapterTest {
 
         // Then
         assertEquals(
-            setOf("MERCHANT_ACCOUNT.MERCHANT-1", "MERCHANT_ACCOUNT.MERCHANT-2", "CASH.GLOBAL"),
+            setOf("MERCHANT_PAYABLE.MERCHANT-1", "MERCHANT_PAYABLE.MERCHANT-2", "PLATFORM_CASH.GLOBAL"),
             result
         )
         verify(exactly = 1) { setOperations.members("balances:dirty") }

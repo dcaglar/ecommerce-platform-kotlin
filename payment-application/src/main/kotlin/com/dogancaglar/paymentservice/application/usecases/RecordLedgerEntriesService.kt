@@ -6,6 +6,8 @@ import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.LedgerEntriesRecorded
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.ledger.Account
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
 import com.dogancaglar.paymentservice.domain.model.ledger.AuthType
@@ -37,7 +39,7 @@ open class RecordLedgerEntriesService(
 
         val amount = Amount.of(event.amountValue, Currency(event.currency))
         val merchantAccount = Account.fromProfile(
-            accountDirectory.getAccountProfile(AccountType.MERCHANT_ACCOUNT, event.sellerId)
+            accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, event.sellerId)
         )
         val authReceivable = Account.fromProfile(
             accountDirectory.getAccountProfile(AccountType.AUTH_RECEIVABLE, "GLOBAL")
@@ -50,26 +52,26 @@ open class RecordLedgerEntriesService(
         )
 
         val journalEntries: List<JournalEntry> = when (event.status.uppercase()) {
-            "SUCCESSFUL_FINAL" ->
-                if(merchantAccount.authType == AuthType.SALE) {
-                    JournalEntry.authHoldAndCapture(
-                        paymentOrderId = event.publicPaymentOrderId,
-                        capturedAmount = amount,
-                        authReceivable = authReceivable,
-                        authLiability = authLiability,
-                        merchantAccount = merchantAccount,
-                        pspReceivable = pspReceivable
-                    )
-                } else {
+            PaymentStatus.AUTHORIZED.name ->
                     JournalEntry.authHold(
-                        paymentOrderId = event.publicPaymentOrderId,
+                        journalIdentifier = event.paymentId,
                         authorizedAmount = amount,
                         authReceivable = authReceivable,
                         authLiability = authLiability
             )
-                }
+
+            PaymentOrderStatus.CAPTURED.name ->
+                JournalEntry.capture(journalIdentifier = event.paymentOrderId,
+                    capturedAmount = amount,
+                    authReceivable=authReceivable,
+                    authLiability=authLiability,
+                    merchantAccount = merchantAccount,
+                    pspReceivable = pspReceivable
+                    )
+
+
             "FAILED_FINAL", "FAILED" -> JournalEntry.failedPayment(
-                paymentOrderId = event.publicPaymentOrderId,
+                paymentOrderId = event.paymentOrderId,
                 amount = amount
             )
             else -> return
@@ -96,7 +98,6 @@ open class RecordLedgerEntriesService(
         val recordedEvent = LedgerEntriesRecorded.create(
             ledgerBatchId = "ledger-batch-${UUID.randomUUID()}",
             paymentOrderId = event.paymentOrderId,
-            publicPaymentOrderId = event.publicPaymentOrderId,
             sellerId = event.sellerId,
             currency = event.currency,
             status = event.status,

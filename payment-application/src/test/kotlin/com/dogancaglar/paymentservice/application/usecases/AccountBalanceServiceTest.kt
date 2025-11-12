@@ -1,5 +1,7 @@
 package com.dogancaglar.paymentservice.application.usecases
 
+import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.balance.AccountBalanceSnapshot
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
@@ -57,11 +59,10 @@ class AccountBalanceServiceTest {
     fun `should update balances for all accounts in a single ledger entry`() {
         // Given
         val entry = LedgerEntryTestHelper.createCaptureLedgerEntry(
-            ledgerEntryId = 10L,
-            paymentOrderId = "PO-10",
-            merchantId = SELLER_A,
-            amountMinor = EUR_10,
-            currency = "EUR"
+            10L,
+            "PO-10",
+            SELLER_A,
+            Amount.of(EUR_10, Currency("EUR"))
         )
 
         val accountCodes = entry.journalEntry.postings.map { it.account.accountCode }.toSet()
@@ -76,12 +77,12 @@ class AccountBalanceServiceTest {
         verify {
             cachePort.addDeltaAndWatermark(accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR", delta = -EUR_10, upToEntryId= 10L)
             cachePort.addDeltaAndWatermark(accountCode = "AUTH_LIABILITY.GLOBAL.EUR", delta = -EUR_10, upToEntryId= 10L)
-            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_A.EUR", delta = +EUR_10, upToEntryId= 10L)
+            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_PAYABLE.$SELLER_A.EUR", delta = +EUR_10, upToEntryId= 10L)
             cachePort.addDeltaAndWatermark(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR", delta = +EUR_10, upToEntryId= 10L)
 
             cachePort.markDirty(accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR")
             cachePort.markDirty(accountCode = "AUTH_LIABILITY.GLOBAL.EUR")
-            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_A.EUR")
+            cachePort.markDirty(accountCode = "MERCHANT_PAYABLE.$SELLER_A.EUR")
             cachePort.markDirty(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR")
         }
 
@@ -94,18 +95,16 @@ class AccountBalanceServiceTest {
     @Test
     fun `should aggregate deltas and use max ledgerEntryId`() {
         val entry1 = LedgerEntryTestHelper.createCaptureLedgerEntry(
-            ledgerEntryId = 5L,
-            paymentOrderId = "PO-5",
-            merchantId = SELLER_B,
-            amountMinor = EUR_10,
-            currency = "EUR"
+            5L,
+            "PO-5",
+            SELLER_B,
+            Amount.of(EUR_10, Currency("EUR"))
         )
         val entry2 = LedgerEntryTestHelper.createCaptureLedgerEntry(
-            ledgerEntryId = 7L,
-            paymentOrderId = "PO-7",
-            merchantId = SELLER_B,
-            amountMinor = EUR_20,
-            currency = "EUR"
+            7L,
+            "PO-7",
+            SELLER_B,
+            Amount.of(EUR_20, Currency("EUR"))
         )
 
         val accountCodes = (entry1.journalEntry.postings + entry2.journalEntry.postings)
@@ -121,12 +120,12 @@ class AccountBalanceServiceTest {
         verify {
             cachePort.addDeltaAndWatermark(accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR", delta = -(EUR_10 + EUR_20), upToEntryId= 7L)
             cachePort.addDeltaAndWatermark(accountCode = "AUTH_LIABILITY.GLOBAL.EUR", delta = -(EUR_10 + EUR_20), upToEntryId= 7L)
-            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_B.EUR", delta = +(EUR_10 + EUR_20), upToEntryId= 7L)
+            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_PAYABLE.$SELLER_B.EUR", delta = +(EUR_10 + EUR_20), upToEntryId= 7L)
             cachePort.addDeltaAndWatermark(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR", delta = +(EUR_10 + EUR_20), upToEntryId= 7L)
 
             cachePort.markDirty(accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR")
             cachePort.markDirty(accountCode = "AUTH_LIABILITY.GLOBAL.EUR")
-            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_B.EUR")
+            cachePort.markDirty(accountCode = "MERCHANT_PAYABLE.$SELLER_B.EUR")
             cachePort.markDirty(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR")
         }
 
@@ -139,11 +138,10 @@ class AccountBalanceServiceTest {
     @Test
     fun `should skip postings already applied based on watermark`() {
         val entry = LedgerEntryTestHelper.createCaptureLedgerEntry(
-            ledgerEntryId = 15L,
-            paymentOrderId = "PO-15",
-            merchantId = SELLER_X,
-            amountMinor = EUR_10,
-            currency = "EUR"
+            15L,
+            "PO-15",
+            SELLER_X,
+            Amount.of(EUR_10, Currency("EUR"))
         )
 
         val accountCodes = entry.journalEntry.postings.map { it.account.accountCode }.toSet()
@@ -170,23 +168,31 @@ class AccountBalanceServiceTest {
     // ───────────────────────────────────────────────
     @Test
     fun `should update only non-zero accounts in authHold plus capture flow`() {
-        val entries = LedgerEntryTestHelper.createAuthHoldAndCaptureLedgerEntries(
-            paymentOrderId = "PO-ZERO",
-            merchantId = SELLER_Z,
-            amountMinor = EUR_10,
-            currency = "EUR"
+        val authEntry = LedgerEntryTestHelper.createAuthHoldLedgerEntry(
+            1L,
+            "1235",
+            Amount.of(EUR_10, Currency("EUR"))
         )
+
+        val captureEntry = LedgerEntryTestHelper.createCaptureLedgerEntry(
+            2L,
+            "PO-ZERO",
+            SELLER_Z,
+            Amount.of(EUR_10, Currency("EUR"))
+        )
+
+        val entries = listOf(authEntry,captureEntry)
 
         val accountCodes = entries.flatMap { it.journalEntry.postings }.map { it.account.accountCode }.toSet()
         every { snapshotPort.findByAccountCodes(accountCodes = accountCodes) } returns emptyList()
 
         val result = service.updateAccountBalancesBatch(ledgerEntries = entries)
-        assertEquals(listOf(101L), result)
+        assertEquals(listOf(captureEntry.ledgerEntryId), result)
 
         verify {
-            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_Z.EUR", delta = +EUR_10, upToEntryId= 101L)
-            cachePort.addDeltaAndWatermark(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR", delta = +EUR_10, upToEntryId= 101L)
-            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_Z.EUR")
+            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_PAYABLE.$SELLER_Z.EUR", delta = +EUR_10, upToEntryId= captureEntry.ledgerEntryId)
+            cachePort.addDeltaAndWatermark(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR", delta = +EUR_10, upToEntryId= captureEntry.ledgerEntryId)
+            cachePort.markDirty(accountCode = "MERCHANT_PAYABLE.$SELLER_Z.EUR")
             cachePort.markDirty(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR")
         }
 
@@ -206,16 +212,22 @@ class AccountBalanceServiceTest {
     @Test
     fun `should aggregate independently for multiple sellers`() {
         val entryA1 = LedgerEntryTestHelper.createCaptureLedgerEntry(
-            ledgerEntryId = 30L, paymentOrderId = "PO-30",
-            merchantId = SELLER_A, amountMinor = EUR_10, currency = "EUR"
+            30L,
+            "PO-30",
+            SELLER_A,
+            Amount.of(EUR_10, Currency("EUR"))
         )
         val entryA2 = LedgerEntryTestHelper.createCaptureLedgerEntry(
-            ledgerEntryId = 35L, paymentOrderId = "PO-35",
-            merchantId = SELLER_A, amountMinor = EUR_20, currency = "EUR"
+            35L,
+            "PO-35",
+            SELLER_A,
+            Amount.of(EUR_20, Currency("EUR"))
         )
         val entryB = LedgerEntryTestHelper.createCaptureLedgerEntry(
-            ledgerEntryId = 40L, paymentOrderId = "PO-40",
-            merchantId = SELLER_B, amountMinor = EUR_05, currency = "EUR"
+            40L,
+            "PO-40",
+            SELLER_B,
+            Amount.of(EUR_05, Currency("EUR"))
         )
 
         val allEntries = listOf(entryA1, entryA2, entryB)
@@ -230,14 +242,14 @@ class AccountBalanceServiceTest {
             cachePort.addDeltaAndWatermark(accountCode = "AUTH_LIABILITY.GLOBAL.EUR", delta = -EUR_35, upToEntryId= 40L)
             cachePort.addDeltaAndWatermark(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR", delta = +EUR_35, upToEntryId= 40L)
 
-            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_A.EUR", delta = +(EUR_10 + EUR_20), upToEntryId= 35L)
-            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_B.EUR", delta = +EUR_05, upToEntryId= 40L)
+            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_PAYABLE.$SELLER_A.EUR", delta = +(EUR_10 + EUR_20), upToEntryId= 35L)
+            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_PAYABLE.$SELLER_B.EUR", delta = +EUR_05, upToEntryId= 40L)
 
             cachePort.markDirty(accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR")
             cachePort.markDirty(accountCode = "AUTH_LIABILITY.GLOBAL.EUR")
             cachePort.markDirty(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR")
-            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_A.EUR")
-            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_B.EUR")
+            cachePort.markDirty(accountCode = "MERCHANT_PAYABLE.$SELLER_A.EUR")
+            cachePort.markDirty(accountCode = "MERCHANT_PAYABLE.$SELLER_B.EUR")
         }
 
         confirmVerified(cachePort)
@@ -249,13 +261,22 @@ class AccountBalanceServiceTest {
     @Test
     fun `should skip sellers below upToEntryIdbut aggregate globals across all`() {
         val entryA1 = LedgerEntryTestHelper.createCaptureLedgerEntry(
-            ledgerEntryId = 30L, paymentOrderId = "PO-30", merchantId = SELLER_A, amountMinor = EUR_10, currency = "EUR"
+            30L,
+            "PO-30",
+            SELLER_A,
+            Amount.of(EUR_10, Currency("EUR"))
         )
         val entryA2 = LedgerEntryTestHelper.createCaptureLedgerEntry(
-            ledgerEntryId = 35L, paymentOrderId = "PO-35", merchantId = SELLER_A, amountMinor = EUR_20, currency = "EUR"
+            35L,
+            "PO-35",
+            SELLER_A,
+            Amount.of(EUR_20, Currency("EUR"))
         )
         val entryB = LedgerEntryTestHelper.createCaptureLedgerEntry(
-            ledgerEntryId = 40L, paymentOrderId = "PO-40", merchantId = SELLER_B, amountMinor = EUR_05, currency = "EUR"
+            40L,
+            "PO-40",
+            SELLER_B,
+            Amount.of(EUR_05, Currency("EUR"))
         )
 
         val entries = listOf(entryA1, entryA2, entryB)
@@ -282,17 +303,17 @@ class AccountBalanceServiceTest {
             cachePort.addDeltaAndWatermark(accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR", delta = -EUR_35, upToEntryId= 40L)
             cachePort.addDeltaAndWatermark(accountCode = "AUTH_LIABILITY.GLOBAL.EUR", delta = -EUR_35, upToEntryId= 40L)
             cachePort.addDeltaAndWatermark(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR", delta = +EUR_35, upToEntryId= 40L)
-            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_B.EUR", delta = +EUR_05, upToEntryId= 40L)
+            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_PAYABLE.$SELLER_B.EUR", delta = +EUR_05, upToEntryId= 40L)
 
             cachePort.markDirty(accountCode = "AUTH_RECEIVABLE.GLOBAL.EUR")
             cachePort.markDirty(accountCode = "AUTH_LIABILITY.GLOBAL.EUR")
             cachePort.markDirty(accountCode = "PSP_RECEIVABLES.GLOBAL.EUR")
-            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_B.EUR")
+            cachePort.markDirty(accountCode = "MERCHANT_PAYABLE.$SELLER_B.EUR")
         }
 
         verify(exactly = 0) {
-            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_ACCOUNT.$SELLER_A.EUR", delta = any(), upToEntryId= any())
-            cachePort.markDirty(accountCode = "MERCHANT_ACCOUNT.$SELLER_A.EUR")
+            cachePort.addDeltaAndWatermark(accountCode = "MERCHANT_PAYABLE.$SELLER_A.EUR", delta = any(), upToEntryId= any())
+            cachePort.markDirty(accountCode = "MERCHANT_PAYABLE.$SELLER_A.EUR")
         }
 
         confirmVerified(cachePort)
