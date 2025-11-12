@@ -12,6 +12,6 @@ interface PaymentMapper {
     fun insertIgnore(payment: PaymentEntity): Int
     fun findByIdempotencyKey(idempotencyKey: String): PaymentEntity?
     fun findById(id: Long): PaymentEntity?
-    fun update(payment: PaymentEntity): Unit
+    fun update(payment: PaymentEntity): Int
     fun deleteById(id: Long): Int
 }

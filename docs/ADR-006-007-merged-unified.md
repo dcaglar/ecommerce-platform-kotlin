@@ -44,7 +44,7 @@ The platform directly persisted payments and emitted outbox events before verify
    - `202 Accepted` (Authorized) or `402 Payment Required` (Declined).
 
 ### 2️⃣ Outbox Dispatcher
-Process 2 type of OutboxEvent
+Process 3 type of OutboxEvent
   1- OutboxEvent<PaymentAuthorized>:
     - Picks up `OutboxEvent<PaymentAuthorized>`.
     - Persist individual `PaymentOrder`(status=INITIATED_PENDING) for each line in payload
@@ -63,14 +63,14 @@ Process 2 type of OutboxEvent
 
 ### 3️⃣ PSP Capture Flow (Asynchronous)
 
-- **PaymentOrderEnqueuer** → consumes `PaymentOrderCreated`,if auto-capture enabled(update paymentorder capture_initiated-> capture_requested, publish a `PaymentORderCaptureCommand`.) otherwise skip it
-- **PaymentORderCaptureExecutor** → checks if status is capture_requested,performs PSP capture call per seller, applying retry/backoff.
-- **PaymentOrderPspResultApplier** → updates DB, marks capture status, emits `PaymentOrderFinalized`.
-
+- **PaymentOrderEnqueuer**(per PaymentOrder) → consumes `PaymentOrderCreated`,if auto-capture enabled(update paymentorder capture_initiated-> capture_requested, publish a `PaymentORderCaptureCommand`.) otherwise skip it
+- **PaymentORderCaptureExecutor**(Per PaymentORder) → checks if status is capture_requested,performs PSP capture call per seller, applying retry/backoff.
+- **PaymentOrderPspResultApplier**(Per PAymentOrder) → updates DB, marks capture status, emits `PaymentOrderFinalized`.
+Capture
 ### 4️⃣ Payment Capture Aggregation
 
 - **PaymentCaptureAggregator** consumes `PaymentOrderFinalized(SUCCESSFUL_FINAL)`.
-- Updates parent `Payment.capturedAmount` in DB.
+- Updates parent `Payment.capturedAmount` in DB.and also updateits status 
 
 ### 5️⃣ Ledger and Accounting
 
@@ -81,7 +81,7 @@ Process 2 type of OutboxEvent
 •	Balanced Postings are inserted into ledger_entries.
 •	Corresponding account balances (account_balances) are atomically updated with optimistic concurrency and idempotency.
 •	PaymentCaptured is not a ledger trigger; it is purely an aggregate signal used for higher-level reconciliation, analytics, and downstream workflow orchestration.
-•	A PaymentAuthorizedConsumer also listen paymentauthorized and will request a ledger for payment
+•	A PaymentAuthorizedConsumer(Per PaymentOrder) also listen paymentauthorized and will request a ledger for payment
 
 
 ---

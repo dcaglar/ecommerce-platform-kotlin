@@ -17,7 +17,7 @@
     </resultMap>
 
     <select id="getMaxPaymentId" resultType="long">
-        SELECT MAX(payment_id) FROM payments
+        SELECT COALESCE(MAX(payment_id), 0) FROM payments
     </select>
 
     <insert id="insertIgnore"
@@ -49,8 +49,19 @@
     </insert>
 
     <select id="findByIdempotencyKey" parameterType="string"
-            resultType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentEntity">
-        SELECT * FROM payments WHERE idempotency_key = #{idempotencyKey}
+            resultMap="PaymentResultMap">
+        SELECT payment_id,
+               buyer_id,
+               order_id,
+               total_amount_value,
+               currency,
+               captured_amount_value,
+               idempotency_key,
+               status,
+               created_at,
+               updated_at
+        FROM payments
+        WHERE idempotency_key = #{idempotencyKey}
     </select>
 
     <select id="findById" resultMap="PaymentResultMap">
@@ -58,8 +69,9 @@
                buyer_id,
                order_id,
                total_amount_value,
-               captured_amount_value,
                currency,
+               captured_amount_value,
+               idempotency_key,
                status,
                created_at,
                updated_at

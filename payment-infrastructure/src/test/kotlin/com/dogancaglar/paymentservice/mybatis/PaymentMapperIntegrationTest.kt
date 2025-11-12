@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertNotNull
 import org.mybatis.spring.annotation.MapperScan
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest
 import org.springframework.beans.factory.annotation.Autowired
@@ -63,6 +64,20 @@ class PaymentMapperIntegrationTest {
     @Autowired
     lateinit var paymentMapper: PaymentMapper
 
+    private fun sampleEntity(id: Long = 101L, key: String = "key-$id") =
+        PaymentEntity(
+            paymentId = id,
+            buyerId = "buyer-$id",
+            orderId = "order-$id",
+            totalAmountValue = 10_000,
+            capturedAmountValue = 0,
+            idempotencyKey = key,
+            currency = "USD",
+            status = "PENDING_AUTH",
+            createdAt = LocalDateTime.now().withNano(0),
+            updatedAt = LocalDateTime.now().withNano(0)
+        )
+
     @Test
     fun `insert find update and delete payment`() {
         val createdAt = LocalDateTime.now().withNano(0)
@@ -103,5 +118,49 @@ class PaymentMapperIntegrationTest {
         assertEquals(1, deleted)
 
         assertNull(paymentMapper.findById(101L))
+    }
+    @Test
+    fun `insert duplicate idempotency key should be ignored`() {
+        val entity1 = sampleEntity(10L, "same-key")
+        val entity2 = sampleEntity(11L, "same-key")
+
+        val firstInsert = paymentMapper.insertIgnore(entity1)
+        assertEquals(1, firstInsert)
+
+        val secondInsert = paymentMapper.insertIgnore(entity2)
+        assertEquals(0, secondInsert, "ON CONFLICT DO NOTHING should skip duplicate")
+
+        val fetched = paymentMapper.findByIdempotencyKey("same-key")
+        assertNotNull(fetched)
+        assertEquals(entity1.paymentId, fetched!!.paymentId)
+    }
+
+    @Test
+    fun `findByIdempotencyKey should return correct row`() {
+        val entity = sampleEntity(200L, "unique-key")
+        paymentMapper.insertIgnore(entity)
+        val found = paymentMapper.findByIdempotencyKey("unique-key")
+        assertNotNull(found)
+        assertEquals(entity.buyerId, found!!.buyerId)
+    }
+
+    @Test
+    fun `getMaxPaymentId should return 0 when table empty`() {
+        val max = paymentMapper.getMaxPaymentId()
+        assertEquals(0L, max)
+    }
+
+    @Test
+    fun `idempotent insert then update does not break unique constraint`() {
+        val key = "idem-test"
+        val entity = sampleEntity(333L, key)
+        paymentMapper.insertIgnore(entity)
+        // inserting again with same key but new id should no-op
+        val again = paymentMapper.insertIgnore(entity.copy(paymentId = 334L))
+        assertEquals(0, again)
+        // update still works on existing record
+        paymentMapper.update(entity.copy(status = "AUTHORIZED"))
+        val fetched = paymentMapper.findByIdempotencyKey(key)
+        assertEquals("AUTHORIZED", fetched!!.status)
     }
 }
