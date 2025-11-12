@@ -12,14 +12,13 @@ class PaymentOutboundAdapter(
     private val paymentMapper: PaymentMapper
 ) : PaymentRepository {
 
+
+
     override fun saveIdempotent(payment: Payment): Payment {
-        val inserted = paymentMapper.insertIgnore(PaymentEntityMapper.toEntity(payment))
-        return if (inserted == 0) {
-            // Already exists, fetch existing
-            paymentMapper.findByIdempotencyKey(payment.idempotencyKey)!!.let { PaymentEntityMapper.toDomain(it) }
-        } else {
-            payment
-        }
+        paymentMapper.insertIgnore(PaymentEntityMapper.toEntity(payment))
+        // ✅ Always read back the persisted version (new or existing)
+        return paymentMapper.findByIdempotencyKey(payment.idempotencyKey)!!
+            .let { PaymentEntityMapper.toDomain(it) }
     }
 
     override fun findByIdempotencyKey(key: String): Payment? {
