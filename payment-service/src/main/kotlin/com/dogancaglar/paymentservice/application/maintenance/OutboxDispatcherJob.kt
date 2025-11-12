@@ -37,6 +37,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
+import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import java.time.Clock
 import java.util.UUID
 
@@ -44,6 +45,7 @@ import java.util.UUID
 @DependsOn("outboxPartitionCreator")
 class OutboxDispatcherJob(
     private val outboxEventRepository: OutboxEventRepository,
+    private val paymentOrderRepository: PaymentOrderRepository,
     @param:Qualifier("batchPaymentEventPublisher") private val syncPaymentEventPublisher: EventPublisherPort,
     private val meterRegistry: MeterRegistry,
     private val objectMapper: ObjectMapper,
@@ -178,22 +180,19 @@ class OutboxDispatcherJob(
 
         logger.info("Expanding PaymentAuthorized → PaymentOrderCreated for paymentId=${data.paymentId}")
         // Expand PaymentOrders from the authorized payload
-        val orders = data.paymentLines.map { line ->
+        val paymentOrders = data.paymentLines.map { line ->
             PaymentOrder.createNew(paymentOrderId = PaymentOrderId(idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER)),
                         paymentId = PaymentId(data.paymentId.toLong()),
                             sellerId = SellerId(line.sellerId ),
                             amount = Amount.of(line.amountValue, Currency(line.currency))
             )
         }
-
+        val outboxEvents = paymentOrders.map { toOutboxEvent(it) }
+            //shoudd we check payment capture limit etc?
+        paymentOrderRepository.insertAll(paymentOrders)
         // For each order, persist an OutboxEvent<PaymentOrderCreated>
-        orders.forEach { order ->
-            val outbox = toOutboxEvent(order,envelope.parentEventId)
-            outboxEventRepository.save(outbox)
-        }
-
-        logger.info("✅ Created ${orders.size} OutboxEvent<PaymentOrderCreated> for paymentId=${data.paymentId}")
-
+        outboxEventRepository.saveAll(outboxEvents)
+        logger.info("✅ Created ${paymentOrders.size} OutboxEvent<PaymentOrderCreated> for paymentId=${data.paymentId}")
         val ok =syncPaymentEventPublisher.publishBatchAtomically(
             envelopes = listOf(envelope),
             eventMetaData = EventMetadatas.PaymentAuthorizedMetadata,
@@ -218,8 +217,40 @@ class OutboxDispatcherJob(
         return ok
     }
 
+    private fun toOutboxEvent(paymentOrder: PaymentOrder): OutboxEvent {
+        val paymentOrderCreatedEvent = paymentOrderDomainEventMapper.toPaymentOrderCreated(paymentOrder)
+        val envelope = DomainEventEnvelopeFactory.envelopeFor(
+            traceId = LogContext.getTraceId() ?: UUID.randomUUID().toString(),
+            data = paymentOrderCreatedEvent,
+            eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
+            aggregateId = paymentOrderCreatedEvent.paymentOrderId
+        )
 
-    private fun toOutboxEvent(newPaymentOrder: PaymentOrder,parentEventId: UUID?): OutboxEvent {
+        val extraLogFields = mapOf(
+            PaymentLogFields.PUBLIC_PAYMENT_ORDER_ID to paymentOrderCreatedEvent.publicPaymentOrderId,
+            PaymentLogFields.PUBLIC_PAYMENT_ID to paymentOrderCreatedEvent.publicPaymentId
+        )
+
+        LogContext.with(envelope, additionalContext = extraLogFields) {
+            logger.debug(
+                "Creating OutboxEvent for eventType={}, aggregateId={}, eventId={}",
+                envelope.eventType,
+                envelope.aggregateId,
+                envelope.eventId
+            )
+        }
+
+        return OutboxEvent.createNew(
+            oeid = paymentOrder.paymentOrderId.value,
+            eventType = envelope.eventType,
+            aggregateId = envelope.aggregateId,
+            payload = serializationPort.toJson(envelope),
+            createdAt = paymentOrder.createdAt
+        )
+    }
+
+
+    private fun toOutboxEventPaymentOrderCreated(newPaymentOrder: PaymentOrder, parentEventId: UUID?): OutboxEvent {
         val newPaymentOrderCreatedEvent = paymentOrderDomainEventMapper.toPaymentOrderCreated(newPaymentOrder)
         val envelope = DomainEventEnvelopeFactory.envelopeFor(
             traceId = LogContext.getTraceId() ?: UUID.randomUUID().toString(),
