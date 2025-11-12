@@ -179,7 +179,7 @@ class OutboxDispatcherJob(
         val data = envelope.data
 
         logger.info("Expanding PaymentAuthorized → PaymentOrderCreated for paymentId=${data.paymentId}")
-        // Expand PaymentOrders from the authorized payload
+        // Expand PaymentOrders from the authorized payload from paymentline
         val paymentOrders = data.paymentLines.map { line ->
             PaymentOrder.createNew(paymentOrderId = PaymentOrderId(idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER)),
                         paymentId = PaymentId(data.paymentId.toLong()),
@@ -187,8 +187,10 @@ class OutboxDispatcherJob(
                             amount = Amount.of(line.amountValue, Currency(line.currency))
             )
         }
+        //create outbox<paymentordercreated>
         val outboxEvents = paymentOrders.map { toOutboxEvent(it) }
             //shoudd we check payment capture limit etc?
+        //paymentorder save batach fails
         paymentOrderRepository.insertAll(paymentOrders)
         // For each order, persist an OutboxEvent<PaymentOrderCreated>
         outboxEventRepository.saveAll(outboxEvents)
@@ -201,21 +203,6 @@ class OutboxDispatcherJob(
         return ok
     }
 
-
-    private fun handlePaymentOrderCreated(evt: OutboxEvent): Boolean {
-        val envelopeType = objectMapper.typeFactory
-            .constructParametricType(EventEnvelope::class.java, PaymentOrderCreated::class.java)
-        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentOrderCreated>
-
-         val ok =syncPaymentEventPublisher.publishBatchAtomically(
-            envelopes = listOf(envelope),
-            eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
-            timeout = java.time.Duration.ofSeconds(10)
-        )
-
-        logger.info("📤 Published PaymentOrderCreated event ${envelope.eventId}")
-        return ok
-    }
 
     private fun toOutboxEvent(paymentOrder: PaymentOrder): OutboxEvent {
         val paymentOrderCreatedEvent = paymentOrderDomainEventMapper.toPaymentOrderCreated(paymentOrder)
@@ -250,36 +237,21 @@ class OutboxDispatcherJob(
     }
 
 
-    private fun toOutboxEventPaymentOrderCreated(newPaymentOrder: PaymentOrder, parentEventId: UUID?): OutboxEvent {
-        val newPaymentOrderCreatedEvent = paymentOrderDomainEventMapper.toPaymentOrderCreated(newPaymentOrder)
-        val envelope = DomainEventEnvelopeFactory.envelopeFor(
-            traceId = LogContext.getTraceId() ?: UUID.randomUUID().toString(),
-            data = newPaymentOrderCreatedEvent,
+
+
+    private fun handlePaymentOrderCreated(evt: OutboxEvent): Boolean {
+        val envelopeType = objectMapper.typeFactory
+            .constructParametricType(EventEnvelope::class.java, PaymentOrderCreated::class.java)
+        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentOrderCreated>
+
+         val ok =syncPaymentEventPublisher.publishBatchAtomically(
+            envelopes = listOf(envelope),
             eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
-            aggregateId = newPaymentOrder.paymentId.value.toString(),
-            parentEventId = parentEventId
+            timeout = java.time.Duration.ofSeconds(10)
         )
 
-        val extraLogFields = mapOf(
-            PaymentLogFields.PUBLIC_PAYMENT_ID to newPaymentOrder.publicPaymentId
-        )
-
-        LogContext.with(envelope, additionalContext = extraLogFields) {
-            logger.debug(
-                "Creating OutboxEvent for eventType={}, aggregateId={}, eventId={}",
-                envelope.eventType,
-                envelope.aggregateId,
-                envelope.eventId
-            )
-        }
-
-        return OutboxEvent.createNew(
-            oeid = newPaymentOrder.paymentId.value,
-            eventType = envelope.eventType,
-            aggregateId = envelope.aggregateId,
-            payload = serializationPort.toJson(envelope),
-            createdAt = newPaymentOrder.createdAt
-        )
+        logger.info("📤 Published PaymentOrderCreated event ${envelope.eventId}")
+        return ok
     }
 
     /*
