@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.application.maintenance
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.OutboxEventMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.OutboxOutboundAdapter
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.event.OutboxEvent
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
@@ -25,7 +25,7 @@ import java.time.ZoneOffset
 
 class OutboxDispatcherJobTest {
 
-    private lateinit var outboxEventPort: OutboxJobMyBatisAdapter
+    private lateinit var outboxEventPort: OutboxOutboundAdapter
     private lateinit var eventPublisherPort: EventPublisherPort
     private lateinit var meterRegistry: MeterRegistry
     private lateinit var objectMapper: ObjectMapper
@@ -38,7 +38,7 @@ class OutboxDispatcherJobTest {
 
     @BeforeEach
     fun setUp() {
-        outboxEventPort = mockk<OutboxJobMyBatisAdapter>(relaxed = true)
+        outboxEventPort = mockk<OutboxOutboundAdapter>(relaxed = true)
         eventPublisherPort = mockk(relaxed = true)
         meterRegistry = mockk(relaxed = true)
         serializationPort = mockk(relaxed = true)
@@ -49,7 +49,7 @@ class OutboxDispatcherJobTest {
         clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
         
         outboxDispatcherJob = OutboxDispatcherJob(
-            outboxEventPort = outboxEventPort,
+            outboxEventRepository = outboxEventPort,
             syncPaymentEventPublisher = eventPublisherPort,
             meterRegistry = meterRegistry,
             objectMapper = objectMapper,

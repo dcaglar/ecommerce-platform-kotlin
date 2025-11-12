@@ -3,11 +3,8 @@ package com.dogancaglar.paymentservice.application.maintenance
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentOrderOutboundAdapter
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentOutboundAdapter
 import com.dogancaglar.paymentservice.application.constants.IdNamespaces
 import com.dogancaglar.paymentservice.application.constants.PaymentLogFields
-import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.event.OutboxEvent
@@ -15,10 +12,8 @@ import com.dogancaglar.paymentservice.domain.event.OutboxEventType
 import com.dogancaglar.paymentservice.domain.event.PaymentAuthorized
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
-import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
@@ -27,7 +22,7 @@ import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_DISPATCHER_DURA
 import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_DISPATCH_FAILED_TOTAL
 import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_EVENT_BACKLOG
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
-import com.dogancaglar.paymentservice.ports.outbound.OutboxEventPort
+import com.dogancaglar.paymentservice.ports.outbound.OutboxEventRepository
 import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.micrometer.core.instrument.Gauge
@@ -48,7 +43,7 @@ import java.util.UUID
 @Service
 @DependsOn("outboxPartitionCreator")
 class OutboxDispatcherJob(
-    @param:Qualifier("outboxJobPort") private val outboxEventPort: OutboxEventPort,
+    private val outboxEventRepository: OutboxEventRepository,
     @param:Qualifier("batchPaymentEventPublisher") private val syncPaymentEventPublisher: EventPublisherPort,
     private val meterRegistry: MeterRegistry,
     private val objectMapper: ObjectMapper,
@@ -86,7 +81,7 @@ class OutboxDispatcherJob(
 
     private fun resetBacklogFromDb(reason: String) {
         try {
-            val fresh = outboxEventPort.countByStatus("NEW")
+            val fresh = outboxEventRepository.countByStatus("NEW")
             backlog.set(fresh.toLong())
             logger.info("Backlog gauge reset to {} ({})", fresh, reason)
         } catch (e: Exception) {
@@ -106,7 +101,7 @@ class OutboxDispatcherJob(
     @Scheduled(fixedDelay = 120000)
     @Transactional(transactionManager = "outboxTxManager", timeout = 5)
     fun reclaimStuck() {
-        val reclaimed = (outboxEventPort as OutboxJobMyBatisAdapter)
+        val reclaimed = outboxEventRepository
             .reclaimStuckClaims(60 * 10)
         if (reclaimed > 0) {
             logger.warn("Reclaimer reset {} stuck outbox events to NEW", reclaimed)
@@ -116,7 +111,7 @@ class OutboxDispatcherJob(
 
     @Transactional(transactionManager = "outboxTxManager", timeout = 2)
     fun claimBatch(batchSize: Int, workerId: String): List<OutboxEvent> {
-        val claimed = (outboxEventPort as OutboxJobMyBatisAdapter)
+        val claimed = outboxEventRepository
             .findBatchForDispatch(batchSize, workerId)
         if (claimed.isNotEmpty()) backlogAdd(-claimed.size.toLong())
         return claimed
@@ -194,7 +189,7 @@ class OutboxDispatcherJob(
         // For each order, persist an OutboxEvent<PaymentOrderCreated>
         orders.forEach { order ->
             val outbox = toOutboxEvent(order,envelope.parentEventId)
-            outboxEventPort.save(outbox)
+            outboxEventRepository.save(outbox)
         }
 
         logger.info("✅ Created ${orders.size} OutboxEvent<PaymentOrderCreated> for paymentId=${data.paymentId}")
@@ -281,14 +276,14 @@ class OutboxDispatcherJob(
     @Transactional(transactionManager = "outboxTxManager", timeout = 5)
     fun persistResults(succeeded: List<OutboxEvent>) {
         if (succeeded.isNotEmpty()) {
-            outboxEventPort.updateAll(succeeded)
+            outboxEventRepository.updateAll(succeeded)
         }
     }
 
     @Transactional(transactionManager = "outboxTxManager", timeout = 2)
     fun unclaimFailedNow(workerId: String, failed: List<OutboxEvent>) {
         if (failed.isEmpty()) return
-        val adapter = (outboxEventPort as OutboxJobMyBatisAdapter)
+        val adapter = outboxEventRepository
         val n = adapter.unclaimSpecific(workerId, failed.map { it.oeid })
         if (n > 0) {
             logger.warn("Unclaimed {} failed outbox rows for worker={}", n, workerId)

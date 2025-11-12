@@ -13,7 +13,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
 import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.inbound.AuthorizePaymentUseCase
-import com.dogancaglar.paymentservice.ports.outbound.OutboxEventPort
+import com.dogancaglar.paymentservice.ports.outbound.OutboxEventRepository
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
 import com.dogancaglar.paymentservice.ports.outbound.PspAuthGatewayPort
 import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
@@ -27,7 +27,7 @@ import java.util.*
 class AuthorizePaymentService(
     private val paymentRepository: PaymentRepository,
     private val psp: PspAuthGatewayPort,
-    private val outboxEventPort: OutboxEventPort,
+    private val outboxEventPort: OutboxEventRepository,
     private val idGeneratorPort: IdGeneratorPort,
     private val serializationPort: SerializationPort,
     private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,

@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.application.config
 
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.OutboxBufferAdapter
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.OutboxOutboundAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentOutboundAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.redis.RedisIdGeneratorPortAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.serialization.JacksonSerializationAdapter
@@ -33,7 +33,7 @@ class PaymentServiceConfig {
     fun createAuthorizePaymentService(
         idGeneratorPort: RedisIdGeneratorPortAdapter,
         paymentRepository: PaymentOutboundAdapter,
-        outboxEventPort: OutboxBufferAdapter,
+        outboxOutboundAdapter: OutboxOutboundAdapter,
         serializationPort: JacksonSerializationAdapter,
         clock: Clock,
         paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
@@ -43,7 +43,7 @@ class PaymentServiceConfig {
             idGeneratorPort = idGeneratorPort,
             paymentRepository = paymentRepository,
             psp = pspAuthGatewayPort,
-            outboxEventPort = outboxEventPort,
+            outboxEventPort = outboxOutboundAdapter,
             serializationPort = serializationPort,
             clock = clock,
             paymentOrderDomainEventMapper = paymentOrderDomainEventMapper
