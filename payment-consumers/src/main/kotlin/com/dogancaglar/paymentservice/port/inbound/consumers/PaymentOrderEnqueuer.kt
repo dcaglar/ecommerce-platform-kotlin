@@ -56,7 +56,7 @@ class PaymentOrderEnqueuer(
             val work = paymentOrderDomainEventMapper.toPaymentOrderCaptureCommand(order, attempt = 0)
             val outEnv = DomainEventEnvelopeFactory.envelopeFor(
                 data = work,
-                eventMetaData = EventMetadatas.PaymentOrderCaptureRequestedMetadata,
+                eventMetaData = EventMetadatas.PaymentOrderCaptureCommandMetadata,
                 aggregateId = work.paymentOrderId, // Kafka key = paymentOrderId
                 traceId = consumed.traceId,
                 parentEventId = consumed.eventId
@@ -66,7 +66,7 @@ class PaymentOrderEnqueuer(
                 publisher.publishSync(
                     preSetEventIdFromCaller = outEnv.eventId,
                     aggregateId = outEnv.aggregateId,
-                    eventMetaData = EventMetadatas.PaymentOrderCaptureRequestedMetadata,
+                    eventMetaData = EventMetadatas.PaymentOrderCaptureCommandMetadata,
                     data = work,
                     traceId = outEnv.traceId,
                     parentEventId = outEnv.parentEventId

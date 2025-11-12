@@ -18,7 +18,7 @@ import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
 import com.dogancaglar.paymentservice.ports.outbound.PspAuthGatewayPort
 import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import org.slf4j.LoggerFactory
-import paymentservice.port.outbound.IdGeneratorPort
+import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import java.time.Clock
 import java.time.LocalDateTime
 import java.util.*
@@ -85,14 +85,6 @@ class AuthorizePaymentService(
             data = paymentAuthorizedEvent,
             eventMetaData = EventMetadatas.PaymentAuthorizedMetadata,
             aggregateId = updated.paymentId.value.toString()
-        )
-
-        val outbox = OutboxEvent.createNew(
-            oeid = updated.paymentId.value,
-            eventType = envelope.eventType,
-            aggregateId = envelope.aggregateId,
-            payload = serializationPort.toJson(envelope),
-            createdAt = updated.createdAt
         )
 
         val extraLogFields = mapOf(

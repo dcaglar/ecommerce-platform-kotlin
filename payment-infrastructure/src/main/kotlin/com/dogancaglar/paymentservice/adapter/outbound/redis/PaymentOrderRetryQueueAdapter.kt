@@ -50,7 +50,7 @@ class PaymentOrderRetryQueueAdapter(
             )
             val envelope = DomainEventEnvelopeFactory.envelopeFor(
                 data = pspCallRequested,
-                eventMetaData = EventMetadatas.PaymentOrderCaptureRequestedMetadata,
+                eventMetaData = EventMetadatas.PaymentOrderCaptureCommandMetadata,
                 aggregateId = pspCallRequested.paymentOrderId,
                 traceId = LogContext.getTraceId() ?: UUID.randomUUID().toString(),
                 parentEventId = LogContext.getEventId()

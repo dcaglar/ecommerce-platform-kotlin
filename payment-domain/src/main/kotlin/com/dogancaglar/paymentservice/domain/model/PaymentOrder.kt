@@ -1,8 +1,10 @@
 package com.dogancaglar.paymentservice.domain.model
 
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
+import java.time.Clock
 import java.time.LocalDateTime
 
 
@@ -92,6 +94,9 @@ class PaymentOrder private constructor(
                 updatedAt = LocalDateTime.now()
             )
         }
+
+
+
 
 
         fun rehydrate(

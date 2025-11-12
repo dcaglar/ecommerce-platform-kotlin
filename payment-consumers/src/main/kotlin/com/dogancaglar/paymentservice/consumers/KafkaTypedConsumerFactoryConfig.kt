@@ -12,6 +12,7 @@ import com.dogancaglar.paymentservice.domain.event.PaymentOrderEvent
 import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.domain.event.LedgerEntriesRecorded
+import com.dogancaglar.paymentservice.domain.event.PaymentAuthorized
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -197,6 +198,27 @@ class KafkaTypedConsumerFactoryConfig(
             }
         }
 
+
+    @Bean("${Topics.PAYMENT_AUTHORIZED}-factory")
+    fun paymentAuthorizedFactory(
+        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
+        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentAuthorized>> {
+        val cfg = cfgFor(EventMetadatas.PaymentAuthorizedMetadata.topic, "${Topics.PAYMENT_AUTHORIZED}-factory")
+        return createFactory(
+            clientId = cfg.id,
+            concurrency = cfg.concurrency,
+            interceptor = interceptor,
+            consumerFactory = customFactory,
+            errorHandler = errorHandler,
+            ackMode = ContainerProperties.AckMode.MANUAL,
+            expectedEventType = EventMetadatas.PaymentAuthorizedMetadata.eventType,
+            batchMode = false
+        )
+    }
+
     @Bean("${Topics.PAYMENT_ORDER_CREATED}-factory")
     fun paymentOrderCreatedFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
@@ -226,7 +248,7 @@ class KafkaTypedConsumerFactoryConfig(
         errorHandler: DefaultErrorHandler
     ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderCaptureCommand>> {
         val cfg = cfgFor(
-            EventMetadatas.PaymentOrderCaptureRequestedMetadata.topic,
+            EventMetadatas.PaymentOrderCaptureCommandMetadata.topic,
             "${Topics.PAYMENT_ORDER_CAPTURE_REQUEST_QUEUE}-factory"
         )
         return createFactory(
@@ -236,7 +258,7 @@ class KafkaTypedConsumerFactoryConfig(
             consumerFactory = customFactory,
             errorHandler = errorHandler,
             ackMode = ContainerProperties.AckMode.MANUAL,
-            expectedEventType = EventMetadatas.PaymentOrderCaptureRequestedMetadata.eventType,
+            expectedEventType = EventMetadatas.PaymentOrderCaptureCommandMetadata.eventType,
             batchMode = false
         )
     }

@@ -10,19 +10,26 @@ The platform directly persisted payments and emitted outbox events before verify
 
 ## Key Decisions
 
-| Area | Before | After |
-|------|---------|-------|
-| **System Role** | Combined PSP + MoR (inconsistent) | Acts solely as Merchant of Record |
-| **Auth Timing** | Payment persisted before authorization | PSP authorization done synchronously before emitting any events |
-| **Outbox Event Creation** | Immediate (pre-auth) | Deferred until PSP authorization success |
-| **Capture Flow** | Combined in sync webflow | Asynchronous per seller via Kafka |
-| **Retry Logic** | Same for all PSP calls | Auth = synchronous, no retry; Capture = Redis ZSET with jitter |
-| **Domain Model** | Weak invariant boundaries | Payment (buyer-level) & PaymentOrder (seller-level) strictly separated |
-| **Status Model** | Flat | Distinct lifecycle states for Payment and PaymentOrder |
+| Area | Before | After                                                                                   |
+|------|---------|-----------------------------------------------------------------------------------------|
+| **System Role** | Combined PSP + MoR (inconsistent) | Acts solely as Merchant of Record                                                       |
+| **Auth Timing** | Payment persisted before authorization | PSP authorization done synchronously before emitting any events                         |
+| **Outbox Event Creation** | Immediate (pre-auth) | Deferred until PSP authorization success                                                |
+| **Capture Flow** | Combined in sync webflow | Asynchronous per seller via Kafka euther auto-triggered or manual, for now default auto |
+| **Retry Logic** | Same for all PSP calls | Auth = synchronous, no retry; Capture = Redis ZSET with jitter                          |
+| **Domain Model** | Weak invariant boundaries | Payment (buyer-level) & PaymentOrder (seller-level) strictly separated                  |
+| **Status Model** | Flat | Distinct lifecycle states for Payment and PaymentOrder                                  |
 
 ---
 
 ## Revised Architecture Overview
+
+### 0 Web/API Layer (ASynchronous CAptire per paymentorderid)
+
+1. **POST /payments/{payment-id}/capture
+    - Validate request checks if capture is valid, and from correct auth
+    - Generate an `idempotency_key` not sure
+    - Persist a OoutboxEvent<PaymentCaptureCommand>.
 
 ### 1️⃣ Web/API Layer (Synchronous Authorization)
 
@@ -31,28 +38,33 @@ The platform directly persisted payments and emitted outbox events before verify
    - Generate an `idempotency_key` (`hash(orderId + buyerId + amount)`).
    - Persist `Payment(status = PENDING_AUTH)`.
 2. **Call PSP.authorize()** synchronously:
-   - On success → update Payment to `AUTHORIZED`, persist one `OutboxEvent<PaymentRequestDTO>`.
+   - On success → update Payment to `AUTHORIZED`, persist one `OutboxEvent<PaymentAuthorized>`.
    - On failure → update Payment to `DECLINED`, stop processing.
 3. **Respond to client:**
    - `202 Accepted` (Authorized) or `402 Payment Required` (Declined).
 
 ### 2️⃣ Outbox Dispatcher
 Process 2 type of OutboxEvent
-  1- OutboxEvent<PaymentRequestDTO>:
-    - Picks up `OutboxEvent<PaymentRequestDTO>`.
-    - Persist individual `PaymentOrder`(status=INITIATED_PENDING) for each line
+  1- OutboxEvent<PaymentAuthorized>:
+    - Picks up `OutboxEvent<PaymentAuthorized>`.
+    - Persist individual `PaymentOrder`(status=INITIATED_PENDING) for each line in payload
     - Persist  `OutboxEvent<PaymentOrderCreated>` in outbox table
     - Publishes to Kafka (`payment_authorized` topic).
 2- OutboxEvent<PaymentOrderCreated>:
 - Picks up `OutboxEvent<PaymentOrderCreated>`.
 - Generates individual `PaymentOrderCreated` from the outboxevent
 - Publishes to Kafka (`payment_order_created` topic).
+3- OutboxEvent<PaymentOrderCaptureCommand>:
+- Picks up `OutboxEvent<PaymentOrderCaptureCommand>`.
+- Generates individual `PaymentOrderCaptureCommand` from the outboxevent<PaymentOrderCaptureCommand>
+- update status of paymentorder to capture_requested
+- Publishes to Kafka (`payment_order_capture_request_queue_topic` topic)
 
 
 ### 3️⃣ PSP Capture Flow (Asynchronous)
 
-- **PaymentOrderEnqueuer** → consumes `PaymentOrderCreated`, republishes `PaymentOrderPspCallRequested`.
-- **PaymentOrderPspCallExecutor** → performs PSP capture call per seller, applying retry/backoff.
+- **PaymentOrderEnqueuer** → consumes `PaymentOrderCreated`,if auto-capture enabled(update paymentorder capture_initiated-> capture_requested, publish a `PaymentORderCaptureCommand`.) otherwise skip it
+- **PaymentORderCaptureExecutor** → checks if status is capture_requested,performs PSP capture call per seller, applying retry/backoff.
 - **PaymentOrderPspResultApplier** → updates DB, marks capture status, emits `PaymentOrderFinalized`.
 
 ### 4️⃣ Payment Capture Aggregation
@@ -69,6 +81,7 @@ Process 2 type of OutboxEvent
 •	Balanced Postings are inserted into ledger_entries.
 •	Corresponding account balances (account_balances) are atomically updated with optimistic concurrency and idempotency.
 •	PaymentCaptured is not a ledger trigger; it is purely an aggregate signal used for higher-level reconciliation, analytics, and downstream workflow orchestration.
+•	A PaymentAuthorizedConsumer also listen paymentauthorized and will request a ledger for payment
 
 
 ---

@@ -2,9 +2,12 @@ package com.dogancaglar.paymentservice.application.maintenance
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.OutboxEventMapper
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.event.OutboxEvent
+import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
+import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
@@ -14,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
+import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -26,6 +30,9 @@ class OutboxDispatcherJobTest {
     private lateinit var meterRegistry: MeterRegistry
     private lateinit var objectMapper: ObjectMapper
     private lateinit var taskScheduler: ThreadPoolTaskScheduler
+    private lateinit var serializationPort: SerializationPort
+    private lateinit var paymentOrderDomaainEventMapper: PaymentOrderDomainEventMapper
+    private lateinit var idGeneratorPort: IdGeneratorPort
     private lateinit var clock: Clock
     private lateinit var outboxDispatcherJob: OutboxDispatcherJob
 
@@ -34,6 +41,9 @@ class OutboxDispatcherJobTest {
         outboxEventPort = mockk<OutboxJobMyBatisAdapter>(relaxed = true)
         eventPublisherPort = mockk(relaxed = true)
         meterRegistry = mockk(relaxed = true)
+        serializationPort = mockk(relaxed = true)
+        paymentOrderDomaainEventMapper = mockk(relaxed = true)
+        idGeneratorPort = mockk(relaxed = true)
         objectMapper = ObjectMapper().registerModule(KotlinModule.Builder().build()).registerModule(JavaTimeModule())
         taskScheduler = mockk()
         clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
@@ -48,7 +58,10 @@ class OutboxDispatcherJobTest {
             batchSize = 10,
             appInstanceId = "test-instance",
             clock = clock,
-            backlogResyncInterval = "PT5M"
+            backlogResyncInterval = "PT5M",
+            serializationPort = serializationPort,
+            paymentOrderDomainEventMapper = paymentOrderDomaainEventMapper,
+            idGeneratorPort = idGeneratorPort
         )
     }
 

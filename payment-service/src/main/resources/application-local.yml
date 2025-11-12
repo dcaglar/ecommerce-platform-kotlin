@@ -12,6 +12,7 @@ app:
   # TopicAdminConfig reads these
   kafka:
     specs:
+      payment_authorized_topic:                   { partitions: 48, replicas: 1, createDlq: true}
       payment_order_created_topic:                { partitions: 48, replicas: 1, createDlq: true }
       payment_order_capture_request_queue_topic:  { partitions: 48, replicas: 1, createDlq: true }
       payment_order_succeeded_topic:              { partitions: 48, replicas: 1, createDlq: true }

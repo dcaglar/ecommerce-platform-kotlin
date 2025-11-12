@@ -19,14 +19,16 @@ object EventMetadatas {
     }
 
 
+
+
     object PaymentAuthorizedMetadata : EventMetadata<PaymentAuthorized> {
-        override val topic = ""
+        override val topic = Topics.PAYMENT_AUTHORIZED
         override val eventType = EVENT_TYPE.PAYMENT_AUTHORIZED
         override val clazz = PaymentAuthorized::class.java
         override val typeRef = object : TypeReference<EventEnvelope<PaymentAuthorized>>() {}
     }
 
-    object PaymentOrderCaptureRequestedMetadata : EventMetadata<PaymentOrderCaptureCommand> {
+    object PaymentOrderCaptureCommandMetadata : EventMetadata<PaymentOrderCaptureCommand> {
         override val topic = Topics.PAYMENT_ORDER_CAPTURE_REQUEST_QUEUE
         override val eventType = EVENT_TYPE.PAYMENT_ORDER_CAPTURE_REQUESTED
         override val clazz = PaymentOrderCaptureCommand::class.java
@@ -74,7 +76,7 @@ object EventMetadatas {
     val all: List<EventMetadata<*>> = listOf(
         PaymentAuthorizedMetadata,
         PaymentOrderCreatedMetadata,
-        PaymentOrderCaptureRequestedMetadata,
+        PaymentOrderCaptureCommandMetadata,
         PaymentOrderSucceededMetadata,
         PaymentOrderFailedMetadata,
         PaymentOrderPspResultUpdatedMetadata,

@@ -1,15 +1,34 @@
 package com.dogancaglar.paymentservice.application.maintenance
 
+import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentOrderOutboundAdapter
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentOutboundAdapter
+import com.dogancaglar.paymentservice.application.constants.IdNamespaces
+import com.dogancaglar.paymentservice.application.constants.PaymentLogFields
+import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.domain.event.EventMetadatas
 import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.event.OutboxEvent
+import com.dogancaglar.paymentservice.domain.event.OutboxEventType
+import com.dogancaglar.paymentservice.domain.event.PaymentAuthorized
+import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.Payment
+import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
+import com.dogancaglar.paymentservice.domain.model.vo.SellerId
+import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_DISPATCHED_TOTAL
 import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_DISPATCHER_DURATION
 import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_DISPATCH_FAILED_TOTAL
 import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_EVENT_BACKLOG
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.OutboxEventPort
+import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
@@ -22,7 +41,9 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import java.time.Clock
+import java.util.UUID
 
 @Service
 @DependsOn("outboxPartitionCreator")
@@ -35,9 +56,12 @@ class OutboxDispatcherJob(
     @param:Value("\${outbox-dispatcher.thread-count:2}") private val threadCount: Int,
     @param:Value("\${outbox-dispatcher.batch-size:250}") private val batchSize: Int,
     @param:Value("\${app.instance-id}") private val appInstanceId: String,
+    private val idGeneratorPort: IdGeneratorPort,
     private val clock: Clock,
-    @param:Value("\${outbox-backlog.resync-interval:PT5M}") private val backlogResyncInterval: String
-) {
+    @param:Value("\${outbox-backlog.resync-interval:PT5M}") private val backlogResyncInterval: String,
+    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
+    private val serializationPort: SerializationPort
+    ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val backlog = java.util.concurrent.atomic.AtomicLong(0)
 
@@ -100,31 +124,159 @@ class OutboxDispatcherJob(
 
     fun publishBatch(events: List<OutboxEvent>)
             : Triple<List<OutboxEvent>, List<OutboxEvent>, List<OutboxEvent>> {
+
         if (events.isEmpty()) return Triple(emptyList(), emptyList(), emptyList())
+
         return try {
-            val envType = objectMapper.typeFactory
-                .constructParametricType(EventEnvelope::class.java, PaymentOrderCreated::class.java)
-            @Suppress("UNCHECKED_CAST")
-            val envelopes: List<EventEnvelope<PaymentOrderCreated>> =
-                events.map { evt -> objectMapper.readValue(evt.payload, envType) as EventEnvelope<PaymentOrderCreated> }
+            val succeeded = mutableListOf<OutboxEvent>()
+            val failed = mutableListOf<OutboxEvent>()
 
-            val ok = syncPaymentEventPublisher.publishBatchAtomically(
-                envelopes = envelopes,
-                eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
-                timeout = java.time.Duration.ofSeconds(30)
-            )
+            events.forEach { evt ->
+                try {
+                    when (OutboxEventType.from(evt.eventType)) {
 
-            if (ok) {
-                val succeeded = events.onEach { it.markAsSent() }
-                Triple(succeeded, emptyList(), emptyList())
-            } else {
-                Triple(emptyList(), events.toList(), emptyList())
+                        OutboxEventType.PAYMENT_AUTHORIZED -> {
+                            val ok = handlePaymentAuthorized(evt)
+                            if (ok) succeeded += evt.markAsSent()
+                            else failed += evt
+                        }
+
+                        OutboxEventType.PAYMENT_ORDER_CREATED -> {
+                            val ok = handlePaymentOrderCreated(evt)
+                            if (ok) succeeded += evt.markAsSent()
+                            else failed += evt
+                        }
+
+                        OutboxEventType.PAYMENT_ORDER_CAPTURE_COMMAND -> {
+                          /*  val ok = handlePaymentOrderCaptureCommand(evt)
+                            if (ok) succeeded += evt.markAsSent()
+                            else failed += evt*/
+                        }
+
+                        else -> {
+                            logger.warn("❓ Unknown outbox event type=${evt.eventType}, skipping oeid=${evt.oeid}")
+                            failed += evt
+                        }
+                    }
+
+                } catch (ex: Exception) {
+                    logger.warn("❌ Failed processing outbox event type=${evt.eventType} id=${evt.oeid}: ${ex.message}", ex)
+                    failed += evt
+                }
             }
+
+            Triple(succeeded, failed, emptyList())
         } catch (t: Throwable) {
-            logger.warn("Batch publish aborted; will UNCLAIM {} rows: {}", events.size, t.toString())
+            logger.warn(
+                "⚠️ Batch publish aborted; will UNCLAIM {} rows due to fatal error: {}",
+                events.size, t.toString(), t
+            )
             Triple(emptyList(), events.toList(), emptyList())
         }
     }
+    @Transactional(transactionManager = "outboxTxManager")
+    fun handlePaymentAuthorized(evt: OutboxEvent):Boolean {
+        val envelopeType = objectMapper.typeFactory
+            .constructParametricType(EventEnvelope::class.java, PaymentAuthorized::class.java)
+        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentAuthorized>
+        val data = envelope.data
+
+        logger.info("Expanding PaymentAuthorized → PaymentOrderCreated for paymentId=${data.paymentId}")
+        // Expand PaymentOrders from the authorized payload
+        val orders = data.paymentLines.map { line ->
+            PaymentOrder.createNew(paymentOrderId = PaymentOrderId(idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER)),
+                        paymentId = PaymentId(data.paymentId.toLong()),
+                            sellerId = SellerId(line.sellerId ),
+                            amount = Amount.of(line.amountValue, Currency(line.currency))
+            )
+        }
+
+        // For each order, persist an OutboxEvent<PaymentOrderCreated>
+        orders.forEach { order ->
+            val outbox = toOutboxEvent(order,envelope.parentEventId)
+            outboxEventPort.save(outbox)
+        }
+
+        logger.info("✅ Created ${orders.size} OutboxEvent<PaymentOrderCreated> for paymentId=${data.paymentId}")
+
+        val ok =syncPaymentEventPublisher.publishBatchAtomically(
+            envelopes = listOf(envelope),
+            eventMetaData = EventMetadatas.PaymentAuthorizedMetadata,
+            timeout = java.time.Duration.ofSeconds(10)
+        )
+        return ok
+    }
+
+
+    private fun handlePaymentOrderCreated(evt: OutboxEvent): Boolean {
+        val envelopeType = objectMapper.typeFactory
+            .constructParametricType(EventEnvelope::class.java, PaymentOrderCreated::class.java)
+        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentOrderCreated>
+
+         val ok =syncPaymentEventPublisher.publishBatchAtomically(
+            envelopes = listOf(envelope),
+            eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
+            timeout = java.time.Duration.ofSeconds(10)
+        )
+
+        logger.info("📤 Published PaymentOrderCreated event ${envelope.eventId}")
+        return ok
+    }
+
+
+    private fun toOutboxEvent(newPaymentOrder: PaymentOrder,parentEventId: UUID?): OutboxEvent {
+        val newPaymentOrderCreatedEvent = paymentOrderDomainEventMapper.toPaymentOrderCreated(newPaymentOrder)
+        val envelope = DomainEventEnvelopeFactory.envelopeFor(
+            traceId = LogContext.getTraceId() ?: UUID.randomUUID().toString(),
+            data = newPaymentOrderCreatedEvent,
+            eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
+            aggregateId = newPaymentOrder.paymentId.value.toString(),
+            parentEventId = parentEventId
+        )
+
+        val extraLogFields = mapOf(
+            PaymentLogFields.PUBLIC_PAYMENT_ID to newPaymentOrder.publicPaymentId
+        )
+
+        LogContext.with(envelope, additionalContext = extraLogFields) {
+            logger.debug(
+                "Creating OutboxEvent for eventType={}, aggregateId={}, eventId={}",
+                envelope.eventType,
+                envelope.aggregateId,
+                envelope.eventId
+            )
+        }
+
+        return OutboxEvent.createNew(
+            oeid = newPaymentOrder.paymentId.value,
+            eventType = envelope.eventType,
+            aggregateId = envelope.aggregateId,
+            payload = serializationPort.toJson(envelope),
+            createdAt = newPaymentOrder.createdAt
+        )
+    }
+
+    /*
+        private fun handlePaymentOrderCaptureCommand(evt: OutboxEvent) {
+            val envelopeType = objectMapper.typeFactory
+                .constructParametricType(EventEnvelope::class.java, PaymentOrderCaptureCommand::class.java)
+            val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentOrderCaptureCommand>
+
+            // Update status (capture requested)
+            paymentOrderOutboundAdapter.markCaptureRequested(envelope.data.paymentOrderId)
+
+            // Publish to capture queue topic
+            syncPaymentEventPublisher.publishBatchAtomically(
+                envelopes = listOf(envelope),
+                eventMetaData = EventMetadatas.PaymentOrderCaptureCommandMetadata,
+                timeout = java.time.Duration.ofSeconds(10)
+            )
+
+            logger.info("📤 Published PaymentOrderCaptureCommand event ${envelope.eventId}")
+        }
+    */
+
+
 
     @Transactional(transactionManager = "outboxTxManager", timeout = 5)
     fun persistResults(succeeded: List<OutboxEvent>) {

@@ -109,7 +109,7 @@ class PaymentOrderEnqueuerTest {
             eventPublisherPort.publishSync<PaymentOrderCaptureCommand>(
                 preSetEventIdFromCaller = any(),
                 aggregateId = paymentOrderId.value.toString(),
-                eventMetaData = EventMetadatas.PaymentOrderCaptureRequestedMetadata,
+                eventMetaData = EventMetadatas.PaymentOrderCaptureCommandMetadata,
                 data = match { data ->
                     data is PaymentOrderCaptureCommand &&
                     data.paymentOrderId == paymentOrderId.value.toString() &&

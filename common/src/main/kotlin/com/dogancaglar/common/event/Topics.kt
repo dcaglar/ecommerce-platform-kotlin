@@ -20,8 +20,8 @@ object EVENT_TYPE {
 
 
 object Topics {
+    const val PAYMENT_AUTHORIZED = "payment_authorized_topic"
     const val PAYMENT_ORDER_CREATED = "payment_order_created_topic"
-    const val PAYMENT_STATUS_CHECK = "payment_status_check_scheduler_topic"
     const val PAYMENT_ORDER_FINALIZED = "payment_order_finalized_topic"
 
     // NEW: PSP work queue
@@ -34,8 +34,8 @@ object Topics {
     fun dlqOf(topic: String) = "$topic.DLQ"
 
     val ALL = listOf(
+        PAYMENT_AUTHORIZED,
         PAYMENT_ORDER_CREATED,
-        PAYMENT_STATUS_CHECK,
         PAYMENT_ORDER_CAPTURE_REQUEST_QUEUE,
         PAYMENT_ORDER_PSP_RESULT_UPDATED,
         PAYMENT_ORDER_FINALIZED,
@@ -45,6 +45,7 @@ object Topics {
 }
 
 object CONSUMER_GROUPS {
+    const val PAYMENT_AUTHORIZED_CONSUMER = "payment-authorized-processor-consumer-group"
     const val PAYMENT_ORDER_ENQUEUER = "payment-order-enqueuer-consumer-group"
     const val PAYMENT_ORDER_CAPTURE_EXECUTOR = "payment-order-capture-executor-consumer-group"
     const val PAYMENT_ORDER_PSP_RESULT_UPDATED = "payment-order-psp-result-updated-consumer-group"

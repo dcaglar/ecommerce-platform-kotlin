@@ -13,7 +13,7 @@ class OutboxJobMyBatisAdapter(
 ) : OutboxEventPort {
 
     private val mapper = template.getMapper(
-        com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.OutboxEventMapper::class.java
+        com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.OutboxEventMapper::class.java
     )
 
 
@@ -21,13 +21,13 @@ class OutboxJobMyBatisAdapter(
 
   override fun findBatchForDispatch(batchSize: Int,workerId: String) =
     mapper.findBatchForDispatch(batchSize, workerId = workerId)
-      .map(com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.OutboxEventEntityMapper::toDomain)
+      .map(com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.OutboxEventEntityMapper::toDomain)
 
 
     override fun updateAll(events: List<OutboxEvent>) {
     if (events.isNotEmpty())
       mapper.batchUpdate(events.map(
-        com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.OutboxEventEntityMapper::toEntity
+        com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.OutboxEventEntityMapper::toEntity
       ))
   }
 

@@ -146,7 +146,7 @@
                         <exclude>**/*IT.kt</exclude>
                         <exclude>**/mybatis/*IntegrationTest.kt</exclude>
                         <exclude>**/redis/*IntegrationTest.kt</exclude>
-                        <exclude>**/persistance/*IntegrationTest.kt</exclude>
+                        <exclude>**/persistence/*IntegrationTest.kt</exclude>
                     </excludes>
                 </configuration>
             </plugin>

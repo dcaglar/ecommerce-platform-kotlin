@@ -1,0 +1,88 @@
+package com.dogancaglar.paymentservice.port.inbound.consumers
+
+import com.dogancaglar.common.event.CONSUMER_GROUPS
+import com.dogancaglar.common.event.DomainEventEnvelopeFactory
+import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.common.event.Topics
+import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.paymentservice.application.util.PaymentFactory
+import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
+import com.dogancaglar.paymentservice.domain.event.EventMetadatas
+import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
+import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.PaymentOrderFactory
+import com.dogancaglar.paymentservice.domain.event.PaymentAuthorized
+import com.dogancaglar.paymentservice.domain.model.PaymentStatus
+import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
+import org.apache.kafka.clients.consumer.Consumer
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.clients.consumer.OffsetAndMetadata
+import org.apache.kafka.common.TopicPartition
+import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.kafka.annotation.KafkaListener
+import org.springframework.stereotype.Component
+import java.time.Clock
+
+@Component
+class PaymentAuthorizedConsumer(
+    @param:Qualifier("syncPaymentTx") private val kafkaTx: KafkaTxExecutor,
+    @param:Qualifier("syncPaymentEventPublisher") private val publisher: EventPublisherPort,
+    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
+    private val clock: Clock
+) {
+    private val logger = LoggerFactory.getLogger(javaClass)
+    private val factory = PaymentFactory(clock)
+
+    @KafkaListener(
+        topics = [Topics.PAYMENT_AUTHORIZED],
+        containerFactory = "${Topics.PAYMENT_AUTHORIZED}-factory",
+        groupId = CONSUMER_GROUPS.PAYMENT_AUTHORIZED_CONSUMER
+    )
+    fun onCreated(
+        record: ConsumerRecord<String, EventEnvelope<PaymentAuthorized>>,
+        consumer: Consumer<*, *>
+    ) {
+        val consumed = record.value()
+        val created = consumed.data
+        val order = factory.createPayment(created)
+
+        val tp = TopicPartition(record.topic(), record.partition())
+        val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
+        val groupMeta =
+            consumer.groupMetadata()                        // <— real metadata (generation, member id, epoch)
+        LogContext.with(consumed) {
+            if (order.status != PaymentStatus.AUTHORIZED) {
+                kafkaTx.run(offsets, groupMeta) {}
+                logger.warn("⏩ Skip authorized consumer (status={}) agg={}", order.status, consumed.aggregateId)
+                return@with
+            }
+            //todo we will request a ledger recording here
+            /*
+            val work = paymentOrderDomainEventMapper.toPaymentOrderCaptureCommand(order, attempt = 0)
+            val outEnv = DomainEventEnvelopeFactory.envelopeFor(
+                data = work,
+                eventMetaData = EventMetadatas.PaymentOrderCaptureCommandMetadata,
+                aggregateId = work.paymentOrderId, // Kafka key = paymentOrderId
+                traceId = consumed.traceId,
+                parentEventId = consumed.eventId
+            )
+
+            kafkaTx.run(offsets, groupMeta) {
+                publisher.publishSync(
+                    preSetEventIdFromCaller = outEnv.eventId,
+                    aggregateId = outEnv.aggregateId,
+                    eventMetaData = EventMetadatas.PaymentOrderCaptureCommandMetadata,
+                    data = work,
+                    traceId = outEnv.traceId,
+                    parentEventId = outEnv.parentEventId
+                )
+                logger.debug("📤 Enqueued PSP work attempt=0 agg={} traceId={}", outEnv.aggregateId, outEnv.traceId)
+            }
+            */
+
+        }
+
+    }
+}

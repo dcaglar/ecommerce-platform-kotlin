@@ -2,16 +2,16 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.PaymentOrderMapper">
+<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentOrderMapper">
     <resultMap id="PaymentOrderResultMap"
-               type="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentOrderEntity">
+               type="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentOrderEntity">
         <id property="paymentOrderId" column="payment_order_id"/>
         <result property="paymentId" column="payment_id"/>
         <result property="sellerId" column="seller_id"/>
         <result property="amountValue" column="amount_value"/>
         <result property="amountCurrency" column="amount_currency"/>
         <result property="status" column="status"
-                typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.typehandler.PaymentOrderStatusTypeHandler"/>
+                typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.PaymentOrderStatusTypeHandler"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
         <result property="retryCount" column="retry_count"/>
@@ -93,7 +93,7 @@
             #{po.sellerId},
             #{po.amountValue},
             #{po.amountCurrency},
-            #{po.status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.typehandler.PaymentOrderStatusTypeHandler},
+            #{po.status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.PaymentOrderStatusTypeHandler},
             #{po.createdAt},
             #{po.updatedAt},
             #{po.retryCount})
@@ -103,7 +103,7 @@
 
 
     <insert id="insert"
-            parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentOrderEntity">
+            parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentOrderEntity">
         INSERT INTO payment_orders (
         payment_order_id,
         payment_id,
@@ -120,7 +120,7 @@
         #{sellerId},
         #{amountValue},
         #{amountCurrency},
-        #{status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.typehandler.PaymentOrderStatusTypeHandler},
+        #{status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.PaymentOrderStatusTypeHandler},
         #{createdAt},
         #{updatedAt},
         #{retryCount}
@@ -128,14 +128,15 @@
     </insert>
 
     <select id="updateReturningIdempotent"
-            parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentOrderEntity"
+            parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentOrderEntity"
             resultMap="PaymentOrderResultMap">
         WITH updated AS (
         UPDATE payment_orders p
         SET
         status = CASE
         WHEN p.status IN ('CAPTURED','REFUNDED') THEN p.status
-        ELSE #{status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.typehandler.PaymentOrderStatusTypeHandler}
+        ELSE
+        #{status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.PaymentOrderStatusTypeHandler}
         END,
         updated_at = GREATEST(p.updated_at, #{updatedAt}),
         retry_count = GREATEST(p.retry_count, #{retryCount})

@@ -17,7 +17,7 @@ import kotlin.random.Random
 class PspAuthorizationGatewayAdapter(
     private val simulator: AuthorizationNetworkSimulator,
     private val config: AuthorizationSimulationProperties,
-    @Qualifier("paymentPspPool") private val pspExecutor: ThreadPoolTaskExecutor,
+    @Qualifier("pspAuthExecutor") private val pspAuthExecutor: ThreadPoolTaskExecutor,
     private val meterRegistry: MeterRegistry        // <--- add this
 ) : PspAuthGatewayPort {
     private val pspQueueDelay = Timer.builder("psp_queue_delay")
@@ -41,7 +41,7 @@ class PspAuthorizationGatewayAdapter(
         val enqueuedAt = System.nanoTime()
 
         return try {
-            future = pspExecutor.submit<PaymentStatus>
+            future = pspAuthExecutor.submit<PaymentStatus>
             {
                 val startedAt = System.nanoTime()
                 pspQueueDelay.record(startedAt - enqueuedAt, TimeUnit.NANOSECONDS)

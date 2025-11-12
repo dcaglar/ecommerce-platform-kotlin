@@ -189,7 +189,7 @@ ecommerce-platform-kotlin/
 ├── payment-infrastructure/               # 🧩 Adapters & auto-configuration
 │   ├── src/main/kotlin/com/dogancaglar/paymentservice/
 │   │   ├── adapter/outbound/             # Outbound adapters (implementing ports)
-│   │   │   ├── persistance/              # Persistence adapters
+│   │   │   ├── persistence/              # Persistence adapters
 │   │   │   │   ├── entity/               # JPA entities
 │   │   │   │   │   ├── PaymentEntity.kt
 │   │   │   │   │   ├── PaymentOrderEntity.kt

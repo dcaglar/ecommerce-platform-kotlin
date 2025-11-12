@@ -1,8 +1,7 @@
 package com.dogancaglar.paymentservice.application.config
 
-import com.dogancaglar.paymentservice.adapter.outbound.persistance.OutboxBufferAdapter
-import com.dogancaglar.paymentservice.adapter.outbound.persistance.PaymentOrderOutboundAdapter
-import com.dogancaglar.paymentservice.adapter.outbound.persistance.PaymentOutboundAdapter
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.OutboxBufferAdapter
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentOutboundAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.redis.RedisIdGeneratorPortAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.serialization.JacksonSerializationAdapter
 import com.dogancaglar.paymentservice.application.usecases.AccountBalanceReadService

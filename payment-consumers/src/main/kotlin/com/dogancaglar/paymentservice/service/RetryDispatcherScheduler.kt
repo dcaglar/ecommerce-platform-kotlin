@@ -31,7 +31,7 @@ class RetryDispatcherScheduler(
     private val running = java.util.concurrent.atomic.AtomicBoolean(false)
 
     // Static tag for your topic (so dashboards can filter/group)
-    private val topicTag = Tag.of("topic", EventMetadatas.PaymentOrderCaptureRequestedMetadata.topic)
+    private val topicTag = Tag.of("topic", EventMetadatas.PaymentOrderCaptureCommandMetadata.topic)
 
     private val processedCounter = Counter.builder("redis_retry_events_total")
         .description("Total retry events successfully re-published")
@@ -112,7 +112,7 @@ class RetryDispatcherScheduler(
                 // Send the whole chunk atomically (one Kafka transaction)
                 val txOk = publisher.publishBatchAtomically(
                     envelopes = envs,
-                    eventMetaData = EventMetadatas.PaymentOrderCaptureRequestedMetadata,
+                    eventMetaData = EventMetadatas.PaymentOrderCaptureCommandMetadata,
                     timeout = java.time.Duration.ofSeconds(30)
                 )
 

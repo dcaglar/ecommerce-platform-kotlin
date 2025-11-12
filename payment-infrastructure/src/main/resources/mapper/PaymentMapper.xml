@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistance.mybatis.PaymentMapper">
+<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentMapper">
     <resultMap id="PaymentResultMap"
-               type="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentEntity">
+               type="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentEntity">
         <id property="paymentId" column="payment_id"/>
         <result property="buyerId" column="buyer_id"/>
         <result property="orderId" column="order_id"/>
@@ -21,7 +21,7 @@
     </select>
 
     <insert id="insertIgnore"
-            parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentEntity">
+            parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentEntity">
         INSERT INTO payments (
         payment_id,
         buyer_id,
@@ -72,7 +72,7 @@
     </delete>
 
     <update id="update"
-            parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistance.entity.PaymentEntity">
+            parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentEntity">
         UPDATE payments SET
         order_id = #{orderId},
         buyer_id = #{buyerId},

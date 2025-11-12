@@ -2,65 +2,88 @@ package com.dogancaglar.paymentservice.domain.event
 
 import java.time.LocalDateTime
 
-class OutboxEvent private constructor(
+
+/**
+ * Represents a durable outbox event entry.
+ * Created atomically with domain changes to ensure reliable async publication.
+ */class OutboxEvent private constructor(
     val oeid: Long,
     val eventType: String,
     val aggregateId: String,
     val payload: String,
-    private var _status: Status,
-    val createdAt: LocalDateTime
+    val status: Status,
+    val createdAt: LocalDateTime,
+    val updatedAt: LocalDateTime
 ) {
 
-    /** Public read-only accessor for status */
-    val status: Status get() = _status
-
-    fun markAsProcessing() {
-        require(_status == Status.NEW) { "Expected status NEW, was $_status" }
-        _status = Status.PROCESSING
-    }
-
-    fun markAsSent() {
-        require(_status == Status.PROCESSING || _status == Status.NEW) {
-            "Expected status NEW or PROCESSING, was $_status"
+    /** Domain-safe transitions */
+    fun markAsProcessing(): OutboxEvent {
+        require(status == Status.NEW) {
+            "Invalid transition from $status to ${Status.PROCESSING}"
         }
-        _status = Status.SENT
+        return copy(status = Status.PROCESSING)
     }
 
+    fun markAsSent(): OutboxEvent {
+        require(status == Status.NEW || status == Status.PROCESSING) {
+            "Invalid transition from $status to ${Status.SENT}"
+        }
+        return copy(status = Status.SENT)
+    }
+
+    /** Functional immutability */
+    private fun copy(
+        status: Status = this.status,
+        updatedAt: LocalDateTime = LocalDateTime.now()
+    ): OutboxEvent = OutboxEvent(
+        oeid = oeid,
+        eventType = eventType,
+        aggregateId = aggregateId,
+        payload = payload,
+        status = status,
+        createdAt = createdAt,
+        updatedAt = updatedAt
+    )
+
+    /** Marker enum for outbox lifecycle */
     enum class Status { NEW, PROCESSING, SENT }
 
     companion object {
 
-        /** 🔹 For newly created Outbox events before first persistence */
+        /** 🔹 Create brand new event for persistence */
         fun createNew(
             oeid: Long,
             eventType: String,
             aggregateId: String,
             payload: String,
-            createdAt: LocalDateTime
+            createdAt: LocalDateTime = LocalDateTime.now()
         ): OutboxEvent = OutboxEvent(
             oeid = oeid,
             eventType = eventType,
             aggregateId = aggregateId,
             payload = payload,
-            _status = Status.NEW,
-            createdAt = createdAt
+            status = Status.NEW,
+            createdAt = createdAt,
+            updatedAt = createdAt
         )
 
-        /** 🔹 For restoring from persistence (e.g., mapper or database row) */
-        fun restore(
+        /** 🔹 Rehydrate from persistence row */
+        fun rehydrate(
             oeid: Long,
             eventType: String,
             aggregateId: String,
             payload: String,
             status: String,
-            createdAt: LocalDateTime
+            createdAt: LocalDateTime,
+            updatedAt: LocalDateTime
         ): OutboxEvent = OutboxEvent(
             oeid = oeid,
             eventType = eventType,
             aggregateId = aggregateId,
             payload = payload,
-            _status = Status.valueOf(status),
-            createdAt = createdAt
+            status = Status.valueOf(status.uppercase()), // safe parse
+            createdAt = createdAt,
+            updatedAt = updatedAt
         )
     }
 }

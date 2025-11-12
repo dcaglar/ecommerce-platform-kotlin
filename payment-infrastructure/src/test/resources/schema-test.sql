@@ -7,6 +7,7 @@ CREATE TABLE outbox_event (
   payload     TEXT         NOT NULL,
   status      VARCHAR(50)  NOT NULL,
   created_at  TIMESTAMP    NOT NULL,
+  updated_at  TIMESTAMP    NOT NULL,
   claimed_at  TIMESTAMP NULL,
   claimed_by  VARCHAR(128) NULL,
   PRIMARY KEY (oeid, created_at)
