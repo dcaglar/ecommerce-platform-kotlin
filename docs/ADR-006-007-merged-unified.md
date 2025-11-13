@@ -166,32 +166,7 @@ ALTER TABLE payments
 
 ```mermaid
 sequenceDiagram
-    participant Client
-    participant API as Payment API
-    participant PSP as External PSP
-    participant DB as PostgreSQL
-    participant K as Kafka
-    participant C as Consumers
-    participant A as Aggregator
-    participant L as Ledger
-
-    Client->>API: POST /payments (idempotency key)
-    API->>DB: insert Payment (PENDING_AUTH)
-    API->>PSP: authorize()
-    alt Authorized
-        PSP-->>API: success
-        API->>DB: update Payment (AUTHORIZED)
-        API->>DB: insert OutboxEvent<PaymentRequestDTO>
-        API-->>Client: 202 Accepted
-        API->>K: OutboxDispatcher → PaymentOrderCreated
-        K->>C: Enqueuer → PSP Call → Result Applier
-        C->>A: PaymentCaptureAggregator → update Payment
-        A->>L: LedgerRecording
-    else Declined
-        PSP-->>API: declined
-        API->>DB: update Payment (DECLINED)
-        API-->>Client: 402 Payment Required
-    end
+    lets create an correscr sequence diagam
 ```
 
 ---

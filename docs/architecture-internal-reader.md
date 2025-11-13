@@ -1,80 +1,62 @@
 # ecommerce-platform-kotlin · Architecture Guide
+## 1 · Purpose/Audience
+- **Demo Scope / Intent**: This platform is a technical showcase designed to
+  demonstrate domain expertise in payments, double-entry ledger design, event-driven
+  architecture, idempotent workflows, and cloud-native patterns.Also  
+- It is not intended
+  as a commercial product but as an educational, interview-ready reference implementation.
 
-*Last updated: **2025‑01‑15** – maintained by **Doğan Çağlar***
+From this platform’s point of view, all business flows are expressed as combinations of:
 
----
+- **Pay-ins**: money entering the platform from external parties (e.g., riders/shoppers)
+- **Internal reallocations**: money moving between internal entities and accounts
+- **Pay-outs**: money leaving the platform to external beneficiaries (e.g., drivers, sellers, tax authorities)
 
-## Table of Contents
+The platform does not encode any single marketplace or Merchant-of-Record model.
+Instead, it provides a small and realistic set of financial primitives that large
+multi-entity platforms (e.g., Uber, bol.com, Airbnb, Amazon Marketplace) commonly
+use: authorization, capture, asynchronous processing, idempotent state transitions,
+and double-entry ledger recording.
 
-1. [Purpose & Audience](#1--purpose--audience)
-2. [System Context](#2--system-context)  
-   2.1 [High‑Level Context Diagram](#21-highlevel-context-diagram)  
-   2.2 [Bounded Context Map](#22-bounded-context-map)
-   2.3 [Payment Bounded Context Domain Model](#23-payment-bounded-context-domain-model)  
-   2.4 [Aggregate Boundaries & Consistency](#24-aggregate-boundaries--consistency)
-3. [Core Design Principles](#3--core-design-principles)
-4. [Architectural Overview](#4--architectural-overview)  
-   4.1 [Layering & Hexagonal Architecture](#41-layering--hexagonal-architecture)  
-   4.2 [Service & Executor Landscape](#42-service--executor-landscape)  
-   4.3 [Payment Flow Architecture](#43-payment-flow-architecture)  
-   4.4 [Complete System Flow Architecture Diagram](#44-complete-system-flow-architecture-diagram)
-   4.5 [Ledger Recording Architecture](#45-ledger-recording-architecture)
-5. [Cross‑Cutting Concerns](#5--crosscutting-concerns)  
-   5.1 [Outbox Pattern](#51-outbox-pattern)  
-   5.2 [Retry & Status‑Check Strategy](#52-retry--statuscheck-strategy)  
-   5.3 [Idempotency](#53-idempotency)  
-   5.4 [Unique ID Generation](#54-unique-id-generation)
-6. [Data & Messaging Design](#6--data--messaging-design)  
-   6.1 [PostgreSQL Outbox Partitioning](#61-postgresql-outbox-partitioning)  
-   6.2 [Kafka Partitioning by `paymentOrderId`](#62-kafka-partitioning-by-paymentorderid)  
-   6.3 [EventEnvelope Contract](#63-eventenvelope-contract)
-7. [Infrastructure & Deployment (Helm/K8s)](#7--infrastructure--deployment-helmk8s)  
-   7.1 [Helm Charts Overview](#71-helm-charts-overview)  
-   7.2 [Environments & Values](#72-environments--values)  
-   7.3 [Kubernetes Objects (Deployments, Services, HPA)](#73-kubernetes-objects-deployments-services-hpa)  
-   7.4 [Lag‑Based Autoscaling (consumer lag)](#74-lagbased-autoscaling-consumer-lag)  
-   7.5 [CI/CD & Scripts](#75-cicd--scripts)
-8. [Observability & Operations](#8--observability--operations)  
-   8.1 [Metrics (Micrometer → Prometheus)](#81-metrics-micrometer--prometheus)  
-   8.2 [Dashboards (Grafana)](#82-dashboards-grafana)  
-   8.3 [Logging & Tracing (JSON, OTel)](#83-logging--tracing-json-otel)  
-   8.4 [ElasticSearch Search Keys](#84-elasticsearch-search-keys)
-9. [Module Structure](#9--module-structure)  
-   9.1 [`common`](#91-common)  
-   9.2 [`common-test`](#92-common-test)  
-   9.3 [`payment-domain`](#93-payment-domain)  
-   9.4 [`payment-application`](#94-payment-application)  
-   9.5 [`payment-infrastructure` (Auto‑config)](#95-payment-infrastructure-autoconfig)  
-   9.6 [Deployables: `payment-service` & `payment-consumers`](#96-deployables-payment-service--payment-consumers)
-10. [Testing & Quality Assurance](#10--testing--quality-assurance)  
-    10.1 [Testing Strategy](#101-testing-strategy)  
-    10.2 [Test Coverage Results](#102-test-coverage-results)
-11. [Quality Attributes](#11--quality-attributes)  
-    11.1 [Reliability & Resilience](#111-reliability--resilience)  
-    11.2 [Security](#112-security)  
-    11.3 [Cloud‑Native & Deployment](#113-cloudnative--deployment)  
-    11.4 [Performance & Scalability](#114-performance--scalability)
-12. [Roadmap](#12--roadmap)
-13. [Glossary](#13--glossary)
-14. [References](#14--references)
-15. [Changelog](#15--changelog)
+Only a representative subset is implemented — enough to demonstrate architectural
+thinking, correctness guarantees, and event-driven workflow design without trying
+to recreate a complete enterprise system.
 
----
+- **Audience**: Backend engineers, SREs, architects, and contributors who need to
+  understand the big picture.
+- **Scope**: Payment + ledger infrastructure for multi-entity, MoR-style platforms,
+  where external PSPs are used as gateways for pay-ins and pay-outs, and all
+  flows are eventually captured in the ledger.
+- 
 
-## 1 · Purpose & Audience
 
-This document is the **single source of truth** for the architectural design of the `ecommerce-platform-kotlin` backend.
-It captures **why** and **how** we build a modular, event‑driven, cloud‑native platform that can scale to multi‑seller,
-high‑throughput workloads while remaining observable, resilient, and easy to evolve.
 
-- **Audience**: Backend engineers, SREs, architects, and contributors who need to understand the big picture.
-- **Scope**: This is a Payment Platform of a Merchant Of Record commerce business, where we only use psp as gateway in authorization, and relate payment to psp calls, and afterwards asyncroonusly process captures
----
+## 2 · Functional Requirements
+This platform models **multi-seller Merchant-of-Record** financial flows. All business operations reduce to a combination of **pay-ins, internal reallocations, and pay-outs**, governed by strict financial invariants.
 
-## 2 · System Context
+**Core Functional Invariants:**
+1. **Single Shopper Authorization**
+   - One PSP authorization (`pspAuthRef`) per shopper.
+   - PSP never sees internal seller structure.
 
-### 2.1 High‑Level Context Diagram
+2. **Multi‑Seller Decomposition**
+   - One `Payment` decomposes into multiple `PaymentOrder`s (one per seller).
 
+3. **Independent Capture Pipeline**
+   - Each seller capture runs asynchronously (auto‑capture or manual).
+   - PSP only receives: `pspAuthRef + amount`.
+
+4. **Seller‑Level Payout Responsibility**
+   - Platform ensures receivable/payable correctness per seller.
+
+5. **Double‑Entry Ledger as Source of Truth**
+   - Every financial event (auth, capture, settlement, fees, commissions, payouts) must produce balanced journal entries.
+
+6. **Payout‑Safe Accounting**
+   - Sellers can only be paid out after required journal posting.
+
+
+### 2.1 System Context
 ```mermaid
 flowchart LR
 subgraph Users
@@ -99,9 +81,10 @@ REDIS
 end
 ```
 
-### 2.2 Bounded Context Map
 
-This diagram shows the Payment Bounded Context and its relationships with downstream contexts, including internal aggregates and integration patterns.
+### 2.2 Payment Bounded Context & Domain Model
+
+This diagram shows the Payment Bounded Context and its relationships with downstream contexts, including internal aggregates and integration patterns
 
 ```mermaid
 %%{init:{'theme':'default','flowchart':{'nodeSpacing':50,'rankSpacing':60}}}%%
@@ -109,46 +92,54 @@ flowchart TB
     classDef payment fill:#4CAF50,stroke:#2E7D32,stroke-width:3px;
     classDef downstream fill:#2196F3,stroke:#1565C0,stroke-width:2px;
     classDef infrastructure fill:#9E9E9E,stroke:#616161,stroke-width:2px;
-    classDef planned fill:#E0E0E0,stroke:#9E9E9E,stroke-width:2px,stroke-dasharray: 5 5;
-
-    subgraph Payment_BC["Payment Bounded Context - Core Domain"]
-        Payment_Agg["Payment<br/>Coordination Aggregate<br/>• Synchronous PSP authorization (captures pspRef)<br/>• Tracks shopper order + totalAmount<br/>• Status transitions: AUTHORIZED / FAILED"]
-        PaymentOrder_Agg["PaymentOrder<br/>Processing Aggregate<br/>• Created only after auth success<br/>• Drives capture/settlement per seller"]
-        Ledger_Subdomain["Ledger Subdomain<br/>Double-entry accounting<br/>• AUTH_HOLD, CAPTURE, SETTLEMENT, PAYOUT, FEES<br/>• Uses AccountType + JournalEntryFactory"]
+    
+    subgraph Payment_BC["Payment Bounded Context (Core Domain)"]
+        Payment_Agg["Payment<br/>Coordination Aggregate<br/>• Synchronous PSP authorization (single PSP call)<br/>• Tracks shopper order + totalAmount<br/>• Status: PENDING_AUTH / AUTHORIZED / PARTIALLY_CAPTURED / CAPTURED_FINAL / DECLINED"]:::payment
+        
+        PaymentOrder_Agg["PaymentOrder<br/>Processing Aggregate<br/>• Created only after PaymentAuthorized<br/>• One per seller / capture leg<br/>• Status: INITIATED_PENDING / CAPTURE_REQUESTED / CAPTURED_FINAL / FINAL_FAILED"]:::payment
+        
+        Ledger_Subdomain["Ledger Subdomain<br/>Double-entry accounting<br/>• Posts entries per successful capture<br/>• Uses AccountType + JournalEntryFactory<br/>• Persists journal_entries + account_balances"]:::payment
     end
 
     subgraph Integration["Integration Layer - Kafka Event Bus"]
-        KAFKA[("Kafka Topics:<br/>payment_order_finalized<br/>ledger_entries_recorded")]
+        KAFKA[("Kafka Topics<br/>• payment_authorized<br/>• payment_order_created<br/>• payment_order_capture_requested<br/>• payment_order_succeeded / failed<br/>• ledger_entries_recorded")]:::infrastructure
     end
 
-    subgraph Downstream_BCs["Downstream Bounded Contexts"]
-        Shipment_BC[("Shipment BC<br/>Listens to PaymentOrderSucceeded<br/>Immediate shipment per seller")]:::downstream
-        Wallet_BC[("Wallet BC<br/>Planned")]:::planned
-        Order_BC[("Order BC<br/>Planned")]:::planned
+    subgraph Downstream_BCs["Downstream Bounded Contexts (Implemented)"]
+        Shipment_BC[("Shipment BC<br/>Listens to PaymentOrderSucceeded<br/>Triggers shipment per seller")]:::downstream
     end
 
-    Payment_Agg -->|"1:N Contains"| PaymentOrder_Agg
-    PaymentOrder_Agg -->|"Emits PaymentOrderSucceeded<br/>per seller immediately"| KAFKA
-    Payment_Agg -->|"Emits PaymentCompleted<br/>when all orders done (optional)"| KAFKA
-    Ledger_Subdomain -->|"Emits LedgerEntriesRecorded"| KAFKA
+    %% Relationships inside Payment BC
+    Payment_Agg -->|"1 : N contains"| PaymentOrder_Agg
+    PaymentOrder_Agg -->|"On CAPTURED_FINAL<br/>triggers ledger posting"| Ledger_Subdomain
+
+    %% Events out of Payment BC
+    Payment_Agg -->|"Emits payment_authorized<br/>after successful PSP auth"| KAFKA
+    PaymentOrder_Agg -->|"Emits payment_order_created<br/>(per seller)"| KAFKA
+    PaymentOrder_Agg -->|"Emits payment_order_capture_requested<br/>(auto or manual capture)"| KAFKA
+    PaymentOrder_Agg -->|"Emits payment_order_succeeded / failed<br/>(final capture result)"| KAFKA
+    Ledger_Subdomain -->|"Emits ledger_entries_recorded"| KAFKA
     
-    KAFKA -->|"Per seller - immediate action"| Shipment_BC
-    KAFKA -.->|"Planned"| Wallet_BC
-    KAFKA -.->|"Planned"| Order_BC
+    %% Downstream consumption
+    KAFKA -->|"Per-seller capture result<br/>PaymentOrderSucceeded/Failed"| Shipment_BC
 
+    %% Styling
     style Payment_BC fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
     style Integration fill:#F5F5F5,stroke:#757575,stroke-width:2px
     style Downstream_BCs fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
 ```
 
+### 2.3.1 CORE ENTITIES
+
 **Key Points:**
 - **Payment** stores the synchronous authorization outcome (`pspRef`, `AUTHORIZED` / `FAILED`) and coordinates downstream seller captures.
 - **PaymentOrder** is instantiated only after the parent payment is authorized and emits events as each seller capture/settlement progresses.
+- - **PaymentOrderEvent** is representing an even interface representing the immutable events transition between payment order statuses
 - **Ledger Subdomain** uses `AccountType` (auth hold, receivable/payable, scheme fees, commission) and the `JournalEntryFactory` (`authHold`, `releaseHoldOnCapture`, `capture`, `settlement`, `recognizePspFee`, `recognizeCommissionFee`, `payoutToMerchant`, `refundPrePayout`) to enforce balanced postings.
 - **Shipment** listens to individual `PaymentOrderSucceeded` events for immediate fulfillment.
 - All integration remains event-driven via Kafka (no direct dependencies).
 
-### 2.3 Payment Bounded Context Domain Model
+### 2.3.2 Payment Bounded Context Domain Model
 
 This diagram shows the **Payment Bounded Context** with its aggregates, entities, value objects, and domain events.
 
@@ -310,8 +301,569 @@ flowchart TB
 - **Consistency Boundaries**: Each aggregate maintains immediate consistency; eventual consistency between aggregates via events
 - **Transaction Scope**: Database transactions for initial Payment+PaymentOrders creation; Kafka transactions for PaymentOrder processing; separate DB transactions per PaymentOrder status updates; eventual Payment status update when all PaymentOrders complete
 
+### 2.5 API Summary
+Authentication
+
+All endpoints require:
+
+Authorization: Bearer <access-token>
+Idempotency-Key: <unique-key>   // for POST endpoints
+Content-Type: application/json
+
+POST /payments
+
+Create a new payment + perform synchronous authorization.
+
+Headers
+	•	Authorization: Bearer …
+	•	Idempotency-Key: …
+
+Response Codes
+	•	202 Accepted — Authorization succeeded, processing continues async
+	•	402 Payment Required — Authorization declined
+	•	400 Bad Request — Invalid request
+	•	409 Conflict — Idempotency key reuse mismatch
+	•	401 / 403 — Auth errors
+
+⸻
+
+POST /payments/{paymentId}/capture
+
+Trigger manual capture for a seller leg.
+
+Headers
+	•	Authorization: Bearer …
+	•	Idempotency-Key: …
+
+Response Codes
+	•	202 Accepted — Capture command queued
+	•	404 Not Found — Payment or seller leg missing
+	•	409 Conflict — Duplicate or invalid capture
+	•	400 Bad Request — Invalid body
+	•	401 / 403 — Auth errors
+
+⸻
+
+GET /payments/{paymentId}
+
+Retrieve payment status (buyer-level).
+
+Headers
+	•	Authorization: Bearer …
+
+Response Codes
+	•	200 OK
+	•	404 Not Found
+	•	401 / 403
+
+⸻
+
+GET /payments/{paymentId}/orders
+
+Retrieve all PaymentOrders (seller-level).
+
+Headers
+	•	Authorization: Bearer …
+
+Response Codes
+	•	200 OK
+	•	404 Not Found
+	•	401 / 403
+
+### 2.6 Data Flow Summary
+```mermaid
+sequenceDiagram
+    autonumber
+
+    participant Client
+    participant PaymentService
+    participant PSPAuth as PSP Authorization
+    participant DB
+    participant Outbox as OutboxDispatcherJob
+    participant Kafka
+    participant Enqueuer
+    participant CaptureExec as CaptureExecutor
+    participant ResultApplier
+    participant Redis
+    participant PSP as PSP Capture
+
+    %% ============================
+    %% 1. Synchronous Authorization
+    %% ============================
+    Client->>PaymentService: POST /payments
+    PaymentService->>PSPAuth: authorize(orderTotal, cardInfo)
+    PSPAuth-->>PaymentService: authResult(APPROVED/DECLINED)
+
+    alt Approved
+        PaymentService->>DB: Persist Payment(PENDING_AUTH→AUTHORIZED)\n+ outbox<PaymentAuthorized>
+        PaymentService-->>Client: 202 Accepted
+    else Declined
+        PaymentService->>DB: Persist Payment(DECLINED)
+        PaymentService-->>Client: 402 Payment Required
+    end
+
+
+    %% =============================================
+    %% 2. (NEW) Manual Capture Request per seller
+    %% =============================================
+    Client->>PaymentService: POST /payments/{paymentId}/capture\n{sellerId, amount}
+    PaymentService->>DB: Validate + Persist outbox<PaymentOrderCaptureCommand>
+    PaymentService-->>Client: 202 Accepted (capture queued)
+
+
+    %% =============================================
+    %% 3. OutboxDispatcherJob — NEW Responsibilities
+    %% =============================================
+    Outbox->>DB: Fetch NEW outbox rows (payment, paymentOrder, captureCmd)
+
+    %% 3.1 PaymentAuthorized
+    Outbox->>Outbox: Expand PaymentAuthorized → create PaymentOrders
+    Outbox->>DB: Insert PaymentOrders
+    Outbox->>DB: Insert outbox<PaymentOrderCreated[]> 
+    Outbox->>Kafka: Publish PaymentAuthorized
+    Outbox->>Kafka: Publish PaymentOrderCreated (per seller)
+
+    %% 3.2 PaymentOrderCreated passthrough
+    Outbox->>Kafka: Publish PaymentOrderCreated
+    Outbox->>DB: Mark SENT
+
+    %% 3.3 PaymentOrderCaptureCommand (NEW)
+    Outbox->>DB: Update PaymentOrder → CAPTURE_REQUESTED
+    Outbox->>Kafka: Publish PaymentOrderCaptureRequested
+
+    Outbox->>DB: Mark outbox items as SENT
+
+
+    %% =============================================
+    %% 4. Enqueuer → PSP Capture Requested
+    %% =============================================
+    Enqueuer->>Kafka: Consume PaymentOrderCreated
+    Enqueuer->>Kafka: Publish PaymentOrderCaptureRequested (auto-capture scenario)
+
+
+    %% =============================================
+    %% 5. Capture Executor
+    %% =============================================
+    CaptureExec->>Kafka: Consume PaymentOrderCaptureRequested
+    CaptureExec->>PSP: capture(sellerAmount, authRef)
+    PSP-->>CaptureExec: captureResult
+    CaptureExec->>Kafka: Publish PaymentOrderPspResultUpdated
+
+
+    %% =============================================
+    %% 6. PSP Result Applier
+    %% =============================================
+    ResultApplier->>Kafka: Consume PaymentOrderPspResultUpdated
+
+    alt Capture Success
+        ResultApplier->>DB: Update PaymentOrder → CAPTURED_FINAL
+        ResultApplier->>Kafka: Publish PaymentOrderSucceeded
+    else Retryable Failure
+        ResultApplier->>Redis: ZSET schedule retry
+        ResultApplier->>DB: retry_count++
+    else Final Failure
+        ResultApplier->>DB: Update PaymentOrder → FINAL_FAILED
+        ResultApplier->>Kafka: Publish PaymentOrderFailed
+    end
+```
+## 3 · Non-Functional Requirements
+(placeholder)
+
+### 3.1 Core Design Principles
+(placeholder)
+
+## 4 · Architectural Overview
+(placeholder)
+
+### 4.1 Layering & Hexagonal Architecture
+(placeholder)
+
+### 4.2 Service & Executor Landscape
+(placeholder)
+
+### 4.3 Payment Flow Architecture
+(placeholder)
+
+### 4.4 Complete System Flow Architecture Diagram
+(placeholder)
+
+### 4.5 Ledger Recording Architecture
+(placeholder)
+
+## 5 · Cross‑Cutting Concerns
+(placeholder)
+
+### 5.1 Outbox Pattern
+(placeholder)
+
+### 5.2 Retry & Status‑Check Strategy
+(placeholder)
+
+### 5.3 Idempotency
+(placeholder)
+
+### 5.4 Unique ID Generation
+(placeholder)
+
+## 6 · Data & Messaging Design
+(placeholder)
+
+### 6.1 PostgreSQL Outbox Partitioning
+(placeholder)
+
+### 6.2 Kafka Partitioning by paymentOrderId
+(placeholder)
+
+### 6.3 EventEnvelope Contract
+(placeholder)
+
+## 7 · Infrastructure & Deployment (Helm/K8s)
+(placeholder)
+
+### 7.1 Helm Charts Overview
+(placeholder)
+
+### 7.2 Environments & Values
+(placeholder)
+
+### 7.3 Kubernetes Objects (Deployments, Services, HPA)
+(placeholder)
+
+### 7.4 Lag-Based Autoscaling (consumer lag)
+(placeholder)
+
+### 7.5 CI/CD & Scripts
+(placeholder)
+
+## 8 · Observability & Operations
+(placeholder)
+
+### 8.1 Metrics (Micrometer → Prometheus)
+(placeholder)
+
+### 8.2 Dashboards (Grafana)
+(placeholder)
+
+### 8.3 Logging & Tracing (JSON, OTel)
+(placeholder)
+
+### 8.4 ElasticSearch Search Keys
+(placeholder)
+
+## 9 · Module Structure
+(placeholder)
+
+### 9.1 common
+(placeholder)
+
+### 9.2 common-test
+(placeholder)
+
+### 9.3 payment-domain
+(placeholder)
+
+### 9.4 payment-application
+(placeholder)
+
+### 9.5 payment-infrastructure (Auto‑config)
+(placeholder)
+
+### 9.6 Deployables: payment-service & payment-consumers
+(placeholder)
+
+## 10 · Testing & Quality Assurance
+(placeholder)
+
+### 10.1 Testing Strategy
+(placeholder)
+
+### 10.2 Test Coverage Results
+(placeholder)
+
+## 11 · Quality Attributes
+(placeholder)
+
+### 11.1 Reliability & Resilience
+(placeholder)
+
+### 11.2 Security
+(placeholder)
+
+### 11.3 Cloud‑Native & Deployment
+(placeholder)
+
+### 11.4 Performance & Scalability
+(placeholder)
+
+## 12 · Roadmap
+(placeholder)
+
+## 13 · Glossary
+(placeholder)
+
+## 14 · References
+(placeholder)
+
+## 15 · Changelog
+(placeholder)
+
+*Last updated: **2025‑01‑15** – maintained by **Doğan Çağlar***
 
 ---
+
+## Table of Contents
+
+1. [Purpose & Audience](#1--purpose--audience)
+2. [System Context](#2--system-context)  
+   2.0 [Functional Requirements](#20-functional-requirements)
+   2.0.1 [Non‑Functional Requirements](#2001-nonfunctional-requirements)
+   2.0.2 [Core Entities](#2002-core-entities)
+   2.0.3 [API Summary](#2003-api-summary)
+   2.0.4 [Data Flow Summary](#2004-data-flow-summary)
+   2.1 [High‑Level Context Diagram](#21-highlevel-context-diagram)
+   2.2 [Bounded Context Map](#22-bounded-context-map)
+   2.3 [Payment Bounded Context Domain Model](#23-payment-bounded-context-domain-model)
+   2.4 [Aggregate Boundaries & Consistency](#24-aggregate-boundaries--consistency)
+3. [Core Design Principles](#3--core-design-principles)
+4. [Architectural Overview](#4--architectural-overview)  
+   4.1 [Layering & Hexagonal Architecture](#41-layering--hexagonal-architecture)  
+   4.2 [Service & Executor Landscape](#42-service--executor-landscape)  
+   4.3 [Payment Flow Architecture](#43-payment-flow-architecture)  
+   4.4 [Complete System Flow Architecture Diagram](#44-complete-system-flow-architecture-diagram)
+   4.5 [Ledger Recording Architecture](#45-ledger-recording-architecture)
+5. [Cross‑Cutting Concerns](#5--crosscutting-concerns)  
+   5.1 [Outbox Pattern](#51-outbox-pattern)  
+   5.2 [Retry & Status‑Check Strategy](#52-retry--statuscheck-strategy)  
+   5.3 [Idempotency](#53-idempotency)  
+   5.4 [Unique ID Generation](#54-unique-id-generation)
+6. [Data & Messaging Design](#6--data--messaging-design)  
+   6.1 [PostgreSQL Outbox Partitioning](#61-postgresql-outbox-partitioning)  
+   6.2 [Kafka Partitioning by `paymentOrderId`](#62-kafka-partitioning-by-paymentorderid)  
+   6.3 [EventEnvelope Contract](#63-eventenvelope-contract)
+7. [Infrastructure & Deployment (Helm/K8s)](#7--infrastructure--deployment-helmk8s)  
+   7.1 [Helm Charts Overview](#71-helm-charts-overview)  
+   7.2 [Environments & Values](#72-environments--values)  
+   7.3 [Kubernetes Objects (Deployments, Services, HPA)](#73-kubernetes-objects-deployments-services-hpa)  
+   7.4 [Lag‑Based Autoscaling (consumer lag)](#74-lagbased-autoscaling-consumer-lag)  
+   7.5 [CI/CD & Scripts](#75-cicd--scripts)
+8. [Observability & Operations](#8--observability--operations)  
+   8.1 [Metrics (Micrometer → Prometheus)](#81-metrics-micrometer--prometheus)  
+   8.2 [Dashboards (Grafana)](#82-dashboards-grafana)  
+   8.3 [Logging & Tracing (JSON, OTel)](#83-logging--tracing-json-otel)  
+   8.4 [ElasticSearch Search Keys](#84-elasticsearch-search-keys)
+9. [Module Structure](#9--module-structure)  
+   9.1 [`common`](#91-common)  
+   9.2 [`common-test`](#92-common-test)  
+   9.3 [`payment-domain`](#93-payment-domain)  
+   9.4 [`payment-application`](#94-payment-application)  
+   9.5 [`payment-infrastructure` (Auto‑config)](#95-payment-infrastructure-autoconfig)  
+   9.6 [Deployables: `payment-service` & `payment-consumers`](#96-deployables-payment-service--payment-consumers)
+10. [Testing & Quality Assurance](#10--testing--quality-assurance)  
+    10.1 [Testing Strategy](#101-testing-strategy)  
+    10.2 [Test Coverage Results](#102-test-coverage-results)
+11. [Quality Attributes](#11--quality-attributes)  
+    11.1 [Reliability & Resilience](#111-reliability--resilience)  
+    11.2 [Security](#112-security)  
+    11.3 [Cloud‑Native & Deployment](#113-cloudnative--deployment)  
+    11.4 [Performance & Scalability](#114-performance--scalability)
+12. [Roadmap](#12--roadmap)
+13. [Glossary](#13--glossary)
+14. [References](#14--references)
+15. [Changelog](#15--changelog)
+
+---
+## 1 · Purpose & Audience
+
+- **Demo Scope / Intent**: This platform is a technical showcase designed to
+  demonstrate domain expertise in payments, double-entry ledger design, event-driven
+  architecture, idempotent workflows, and cloud-native patterns.Also  
+- It is not intended
+  as a commercial product but as an educational, interview-ready reference implementation.
+
+From this platform’s point of view, all business flows are expressed as combinations of:
+
+- **Pay-ins**: money entering the platform from external parties (e.g., riders/shoppers)
+- **Internal reallocations**: money moving between internal entities and accounts
+- **Pay-outs**: money leaving the platform to external beneficiaries (e.g., drivers, sellers, tax authorities)
+
+The platform does not encode any single marketplace or Merchant-of-Record model.
+Instead, it provides a small and realistic set of financial primitives that large
+multi-entity platforms (e.g., Uber, bol.com, Airbnb, Amazon Marketplace) commonly
+use: authorization, capture, asynchronous processing, idempotent state transitions,
+and double-entry ledger recording.
+
+Only a representative subset is implemented — enough to demonstrate architectural
+thinking, correctness guarantees, and event-driven workflow design without trying
+to recreate a complete enterprise system.
+
+- **Audience**: Backend engineers, SREs, architects, and contributors who need to
+  understand the big picture.
+- **Scope**: Payment + ledger infrastructure for multi-entity, MoR-style platforms,
+  where external PSPs are used as gateways for pay-ins and pay-outs, and all
+  flows are eventually captured in the ledger.
+- 
+
+
+### 2 Functional Requirements
+
+This platform models **multi-seller Merchant-of-Record** financial flows. All business operations reduce to a combination of **pay-ins, internal reallocations, and pay-outs**, governed by strict financial invariants.
+
+**Core Functional Invariants:**
+1. **Single Shopper Authorization**
+   - One PSP authorization (`pspAuthRef`) per shopper.
+   - PSP never sees internal seller structure.
+
+2. **Multi‑Seller Decomposition**
+   - One `Payment` decomposes into multiple `PaymentOrder`s (one per seller).
+
+3. **Independent Capture Pipeline**
+   - Each seller capture runs asynchronously (auto‑capture or manual).
+   - PSP only receives: `pspAuthRef + amount`.
+
+4. **Seller‑Level Payout Responsibility**
+   - Platform ensures receivable/payable correctness per seller.
+
+5. **Double‑Entry Ledger as Source of Truth**
+   - Every financial event (auth, capture, settlement, fees, commissions, payouts) must produce balanced journal entries.
+
+6. **Event‑Driven Orchestration**
+   - Kafka-based asynchronous workflow for PaymentOrders.
+
+7. **Idempotent, Exactly‑Once Processing**
+   - DB-level idempotency + Kafka transactions guarantee correctness.
+
+8. **Payout‑Safe Accounting**
+   - Sellers can only be paid out after required journal posting.
+
+---
+
+### 2.1 Core Entities
+
+From the Payment Bounded Context:
+
+- **Payment (Coordination Aggregate)**  
+  Holds shopper authorization and orchestrates all seller-level flows.
+
+- **PaymentOrder (Processing Aggregate)**  
+  Seller-specific capture/settlement unit with independent retries.
+
+- **JournalEntry (Ledger Aggregate)**  
+  Immutable, balanced accounting event (created via factory).
+
+- **Account**  
+  Encapsulates receivable/payable buckets, typed using `AccountType`.
+
+- **Amount / Currency**  
+  Value objects representing smallest monetary units with validation.
+
+---
+
+### 2.2 API Summary
+
+**POST /payments**  
+- Synchronous PSP authorization(idempotent)  
+- Persist Payment + OutboxEvent  
+- Returns `202 Accepted` with `paymentId` & `pspAuthRef`
+
+**POST /payments/{paymentId}/capture**  
+- Manual capture request  
+- Body: `{ sellerId, amount }`  
+- Validates invariants  
+- Writes OutboxEvent<PaymentCaptureCommand>
+
+**GET /balances/{accountCode}**  
+- Real-time (snapshot + redis delta) or strong consistency read
+
+---
+
+### 2.0.4 Data Flow Summary
+
+**Inbound (payment-service)**  
+- REST → DB → Outbox
+
+**Outbox Dispatcher**  
+Process 3 type of OutboxEvent
+  1- OutboxEvent<PaymentAuthorized>:
+    - Picks up `OutboxEvent<PaymentAuthorized>`.
+    - Persist individual `PaymentOrder`(status=INITIATED_PENDING) for each line in payload
+    - Persist  `OutboxEvent<PaymentOrderCreated>` in outbox table
+    - Publishes to Kafka (`payment_authorized` topic).
+2- OutboxEvent<PaymentOrderCreated>:
+   - Picks up `OutboxEvent<PaymentOrderCreated>`.
+   - Generates individual `PaymentOrderCreated` from the outboxevent
+   - Publishes to Kafka (`payment_order_created` topic).
+3- OutboxEvent<PaymentOrderCaptureCommand>:
+   - Picks up `OutboxEvent<PaymentOrderCaptureCommand>`.
+   - Generates individual `PaymentOrderCaptureCommand` from the outboxevent<PaymentOrderCaptureCommand>
+   - update status of paymentorder to capture_requested
+   - Publishes to Kafka (`payment_order_capture_request_queue_topic` topic)
+
+**PSP Flow (payment-consumers)**  
+- Enqueuer → Capture Psp call executor → Psp Result applier  
+- Independent per PaymentOrder  
+- Emits succeeded/failed events
+
+**Ledger Flow**  
+- Dispatcher → ledger topic → ledger recording consumer → journal entries
+
+**Balance Flow**  
+- Ledger delta → Redis → Snapshot job → PostgreSQL durable snapshot
+
+---
+
+### 2.1 High‑Level Context Diagram
+
+```mermaid
+flowchart LR
+subgraph Users
+U1([Browser / Mobile App])
+U2([Back‑office Portal])
+end
+U1 -->|REST/GraphQL|GW["🛡️ API Gateway / Ingress"]
+U2 -->|REST|GW
+GW --> PAY[(payment-service API)]
+PAY --> K((Kafka))
+K -->|events|CONS[(payment-consumers)]
+K --> ANA[(Analytics / BI)]
+PAY --> DB[(PostgreSQL Cluster)]
+PAY --> REDIS[(Redis)]
+subgraph Cloud
+PAY
+CONS
+ANA
+K
+DB
+REDIS
+end
+```
+
+
+
+
+
+
+### 2.0.1 Non‑Functional Requirements
+
+1. **Consistency Over Availability**
+    - Financial invariants prioritized over temporary uptime.
+
+2. **High Throughput, Low Contention**
+    - PSP, ledger, and balance flows scale independently.
+
+3. **Fault Tolerance**
+    - PSP retries via Redis ZSET, optimistic concurrency everywhere.
+
+4. **Durability**
+    - Outbox ensures atomic DB writes before publishing.
+
+5. **Observability**
+    - JSON logs (with `traceId`), Prometheus metrics, optional OTel.
+
+6. **Security & Compliance**
+    - OAuth2, PCI‑compatible boundaries (PSP handles card data).
+
+---
+
 
 ## 3 · Core Design Principles
 
