@@ -1,145 +1,9 @@
 # ecommerce-platform-kotlin · Architecture Guide
-
-## 3 · Non-Functional Requirements
-(placeholder)
-
-### 3.1 Core Design Principles
-(placeholder)
-
-## 4 · Architectural Overview
-(placeholder)
-
-### 4.1 Layering & Hexagonal Architecture
-(placeholder)
-
-### 4.2 Service & Executor Landscape
-(placeholder)
-
-### 4.3 Payment Flow Architecture
-(placeholder)
-
-### 4.4 Complete System Flow Architecture Diagram
-(placeholder)
-
-### 4.5 Ledger Recording Architecture
-(placeholder)
-
-## 5 · Cross‑Cutting Concerns
-(placeholder)
-
-### 5.1 Outbox Pattern
-(placeholder)
-
-### 5.2 Retry & Status‑Check Strategy
-(placeholder)
-
-### 5.3 Idempotency
-(placeholder)
-
-### 5.4 Unique ID Generation
-(placeholder)
-
-## 6 · Data & Messaging Design
-(placeholder)
-
-### 6.1 PostgreSQL Outbox Partitioning
-(placeholder)
-
-### 6.2 Kafka Partitioning by paymentOrderId
-(placeholder)
-
-### 6.3 EventEnvelope Contract
-(placeholder)
-
-## 7 · Infrastructure & Deployment (Helm/K8s)
-(placeholder)
-
-### 7.1 Helm Charts Overview
-(placeholder)
-
-### 7.2 Environments & Values
-(placeholder)
-
-### 7.3 Kubernetes Objects (Deployments, Services, HPA)
-(placeholder)
-
-### 7.4 Lag-Based Autoscaling (consumer lag)
-(placeholder)
-
-### 7.5 CI/CD & Scripts
-(placeholder)
-
-## 8 · Observability & Operations
-(placeholder)
-
-### 8.1 Metrics (Micrometer → Prometheus)
-(placeholder)
-
-### 8.2 Dashboards (Grafana)
-(placeholder)
-
-### 8.3 Logging & Tracing (JSON, OTel)
-(placeholder)
-
-### 8.4 ElasticSearch Search Keys
-(placeholder)
-
-## 9 · Module Structure
-(placeholder)
-
-### 9.1 common
-(placeholder)
-
-### 9.2 common-test
-(placeholder)
-
-### 9.3 payment-domain
-(placeholder)
-
-### 9.4 payment-application
-(placeholder)
-
-### 9.5 payment-infrastructure (Auto‑config)
-(placeholder)
-
-### 9.6 Deployables: payment-service & payment-consumers
-(placeholder)
-
-## 10 · Testing & Quality Assurance
-(placeholder)
-
-### 10.1 Testing Strategy
-(placeholder)
-
-### 10.2 Test Coverage Results
-(placeholder)
-
-## 11 · Quality Attributes
-(placeholder)
-
-### 11.1 Reliability & Resilience
-(placeholder)
-
-### 11.2 Security
-(placeholder)
-
-### 11.3 Cloud‑Native & Deployment
-(placeholder)
-
-### 11.4 Performance & Scalability
-(placeholder)
-
-## 12 · Roadmap
-(placeholder)
-
-## 13 · Glossary
-(placeholder)
-
-## 14 · References
-(placeholder)
-
-## 15 · Changelog
-(placeholder)
+This platform is a technical showcase designed to
+demonstrate domain expertise in payments, double-entry ledger design, event-driven
+architecture, idempotent workflows, and cloud-native patterns.Also
+- It is not intended
+  as a commercial product but as an educational and reference for fur projects
 
 *Last updated: **2025‑01‑15** – maintained by **Doğan Çağlar***
 
@@ -147,14 +11,21 @@
 
 ## Table of Contents
 
-1. [Purpose & Audience](#1--purpose--audience)
-2. [Functional Requirements](##2--Functional--Requirements)  
+1. [Purpose & Audience](#1--purposeaudience-)
+2. [Functional Requirements](#2--functional-requirements)
+   
    2.1 [System Context](#21-system-context)
+
    2.2 [Core Entities](#22-core-entities)
+   
    2.3 [PAyment Bounded Context-Integration Diagram](#23-paymentboundedcontext-integration-diagram-this-diagram-shows-external-integration--boundaries)
+   
    2.4 [PAyment Bounded Context-Domain Design](#24-payment-bounded-context-domain-modelthis-diagram-shows-internal-domain-aggregates-value-objects-and-events)
+   
    2.5 [Aggregate Boundaries & Consistency(This diagram shows aggregate boundaries, consistency guarantees, and transaction scopes.](#25-aggregate-boundaries--consistencythis-diagram-shows-aggregate-boundaries-consistency-guarantees-and-transaction-scopes)
+   
    2.6 [API Summary](#26-api-summary)
+
    2.7 [Data Flow](#27-data-flow-summary)
 3. [Core Design Principles](#3--core-design-principles)
 4. [Architectural Overview](#4--architectural-overview)  
@@ -204,12 +75,7 @@
 15. [Changelog](#15--changelog)
 
 ---
-## 1 · Purpose/Audience
-- **Demo Scope / Intent**: This platform is a technical showcase designed to
-  demonstrate domain expertise in payments, double-entry ledger design, event-driven
-  architecture, idempotent workflows, and cloud-native patterns.Also
-- It is not intended
-  as a commercial product but as an educational, interview-ready reference implementation.
+## 1 · Purpose/Audience 
 
 From this platform’s point of view, all business flows are expressed as combinations of:
 
