@@ -1,26 +1,471 @@
 # ecommerce-platform-kotlin · Architecture Guide
+## 1 · Purpose/Audience
+- **Demo Scope / Intent**: This platform is a technical showcase designed to
+  demonstrate domain expertise in payments, double-entry ledger design, event-driven
+  architecture, idempotent workflows, and cloud-native patterns.Also  
+- It is not intended
+  as a commercial product but as an educational, interview-ready reference implementation.
+
+From this platform’s point of view, all business flows are expressed as combinations of:
+
+- **Pay-ins**: money entering the platform from external parties (e.g., riders/shoppers)
+- **Internal reallocations**: money moving between internal entities and accounts
+- **Pay-outs**: money leaving the platform to external beneficiaries (e.g., drivers, sellers, tax authorities)
+
+The platform does not encode any single marketplace or Merchant-of-Record model.
+Instead, it provides a small and realistic set of financial primitives that large
+multi-entity platforms (e.g., Uber, bol.com, Airbnb, Amazon Marketplace) commonly
+use: authorization, capture, asynchronous processing, idempotent state transitions,
+and double-entry ledger recording.
+
+Only a representative subset is implemented — enough to demonstrate architectural
+thinking, correctness guarantees, and event-driven workflow design without trying
+to recreate a complete enterprise system.
+
+- **Audience**: Backend engineers, SREs, architects, and contributors who need to
+  understand the big picture.
+- **Scope**: Payment + ledger infrastructure for multi-entity, MoR-style platforms,
+  where external PSPs are used as gateways for pay-ins and pay-outs, and all
+  flows are eventually captured in the ledger.
+- 
+
+
 
 ## 2 · Functional Requirements
-(placeholder)
+This platform models **multi-seller Merchant-of-Record** financial flows. All business operations reduce to a combination of **pay-ins, internal reallocations, and pay-outs**, governed by strict financial invariants.
+
+**Core Functional Invariants:**
+1. **Single Shopper Authorization**
+   - One PSP authorization (`pspAuthRef`) per shopper.
+   - PSP never sees internal seller structure.
+
+2. **Multi‑Seller Decomposition**
+   - One `Payment` decomposes into multiple `PaymentOrder`s (one per seller).
+
+3. **Independent Capture Pipeline**
+   - Each seller capture runs asynchronously (auto‑capture or manual).
+   - PSP only receives: `pspAuthRef + amount`.
+
+4. **Seller‑Level Payout Responsibility**
+   - Platform ensures receivable/payable correctness per seller.
+
+5. **Double‑Entry Ledger as Source of Truth**
+   - Every financial event (auth, capture, settlement, fees, commissions, payouts) must produce balanced journal entries.
+
+6. **Payout‑Safe Accounting**
+   - Sellers can only be paid out after required journal posting.
+
 
 ### 2.1 System Context
-(placeholder)
+```mermaid
+flowchart LR
+subgraph Users
+U1([Browser / Mobile App])
+U2([Back‑office Portal])
+end
+U1 -->|REST/GraphQL|GW["🛡️ API Gateway / Ingress"]
+U2 -->|REST|GW
+GW --> PAY[(payment-service API)]
+PAY --> K((Kafka))
+K -->|events|CONS[(payment-consumers)]
+K --> ANA[(Analytics / BI)]
+PAY --> DB[(PostgreSQL Cluster)]
+PAY --> REDIS[(Redis)]
+subgraph Cloud
+PAY
+CONS
+ANA
+K
+DB
+REDIS
+end
+```
+
 
 ### 2.2 Payment Bounded Context & Domain Model
-(placeholder)
 
-### 2.3 High-Level Context Diagram
-(placeholder)
+This diagram shows the Payment Bounded Context and its relationships with downstream contexts, including internal aggregates and integration patterns
 
-### 2.4 Core Entities
-(placeholder)
+```mermaid
+%%{init:{'theme':'default','flowchart':{'nodeSpacing':50,'rankSpacing':60}}}%%
+flowchart TB
+    classDef payment fill:#4CAF50,stroke:#2E7D32,stroke-width:3px;
+    classDef downstream fill:#2196F3,stroke:#1565C0,stroke-width:2px;
+    classDef infrastructure fill:#9E9E9E,stroke:#616161,stroke-width:2px;
+    
+    subgraph Payment_BC["Payment Bounded Context (Core Domain)"]
+        Payment_Agg["Payment<br/>Coordination Aggregate<br/>• Synchronous PSP authorization (single PSP call)<br/>• Tracks shopper order + totalAmount<br/>• Status: PENDING_AUTH / AUTHORIZED / PARTIALLY_CAPTURED / CAPTURED_FINAL / DECLINED"]:::payment
+        
+        PaymentOrder_Agg["PaymentOrder<br/>Processing Aggregate<br/>• Created only after PaymentAuthorized<br/>• One per seller / capture leg<br/>• Status: INITIATED_PENDING / CAPTURE_REQUESTED / CAPTURED_FINAL / FINAL_FAILED"]:::payment
+        
+        Ledger_Subdomain["Ledger Subdomain<br/>Double-entry accounting<br/>• Posts entries per successful capture<br/>• Uses AccountType + JournalEntryFactory<br/>• Persists journal_entries + account_balances"]:::payment
+    end
+
+    subgraph Integration["Integration Layer - Kafka Event Bus"]
+        KAFKA[("Kafka Topics<br/>• payment_authorized<br/>• payment_order_created<br/>• payment_order_capture_requested<br/>• payment_order_succeeded / failed<br/>• ledger_entries_recorded")]:::infrastructure
+    end
+
+    subgraph Downstream_BCs["Downstream Bounded Contexts (Implemented)"]
+        Shipment_BC[("Shipment BC<br/>Listens to PaymentOrderSucceeded<br/>Triggers shipment per seller")]:::downstream
+    end
+
+    %% Relationships inside Payment BC
+    Payment_Agg -->|"1 : N contains"| PaymentOrder_Agg
+    PaymentOrder_Agg -->|"On CAPTURED_FINAL<br/>triggers ledger posting"| Ledger_Subdomain
+
+    %% Events out of Payment BC
+    Payment_Agg -->|"Emits payment_authorized<br/>after successful PSP auth"| KAFKA
+    PaymentOrder_Agg -->|"Emits payment_order_created<br/>(per seller)"| KAFKA
+    PaymentOrder_Agg -->|"Emits payment_order_capture_requested<br/>(auto or manual capture)"| KAFKA
+    PaymentOrder_Agg -->|"Emits payment_order_succeeded / failed<br/>(final capture result)"| KAFKA
+    Ledger_Subdomain -->|"Emits ledger_entries_recorded"| KAFKA
+    
+    %% Downstream consumption
+    KAFKA -->|"Per-seller capture result<br/>PaymentOrderSucceeded/Failed"| Shipment_BC
+
+    %% Styling
+    style Payment_BC fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
+    style Integration fill:#F5F5F5,stroke:#757575,stroke-width:2px
+    style Downstream_BCs fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
+```
+
+### 2.3.1 CORE ENTITIES
+
+**Key Points:**
+- **Payment** stores the synchronous authorization outcome (`pspRef`, `AUTHORIZED` / `FAILED`) and coordinates downstream seller captures.
+- **PaymentOrder** is instantiated only after the parent payment is authorized and emits events as each seller capture/settlement progresses.
+- - **PaymentOrderEvent** is representing an even interface representing the immutable events transition between payment order statuses
+- **Ledger Subdomain** uses `AccountType` (auth hold, receivable/payable, scheme fees, commission) and the `JournalEntryFactory` (`authHold`, `releaseHoldOnCapture`, `capture`, `settlement`, `recognizePspFee`, `recognizeCommissionFee`, `payoutToMerchant`, `refundPrePayout`) to enforce balanced postings.
+- **Shipment** listens to individual `PaymentOrderSucceeded` events for immediate fulfillment.
+- All integration remains event-driven via Kafka (no direct dependencies).
+
+### 2.3.2 Payment Bounded Context Domain Model
+
+This diagram shows the **Payment Bounded Context** with its aggregates, entities, value objects, and domain events.
+
+```mermaid
+%%{init:{'theme':'default','flowchart':{'nodeSpacing':40,'rankSpacing':50}}}%%
+flowchart TB
+    classDef aggregate fill:#4CAF50,stroke:#2E7D32,stroke-width:4px;
+    classDef entity fill:#2196F3,stroke:#1565C0,stroke-width:2px;
+    classDef vo fill:#FF9800,stroke:#E65100,stroke-width:2px;
+    classDef event fill:#9C27B0,stroke:#6A1B9A,stroke-width:2px;
+    classDef command fill:#00BCD4,stroke:#00838F,stroke-width:2px;
+    classDef service fill:#795548,stroke:#5D4037,stroke-width:2px;
+
+    subgraph Payment_Coordination["💳 Payment (Coordination Aggregate)"]
+        Payment_Agg["Payment<br/>(Coordination Aggregate Root)<br/>• paymentId: PaymentId<br/>• buyerId: BuyerId<br/>• orderId: OrderId<br/>• totalAmount: Amount<br/>• status: PaymentStatus<br/>• paymentOrders: List<PaymentOrder><br/><br/>Purpose:<br/>• Container for payment request<br/>• Tracks overall payment status<br/>• Emits PaymentCompleted/PaymentUpdated<br/>  events for downstream services<br/>  (e.g., Shipment domain)"]
+    end
+
+    subgraph PaymentOrder_Processing["📋 PaymentOrder (Processing Aggregate)"]
+        PaymentOrder_Agg["PaymentOrder<br/>(Processing Aggregate Root)<br/>• paymentOrderId: PaymentOrderId<br/>• paymentId: PaymentId (reference)<br/>• sellerId: SellerId<br/>• amount: Amount<br/>• status: PaymentOrderStatus<br/>• retryCount: Int<br/>• retryReason: String?<br/>• lastErrorMessage: String?<br/><br/>Purpose:<br/>• Each PaymentOrder processed<br/>  independently with separate<br/>  PSP calls<br/>• Emits PaymentOrderCreated,<br/>  PaymentOrderSucceeded/Failed"]
+    end
+
+    subgraph Ledger_Subdomain["🧾 Ledger Subdomain"]
+        JournalEntry_Agg["JournalEntry<br/>Aggregate Root<br/>• id: String<br/>• txType: JournalType<br/>• postings: List<Posting><br/><br/>Factory Methods:<br/>• authHold()<br/>• capture()<br/>• settlement()<br/>• feeRegistered()<br/>• payout()<br/>• fullFlow()<br/><br/>Private Constructor<br/>Enforces Balance"]
+        Posting_Entity["Posting Entity<br/>(Factory-Enforced)<br/>• account: Account<br/>• amount: Amount<br/>• direction: Debit/Credit<br/><br/>Factories:<br/>• Posting.Debit.create()<br/>• Posting.Credit.create()"]
+        Account_VO["Account Value Object<br/>(Factory-Enforced)<br/>• accountCode: String<br/>• type: AccountType<br/>• entityId: String<br/><br/>Factory:<br/>• Account.create(type, entityId)"]
+    end
+
+    subgraph Value_Objects["📦 Value Objects"]
+        PaymentId_VO["PaymentId<br/>(Value Object)"]
+        PaymentOrderId_VO["PaymentOrderId<br/>(Value Object)"]
+        SellerId_VO["SellerId<br/>(Value Object)"]
+        BuyerId_VO["BuyerId<br/>(Value Object)"]
+        Amount_VO["Amount<br/>• quantity: Long<br/>• currency: Currency<br/>(Factory: Amount.of())"]
+        Currency_VO["Currency<br/>(Value Class)<br/>• currencyCode: String"]
+        Account_VO["Account<br/>(Factory-Enforced)<br/>• type: AccountType<br/>• entityId: String<br/>(Factory: Account.create())"]
+    end
+
+    subgraph Domain_Events["📨 Domain Events"]
+        PaymentCreated_Event["PaymentOrderCreated<br/>(Processing Level)"]
+        PaymentSucceeded_Event["PaymentOrderSucceeded<br/>(Processing Level)"]
+        PaymentFailed_Event["PaymentOrderFailed<br/>(Processing Level)"]
+        PaymentCompleted_Event["PaymentCompleted<br/>(Optional Coordination Level)<br/>Emitted when all<br/>PaymentOrders finalized<br/>(for overall order tracking)"]
+        LedgerRecorded_Event["LedgerEntriesRecorded"]
+    end
+
+    subgraph Domain_Commands["⚡ Domain Commands"]
+        CreatePayment_Cmd["CreatePaymentCommand"]
+        LedgerRecording_Cmd["LedgerRecordingCommand"]
+    end
+
+    Payment_Agg -->|"Contains (1:N)<br/>Coordination Container"| PaymentOrder_Agg
+    Payment_Agg -->|"Uses"| PaymentId_VO
+    Payment_Agg -->|"Uses"| BuyerId_VO
+    Payment_Agg -->|"Uses"| Amount_VO
+    PaymentOrder_Agg -->|"References"| PaymentId_VO
+    PaymentOrder_Agg -->|"Uses"| PaymentOrderId_VO
+    PaymentOrder_Agg -->|"Uses"| SellerId_VO
+    PaymentOrder_Agg -->|"Uses"| Amount_VO
+    PaymentOrder_Agg -->|"Emits (Processing)"| PaymentCreated_Event
+    PaymentOrder_Agg -->|"Emits (Processing)"| PaymentSucceeded_Event
+    PaymentOrder_Agg -->|"Emits (Processing)"| PaymentFailed_Event
+    Payment_Agg -->|"Emits (Coordination)<br/>When all PaymentOrders<br/>finalized (optional)"| PaymentCompleted_Event["PaymentCompleted<br/>(Optional - for overall<br/>order status tracking)"]
+
+    JournalEntry_Agg -->|"Contains (1:N)"| Posting_Entity
+    JournalEntry_Agg -->|"Uses"| Account_VO
+    JournalEntry_Agg -->|"Emits"| LedgerRecorded_Event
+
+    CreatePayment_Cmd -->|"Creates<br/>Payment + PaymentOrders"| Payment_Agg
+    LedgerRecording_Cmd -->|"Creates"| JournalEntry_Agg
+
+    style Payment_Agg fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
+    style PaymentOrder_Agg fill:#C8E6C9,stroke:#388E3C,stroke-width:4px
+    style JournalEntry_Agg fill:#C8E6C9,stroke:#388E3C,stroke-width:4px
+    style Posting_Entity fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
+    style PaymentId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
+    style PaymentOrderId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
+    style SellerId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
+    style BuyerId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
+    style Amount_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
+    style Account_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
+```
+
+In the refreshed Merchant-of-Record scope:
+- `Payment` captures the shopper-level authorization synchronously (stores PSP auth id, status) and acts as the coordination point for all downstream seller obligations.
+- `PaymentOrder` represents each seller capture obligation that will be executed asynchronously via the PSP capture endpoint, independent per seller.
+- The ledger subdomain remains unchanged, recording AUTH_HOLD during authorization and subsequent capture/settlement postings as events progress.
+
+### 2.4 Aggregate Boundaries & Consistency
+
+This diagram shows aggregate boundaries, consistency guarantees, and transaction scopes.
+
+```mermaid
+%%{init:{'theme':'default','flowchart':{'nodeSpacing':40,'rankSpacing':50}}}%%
+flowchart TB
+    classDef aggregate fill:#4CAF50,stroke:#2E7D32,stroke-width:4px;
+    classDef consistency fill:#FF9800,stroke:#E65100,stroke-width:2px;
+    classDef transaction fill:#2196F3,stroke:#1565C0,stroke-width:2px;
+
+    subgraph Payment_Coordination_Boundary["💳 Payment Aggregate (Coordination)"]
+        Payment_Invariants["Invariants:<br/>• totalAmount = sum(paymentOrders.amount)<br/>• All amounts same currency<br/>• Consistency: Immediate<br/><br/>Purpose:<br/>• Coordination aggregate for<br/>  cross-domain integration<br/>• Tracks overall payment completion<br/>• Emits PaymentCompleted when<br/>  all PaymentOrders finalized"]
+        Payment_Actions["Actions:<br/>• markAsPaid()<br/>• markAsFailed()<br/>• addPaymentOrder()<br/>• checkAllPaymentOrdersCompleted()<br/>• emitPaymentCompleted()"]
+        Payment_Events["Coordination Events:<br/>• PaymentCompleted (optional - emitted<br/>  when all PaymentOrders finalized)<br/>• PaymentUpdated<br/><br/>Note: Shipment domain listens to<br/>individual PaymentOrderSucceeded<br/>events (not PaymentCompleted) to<br/>initiate shipment per seller immediately"]
+    end
+
+    subgraph PaymentOrder_Aggregate_Boundary["📋 PaymentOrder Aggregate (Processing)"]
+        PO_Invariants["Invariants:<br/>• retryCount ≤ MAX_RETRIES (5)<br/>• Terminal states immutable<br/>• Consistency: Immediate<br/>• Each PaymentOrder processed<br/>  independently with separate PSP call"]
+        PO_Actions["Actions:<br/>• markAsPaid()<br/>• markAsFailed()<br/>• incrementRetry()<br/>• markAsPending()<br/>• withRetryReason()<br/>• withLastError()"]
+        PO_Status["Status Transitions:<br/>INITIATED_PENDING →<br/>SUCCESSFUL_FINAL /<br/>FAILED_FINAL"]
+        PO_Processing["Processing:<br/>• Separate PSP call per PaymentOrder<br/>• Independent retry logic<br/>• Individual status tracking<br/>• Event-driven (PaymentOrderCreated,<br/>  PaymentOrderSucceeded, etc.)<br/>• Events trigger Payment status<br/>  evaluation"]
+    end
+
+    subgraph Ledger_Aggregate_Boundary["🧾 Ledger Aggregate Boundary"]
+        Ledger_Invariants["Invariants:<br/>• Debits = Credits (balanced)<br/>• JournalEntry immutable<br/>• Consistency: Immediate<br/>• Factory-enforced creation<br/>  (private constructors)"]
+        Ledger_Actions["Actions:<br/>• JournalEntry.fullFlow()<br/>• JournalEntry.failedPayment()<br/>• Account.create()<br/>• Amount.of()<br/>• Posting.Debit.create()<br/>• Posting.Credit.create()"]
+        Ledger_Balance["Balance Rule:<br/>Σ(Posting.debits) =<br/>Σ(Posting.credits)<br/><br/>Enforced at creation via<br/>factory methods"]
+    end
+
+    subgraph Transaction_Scopes["🔒 Transaction Scopes"]
+        DB_Transaction["Database Transaction<br/>• Payment + PaymentOrders<br/>• JournalEntry + Postings<br/>• Atomic within aggregate"]
+        Kafka_Transaction["Kafka Transaction<br/>• Offset commit<br/>• Event publish<br/>• Atomic across aggregates"]
+    end
+
+    Payment_Coordination_Boundary -->|"Contains (1:N)<br/>Coordination Container"| PaymentOrder_Aggregate_Boundary
+    PaymentOrder_Aggregate_Boundary -->|"Completion triggers<br/>Payment status evaluation"| Payment_Coordination_Boundary
+    PaymentOrder_Aggregate_Boundary -->|"Emits Events<br/>Eventually Consistent<br/>(Per PaymentOrder)"| Ledger_Aggregate_Boundary
+    Payment_Coordination_Boundary -->|"May emit<br/>PaymentCompleted<br/>(Optional - overall status)"| CrossDomain["🌐 Downstream Services"]
+    PaymentOrder_Aggregate_Boundary -->|"Emits<br/>PaymentOrderSucceeded<br/>(Per seller - immediate action)"| CrossDomain
+    Payment_Coordination_Boundary -->|"Uses<br/>Initial Creation +<br/>Status Updates"| DB_Transaction
+    PaymentOrder_Aggregate_Boundary -->|"Uses<br/>All Processing"| Kafka_Transaction
+    PaymentOrder_Aggregate_Boundary -->|"Uses<br/>Status Updates"| DB_Transaction
+    Ledger_Aggregate_Boundary -->|"Uses"| DB_Transaction
+
+    style Payment_Coordination_Boundary fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
+    style PaymentOrder_Aggregate_Boundary fill:#C8E6C9,stroke:#388E3C,stroke-width:4px
+    style Ledger_Aggregate_Boundary fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
+    style DB_Transaction fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
+    style Kafka_Transaction fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
+```
+
+**Key DDD Concepts:**
+- **Payment**: Coordination aggregate root representing a multi-seller checkout (e.g., Amazon shopping cart). Contains multiple `PaymentOrder` objects (1:N), one per seller. 
+  - **Coordination Role**: Tracks overall payment completion status across all `PaymentOrder` objects
+  - **Use Case**: When a shopper checks out with products from multiple sellers, one `Payment` contains multiple `PaymentOrders` (one per seller)
+  - **Cross-Domain Events**: When all `PaymentOrder` objects are finalized (succeed/fail), `Payment` can optionally be updated and emit `PaymentCompleted` event for overall order tracking
+  - **Note**: Shipment domain listens to individual `PaymentOrderSucceeded` events (not `PaymentCompleted`) to immediately initiate shipment for that seller's products - they don't wait for other sellers' payments
+  - **Dual Purpose**: Container for initial persistence + optional coordination point for overall payment status
+- **PaymentOrder**: Processing aggregate root for PSP interactions. Represents payment for a single seller's products in a multi-seller checkout.
+  - **Real-World Example**: Amazon checkout - shopper has products from Seller A, B, and C → creates Payment with 3 PaymentOrders
+  - **Independent Processing**: Each `PaymentOrder` is processed independently:
+    - Separate PSP call per `PaymentOrder` (each seller gets independent PSP processing)
+    - Independent retry logic and status tracking
+    - Individual event emission (`PaymentOrderCreated`, `PaymentOrderSucceeded`, `PaymentOrderFailed`)
+    - Processed via Kafka consumers using `paymentOrderId` as partition key
+  - **Immediate Downstream Actions**: When `PaymentOrderSucceeded` event is emitted for Seller A:
+    - Shipment domain immediately starts shipping Seller A's products (doesn't wait for Seller B or C)
+    - Enables parallel fulfillment across different sellers
+  - **Coordination Trigger**: When all `PaymentOrder` statuses are terminal, triggers optional `Payment` status evaluation
+- **Separate Aggregate**: `JournalEntry` forms its own aggregate boundary for ledger
+- **Consistency Boundaries**: Each aggregate maintains immediate consistency; eventual consistency between aggregates via events
+- **Transaction Scope**: Database transactions for initial Payment+PaymentOrders creation; Kafka transactions for PaymentOrder processing; separate DB transactions per PaymentOrder status updates; eventual Payment status update when all PaymentOrders complete
 
 ### 2.5 API Summary
-(placeholder)
+Authentication
+
+All endpoints require:
+
+Authorization: Bearer <access-token>
+Idempotency-Key: <unique-key>   // for POST endpoints
+Content-Type: application/json
+
+POST /payments
+
+Create a new payment + perform synchronous authorization.
+
+Headers
+	•	Authorization: Bearer …
+	•	Idempotency-Key: …
+
+Response Codes
+	•	202 Accepted — Authorization succeeded, processing continues async
+	•	402 Payment Required — Authorization declined
+	•	400 Bad Request — Invalid request
+	•	409 Conflict — Idempotency key reuse mismatch
+	•	401 / 403 — Auth errors
+
+⸻
+
+POST /payments/{paymentId}/capture
+
+Trigger manual capture for a seller leg.
+
+Headers
+	•	Authorization: Bearer …
+	•	Idempotency-Key: …
+
+Response Codes
+	•	202 Accepted — Capture command queued
+	•	404 Not Found — Payment or seller leg missing
+	•	409 Conflict — Duplicate or invalid capture
+	•	400 Bad Request — Invalid body
+	•	401 / 403 — Auth errors
+
+⸻
+
+GET /payments/{paymentId}
+
+Retrieve payment status (buyer-level).
+
+Headers
+	•	Authorization: Bearer …
+
+Response Codes
+	•	200 OK
+	•	404 Not Found
+	•	401 / 403
+
+⸻
+
+GET /payments/{paymentId}/orders
+
+Retrieve all PaymentOrders (seller-level).
+
+Headers
+	•	Authorization: Bearer …
+
+Response Codes
+	•	200 OK
+	•	404 Not Found
+	•	401 / 403
 
 ### 2.6 Data Flow Summary
-(placeholder)
+```mermaid
+sequenceDiagram
+    autonumber
 
+    participant Client
+    participant PaymentService
+    participant PSPAuth as PSP Authorization
+    participant DB
+    participant Outbox as OutboxDispatcherJob
+    participant Kafka
+    participant Enqueuer
+    participant CaptureExec as CaptureExecutor
+    participant ResultApplier
+    participant Redis
+    participant PSP as PSP Capture
+
+    %% ============================
+    %% 1. Synchronous Authorization
+    %% ============================
+    Client->>PaymentService: POST /payments
+    PaymentService->>PSPAuth: authorize(orderTotal, cardInfo)
+    PSPAuth-->>PaymentService: authResult(APPROVED/DECLINED)
+
+    alt Approved
+        PaymentService->>DB: Persist Payment(PENDING_AUTH→AUTHORIZED)\n+ outbox<PaymentAuthorized>
+        PaymentService-->>Client: 202 Accepted
+    else Declined
+        PaymentService->>DB: Persist Payment(DECLINED)
+        PaymentService-->>Client: 402 Payment Required
+    end
+
+
+    %% =============================================
+    %% 2. (NEW) Manual Capture Request per seller
+    %% =============================================
+    Client->>PaymentService: POST /payments/{paymentId}/capture\n{sellerId, amount}
+    PaymentService->>DB: Validate + Persist outbox<PaymentOrderCaptureCommand>
+    PaymentService-->>Client: 202 Accepted (capture queued)
+
+
+    %% =============================================
+    %% 3. OutboxDispatcherJob — NEW Responsibilities
+    %% =============================================
+    Outbox->>DB: Fetch NEW outbox rows (payment, paymentOrder, captureCmd)
+
+    %% 3.1 PaymentAuthorized
+    Outbox->>Outbox: Expand PaymentAuthorized → create PaymentOrders
+    Outbox->>DB: Insert PaymentOrders
+    Outbox->>DB: Insert outbox<PaymentOrderCreated[]> 
+    Outbox->>Kafka: Publish PaymentAuthorized
+    Outbox->>Kafka: Publish PaymentOrderCreated (per seller)
+
+    %% 3.2 PaymentOrderCreated passthrough
+    Outbox->>Kafka: Publish PaymentOrderCreated
+    Outbox->>DB: Mark SENT
+
+    %% 3.3 PaymentOrderCaptureCommand (NEW)
+    Outbox->>DB: Update PaymentOrder → CAPTURE_REQUESTED
+    Outbox->>Kafka: Publish PaymentOrderCaptureRequested
+
+    Outbox->>DB: Mark outbox items as SENT
+
+
+    %% =============================================
+    %% 4. Enqueuer → PSP Capture Requested
+    %% =============================================
+    Enqueuer->>Kafka: Consume PaymentOrderCreated
+    Enqueuer->>Kafka: Publish PaymentOrderCaptureRequested (auto-capture scenario)
+
+
+    %% =============================================
+    %% 5. Capture Executor
+    %% =============================================
+    CaptureExec->>Kafka: Consume PaymentOrderCaptureRequested
+    CaptureExec->>PSP: capture(sellerAmount, authRef)
+    PSP-->>CaptureExec: captureResult
+    CaptureExec->>Kafka: Publish PaymentOrderPspResultUpdated
+
+
+    %% =============================================
+    %% 6. PSP Result Applier
+    %% =============================================
+    ResultApplier->>Kafka: Consume PaymentOrderPspResultUpdated
+
+    alt Capture Success
+        ResultApplier->>DB: Update PaymentOrder → CAPTURED_FINAL
+        ResultApplier->>Kafka: Publish PaymentOrderSucceeded
+    else Retryable Failure
+        ResultApplier->>Redis: ZSET schedule retry
+        ResultApplier->>DB: retry_count++
+    else Final Failure
+        ResultApplier->>DB: Update PaymentOrder → FINAL_FAILED
+        ResultApplier->>Kafka: Publish PaymentOrderFailed
+    end
+```
 ## 3 · Non-Functional Requirements
 (placeholder)
 
@@ -258,9 +703,8 @@ to recreate a complete enterprise system.
   flows are eventually captured in the ledger.
 - 
 
-## 2 · System Context
 
-### 2.0 Functional Requirements
+### 2 Functional Requirements
 
 This platform models **multi-seller Merchant-of-Record** financial flows. All business operations reduce to a combination of **pay-ins, internal reallocations, and pay-outs**, governed by strict financial invariants.
 
@@ -293,7 +737,7 @@ This platform models **multi-seller Merchant-of-Record** financial flows. All bu
 
 ---
 
-### 2.0.2 Core Entities
+### 2.1 Core Entities
 
 From the Payment Bounded Context:
 
@@ -314,10 +758,10 @@ From the Payment Bounded Context:
 
 ---
 
-### 2.0.3 API Summary
+### 2.2 API Summary
 
 **POST /payments**  
-- Synchronous PSP authorization  
+- Synchronous PSP authorization(idempotent)  
 - Persist Payment + OutboxEvent  
 - Returns `202 Accepted` with `paymentId` & `pspAuthRef`
 
@@ -338,11 +782,24 @@ From the Payment Bounded Context:
 - REST → DB → Outbox
 
 **Outbox Dispatcher**  
-- Expands Payment → PaymentOrders  
-- Publishes PaymentAuthorized + PaymentOrderCreated
+Process 3 type of OutboxEvent
+  1- OutboxEvent<PaymentAuthorized>:
+    - Picks up `OutboxEvent<PaymentAuthorized>`.
+    - Persist individual `PaymentOrder`(status=INITIATED_PENDING) for each line in payload
+    - Persist  `OutboxEvent<PaymentOrderCreated>` in outbox table
+    - Publishes to Kafka (`payment_authorized` topic).
+2- OutboxEvent<PaymentOrderCreated>:
+   - Picks up `OutboxEvent<PaymentOrderCreated>`.
+   - Generates individual `PaymentOrderCreated` from the outboxevent
+   - Publishes to Kafka (`payment_order_created` topic).
+3- OutboxEvent<PaymentOrderCaptureCommand>:
+   - Picks up `OutboxEvent<PaymentOrderCaptureCommand>`.
+   - Generates individual `PaymentOrderCaptureCommand` from the outboxevent<PaymentOrderCaptureCommand>
+   - update status of paymentorder to capture_requested
+   - Publishes to Kafka (`payment_order_capture_request_queue_topic` topic)
 
 **PSP Flow (payment-consumers)**  
-- Enqueuer → PSP call executor → Result applier  
+- Enqueuer → Capture Psp call executor → Psp Result applier  
 - Independent per PaymentOrder  
 - Emits succeeded/failed events
 
@@ -380,219 +837,7 @@ REDIS
 end
 ```
 
-### 2.2 Bounded Context Map
 
-This diagram shows the Payment Bounded Context and its relationships with downstream contexts, including internal aggregates and integration patterns.
-
-```mermaid
-%%{init:{'theme':'default','flowchart':{'nodeSpacing':50,'rankSpacing':60}}}%%
-flowchart TB
-    classDef payment fill:#4CAF50,stroke:#2E7D32,stroke-width:3px;
-    classDef downstream fill:#2196F3,stroke:#1565C0,stroke-width:2px;
-    classDef infrastructure fill:#9E9E9E,stroke:#616161,stroke-width:2px;
-    classDef planned fill:#E0E0E0,stroke:#9E9E9E,stroke-width:2px,stroke-dasharray: 5 5;
-
-    subgraph Payment_BC["Payment Bounded Context - Core Domain"]
-        Payment_Agg["Payment<br/>Coordination Aggregate<br/>• Synchronous PSP authorization (captures pspRef)<br/>• Tracks shopper order + totalAmount<br/>• Status transitions: AUTHORIZED / FAILED"]
-        PaymentOrder_Agg["PaymentOrder<br/>Processing Aggregate<br/>• Created only after auth success<br/>• Drives capture/settlement per seller"]
-        Ledger_Subdomain["Ledger Subdomain<br/>Double-entry accounting<br/>• AUTH_HOLD, CAPTURE, SETTLEMENT, PAYOUT, FEES<br/>• Uses AccountType + JournalEntryFactory"]
-    end
-
-    subgraph Integration["Integration Layer - Kafka Event Bus"]
-        KAFKA[("Kafka Topics:<br/>payment_order_finalized<br/>ledger_entries_recorded")]
-    end
-
-    subgraph Downstream_BCs["Downstream Bounded Contexts"]
-        Shipment_BC[("Shipment BC<br/>Listens to PaymentOrderSucceeded<br/>Immediate shipment per seller")]:::downstream
-        Wallet_BC[("Wallet BC<br/>Planned")]:::planned
-        Order_BC[("Order BC<br/>Planned")]:::planned
-    end
-
-    Payment_Agg -->|"1:N Contains"| PaymentOrder_Agg
-    PaymentOrder_Agg -->|"Emits PaymentOrderSucceeded<br/>per seller immediately"| KAFKA
-    Payment_Agg -->|"Emits PaymentCompleted<br/>when all orders done (optional)"| KAFKA
-    Ledger_Subdomain -->|"Emits LedgerEntriesRecorded"| KAFKA
-    
-    KAFKA -->|"Per seller - immediate action"| Shipment_BC
-    KAFKA -.->|"Planned"| Wallet_BC
-    KAFKA -.->|"Planned"| Order_BC
-
-    style Payment_BC fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
-    style Integration fill:#F5F5F5,stroke:#757575,stroke-width:2px
-    style Downstream_BCs fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
-```
-
-**Key Points:**
-- **Payment** stores the synchronous authorization outcome (`pspRef`, `AUTHORIZED` / `FAILED`) and coordinates downstream seller captures.
-- **PaymentOrder** is instantiated only after the parent payment is authorized and emits events as each seller capture/settlement progresses.
-- **Ledger Subdomain** uses `AccountType` (auth hold, receivable/payable, scheme fees, commission) and the `JournalEntryFactory` (`authHold`, `releaseHoldOnCapture`, `capture`, `settlement`, `recognizePspFee`, `recognizeCommissionFee`, `payoutToMerchant`, `refundPrePayout`) to enforce balanced postings.
-- **Shipment** listens to individual `PaymentOrderSucceeded` events for immediate fulfillment.
-- All integration remains event-driven via Kafka (no direct dependencies).
-
-### 2.3 Payment Bounded Context Domain Model
-
-This diagram shows the **Payment Bounded Context** with its aggregates, entities, value objects, and domain events.
-
-```mermaid
-%%{init:{'theme':'default','flowchart':{'nodeSpacing':40,'rankSpacing':50}}}%%
-flowchart TB
-    classDef aggregate fill:#4CAF50,stroke:#2E7D32,stroke-width:4px;
-    classDef entity fill:#2196F3,stroke:#1565C0,stroke-width:2px;
-    classDef vo fill:#FF9800,stroke:#E65100,stroke-width:2px;
-    classDef event fill:#9C27B0,stroke:#6A1B9A,stroke-width:2px;
-    classDef command fill:#00BCD4,stroke:#00838F,stroke-width:2px;
-    classDef service fill:#795548,stroke:#5D4037,stroke-width:2px;
-
-    subgraph Payment_Coordination["💳 Payment (Coordination Aggregate)"]
-        Payment_Agg["Payment<br/>(Coordination Aggregate Root)<br/>• paymentId: PaymentId<br/>• buyerId: BuyerId<br/>• orderId: OrderId<br/>• totalAmount: Amount<br/>• status: PaymentStatus<br/>• paymentOrders: List<PaymentOrder><br/><br/>Purpose:<br/>• Container for payment request<br/>• Tracks overall payment status<br/>• Emits PaymentCompleted/PaymentUpdated<br/>  events for downstream services<br/>  (e.g., Shipment domain)"]
-    end
-
-    subgraph PaymentOrder_Processing["📋 PaymentOrder (Processing Aggregate)"]
-        PaymentOrder_Agg["PaymentOrder<br/>(Processing Aggregate Root)<br/>• paymentOrderId: PaymentOrderId<br/>• paymentId: PaymentId (reference)<br/>• sellerId: SellerId<br/>• amount: Amount<br/>• status: PaymentOrderStatus<br/>• retryCount: Int<br/>• retryReason: String?<br/>• lastErrorMessage: String?<br/><br/>Purpose:<br/>• Each PaymentOrder processed<br/>  independently with separate<br/>  PSP calls<br/>• Emits PaymentOrderCreated,<br/>  PaymentOrderSucceeded/Failed"]
-    end
-
-    subgraph Ledger_Subdomain["🧾 Ledger Subdomain"]
-        JournalEntry_Agg["JournalEntry<br/>Aggregate Root<br/>• id: String<br/>• txType: JournalType<br/>• postings: List<Posting><br/><br/>Factory Methods:<br/>• authHold()<br/>• capture()<br/>• settlement()<br/>• feeRegistered()<br/>• payout()<br/>• fullFlow()<br/><br/>Private Constructor<br/>Enforces Balance"]
-        Posting_Entity["Posting Entity<br/>(Factory-Enforced)<br/>• account: Account<br/>• amount: Amount<br/>• direction: Debit/Credit<br/><br/>Factories:<br/>• Posting.Debit.create()<br/>• Posting.Credit.create()"]
-        Account_VO["Account Value Object<br/>(Factory-Enforced)<br/>• accountCode: String<br/>• type: AccountType<br/>• entityId: String<br/><br/>Factory:<br/>• Account.create(type, entityId)"]
-    end
-
-    subgraph Value_Objects["📦 Value Objects"]
-        PaymentId_VO["PaymentId<br/>(Value Object)"]
-        PaymentOrderId_VO["PaymentOrderId<br/>(Value Object)"]
-        SellerId_VO["SellerId<br/>(Value Object)"]
-        BuyerId_VO["BuyerId<br/>(Value Object)"]
-        Amount_VO["Amount<br/>• quantity: Long<br/>• currency: Currency<br/>(Factory: Amount.of())"]
-        Currency_VO["Currency<br/>(Value Class)<br/>• currencyCode: String"]
-        Account_VO["Account<br/>(Factory-Enforced)<br/>• type: AccountType<br/>• entityId: String<br/>(Factory: Account.create())"]
-    end
-
-    subgraph Domain_Events["📨 Domain Events"]
-        PaymentCreated_Event["PaymentOrderCreated<br/>(Processing Level)"]
-        PaymentSucceeded_Event["PaymentOrderSucceeded<br/>(Processing Level)"]
-        PaymentFailed_Event["PaymentOrderFailed<br/>(Processing Level)"]
-        PaymentCompleted_Event["PaymentCompleted<br/>(Optional Coordination Level)<br/>Emitted when all<br/>PaymentOrders finalized<br/>(for overall order tracking)"]
-        LedgerRecorded_Event["LedgerEntriesRecorded"]
-    end
-
-    subgraph Domain_Commands["⚡ Domain Commands"]
-        CreatePayment_Cmd["CreatePaymentCommand"]
-        LedgerRecording_Cmd["LedgerRecordingCommand"]
-    end
-
-    Payment_Agg -->|"Contains (1:N)<br/>Coordination Container"| PaymentOrder_Agg
-    Payment_Agg -->|"Uses"| PaymentId_VO
-    Payment_Agg -->|"Uses"| BuyerId_VO
-    Payment_Agg -->|"Uses"| Amount_VO
-    PaymentOrder_Agg -->|"References"| PaymentId_VO
-    PaymentOrder_Agg -->|"Uses"| PaymentOrderId_VO
-    PaymentOrder_Agg -->|"Uses"| SellerId_VO
-    PaymentOrder_Agg -->|"Uses"| Amount_VO
-    PaymentOrder_Agg -->|"Emits (Processing)"| PaymentCreated_Event
-    PaymentOrder_Agg -->|"Emits (Processing)"| PaymentSucceeded_Event
-    PaymentOrder_Agg -->|"Emits (Processing)"| PaymentFailed_Event
-    Payment_Agg -->|"Emits (Coordination)<br/>When all PaymentOrders<br/>finalized (optional)"| PaymentCompleted_Event["PaymentCompleted<br/>(Optional - for overall<br/>order status tracking)"]
-
-    JournalEntry_Agg -->|"Contains (1:N)"| Posting_Entity
-    JournalEntry_Agg -->|"Uses"| Account_VO
-    JournalEntry_Agg -->|"Emits"| LedgerRecorded_Event
-
-    CreatePayment_Cmd -->|"Creates<br/>Payment + PaymentOrders"| Payment_Agg
-    LedgerRecording_Cmd -->|"Creates"| JournalEntry_Agg
-
-    style Payment_Agg fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
-    style PaymentOrder_Agg fill:#C8E6C9,stroke:#388E3C,stroke-width:4px
-    style JournalEntry_Agg fill:#C8E6C9,stroke:#388E3C,stroke-width:4px
-    style Posting_Entity fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
-    style PaymentId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
-    style PaymentOrderId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
-    style SellerId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
-    style BuyerId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
-    style Amount_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
-    style Account_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
-```
-
-In the refreshed Merchant-of-Record scope:
-- `Payment` captures the shopper-level authorization synchronously (stores PSP auth id, status) and acts as the coordination point for all downstream seller obligations.
-- `PaymentOrder` represents each seller capture obligation that will be executed asynchronously via the PSP capture endpoint, independent per seller.
-- The ledger subdomain remains unchanged, recording AUTH_HOLD during authorization and subsequent capture/settlement postings as events progress.
-
-### 2.4 Aggregate Boundaries & Consistency
-
-This diagram shows aggregate boundaries, consistency guarantees, and transaction scopes.
-
-```mermaid
-%%{init:{'theme':'default','flowchart':{'nodeSpacing':40,'rankSpacing':50}}}%%
-flowchart TB
-    classDef aggregate fill:#4CAF50,stroke:#2E7D32,stroke-width:4px;
-    classDef consistency fill:#FF9800,stroke:#E65100,stroke-width:2px;
-    classDef transaction fill:#2196F3,stroke:#1565C0,stroke-width:2px;
-
-    subgraph Payment_Coordination_Boundary["💳 Payment Aggregate (Coordination)"]
-        Payment_Invariants["Invariants:<br/>• totalAmount = sum(paymentOrders.amount)<br/>• All amounts same currency<br/>• Consistency: Immediate<br/><br/>Purpose:<br/>• Coordination aggregate for<br/>  cross-domain integration<br/>• Tracks overall payment completion<br/>• Emits PaymentCompleted when<br/>  all PaymentOrders finalized"]
-        Payment_Actions["Actions:<br/>• markAsPaid()<br/>• markAsFailed()<br/>• addPaymentOrder()<br/>• checkAllPaymentOrdersCompleted()<br/>• emitPaymentCompleted()"]
-        Payment_Events["Coordination Events:<br/>• PaymentCompleted (optional - emitted<br/>  when all PaymentOrders finalized)<br/>• PaymentUpdated<br/><br/>Note: Shipment domain listens to<br/>individual PaymentOrderSucceeded<br/>events (not PaymentCompleted) to<br/>initiate shipment per seller immediately"]
-    end
-
-    subgraph PaymentOrder_Aggregate_Boundary["📋 PaymentOrder Aggregate (Processing)"]
-        PO_Invariants["Invariants:<br/>• retryCount ≤ MAX_RETRIES (5)<br/>• Terminal states immutable<br/>• Consistency: Immediate<br/>• Each PaymentOrder processed<br/>  independently with separate PSP call"]
-        PO_Actions["Actions:<br/>• markAsPaid()<br/>• markAsFailed()<br/>• incrementRetry()<br/>• markAsPending()<br/>• withRetryReason()<br/>• withLastError()"]
-        PO_Status["Status Transitions:<br/>INITIATED_PENDING →<br/>SUCCESSFUL_FINAL /<br/>FAILED_FINAL"]
-        PO_Processing["Processing:<br/>• Separate PSP call per PaymentOrder<br/>• Independent retry logic<br/>• Individual status tracking<br/>• Event-driven (PaymentOrderCreated,<br/>  PaymentOrderSucceeded, etc.)<br/>• Events trigger Payment status<br/>  evaluation"]
-    end
-
-    subgraph Ledger_Aggregate_Boundary["🧾 Ledger Aggregate Boundary"]
-        Ledger_Invariants["Invariants:<br/>• Debits = Credits (balanced)<br/>• JournalEntry immutable<br/>• Consistency: Immediate<br/>• Factory-enforced creation<br/>  (private constructors)"]
-        Ledger_Actions["Actions:<br/>• JournalEntry.fullFlow()<br/>• JournalEntry.failedPayment()<br/>• Account.create()<br/>• Amount.of()<br/>• Posting.Debit.create()<br/>• Posting.Credit.create()"]
-        Ledger_Balance["Balance Rule:<br/>Σ(Posting.debits) =<br/>Σ(Posting.credits)<br/><br/>Enforced at creation via<br/>factory methods"]
-    end
-
-    subgraph Transaction_Scopes["🔒 Transaction Scopes"]
-        DB_Transaction["Database Transaction<br/>• Payment + PaymentOrders<br/>• JournalEntry + Postings<br/>• Atomic within aggregate"]
-        Kafka_Transaction["Kafka Transaction<br/>• Offset commit<br/>• Event publish<br/>• Atomic across aggregates"]
-    end
-
-    Payment_Coordination_Boundary -->|"Contains (1:N)<br/>Coordination Container"| PaymentOrder_Aggregate_Boundary
-    PaymentOrder_Aggregate_Boundary -->|"Completion triggers<br/>Payment status evaluation"| Payment_Coordination_Boundary
-    PaymentOrder_Aggregate_Boundary -->|"Emits Events<br/>Eventually Consistent<br/>(Per PaymentOrder)"| Ledger_Aggregate_Boundary
-    Payment_Coordination_Boundary -->|"May emit<br/>PaymentCompleted<br/>(Optional - overall status)"| CrossDomain["🌐 Downstream Services"]
-    PaymentOrder_Aggregate_Boundary -->|"Emits<br/>PaymentOrderSucceeded<br/>(Per seller - immediate action)"| CrossDomain
-    Payment_Coordination_Boundary -->|"Uses<br/>Initial Creation +<br/>Status Updates"| DB_Transaction
-    PaymentOrder_Aggregate_Boundary -->|"Uses<br/>All Processing"| Kafka_Transaction
-    PaymentOrder_Aggregate_Boundary -->|"Uses<br/>Status Updates"| DB_Transaction
-    Ledger_Aggregate_Boundary -->|"Uses"| DB_Transaction
-
-    style Payment_Coordination_Boundary fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
-    style PaymentOrder_Aggregate_Boundary fill:#C8E6C9,stroke:#388E3C,stroke-width:4px
-    style Ledger_Aggregate_Boundary fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
-    style DB_Transaction fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
-    style Kafka_Transaction fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
-```
-
-**Key DDD Concepts:**
-- **Payment**: Coordination aggregate root representing a multi-seller checkout (e.g., Amazon shopping cart). Contains multiple `PaymentOrder` objects (1:N), one per seller. 
-  - **Coordination Role**: Tracks overall payment completion status across all `PaymentOrder` objects
-  - **Use Case**: When a shopper checks out with products from multiple sellers, one `Payment` contains multiple `PaymentOrders` (one per seller)
-  - **Cross-Domain Events**: When all `PaymentOrder` objects are finalized (succeed/fail), `Payment` can optionally be updated and emit `PaymentCompleted` event for overall order tracking
-  - **Note**: Shipment domain listens to individual `PaymentOrderSucceeded` events (not `PaymentCompleted`) to immediately initiate shipment for that seller's products - they don't wait for other sellers' payments
-  - **Dual Purpose**: Container for initial persistence + optional coordination point for overall payment status
-- **PaymentOrder**: Processing aggregate root for PSP interactions. Represents payment for a single seller's products in a multi-seller checkout.
-  - **Real-World Example**: Amazon checkout - shopper has products from Seller A, B, and C → creates Payment with 3 PaymentOrders
-  - **Independent Processing**: Each `PaymentOrder` is processed independently:
-    - Separate PSP call per `PaymentOrder` (each seller gets independent PSP processing)
-    - Independent retry logic and status tracking
-    - Individual event emission (`PaymentOrderCreated`, `PaymentOrderSucceeded`, `PaymentOrderFailed`)
-    - Processed via Kafka consumers using `paymentOrderId` as partition key
-  - **Immediate Downstream Actions**: When `PaymentOrderSucceeded` event is emitted for Seller A:
-    - Shipment domain immediately starts shipping Seller A's products (doesn't wait for Seller B or C)
-    - Enables parallel fulfillment across different sellers
-  - **Coordination Trigger**: When all `PaymentOrder` statuses are terminal, triggers optional `Payment` status evaluation
-- **Separate Aggregate**: `JournalEntry` forms its own aggregate boundary for ledger
-- **Consistency Boundaries**: Each aggregate maintains immediate consistency; eventual consistency between aggregates via events
-- **Transaction Scope**: Database transactions for initial Payment+PaymentOrders creation; Kafka transactions for PaymentOrder processing; separate DB transactions per PaymentOrder status updates; eventual Payment status update when all PaymentOrders complete
-
-
----
 
 
 
