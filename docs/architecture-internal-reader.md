@@ -1,471 +1,5 @@
 # ecommerce-platform-kotlin · Architecture Guide
-## 1 · Purpose/Audience
-- **Demo Scope / Intent**: This platform is a technical showcase designed to
-  demonstrate domain expertise in payments, double-entry ledger design, event-driven
-  architecture, idempotent workflows, and cloud-native patterns.Also  
-- It is not intended
-  as a commercial product but as an educational, interview-ready reference implementation.
 
-From this platform’s point of view, all business flows are expressed as combinations of:
-
-- **Pay-ins**: money entering the platform from external parties (e.g., riders/shoppers)
-- **Internal reallocations**: money moving between internal entities and accounts
-- **Pay-outs**: money leaving the platform to external beneficiaries (e.g., drivers, sellers, tax authorities)
-
-The platform does not encode any single marketplace or Merchant-of-Record model.
-Instead, it provides a small and realistic set of financial primitives that large
-multi-entity platforms (e.g., Uber, bol.com, Airbnb, Amazon Marketplace) commonly
-use: authorization, capture, asynchronous processing, idempotent state transitions,
-and double-entry ledger recording.
-
-Only a representative subset is implemented — enough to demonstrate architectural
-thinking, correctness guarantees, and event-driven workflow design without trying
-to recreate a complete enterprise system.
-
-- **Audience**: Backend engineers, SREs, architects, and contributors who need to
-  understand the big picture.
-- **Scope**: Payment + ledger infrastructure for multi-entity, MoR-style platforms,
-  where external PSPs are used as gateways for pay-ins and pay-outs, and all
-  flows are eventually captured in the ledger.
-- 
-
-
-
-## 2 · Functional Requirements
-This platform models **multi-seller Merchant-of-Record** financial flows. All business operations reduce to a combination of **pay-ins, internal reallocations, and pay-outs**, governed by strict financial invariants.
-
-**Core Functional Invariants:**
-1. **Single Shopper Authorization**
-   - One PSP authorization (`pspAuthRef`) per shopper.
-   - PSP never sees internal seller structure.
-
-2. **Multi‑Seller Decomposition**
-   - One `Payment` decomposes into multiple `PaymentOrder`s (one per seller).
-
-3. **Independent Capture Pipeline**
-   - Each seller capture runs asynchronously (auto‑capture or manual).
-   - PSP only receives: `pspAuthRef + amount`.
-
-4. **Seller‑Level Payout Responsibility**
-   - Platform ensures receivable/payable correctness per seller.
-
-5. **Double‑Entry Ledger as Source of Truth**
-   - Every financial event (auth, capture, settlement, fees, commissions, payouts) must produce balanced journal entries.
-
-6. **Payout‑Safe Accounting**
-   - Sellers can only be paid out after required journal posting.
-
-
-### 2.1 System Context
-```mermaid
-flowchart LR
-subgraph Users
-U1([Browser / Mobile App])
-U2([Back‑office Portal])
-end
-U1 -->|REST/GraphQL|GW["🛡️ API Gateway / Ingress"]
-U2 -->|REST|GW
-GW --> PAY[(payment-service API)]
-PAY --> K((Kafka))
-K -->|events|CONS[(payment-consumers)]
-K --> ANA[(Analytics / BI)]
-PAY --> DB[(PostgreSQL Cluster)]
-PAY --> REDIS[(Redis)]
-subgraph Cloud
-PAY
-CONS
-ANA
-K
-DB
-REDIS
-end
-```
-
-
-### 2.2 Payment Bounded Context & Domain Model
-
-This diagram shows the Payment Bounded Context and its relationships with downstream contexts, including internal aggregates and integration patterns
-
-```mermaid
-%%{init:{'theme':'default','flowchart':{'nodeSpacing':50,'rankSpacing':60}}}%%
-flowchart TB
-    classDef payment fill:#4CAF50,stroke:#2E7D32,stroke-width:3px;
-    classDef downstream fill:#2196F3,stroke:#1565C0,stroke-width:2px;
-    classDef infrastructure fill:#9E9E9E,stroke:#616161,stroke-width:2px;
-    
-    subgraph Payment_BC["Payment Bounded Context (Core Domain)"]
-        Payment_Agg["Payment<br/>Coordination Aggregate<br/>• Synchronous PSP authorization (single PSP call)<br/>• Tracks shopper order + totalAmount<br/>• Status: PENDING_AUTH / AUTHORIZED / PARTIALLY_CAPTURED / CAPTURED_FINAL / DECLINED"]:::payment
-        
-        PaymentOrder_Agg["PaymentOrder<br/>Processing Aggregate<br/>• Created only after PaymentAuthorized<br/>• One per seller / capture leg<br/>• Status: INITIATED_PENDING / CAPTURE_REQUESTED / CAPTURED_FINAL / FINAL_FAILED"]:::payment
-        
-        Ledger_Subdomain["Ledger Subdomain<br/>Double-entry accounting<br/>• Posts entries per successful capture<br/>• Uses AccountType + JournalEntryFactory<br/>• Persists journal_entries + account_balances"]:::payment
-    end
-
-    subgraph Integration["Integration Layer - Kafka Event Bus"]
-        KAFKA[("Kafka Topics<br/>• payment_authorized<br/>• payment_order_created<br/>• payment_order_capture_requested<br/>• payment_order_succeeded / failed<br/>• ledger_entries_recorded")]:::infrastructure
-    end
-
-    subgraph Downstream_BCs["Downstream Bounded Contexts (Implemented)"]
-        Shipment_BC[("Shipment BC<br/>Listens to PaymentOrderSucceeded<br/>Triggers shipment per seller")]:::downstream
-    end
-
-    %% Relationships inside Payment BC
-    Payment_Agg -->|"1 : N contains"| PaymentOrder_Agg
-    PaymentOrder_Agg -->|"On CAPTURED_FINAL<br/>triggers ledger posting"| Ledger_Subdomain
-
-    %% Events out of Payment BC
-    Payment_Agg -->|"Emits payment_authorized<br/>after successful PSP auth"| KAFKA
-    PaymentOrder_Agg -->|"Emits payment_order_created<br/>(per seller)"| KAFKA
-    PaymentOrder_Agg -->|"Emits payment_order_capture_requested<br/>(auto or manual capture)"| KAFKA
-    PaymentOrder_Agg -->|"Emits payment_order_succeeded / failed<br/>(final capture result)"| KAFKA
-    Ledger_Subdomain -->|"Emits ledger_entries_recorded"| KAFKA
-    
-    %% Downstream consumption
-    KAFKA -->|"Per-seller capture result<br/>PaymentOrderSucceeded/Failed"| Shipment_BC
-
-    %% Styling
-    style Payment_BC fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
-    style Integration fill:#F5F5F5,stroke:#757575,stroke-width:2px
-    style Downstream_BCs fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
-```
-
-### 2.3.1 CORE ENTITIES
-
-**Key Points:**
-- **Payment** stores the synchronous authorization outcome (`pspRef`, `AUTHORIZED` / `FAILED`) and coordinates downstream seller captures.
-- **PaymentOrder** is instantiated only after the parent payment is authorized and emits events as each seller capture/settlement progresses.
-- - **PaymentOrderEvent** is representing an even interface representing the immutable events transition between payment order statuses
-- **Ledger Subdomain** uses `AccountType` (auth hold, receivable/payable, scheme fees, commission) and the `JournalEntryFactory` (`authHold`, `releaseHoldOnCapture`, `capture`, `settlement`, `recognizePspFee`, `recognizeCommissionFee`, `payoutToMerchant`, `refundPrePayout`) to enforce balanced postings.
-- **Shipment** listens to individual `PaymentOrderSucceeded` events for immediate fulfillment.
-- All integration remains event-driven via Kafka (no direct dependencies).
-
-### 2.3.2 Payment Bounded Context Domain Model
-
-This diagram shows the **Payment Bounded Context** with its aggregates, entities, value objects, and domain events.
-
-```mermaid
-%%{init:{'theme':'default','flowchart':{'nodeSpacing':40,'rankSpacing':50}}}%%
-flowchart TB
-    classDef aggregate fill:#4CAF50,stroke:#2E7D32,stroke-width:4px;
-    classDef entity fill:#2196F3,stroke:#1565C0,stroke-width:2px;
-    classDef vo fill:#FF9800,stroke:#E65100,stroke-width:2px;
-    classDef event fill:#9C27B0,stroke:#6A1B9A,stroke-width:2px;
-    classDef command fill:#00BCD4,stroke:#00838F,stroke-width:2px;
-    classDef service fill:#795548,stroke:#5D4037,stroke-width:2px;
-
-    subgraph Payment_Coordination["💳 Payment (Coordination Aggregate)"]
-        Payment_Agg["Payment<br/>(Coordination Aggregate Root)<br/>• paymentId: PaymentId<br/>• buyerId: BuyerId<br/>• orderId: OrderId<br/>• totalAmount: Amount<br/>• status: PaymentStatus<br/>• paymentOrders: List<PaymentOrder><br/><br/>Purpose:<br/>• Container for payment request<br/>• Tracks overall payment status<br/>• Emits PaymentCompleted/PaymentUpdated<br/>  events for downstream services<br/>  (e.g., Shipment domain)"]
-    end
-
-    subgraph PaymentOrder_Processing["📋 PaymentOrder (Processing Aggregate)"]
-        PaymentOrder_Agg["PaymentOrder<br/>(Processing Aggregate Root)<br/>• paymentOrderId: PaymentOrderId<br/>• paymentId: PaymentId (reference)<br/>• sellerId: SellerId<br/>• amount: Amount<br/>• status: PaymentOrderStatus<br/>• retryCount: Int<br/>• retryReason: String?<br/>• lastErrorMessage: String?<br/><br/>Purpose:<br/>• Each PaymentOrder processed<br/>  independently with separate<br/>  PSP calls<br/>• Emits PaymentOrderCreated,<br/>  PaymentOrderSucceeded/Failed"]
-    end
-
-    subgraph Ledger_Subdomain["🧾 Ledger Subdomain"]
-        JournalEntry_Agg["JournalEntry<br/>Aggregate Root<br/>• id: String<br/>• txType: JournalType<br/>• postings: List<Posting><br/><br/>Factory Methods:<br/>• authHold()<br/>• capture()<br/>• settlement()<br/>• feeRegistered()<br/>• payout()<br/>• fullFlow()<br/><br/>Private Constructor<br/>Enforces Balance"]
-        Posting_Entity["Posting Entity<br/>(Factory-Enforced)<br/>• account: Account<br/>• amount: Amount<br/>• direction: Debit/Credit<br/><br/>Factories:<br/>• Posting.Debit.create()<br/>• Posting.Credit.create()"]
-        Account_VO["Account Value Object<br/>(Factory-Enforced)<br/>• accountCode: String<br/>• type: AccountType<br/>• entityId: String<br/><br/>Factory:<br/>• Account.create(type, entityId)"]
-    end
-
-    subgraph Value_Objects["📦 Value Objects"]
-        PaymentId_VO["PaymentId<br/>(Value Object)"]
-        PaymentOrderId_VO["PaymentOrderId<br/>(Value Object)"]
-        SellerId_VO["SellerId<br/>(Value Object)"]
-        BuyerId_VO["BuyerId<br/>(Value Object)"]
-        Amount_VO["Amount<br/>• quantity: Long<br/>• currency: Currency<br/>(Factory: Amount.of())"]
-        Currency_VO["Currency<br/>(Value Class)<br/>• currencyCode: String"]
-        Account_VO["Account<br/>(Factory-Enforced)<br/>• type: AccountType<br/>• entityId: String<br/>(Factory: Account.create())"]
-    end
-
-    subgraph Domain_Events["📨 Domain Events"]
-        PaymentCreated_Event["PaymentOrderCreated<br/>(Processing Level)"]
-        PaymentSucceeded_Event["PaymentOrderSucceeded<br/>(Processing Level)"]
-        PaymentFailed_Event["PaymentOrderFailed<br/>(Processing Level)"]
-        PaymentCompleted_Event["PaymentCompleted<br/>(Optional Coordination Level)<br/>Emitted when all<br/>PaymentOrders finalized<br/>(for overall order tracking)"]
-        LedgerRecorded_Event["LedgerEntriesRecorded"]
-    end
-
-    subgraph Domain_Commands["⚡ Domain Commands"]
-        CreatePayment_Cmd["CreatePaymentCommand"]
-        LedgerRecording_Cmd["LedgerRecordingCommand"]
-    end
-
-    Payment_Agg -->|"Contains (1:N)<br/>Coordination Container"| PaymentOrder_Agg
-    Payment_Agg -->|"Uses"| PaymentId_VO
-    Payment_Agg -->|"Uses"| BuyerId_VO
-    Payment_Agg -->|"Uses"| Amount_VO
-    PaymentOrder_Agg -->|"References"| PaymentId_VO
-    PaymentOrder_Agg -->|"Uses"| PaymentOrderId_VO
-    PaymentOrder_Agg -->|"Uses"| SellerId_VO
-    PaymentOrder_Agg -->|"Uses"| Amount_VO
-    PaymentOrder_Agg -->|"Emits (Processing)"| PaymentCreated_Event
-    PaymentOrder_Agg -->|"Emits (Processing)"| PaymentSucceeded_Event
-    PaymentOrder_Agg -->|"Emits (Processing)"| PaymentFailed_Event
-    Payment_Agg -->|"Emits (Coordination)<br/>When all PaymentOrders<br/>finalized (optional)"| PaymentCompleted_Event["PaymentCompleted<br/>(Optional - for overall<br/>order status tracking)"]
-
-    JournalEntry_Agg -->|"Contains (1:N)"| Posting_Entity
-    JournalEntry_Agg -->|"Uses"| Account_VO
-    JournalEntry_Agg -->|"Emits"| LedgerRecorded_Event
-
-    CreatePayment_Cmd -->|"Creates<br/>Payment + PaymentOrders"| Payment_Agg
-    LedgerRecording_Cmd -->|"Creates"| JournalEntry_Agg
-
-    style Payment_Agg fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
-    style PaymentOrder_Agg fill:#C8E6C9,stroke:#388E3C,stroke-width:4px
-    style JournalEntry_Agg fill:#C8E6C9,stroke:#388E3C,stroke-width:4px
-    style Posting_Entity fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
-    style PaymentId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
-    style PaymentOrderId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
-    style SellerId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
-    style BuyerId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
-    style Amount_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
-    style Account_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
-```
-
-In the refreshed Merchant-of-Record scope:
-- `Payment` captures the shopper-level authorization synchronously (stores PSP auth id, status) and acts as the coordination point for all downstream seller obligations.
-- `PaymentOrder` represents each seller capture obligation that will be executed asynchronously via the PSP capture endpoint, independent per seller.
-- The ledger subdomain remains unchanged, recording AUTH_HOLD during authorization and subsequent capture/settlement postings as events progress.
-
-### 2.4 Aggregate Boundaries & Consistency
-
-This diagram shows aggregate boundaries, consistency guarantees, and transaction scopes.
-
-```mermaid
-%%{init:{'theme':'default','flowchart':{'nodeSpacing':40,'rankSpacing':50}}}%%
-flowchart TB
-    classDef aggregate fill:#4CAF50,stroke:#2E7D32,stroke-width:4px;
-    classDef consistency fill:#FF9800,stroke:#E65100,stroke-width:2px;
-    classDef transaction fill:#2196F3,stroke:#1565C0,stroke-width:2px;
-
-    subgraph Payment_Coordination_Boundary["💳 Payment Aggregate (Coordination)"]
-        Payment_Invariants["Invariants:<br/>• totalAmount = sum(paymentOrders.amount)<br/>• All amounts same currency<br/>• Consistency: Immediate<br/><br/>Purpose:<br/>• Coordination aggregate for<br/>  cross-domain integration<br/>• Tracks overall payment completion<br/>• Emits PaymentCompleted when<br/>  all PaymentOrders finalized"]
-        Payment_Actions["Actions:<br/>• markAsPaid()<br/>• markAsFailed()<br/>• addPaymentOrder()<br/>• checkAllPaymentOrdersCompleted()<br/>• emitPaymentCompleted()"]
-        Payment_Events["Coordination Events:<br/>• PaymentCompleted (optional - emitted<br/>  when all PaymentOrders finalized)<br/>• PaymentUpdated<br/><br/>Note: Shipment domain listens to<br/>individual PaymentOrderSucceeded<br/>events (not PaymentCompleted) to<br/>initiate shipment per seller immediately"]
-    end
-
-    subgraph PaymentOrder_Aggregate_Boundary["📋 PaymentOrder Aggregate (Processing)"]
-        PO_Invariants["Invariants:<br/>• retryCount ≤ MAX_RETRIES (5)<br/>• Terminal states immutable<br/>• Consistency: Immediate<br/>• Each PaymentOrder processed<br/>  independently with separate PSP call"]
-        PO_Actions["Actions:<br/>• markAsPaid()<br/>• markAsFailed()<br/>• incrementRetry()<br/>• markAsPending()<br/>• withRetryReason()<br/>• withLastError()"]
-        PO_Status["Status Transitions:<br/>INITIATED_PENDING →<br/>SUCCESSFUL_FINAL /<br/>FAILED_FINAL"]
-        PO_Processing["Processing:<br/>• Separate PSP call per PaymentOrder<br/>• Independent retry logic<br/>• Individual status tracking<br/>• Event-driven (PaymentOrderCreated,<br/>  PaymentOrderSucceeded, etc.)<br/>• Events trigger Payment status<br/>  evaluation"]
-    end
-
-    subgraph Ledger_Aggregate_Boundary["🧾 Ledger Aggregate Boundary"]
-        Ledger_Invariants["Invariants:<br/>• Debits = Credits (balanced)<br/>• JournalEntry immutable<br/>• Consistency: Immediate<br/>• Factory-enforced creation<br/>  (private constructors)"]
-        Ledger_Actions["Actions:<br/>• JournalEntry.fullFlow()<br/>• JournalEntry.failedPayment()<br/>• Account.create()<br/>• Amount.of()<br/>• Posting.Debit.create()<br/>• Posting.Credit.create()"]
-        Ledger_Balance["Balance Rule:<br/>Σ(Posting.debits) =<br/>Σ(Posting.credits)<br/><br/>Enforced at creation via<br/>factory methods"]
-    end
-
-    subgraph Transaction_Scopes["🔒 Transaction Scopes"]
-        DB_Transaction["Database Transaction<br/>• Payment + PaymentOrders<br/>• JournalEntry + Postings<br/>• Atomic within aggregate"]
-        Kafka_Transaction["Kafka Transaction<br/>• Offset commit<br/>• Event publish<br/>• Atomic across aggregates"]
-    end
-
-    Payment_Coordination_Boundary -->|"Contains (1:N)<br/>Coordination Container"| PaymentOrder_Aggregate_Boundary
-    PaymentOrder_Aggregate_Boundary -->|"Completion triggers<br/>Payment status evaluation"| Payment_Coordination_Boundary
-    PaymentOrder_Aggregate_Boundary -->|"Emits Events<br/>Eventually Consistent<br/>(Per PaymentOrder)"| Ledger_Aggregate_Boundary
-    Payment_Coordination_Boundary -->|"May emit<br/>PaymentCompleted<br/>(Optional - overall status)"| CrossDomain["🌐 Downstream Services"]
-    PaymentOrder_Aggregate_Boundary -->|"Emits<br/>PaymentOrderSucceeded<br/>(Per seller - immediate action)"| CrossDomain
-    Payment_Coordination_Boundary -->|"Uses<br/>Initial Creation +<br/>Status Updates"| DB_Transaction
-    PaymentOrder_Aggregate_Boundary -->|"Uses<br/>All Processing"| Kafka_Transaction
-    PaymentOrder_Aggregate_Boundary -->|"Uses<br/>Status Updates"| DB_Transaction
-    Ledger_Aggregate_Boundary -->|"Uses"| DB_Transaction
-
-    style Payment_Coordination_Boundary fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
-    style PaymentOrder_Aggregate_Boundary fill:#C8E6C9,stroke:#388E3C,stroke-width:4px
-    style Ledger_Aggregate_Boundary fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
-    style DB_Transaction fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
-    style Kafka_Transaction fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
-```
-
-**Key DDD Concepts:**
-- **Payment**: Coordination aggregate root representing a multi-seller checkout (e.g., Amazon shopping cart). Contains multiple `PaymentOrder` objects (1:N), one per seller. 
-  - **Coordination Role**: Tracks overall payment completion status across all `PaymentOrder` objects
-  - **Use Case**: When a shopper checks out with products from multiple sellers, one `Payment` contains multiple `PaymentOrders` (one per seller)
-  - **Cross-Domain Events**: When all `PaymentOrder` objects are finalized (succeed/fail), `Payment` can optionally be updated and emit `PaymentCompleted` event for overall order tracking
-  - **Note**: Shipment domain listens to individual `PaymentOrderSucceeded` events (not `PaymentCompleted`) to immediately initiate shipment for that seller's products - they don't wait for other sellers' payments
-  - **Dual Purpose**: Container for initial persistence + optional coordination point for overall payment status
-- **PaymentOrder**: Processing aggregate root for PSP interactions. Represents payment for a single seller's products in a multi-seller checkout.
-  - **Real-World Example**: Amazon checkout - shopper has products from Seller A, B, and C → creates Payment with 3 PaymentOrders
-  - **Independent Processing**: Each `PaymentOrder` is processed independently:
-    - Separate PSP call per `PaymentOrder` (each seller gets independent PSP processing)
-    - Independent retry logic and status tracking
-    - Individual event emission (`PaymentOrderCreated`, `PaymentOrderSucceeded`, `PaymentOrderFailed`)
-    - Processed via Kafka consumers using `paymentOrderId` as partition key
-  - **Immediate Downstream Actions**: When `PaymentOrderSucceeded` event is emitted for Seller A:
-    - Shipment domain immediately starts shipping Seller A's products (doesn't wait for Seller B or C)
-    - Enables parallel fulfillment across different sellers
-  - **Coordination Trigger**: When all `PaymentOrder` statuses are terminal, triggers optional `Payment` status evaluation
-- **Separate Aggregate**: `JournalEntry` forms its own aggregate boundary for ledger
-- **Consistency Boundaries**: Each aggregate maintains immediate consistency; eventual consistency between aggregates via events
-- **Transaction Scope**: Database transactions for initial Payment+PaymentOrders creation; Kafka transactions for PaymentOrder processing; separate DB transactions per PaymentOrder status updates; eventual Payment status update when all PaymentOrders complete
-
-### 2.5 API Summary
-Authentication
-
-All endpoints require:
-
-Authorization: Bearer <access-token>
-Idempotency-Key: <unique-key>   // for POST endpoints
-Content-Type: application/json
-
-POST /payments
-
-Create a new payment + perform synchronous authorization.
-
-Headers
-	•	Authorization: Bearer …
-	•	Idempotency-Key: …
-
-Response Codes
-	•	202 Accepted — Authorization succeeded, processing continues async
-	•	402 Payment Required — Authorization declined
-	•	400 Bad Request — Invalid request
-	•	409 Conflict — Idempotency key reuse mismatch
-	•	401 / 403 — Auth errors
-
-⸻
-
-POST /payments/{paymentId}/capture
-
-Trigger manual capture for a seller leg.
-
-Headers
-	•	Authorization: Bearer …
-	•	Idempotency-Key: …
-
-Response Codes
-	•	202 Accepted — Capture command queued
-	•	404 Not Found — Payment or seller leg missing
-	•	409 Conflict — Duplicate or invalid capture
-	•	400 Bad Request — Invalid body
-	•	401 / 403 — Auth errors
-
-⸻
-
-GET /payments/{paymentId}
-
-Retrieve payment status (buyer-level).
-
-Headers
-	•	Authorization: Bearer …
-
-Response Codes
-	•	200 OK
-	•	404 Not Found
-	•	401 / 403
-
-⸻
-
-GET /payments/{paymentId}/orders
-
-Retrieve all PaymentOrders (seller-level).
-
-Headers
-	•	Authorization: Bearer …
-
-Response Codes
-	•	200 OK
-	•	404 Not Found
-	•	401 / 403
-
-### 2.6 Data Flow Summary
-```mermaid
-sequenceDiagram
-    autonumber
-
-    participant Client
-    participant PaymentService
-    participant PSPAuth as PSP Authorization
-    participant DB
-    participant Outbox as OutboxDispatcherJob
-    participant Kafka
-    participant Enqueuer
-    participant CaptureExec as CaptureExecutor
-    participant ResultApplier
-    participant Redis
-    participant PSP as PSP Capture
-
-    %% ============================
-    %% 1. Synchronous Authorization
-    %% ============================
-    Client->>PaymentService: POST /payments
-    PaymentService->>PSPAuth: authorize(orderTotal, cardInfo)
-    PSPAuth-->>PaymentService: authResult(APPROVED/DECLINED)
-
-    alt Approved
-        PaymentService->>DB: Persist Payment(PENDING_AUTH→AUTHORIZED)\n+ outbox<PaymentAuthorized>
-        PaymentService-->>Client: 202 Accepted
-    else Declined
-        PaymentService->>DB: Persist Payment(DECLINED)
-        PaymentService-->>Client: 402 Payment Required
-    end
-
-
-    %% =============================================
-    %% 2. (NEW) Manual Capture Request per seller
-    %% =============================================
-    Client->>PaymentService: POST /payments/{paymentId}/capture\n{sellerId, amount}
-    PaymentService->>DB: Validate + Persist outbox<PaymentOrderCaptureCommand>
-    PaymentService-->>Client: 202 Accepted (capture queued)
-
-
-    %% =============================================
-    %% 3. OutboxDispatcherJob — NEW Responsibilities
-    %% =============================================
-    Outbox->>DB: Fetch NEW outbox rows (payment, paymentOrder, captureCmd)
-
-    %% 3.1 PaymentAuthorized
-    Outbox->>Outbox: Expand PaymentAuthorized → create PaymentOrders
-    Outbox->>DB: Insert PaymentOrders
-    Outbox->>DB: Insert outbox<PaymentOrderCreated[]> 
-    Outbox->>Kafka: Publish PaymentAuthorized
-    Outbox->>Kafka: Publish PaymentOrderCreated (per seller)
-
-    %% 3.2 PaymentOrderCreated passthrough
-    Outbox->>Kafka: Publish PaymentOrderCreated
-    Outbox->>DB: Mark SENT
-
-    %% 3.3 PaymentOrderCaptureCommand (NEW)
-    Outbox->>DB: Update PaymentOrder → CAPTURE_REQUESTED
-    Outbox->>Kafka: Publish PaymentOrderCaptureRequested
-
-    Outbox->>DB: Mark outbox items as SENT
-
-
-    %% =============================================
-    %% 4. Enqueuer → PSP Capture Requested
-    %% =============================================
-    Enqueuer->>Kafka: Consume PaymentOrderCreated
-    Enqueuer->>Kafka: Publish PaymentOrderCaptureRequested (auto-capture scenario)
-
-
-    %% =============================================
-    %% 5. Capture Executor
-    %% =============================================
-    CaptureExec->>Kafka: Consume PaymentOrderCaptureRequested
-    CaptureExec->>PSP: capture(sellerAmount, authRef)
-    PSP-->>CaptureExec: captureResult
-    CaptureExec->>Kafka: Publish PaymentOrderPspResultUpdated
-
-
-    %% =============================================
-    %% 6. PSP Result Applier
-    %% =============================================
-    ResultApplier->>Kafka: Consume PaymentOrderPspResultUpdated
-
-    alt Capture Success
-        ResultApplier->>DB: Update PaymentOrder → CAPTURED_FINAL
-        ResultApplier->>Kafka: Publish PaymentOrderSucceeded
-    else Retryable Failure
-        ResultApplier->>Redis: ZSET schedule retry
-        ResultApplier->>DB: retry_count++
-    else Final Failure
-        ResultApplier->>DB: Update PaymentOrder → FINAL_FAILED
-        ResultApplier->>Kafka: Publish PaymentOrderFailed
-    end
-```
 ## 3 · Non-Functional Requirements
 (placeholder)
 
@@ -614,16 +148,14 @@ sequenceDiagram
 ## Table of Contents
 
 1. [Purpose & Audience](#1--purpose--audience)
-2. [System Context](#2--system-context)  
-   2.0 [Functional Requirements](#20-functional-requirements)
-   2.0.1 [Non‑Functional Requirements](#2001-nonfunctional-requirements)
-   2.0.2 [Core Entities](#2002-core-entities)
-   2.0.3 [API Summary](#2003-api-summary)
-   2.0.4 [Data Flow Summary](#2004-data-flow-summary)
-   2.1 [High‑Level Context Diagram](#21-highlevel-context-diagram)
-   2.2 [Bounded Context Map](#22-bounded-context-map)
-   2.3 [Payment Bounded Context Domain Model](#23-payment-bounded-context-domain-model)
-   2.4 [Aggregate Boundaries & Consistency](#24-aggregate-boundaries--consistency)
+2. [Functional Requirements](##2--Functional--Requirements)  
+   2.1 [System Context](#21-system-context)
+   2.2 [Core Entities](#22-core-entities)
+   2.3 [PAyment Bounded Context-Integration Diagram](#23-paymentboundedcontext-integration-diagram-this-diagram-shows-external-integration--boundaries)
+   2.4 [PAyment Bounded Context-Domain Design](#24-payment-bounded-context-domain-modelthis-diagram-shows-internal-domain-aggregates-value-objects-and-events)
+   2.5 [Aggregate Boundaries & Consistency(This diagram shows aggregate boundaries, consistency guarantees, and transaction scopes.](#25-aggregate-boundaries--consistencythis-diagram-shows-aggregate-boundaries-consistency-guarantees-and-transaction-scopes)
+   2.6 [API Summary](#26-api-summary)
+   2.7 [Data Flow](#27-data-flow-summary)
 3. [Core Design Principles](#3--core-design-principles)
 4. [Architectural Overview](#4--architectural-overview)  
    4.1 [Layering & Hexagonal Architecture](#41-layering--hexagonal-architecture)  
@@ -672,11 +204,10 @@ sequenceDiagram
 15. [Changelog](#15--changelog)
 
 ---
-## 1 · Purpose & Audience
-
+## 1 · Purpose/Audience
 - **Demo Scope / Intent**: This platform is a technical showcase designed to
   demonstrate domain expertise in payments, double-entry ledger design, event-driven
-  architecture, idempotent workflows, and cloud-native patterns.Also  
+  architecture, idempotent workflows, and cloud-native patterns.Also
 - It is not intended
   as a commercial product but as an educational, interview-ready reference implementation.
 
@@ -701,118 +232,36 @@ to recreate a complete enterprise system.
 - **Scope**: Payment + ledger infrastructure for multi-entity, MoR-style platforms,
   where external PSPs are used as gateways for pay-ins and pay-outs, and all
   flows are eventually captured in the ledger.
-- 
+-
 
 
-### 2 Functional Requirements
 
+## 2 · Functional Requirements
 This platform models **multi-seller Merchant-of-Record** financial flows. All business operations reduce to a combination of **pay-ins, internal reallocations, and pay-outs**, governed by strict financial invariants.
 
 **Core Functional Invariants:**
 1. **Single Shopper Authorization**
-   - One PSP authorization (`pspAuthRef`) per shopper.
-   - PSP never sees internal seller structure.
+    - One PSP authorization (`pspAuthRef`) per shopper.
+    - PSP never sees internal seller structure.
 
 2. **Multi‑Seller Decomposition**
-   - One `Payment` decomposes into multiple `PaymentOrder`s (one per seller).
+    - One `Payment` decomposes into multiple `PaymentOrder`s (one per seller).
 
 3. **Independent Capture Pipeline**
-   - Each seller capture runs asynchronously (auto‑capture or manual).
-   - PSP only receives: `pspAuthRef + amount`.
+    - Each seller capture runs asynchronously (auto‑capture or manual).
+    - PSP only receives: `pspAuthRef + amount`.
 
 4. **Seller‑Level Payout Responsibility**
-   - Platform ensures receivable/payable correctness per seller.
+    - Platform ensures receivable/payable correctness per seller.
 
 5. **Double‑Entry Ledger as Source of Truth**
-   - Every financial event (auth, capture, settlement, fees, commissions, payouts) must produce balanced journal entries.
+    - Every financial event (auth, capture, settlement, fees, commissions, payouts) must produce balanced journal entries.
 
-6. **Event‑Driven Orchestration**
-   - Kafka-based asynchronous workflow for PaymentOrders.
+6. **Payout‑Safe Accounting**
+    - Sellers can only be paid out after required journal posting.
 
-7. **Idempotent, Exactly‑Once Processing**
-   - DB-level idempotency + Kafka transactions guarantee correctness.
 
-8. **Payout‑Safe Accounting**
-   - Sellers can only be paid out after required journal posting.
-
----
-
-### 2.1 Core Entities
-
-From the Payment Bounded Context:
-
-- **Payment (Coordination Aggregate)**  
-  Holds shopper authorization and orchestrates all seller-level flows.
-
-- **PaymentOrder (Processing Aggregate)**  
-  Seller-specific capture/settlement unit with independent retries.
-
-- **JournalEntry (Ledger Aggregate)**  
-  Immutable, balanced accounting event (created via factory).
-
-- **Account**  
-  Encapsulates receivable/payable buckets, typed using `AccountType`.
-
-- **Amount / Currency**  
-  Value objects representing smallest monetary units with validation.
-
----
-
-### 2.2 API Summary
-
-**POST /payments**  
-- Synchronous PSP authorization(idempotent)  
-- Persist Payment + OutboxEvent  
-- Returns `202 Accepted` with `paymentId` & `pspAuthRef`
-
-**POST /payments/{paymentId}/capture**  
-- Manual capture request  
-- Body: `{ sellerId, amount }`  
-- Validates invariants  
-- Writes OutboxEvent<PaymentCaptureCommand>
-
-**GET /balances/{accountCode}**  
-- Real-time (snapshot + redis delta) or strong consistency read
-
----
-
-### 2.0.4 Data Flow Summary
-
-**Inbound (payment-service)**  
-- REST → DB → Outbox
-
-**Outbox Dispatcher**  
-Process 3 type of OutboxEvent
-  1- OutboxEvent<PaymentAuthorized>:
-    - Picks up `OutboxEvent<PaymentAuthorized>`.
-    - Persist individual `PaymentOrder`(status=INITIATED_PENDING) for each line in payload
-    - Persist  `OutboxEvent<PaymentOrderCreated>` in outbox table
-    - Publishes to Kafka (`payment_authorized` topic).
-2- OutboxEvent<PaymentOrderCreated>:
-   - Picks up `OutboxEvent<PaymentOrderCreated>`.
-   - Generates individual `PaymentOrderCreated` from the outboxevent
-   - Publishes to Kafka (`payment_order_created` topic).
-3- OutboxEvent<PaymentOrderCaptureCommand>:
-   - Picks up `OutboxEvent<PaymentOrderCaptureCommand>`.
-   - Generates individual `PaymentOrderCaptureCommand` from the outboxevent<PaymentOrderCaptureCommand>
-   - update status of paymentorder to capture_requested
-   - Publishes to Kafka (`payment_order_capture_request_queue_topic` topic)
-
-**PSP Flow (payment-consumers)**  
-- Enqueuer → Capture Psp call executor → Psp Result applier  
-- Independent per PaymentOrder  
-- Emits succeeded/failed events
-
-**Ledger Flow**  
-- Dispatcher → ledger topic → ledger recording consumer → journal entries
-
-**Balance Flow**  
-- Ledger delta → Redis → Snapshot job → PostgreSQL durable snapshot
-
----
-
-### 2.1 High‑Level Context Diagram
-
+### 2.1 System Context
 ```mermaid
 flowchart LR
 subgraph Users
@@ -839,30 +288,388 @@ end
 
 
 
+### 2.2 Core Entities
+**Key Points:**
+- **Payment** stores the synchronous authorization outcome (`pspRef`, `AUTHORIZED` / `FAILED`) and coordinates downstream seller captures.
+- **PaymentOrder** is instantiated only after the parent payment is authorized and emits events as each seller capture/settlement progresses.
+- - **PaymentOrderEvent** is representing an even interface representing the immutable events transition between payment order statuses
+- **Ledger Subdomain** uses `AccountType` (auth hold, receivable/payable, scheme fees, commission) and the `JournalEntryFactory` (`authHold`, `releaseHoldOnCapture`, `capture`, `settlement`, `recognizePspFee`, `recognizeCommissionFee`, `payoutToMerchant`, `refundPrePayout`) to enforce balanced postings.
+- **Shipment** listens to individual `PaymentOrderSucceeded` events for immediate fulfillment.
+- All integration remains event-driven via Kafka (no direct dependencies).
+
+### 2.3 PaymentBoundedContext Integration Diagram (This diagram shows external integration / boundaries)
+
+This diagram shows the Payment Bounded Context and its relationships with downstream contexts, including internal aggregates and integration patterns which means
+```mermaid
+%%{init:{'theme':'default','flowchart':{'nodeSpacing':50,'rankSpacing':60}}}%%
+flowchart TB
+    classDef payment fill:#4CAF50,stroke:#2E7D32,stroke-width:3px;
+    classDef downstream fill:#2196F3,stroke:#1565C0,stroke-width:2px;
+    classDef infrastructure fill:#9E9E9E,stroke:#616161,stroke-width:2px;
+    
+    subgraph Payment_BC["Payment Bounded Context (Core Domain)"]
+        Payment_Agg["Payment<br/>Coordination Aggregate<br/>• Synchronous PSP authorization (single PSP call)<br/>• Tracks shopper order + totalAmount<br/>• Status: PENDING_AUTH / AUTHORIZED / PARTIALLY_CAPTURED / CAPTURED_FINAL / DECLINED"]:::payment
+        
+        PaymentOrder_Agg["PaymentOrder<br/>Processing Aggregate<br/>• Created only after PaymentAuthorized<br/>• One per seller / capture leg<br/>• Status: INITIATED_PENDING / CAPTURE_REQUESTED / CAPTURED_FINAL / FINAL_FAILED"]:::payment
+        
+        Ledger_Subdomain["Ledger Subdomain<br/>Double-entry accounting<br/>• Posts entries per successful capture<br/>• Uses AccountType + JournalEntryFactory<br/>• Persists journal_entries + account_balances"]:::payment
+    end
+
+    subgraph Integration["Integration Layer - Kafka Event Bus"]
+        KAFKA[("Kafka Topics<br/>• payment_authorized<br/>• payment_order_created<br/>• payment_order_capture_requested<br/>• payment_order_succeeded / failed<br/>• ledger_entries_recorded")]:::infrastructure
+    end
+
+    subgraph Downstream_BCs["Downstream Bounded Contexts (Implemented)"]
+        Shipment_BC[("Shipment BC<br/>Listens to payment_order_capture_requested<br/>Triggers shipment per seller")]:::downstream
+    end
+
+    %% Relationships inside Payment BC
+    Payment_Agg -->|"1 : N contains"| PaymentOrder_Agg
+    PaymentOrder_Agg -->|"On CAPTURED_FINAL<br/>triggers ledger posting"| Ledger_Subdomain
+
+    %% Events out of Payment BC
+    Payment_Agg -->|"Emits payment_authorized<br/>after successful PSP auth"| KAFKA
+    PaymentOrder_Agg -->|"Emits payment_order_created<br/>(per seller)"| KAFKA
+    PaymentOrder_Agg -->|"Emits payment_order_capture_requested<br/>(auto or manual capture)"| KAFKA
+    PaymentOrder_Agg -->|"Emits payment_order_succeeded / failed<br/>(final capture result)"| KAFKA
+    Ledger_Subdomain -->|"Emits ledger_entries_recorded"| KAFKA
+    
+    %% Downstream consumption
+    KAFKA -->|"Per-seller capture result<br/>PaymentOrderSucceeded/Failed"| Shipment_BC
+
+    %% Styling
+    style Payment_BC fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
+    style Integration fill:#F5F5F5,stroke:#757575,stroke-width:2px
+    style Downstream_BCs fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
+```
 
 
+### 2.4 Payment Bounded Context Domain Model(This diagram shows internal domain aggregates, value objects, and events)
 
-### 2.0.1 Non‑Functional Requirements
 
-1. **Consistency Over Availability**
-    - Financial invariants prioritized over temporary uptime.
+```mermaid
+%%{init:{'theme':'default','flowchart':{'nodeSpacing':40,'rankSpacing':50}}}%%
+flowchart TB
+    classDef aggregate fill:#4CAF50,stroke:#2E7D32,stroke-width:4px;
+    classDef entity fill:#2196F3,stroke:#1565C0,stroke-width:2px;
+    classDef vo fill:#FF9800,stroke:#E65100,stroke-width:2px;
+    classDef event fill:#9C27B0,stroke:#6A1B9A,stroke-width:2px;
+    classDef command fill:#00BCD4,stroke:#00838F,stroke-width:2px;
+    classDef service fill:#795548,stroke:#5D4037,stroke-width:2px;
 
-2. **High Throughput, Low Contention**
-    - PSP, ledger, and balance flows scale independently.
+    subgraph Payment_Coordination["💳 Payment (Coordination Aggregate)"]
+        Payment_Agg["Payment<br/>(Coordination Aggregate Root)<br/>• paymentId: PaymentId<br/>• buyerId: BuyerId<br/>• orderId: OrderId<br/>• totalAmount: Amount<br/>• status: PaymentStatus<br/>• paymentOrders: List<PaymentOrder><br/><br/>Purpose:<br/>• Container for payment request<br/>• Tracks overall payment status<br/>• Emits PaymentCompleted/PaymentUpdated<br/>  events for downstream services<br/>  (e.g., Shipment domain)"]
+    end
 
-3. **Fault Tolerance**
-    - PSP retries via Redis ZSET, optimistic concurrency everywhere.
+    subgraph PaymentOrder_Processing["📋 PaymentOrder (Processing Aggregate)"]
+        PaymentOrder_Agg["PaymentOrder<br/>(Processing Aggregate Root)<br/>• paymentOrderId: PaymentOrderId<br/>• paymentId: PaymentId (reference)<br/>• sellerId: SellerId<br/>• amount: Amount<br/>• status: PaymentOrderStatus<br/>• retryCount: Int<br/>• retryReason: String?<br/>• lastErrorMessage: String?<br/><br/>Purpose:<br/>• Each PaymentOrder processed<br/>  independently with separate<br/>  PSP calls<br/>• Emits PaymentOrderCreated,<br/>  PaymentOrderSucceeded/Failed"]
+    end
 
-4. **Durability**
-    - Outbox ensures atomic DB writes before publishing.
+    subgraph Ledger_Subdomain["🧾 Ledger Subdomain"]
+        JournalEntry_Agg["JournalEntry<br/>Aggregate Root<br/>• id: String<br/>• txType: JournalType<br/>• postings: List<Posting><br/><br/>Factory Methods:<br/>• authHold()<br/>• capture()<br/>• settlement()<br/>• feeRegistered()<br/>• payout()<br/>• fullFlow()<br/><br/>Private Constructor<br/>Enforces Balance"]
+        Posting_Entity["Posting Entity<br/>(Factory-Enforced)<br/>• account: Account<br/>• amount: Amount<br/>• direction: Debit/Credit<br/><br/>Factories:<br/>• Posting.Debit.create()<br/>• Posting.Credit.create()"]
+        Account_VO["Account Value Object<br/>(Factory-Enforced)<br/>• accountCode: String<br/>• type: AccountType<br/>• entityId: String<br/><br/>Factory:<br/>• Account.create(type, entityId)"]
+    end
 
-5. **Observability**
-    - JSON logs (with `traceId`), Prometheus metrics, optional OTel.
+    subgraph Value_Objects["📦 Value Objects"]
+        PaymentId_VO["PaymentId<br/>(Value Object)"]
+        PaymentOrderId_VO["PaymentOrderId<br/>(Value Object)"]
+        SellerId_VO["SellerId<br/>(Value Object)"]
+        BuyerId_VO["BuyerId<br/>(Value Object)"]
+        Amount_VO["Amount<br/>• quantity: Long<br/>• currency: Currency<br/>(Factory: Amount.of())"]
+        Currency_VO["Currency<br/>(Value Class)<br/>• currencyCode: String"]
+        Account_VO["Account<br/>(Factory-Enforced)<br/>• type: AccountType<br/>• entityId: String<br/>(Factory: Account.create())"]
+    end
 
-6. **Security & Compliance**
-    - OAuth2, PCI‑compatible boundaries (PSP handles card data).
+    subgraph Domain_Events["📨 Domain Events"]
+        PaymentCreated_Event["PaymentOrderCreated<br/>(Processing Level)"]
+        PaymentSucceeded_Event["PaymentOrderSucceeded<br/>(Processing Level)"]
+        PaymentFailed_Event["PaymentOrderFailed<br/>(Processing Level)"]
+        PaymentCompleted_Event["PaymentCompleted<br/>(Optional Coordination Level)<br/>Emitted when all<br/>PaymentOrders finalized<br/>(for overall order tracking)"]
+        LedgerRecorded_Event["LedgerEntriesRecorded"]
+    end
 
----
+    subgraph Domain_Commands["⚡ Domain Commands"]
+        CreatePayment_Cmd["CreatePaymentCommand"]
+        LedgerRecording_Cmd["LedgerRecordingCommand"]
+    end
+
+    Payment_Agg -->|"Contains (1:N)<br/>Coordination Container"| PaymentOrder_Agg
+    Payment_Agg -->|"Uses"| PaymentId_VO
+    Payment_Agg -->|"Uses"| BuyerId_VO
+    Payment_Agg -->|"Uses"| Amount_VO
+    PaymentOrder_Agg -->|"References"| PaymentId_VO
+    PaymentOrder_Agg -->|"Uses"| PaymentOrderId_VO
+    PaymentOrder_Agg -->|"Uses"| SellerId_VO
+    PaymentOrder_Agg -->|"Uses"| Amount_VO
+    PaymentOrder_Agg -->|"Emits (Processing)"| PaymentCreated_Event
+    PaymentOrder_Agg -->|"Emits (Processing)"| PaymentSucceeded_Event
+    PaymentOrder_Agg -->|"Emits (Processing)"| PaymentFailed_Event
+    Payment_Agg -->|"Emits (Coordination)<br/>When all PaymentOrders<br/>finalized (optional)"| PaymentCompleted_Event["PaymentCompleted<br/>(Optional - for overall<br/>order status tracking)"]
+
+    JournalEntry_Agg -->|"Contains (1:N)"| Posting_Entity
+    JournalEntry_Agg -->|"Uses"| Account_VO
+    JournalEntry_Agg -->|"Emits"| LedgerRecorded_Event
+
+    CreatePayment_Cmd -->|"Creates<br/>Payment + PaymentOrders"| Payment_Agg
+    LedgerRecording_Cmd -->|"Creates"| JournalEntry_Agg
+
+    style Payment_Agg fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
+    style PaymentOrder_Agg fill:#C8E6C9,stroke:#388E3C,stroke-width:4px
+    style JournalEntry_Agg fill:#C8E6C9,stroke:#388E3C,stroke-width:4px
+    style Posting_Entity fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
+    style PaymentId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
+    style PaymentOrderId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
+    style SellerId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
+    style BuyerId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
+    style Amount_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
+    style Account_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
+```
+
+In the refreshed Merchant-of-Record scope:
+- `Payment` captures the shopper-level authorization synchronously (stores PSP auth id, status) and acts as the coordination point for all downstream seller obligations.
+- `PaymentOrder` represents each seller capture obligation that will be executed asynchronously via the PSP capture endpoint, independent per seller.
+- The ledger subdomain remains unchanged, recording AUTH_HOLD during authorization and subsequent capture/settlement postings as events progress.
+
+### 2.5 Aggregate Boundaries & Consistency(This diagram shows aggregate boundaries, consistency guarantees, and transaction scopes.)
+
+
+```mermaid
+%%{init:{'theme':'default','flowchart':{'nodeSpacing':40,'rankSpacing':50}}}%%
+flowchart TB
+    classDef aggregate fill:#4CAF50,stroke:#2E7D32,stroke-width:4px;
+    classDef consistency fill:#FF9800,stroke:#E65100,stroke-width:2px;
+    classDef transaction fill:#2196F3,stroke:#1565C0,stroke-width:2px;
+
+    subgraph Payment_Coordination_Boundary["💳 Payment Aggregate (Coordination)"]
+        Payment_Invariants["Invariants:<br/>• totalAmount = sum(paymentOrders.amount)<br/>• All amounts same currency<br/>• Consistency: Immediate<br/><br/>Purpose:<br/>• Coordination aggregate for<br/>  cross-domain integration<br/>• Tracks overall payment completion<br/>• Emits PaymentCompleted when<br/>  all PaymentOrders finalized"]
+        Payment_Actions["Actions:<br/>• markAsPaid()<br/>• markAsFailed()<br/>• addPaymentOrder()<br/>• checkAllPaymentOrdersCompleted()<br/>• emitPaymentCompleted()"]
+        Payment_Events["Coordination Events:<br/>• PaymentCompleted (optional - emitted<br/>  when all PaymentOrders finalized)<br/>• PaymentUpdated<br/><br/>Note: Shipment domain listens to<br/>individual PaymentOrderSucceeded<br/>events (not PaymentCompleted) to<br/>initiate shipment per seller immediately"]
+    end
+
+    subgraph PaymentOrder_Aggregate_Boundary["📋 PaymentOrder Aggregate (Processing)"]
+        PO_Invariants["Invariants:<br/>• retryCount ≤ MAX_RETRIES (5)<br/>• Terminal states immutable<br/>• Consistency: Immediate<br/>• Each PaymentOrder processed<br/>  independently with separate PSP call"]
+        PO_Actions["Actions:<br/>• markAsPaid()<br/>• markAsFailed()<br/>• incrementRetry()<br/>• markAsPending()<br/>• withRetryReason()<br/>• withLastError()"]
+        PO_Status["Status Transitions:<br/>INITIATED_PENDING →<br/>SUCCESSFUL_FINAL /<br/>FAILED_FINAL"]
+        PO_Processing["Processing:<br/>• Separate PSP call per PaymentOrder<br/>• Independent retry logic<br/>• Individual status tracking<br/>• Event-driven (PaymentOrderCreated,<br/>  PaymentOrderSucceeded, etc.)<br/>• Events trigger Payment status<br/>  evaluation"]
+    end
+
+    subgraph Ledger_Aggregate_Boundary["🧾 Ledger Aggregate Boundary"]
+        Ledger_Invariants["Invariants:<br/>• Debits = Credits (balanced)<br/>• JournalEntry immutable<br/>• Consistency: Immediate<br/>• Factory-enforced creation<br/>  (private constructors)"]
+        Ledger_Actions["Actions:<br/>• JournalEntry.fullFlow()<br/>• JournalEntry.failedPayment()<br/>• Account.create()<br/>• Amount.of()<br/>• Posting.Debit.create()<br/>• Posting.Credit.create()"]
+        Ledger_Balance["Balance Rule:<br/>Σ(Posting.debits) =<br/>Σ(Posting.credits)<br/><br/>Enforced at creation via<br/>factory methods"]
+    end
+
+    subgraph Transaction_Scopes["🔒 Transaction Scopes"]
+        DB_Transaction["Database Transaction<br/>• Payment + PaymentOrders<br/>• JournalEntry + Postings<br/>• Atomic within aggregate"]
+        Kafka_Transaction["Kafka Transaction<br/>• Offset commit<br/>• Event publish<br/>• Atomic across aggregates"]
+    end
+
+    Payment_Coordination_Boundary -->|"Contains (1:N)<br/>Coordination Container"| PaymentOrder_Aggregate_Boundary
+    PaymentOrder_Aggregate_Boundary -->|"Completion triggers<br/>Payment status evaluation"| Payment_Coordination_Boundary
+    PaymentOrder_Aggregate_Boundary -->|"Emits Events<br/>Eventually Consistent<br/>(Per PaymentOrder)"| Ledger_Aggregate_Boundary
+    Payment_Coordination_Boundary -->|"May emit<br/>PaymentCompleted<br/>(Optional - overall status)"| CrossDomain["🌐 Downstream Services"]
+    PaymentOrder_Aggregate_Boundary -->|"Emits<br/>PaymentOrderSucceeded<br/>(Per seller - immediate action)"| CrossDomain
+    Payment_Coordination_Boundary -->|"Uses<br/>Initial Creation +<br/>Status Updates"| DB_Transaction
+    PaymentOrder_Aggregate_Boundary -->|"Uses<br/>All Processing"| Kafka_Transaction
+    PaymentOrder_Aggregate_Boundary -->|"Uses<br/>Status Updates"| DB_Transaction
+    Ledger_Aggregate_Boundary -->|"Uses"| DB_Transaction
+
+    style Payment_Coordination_Boundary fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
+    style PaymentOrder_Aggregate_Boundary fill:#C8E6C9,stroke:#388E3C,stroke-width:4px
+    style Ledger_Aggregate_Boundary fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
+    style DB_Transaction fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
+    style Kafka_Transaction fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
+```
+
+**Key DDD Concepts:**
+- **Payment**: Coordination aggregate root representing a multi-seller checkout (e.g., Amazon shopping cart). Contains multiple `PaymentOrder` objects (1:N), one per seller.
+    - **Coordination Role**: Tracks overall payment completion status across all `PaymentOrder` objects
+    - **Use Case**: When a shopper checks out with products from multiple sellers, one `Payment` contains multiple `PaymentOrders` (one per seller)
+    - **Cross-Domain Events**: When all `PaymentOrder` objects are finalized (succeed/fail), `Payment` can optionally be updated and emit `PaymentCompleted` event for overall order tracking
+    - **Note**: Shipment domain listens to individual `PaymentOrderSucceeded` events (not `PaymentCompleted`) to immediately initiate shipment for that seller's products - they don't wait for other sellers' payments
+    - **Dual Purpose**: Container for initial persistence + optional coordination point for overall payment status
+- **PaymentOrder**: Processing aggregate root for PSP interactions. Represents payment for a single seller's products in a multi-seller checkout.
+    - **Real-World Example**: Amazon checkout - shopper has products from Seller A, B, and C → creates Payment with 3 PaymentOrders
+    - **Independent Processing**: Each `PaymentOrder` is processed independently:
+        - Separate PSP call per `PaymentOrder` (each seller gets independent PSP processing)
+        - Independent retry logic and status tracking
+        - Individual event emission (`PaymentOrderCreated`, `PaymentOrderSucceeded`, `PaymentOrderFailed`)
+        - Processed via Kafka consumers using `paymentOrderId` as partition key
+    - **Immediate Downstream Actions**: When `PaymentOrderSucceeded` event is emitted for Seller A:
+        - Shipment domain immediately starts shipping Seller A's products (doesn't wait for Seller B or C)
+        - Enables parallel fulfillment across different sellers
+    - **Coordination Trigger**: When all `PaymentOrder` statuses are terminal, triggers optional `Payment` status evaluation
+- **Separate Aggregate**: `JournalEntry` forms its own aggregate boundary for ledger
+- **Consistency Boundaries**: Each aggregate maintains immediate consistency; eventual consistency between aggregates via events
+- **Transaction Scope**: Database transactions for initial Payment+PaymentOrders creation; Kafka transactions for PaymentOrder processing; separate DB transactions per PaymentOrder status updates; eventual Payment status update when all PaymentOrders complete
+
+### 2.6 API Summary
+Authentication
+
+All endpoints require:
+
+Authorization: Bearer <access-token>
+Idempotency-Key: <unique-key>   // for POST endpoints
+Content-Type: application/json
+
+POST /payments
+
+Create a new payment + perform synchronous authorization.
+
+Headers
+•	Authorization: Bearer …
+•	Idempotency-Key: …
+
+Response Codes
+•	202 Accepted — Authorization succeeded, processing continues async
+•	402 Payment Required — Authorization declined
+•	400 Bad Request — Invalid request
+•	409 Conflict — Idempotency key reuse mismatch
+•	401 / 403 — Auth errors
+
+⸻
+
+POST /payments/{paymentId}/capture
+
+Trigger manual capture for a seller leg.
+
+Headers
+•	Authorization: Bearer …
+•	Idempotency-Key: …
+
+Response Codes
+•	202 Accepted — Capture command queued
+•	404 Not Found — Payment or seller leg missing
+•	409 Conflict — Duplicate or invalid capture
+•	400 Bad Request — Invalid body
+•	401 / 403 — Auth errors
+
+⸻
+
+GET /payments/{paymentId}
+
+Retrieve payment status (buyer-level).
+
+Headers
+•	Authorization: Bearer …
+
+Response Codes
+•	200 OK
+•	404 Not Found
+•	401 / 403
+
+⸻
+
+GET /payments/{paymentId}/orders
+
+Retrieve all PaymentOrders (seller-level).
+
+Headers
+•	Authorization: Bearer …
+
+Response Codes
+•	200 OK
+•	404 Not Found
+•	401 / 403
+
+### 2.7 Data Flow Summary
+```mermaid
+sequenceDiagram
+    autonumber
+
+    participant Client
+    participant PaymentService
+    participant PSPAuth as PSP Authorization
+    participant DB
+    participant Outbox as OutboxDispatcherJob
+    participant Kafka
+    participant Enqueuer
+    participant CaptureExec as CaptureExecutor
+    participant ResultApplier
+    participant Redis
+    participant PSP as PSP Capture
+
+    %% ============================
+    %% 1. Synchronous Authorization
+    %% ============================
+    Client->>PaymentService: POST /payments
+    PaymentService->>PSPAuth: authorize(orderTotal, cardInfo)
+    PSPAuth-->>PaymentService: authResult(APPROVED/DECLINED)
+
+    alt Approved
+        PaymentService->>DB: Persist Payment(PENDING_AUTH→AUTHORIZED)\n+ outbox<PaymentAuthorized>
+        PaymentService-->>Client: 202 Accepted
+    else Declined
+        PaymentService->>DB: Persist Payment(DECLINED)
+        PaymentService-->>Client: 402 Payment Required
+    end
+
+
+    %% =============================================
+    %% 2. (NEW) Manual Capture Request per seller
+    %% =============================================
+    Client->>PaymentService: POST /payments/{paymentId}/capture\n{sellerId, amount}
+    PaymentService->>DB: Validate + Persist outbox<PaymentOrderCaptureCommand>
+    PaymentService-->>Client: 202 Accepted (capture queued)
+
+
+    %% =============================================
+    %% 3. OutboxDispatcherJob — NEW Responsibilities
+    %% =============================================
+    Outbox->>DB: Fetch NEW outbox rows (payment, paymentOrder, captureCmd)
+
+    %% 3.1 PaymentAuthorized
+    Outbox->>Outbox: Expand PaymentAuthorized → create PaymentOrders
+    Outbox->>DB: Insert PaymentOrders
+    Outbox->>DB: Insert outbox<PaymentOrderCreated[]> 
+    Outbox->>Kafka: Publish PaymentAuthorized
+    Outbox->>Kafka: Publish PaymentOrderCreated (per seller)
+
+    %% 3.2 PaymentOrderCreated passthrough
+    Outbox->>Kafka: Publish PaymentOrderCreated
+    Outbox->>DB: Mark SENT
+
+    %% 3.3 PaymentOrderCaptureCommand (NEW)
+    Outbox->>DB: Update PaymentOrder → CAPTURE_REQUESTED
+    Outbox->>Kafka: Publish PaymentOrderCaptureRequested
+
+    Outbox->>DB: Mark outbox items as SENT
+
+
+    %% =============================================
+    %% 4. Enqueuer → PSP Capture Requested
+    %% =============================================
+    Enqueuer->>Kafka: Consume PaymentOrderCreated
+    Enqueuer->>Kafka: Publish PaymentOrderCaptureRequested (auto-capture scenario)
+
+
+    %% =============================================
+    %% 5. Capture Executor
+    %% =============================================
+    CaptureExec->>Kafka: Consume PaymentOrderCaptureRequested
+    CaptureExec->>PSP: capture(sellerAmount, authRef)
+    PSP-->>CaptureExec: captureResult
+    CaptureExec->>Kafka: Publish PaymentOrderPspResultUpdated
+
+
+    %% =============================================
+    %% 6. PSP Result Applier
+    %% =============================================
+    ResultApplier->>Kafka: Consume PaymentOrderPspResultUpdated
+
+    alt Capture Success
+        ResultApplier->>DB: Update PaymentOrder → CAPTURED_FINAL
+        ResultApplier->>Kafka: Publish PaymentOrderSucceeded
+    else Retryable Failure
+        ResultApplier->>Redis: ZSET schedule retry
+        ResultApplier->>DB: retry_count++
+    else Final Failure
+        ResultApplier->>DB: Update PaymentOrder → FINAL_FAILED
+        ResultApplier->>Kafka: Publish PaymentOrderFailed
+    end
+```
+
 
 
 ## 3 · Core Design Principles
@@ -921,15 +728,15 @@ flowchart LR
 
 > **Current Architecture (Jan‑2025):** `payment-consumers` contains six specialized consumers organized into **three independent flows**:
 > - **PSP Flow** (3 consumers):
->   - **PaymentOrderEnqueuer** *(reads `payment_order_created_topic` and enqueues PSP call tasks)*
+    >   - **PaymentOrderEnqueuer** *(reads `payment_order_created_topic` and enqueues PSP call tasks)*
 >   - **PaymentOrderPspCallExecutor** *(invokes PSP **capture** endpoint and publishes results)*
 >   - **PaymentOrderPspResultApplier** *(applies PSP results and manages retries)*
 > - **Status Check Flow** (1 consumer):
->   - **ScheduledPaymentStatusCheckExecutor** *(handles async status check requests)*
+    >   - **ScheduledPaymentStatusCheckExecutor** *(handles async status check requests)*
 > - **Ledger Flow** (2 consumers):
->   - **LedgerRecordingRequestDispatcher** *(routes finalized payments to ledger queue)*
+    >   - **LedgerRecordingRequestDispatcher** *(routes finalized payments to ledger queue)*
 >   - **LedgerRecordingConsumer** *(creates double-entry journal entries)*
-> 
+>
 > **Independent Scaling & Flow Isolation**: Each flow uses separate Kafka topics and consumer groups:
 > - **PSP Flow**: Consumer groups `payment-order-*-consumer-group` (concurrency=8), topics `payment_order_*_topic` (48 partitions)
 > - **Status Check Flow**: Consumer group `payment-status-check-scheduler-consumer-group` (concurrency=1), topic `payment_status_check_scheduler_topic` (1 partition)
@@ -1111,28 +918,28 @@ The account balance system maintains real-time, idempotent balance aggregation f
 2. **Cold Layer (PostgreSQL)**: Stores durable snapshots with `last_applied_entry_id` for consistency
 
 **Key Components:**
-- **AccountBalanceConsumer**: 
-  - Batch consumer processing `LedgerEntriesRecorded` events (concurrency=4, partitioned by `sellerId`)
-  - Consumes batches of 100-500 events (Kafka batch size)
-  - Uses `KafkaTxExecutor` for atomic offset commit + processing
-  - Extracts all ledger entries from batch, converts to domain objects, passes to service
-  
-- **AccountBalanceService**: 
-  - Processes list of `LedgerEntry` domain objects (from batch)
-  - Extracts all postings, groups by account code
-  - **Batch loads** current snapshots from PostgreSQL (`findByAccountCodes`) for efficiency
-  - For each account: filters postings by watermark, computes delta, updates Redis atomically
-  - Marks accounts as dirty for snapshot job processing
-  
-- **AccountBalanceSnapshotJob**: 
-  - Scheduled job (every 1 minute, configurable via `account-balance.snapshot-interval`)
-  - Reads dirty accounts from Redis set
-  - For each dirty account: atomically gets and resets delta, merges to snapshot, saves to DB
-  - Uses database watermark guard to prevent concurrent overwrites
-  
+- **AccountBalanceConsumer**:
+    - Batch consumer processing `LedgerEntriesRecorded` events (concurrency=4, partitioned by `sellerId`)
+    - Consumes batches of 100-500 events (Kafka batch size)
+    - Uses `KafkaTxExecutor` for atomic offset commit + processing
+    - Extracts all ledger entries from batch, converts to domain objects, passes to service
+
+- **AccountBalanceService**:
+    - Processes list of `LedgerEntry` domain objects (from batch)
+    - Extracts all postings, groups by account code
+    - **Batch loads** current snapshots from PostgreSQL (`findByAccountCodes`) for efficiency
+    - For each account: filters postings by watermark, computes delta, updates Redis atomically
+    - Marks accounts as dirty for snapshot job processing
+
+- **AccountBalanceSnapshotJob**:
+    - Scheduled job (every 1 minute, configurable via `account-balance.snapshot-interval`)
+    - Reads dirty accounts from Redis set
+    - For each dirty account: atomically gets and resets delta, merges to snapshot, saves to DB
+    - Uses database watermark guard to prevent concurrent overwrites
+
 - **AccountBalanceReadService**: Provides two read patterns:
-  - `getRealTimeBalance()`: Fast read (`snapshot + redis.delta`, non-consuming)
-  - `getStrongBalance()`: Strong consistency read (consumes delta, merges immediately, returns)
+    - `getRealTimeBalance()`: Fast read (`snapshot + redis.delta`, non-consuming)
+    - `getStrongBalance()`: Strong consistency read (consumes delta, merges immediately, returns)
 
 #### Balance Flow Sequence
 
@@ -1175,27 +982,27 @@ sequenceDiagram
 **Watermark-Based Duplicate Prevention (Two-Level Protection):**
 
 1. **Consumer-Level Filtering** (`AccountBalanceService`):
-   - Loads current snapshot watermarks from PostgreSQL (batch query: `findByAccountCodes`)
-   - Filters postings: `WHERE ledger_entry_id > lastAppliedEntryId` before computing deltas
-   - Only processes new ledger entries that haven't been applied yet
-   - Prevents duplicate delta accumulation in Redis on replay/retry
+    - Loads current snapshot watermarks from PostgreSQL (batch query: `findByAccountCodes`)
+    - Filters postings: `WHERE ledger_entry_id > lastAppliedEntryId` before computing deltas
+    - Only processes new ledger entries that haven't been applied yet
+    - Prevents duplicate delta accumulation in Redis on replay/retry
 
 2. **Database-Level Watermark Guard** (`insertOrUpdateSnapshot`):
-   - PostgreSQL UPSERT includes WHERE clause: `WHERE account_balances.last_applied_entry_id < EXCLUDED.last_applied_entry_id`
-   - Update only proceeds if new watermark is **strictly greater** than current watermark
-   - Protects against concurrent snapshot job executions and race conditions
-   - Ensures snapshots always advance monotonically (no rollbacks)
+    - PostgreSQL UPSERT includes WHERE clause: `WHERE account_balances.last_applied_entry_id < EXCLUDED.last_applied_entry_id`
+    - Update only proceeds if new watermark is **strictly greater** than current watermark
+    - Protects against concurrent snapshot job executions and race conditions
+    - Ensures snapshots always advance monotonically (no rollbacks)
 
 **Atomic Operations:**
-- **Redis Lua Script (`addDeltaAndWatermark`)**: 
-  - `HINCRBY` on delta field (atomic increment)
-  - `HSET` watermark if new value is higher
-  - `EXPIRE` sets TTL on hash (5 minutes)
-  - `SADD` adds account to dirty set (also with TTL)
+- **Redis Lua Script (`addDeltaAndWatermark`)**:
+    - `HINCRBY` on delta field (atomic increment)
+    - `HSET` watermark if new value is higher
+    - `EXPIRE` sets TTL on hash (5 minutes)
+    - `SADD` adds account to dirty set (also with TTL)
 - **Redis Lua Script (`getAndResetDeltaWithWatermark`)**:
-  - `HGET` retrieves delta and watermark atomically
-  - `HSET` resets delta to 0 (prevents double-counting)
-  - Returns both values for merging
+    - `HGET` retrieves delta and watermark atomically
+    - `HSET` resets delta to 0 (prevents double-counting)
+    - Returns both values for merging
 - **PostgreSQL UPSERT**: `ON CONFLICT (account_code) DO UPDATE` with watermark guard ensures safe concurrent writes
 
 **Delta Reset Mechanism:**
@@ -1255,23 +1062,23 @@ fun getStrongBalance(accountCode: String): Long {
 
 **Snapshot Job Failure Scenarios:**
 1. **Delta reset succeeds, but DB save fails**:
-   - Delta already reset to 0 in Redis (cannot be retried from Redis)
-   - Snapshot not updated in DB (remains at old balance)
-   - **Recovery**: Next consumer batch will re-compute delta from ledger entries (watermark check prevents duplicates, but new entries since snapshot will be processed)
-   - **Alternative Recovery**: Recompute balance from `postings` table if needed
+    - Delta already reset to 0 in Redis (cannot be retried from Redis)
+    - Snapshot not updated in DB (remains at old balance)
+    - **Recovery**: Next consumer batch will re-compute delta from ledger entries (watermark check prevents duplicates, but new entries since snapshot will be processed)
+    - **Alternative Recovery**: Recompute balance from `postings` table if needed
 2. **Redis failure during getAndResetDeltaWithWatermark**:
-   - Delta remains in Redis, dirty marker remains
-   - Job retries on next cycle (1 minute)
-   - If Redis recovers, next cycle will process successfully
+    - Delta remains in Redis, dirty marker remains
+    - Job retries on next cycle (1 minute)
+    - If Redis recovers, next cycle will process successfully
 3. **Database failure during saveSnapshot**:
-   - Delta already reset in Redis
-   - DB transaction rollback (if within transaction) or no update
-   - Next cycle will try to process, but delta is 0, so no-op
-   - **Recovery**: Consumer will accumulate new deltas, next job cycle will merge
+    - Delta already reset in Redis
+    - DB transaction rollback (if within transaction) or no update
+    - Next cycle will try to process, but delta is 0, so no-op
+    - **Recovery**: Consumer will accumulate new deltas, next job cycle will merge
 4. **Watermark guard rejects update**:
-   - Another job instance already merged with higher watermark
-   - Update skipped (no-op), correct behavior (idempotent)
-   - No data loss, snapshot remains consistent
+    - Another job instance already merged with higher watermark
+    - Update skipped (no-op), correct behavior (idempotent)
+    - No data loss, snapshot remains consistent
 
 **Concurrent Snapshot Job Executions:**
 - Multiple job instances can run simultaneously (e.g., during deployment)
@@ -1316,8 +1123,8 @@ Adds a complete **double‑entry accounting subsystem** for reliable financial r
 - **Atomic Delta Updates**: Redis Lua scripts ensure atomic delta + watermark updates (HINCRBY + HSET in single operation)
 - **Scheduled Merge**: `AccountBalanceSnapshotJob` runs every 1 minute, merging dirty Redis deltas into PostgreSQL snapshots
 - **Read Patterns**:
-  - **Real-Time Read**: `snapshot.balance + redis.delta` (fast, eventual consistency)
-  - **Strong Consistency Read**: Atomically merge delta to snapshot before returning (slower, guaranteed accuracy)
+    - **Real-Time Read**: `snapshot.balance + redis.delta` (fast, eventual consistency)
+    - **Strong Consistency Read**: Atomically merge delta to snapshot before returning (slower, guaranteed accuracy)
 
 **Configuration Sources:**
 - **Consumer Configuration**: `app.kafka.dynamic-consumers[]` in `payment-consumers/src/main/resources/application-local.yml`
@@ -1347,7 +1154,7 @@ sequenceDiagram
 
 #### Components
 
-- **LedgerRecordingRequestDispatcher**: 
+- **LedgerRecordingRequestDispatcher**:
     - Kafka consumer for `payment_order_finalized_topic` (unified topic, partitioned by `paymentOrderId`)
     - Consumer Group: `ledger-recording-request-dispatcher-consumer-group`
     - Container Factory: `payment_order_finalized_topic-factory`
@@ -1356,13 +1163,13 @@ sequenceDiagram
     - Delegates to `RequestLedgerRecordingService` within Kafka transaction boundary
     - Log Context: Uses `LogContext.with(env)` to propagate `traceId` and `parentEventId` from envelope
 
-- **RequestLedgerRecordingService**: 
+- **RequestLedgerRecordingService**:
     - Transforms `PaymentOrderEvent` → `LedgerRecordingCommand` with trace and parent event propagation
     - **Critical Design**: Publishes with **`aggregateId = sellerId`** (NOT `paymentOrderId`) to `ledger_record_request_queue_topic`
     - This ensures all ledger commands for the same merchant route to the same Kafka partition
     - **Partition Key Switch**: Payment flow uses `paymentOrderId`, but ledger flow switches to `sellerId` for merchant-level ordering
 
-- **LedgerRecordingConsumer**: 
+- **LedgerRecordingConsumer**:
     - Listens on `ledger_record_request_queue_topic` (partitioned by `sellerId`)
     - Consumer Group: `ledger-recording-consumer-group`
     - Container Factory: `ledger_record_request_queue_topic-factory`
@@ -1372,12 +1179,12 @@ sequenceDiagram
     - Log Context: Uses `LogContext.with(env)` to propagate `traceId` and `parentEventId` from envelope
     - Event Type Filtering: Factory configured with `expectedEventType = EVENT_TYPE.LEDGER_RECORDING_REQUESTED`
 
-- **RecordLedgerEntriesService**: 
+- **RecordLedgerEntriesService**:
     - Creates balanced `JournalEntry` objects via `JournalEntry` factory methods, persists via `LedgerEntryPort.postLedgerEntriesAtomic()`
     - **Journal Entry Creation Logic**:
-      - `SUCCESSFUL_FINAL` with `AuthType.SALE` (default): Uses `JournalEntry.authHoldAndCapture()` → returns 2 entries (auth hold + capture)
-      - `SUCCESSFUL_FINAL` with other auth types: Uses `JournalEntry.authHold()` → returns 1 entry
-      - `FAILED_FINAL`/`FAILED`: Uses `JournalEntry.failedPayment()` → returns empty list (no persistence)
+        - `SUCCESSFUL_FINAL` with `AuthType.SALE` (default): Uses `JournalEntry.authHoldAndCapture()` → returns 2 entries (auth hold + capture)
+        - `SUCCESSFUL_FINAL` with other auth types: Uses `JournalEntry.authHold()` → returns 1 entry
+        - `FAILED_FINAL`/`FAILED`: Uses `JournalEntry.failedPayment()` → returns empty list (no persistence)
     - Processes entries via `postLedgerEntriesAtomic()` which processes entries sequentially within a single transaction
     - Emits `LedgerEntriesRecorded` with **`aggregateId = sellerId`** to `ledger_entries_recorded_topic`
     - **Maintains Partition Alignment**: Uses same `sellerId` key, ensuring entries stay in same partition
@@ -1424,60 +1231,60 @@ sequenceDiagram
 - Executes within `KafkaTxExecutor` transactional boundary for offset + event commit
 - **Batch Processing**: All journal entries for a payment order are processed via `postLedgerEntriesAtomic(entries)` in a single transaction
 - **Entry Processing**: `postLedgerEntriesAtomic()` processes entries sequentially within the transaction:
-  - Each entry is checked for duplicates via `insertJournalEntry()` with `ON CONFLICT DO NOTHING`
-  - When `insertJournalEntry()` returns `0` (duplicate detected): Method returns early, entire batch skipped
-  - When `insertJournalEntry()` returns `1` (new entry): Entry and all postings are inserted successfully
+    - Each entry is checked for duplicates via `insertJournalEntry()` with `ON CONFLICT DO NOTHING`
+    - When `insertJournalEntry()` returns `0` (duplicate detected): Method returns early, entire batch skipped
+    - When `insertJournalEntry()` returns `1` (new entry): Entry and all postings are inserted successfully
 - **Database-level idempotency** via `ON CONFLICT` in `journal_entries` and `postings` tables
-- **Duplicate Detection Behavior**: 
-  - **Early Exit**: When first duplicate is detected, `postLedgerEntriesAtomic()` returns immediately
-  - **Batch Abandonment**: Remaining entries in the batch are not processed
-  - **Transaction Commit**: Method exits successfully, transaction commits (no-op since no inserts occurred)
-  - Processing moves to next `LedgerRecordingCommand` (not next entry in current batch)
+- **Duplicate Detection Behavior**:
+    - **Early Exit**: When first duplicate is detected, `postLedgerEntriesAtomic()` returns immediately
+    - **Batch Abandonment**: Remaining entries in the batch are not processed
+    - **Transaction Commit**: Method exits successfully, transaction commits (no-op since no inserts occurred)
+    - Processing moves to next `LedgerRecordingCommand` (not next entry in current batch)
 - **Consequences of replays**:
-  - Duplicate journal entries cause early return, preventing batch processing
-  - Only entries before the duplicate are processed (if any)
-  - Retries will hit the same duplicate and skip the batch again
-  - External systems can detect replays via event deduplication logic
+    - Duplicate journal entries cause early return, preventing batch processing
+    - Only entries before the duplicate are processed (if any)
+    - Retries will hit the same duplicate and skip the batch again
+    - External systems can detect replays via event deduplication logic
 
 #### Exception Handling & Failure Modes
 
 **LedgerRecordingRequestDispatcher Failure Scenarios**:
 1. **Publish exception**: If `RequestLedgerRecordingService.publishSync()` throws (Kafka unavailable, serialization error)
-   - Exception propagates up to `KafkaTxExecutor`
-   - **Kafka transaction aborts**: Consumer offset not committed, `LedgerRecordingCommand` not published
-   - Event will be retried automatically by Kafka consumer
-   - No state change in ledger system
+    - Exception propagates up to `KafkaTxExecutor`
+    - **Kafka transaction aborts**: Consumer offset not committed, `LedgerRecordingCommand` not published
+    - Event will be retried automatically by Kafka consumer
+    - No state change in ledger system
 2. **Repeated failures**: If publish consistently fails, event will retry indefinitely until fixed or DLQ configured
 
 **LedgerRecordingConsumer Failure Scenarios**:
 1. **Persistence exception** (`postLedgerEntriesAtomic()` throws during processing):
-   - All entries processed in a single `@Transactional` method
-   - Exception propagates before `LedgerEntriesRecorded` event publishing
-   - `KafkaTxExecutor` aborts transaction: Consumer offset not committed
-   - **Spring Transaction Rollback**: All DB changes within `postLedgerEntriesAtomic()` are rolled back
-   - `LedgerRecordingCommand` will be retried
-   - **State**: No entries persisted (all-or-nothing within the transaction)
-   - No event published
-   - **On retry**: All entries reprocessed from scratch
+    - All entries processed in a single `@Transactional` method
+    - Exception propagates before `LedgerEntriesRecorded` event publishing
+    - `KafkaTxExecutor` aborts transaction: Consumer offset not committed
+    - **Spring Transaction Rollback**: All DB changes within `postLedgerEntriesAtomic()` are rolled back
+    - `LedgerRecordingCommand` will be retried
+    - **State**: No entries persisted (all-or-nothing within the transaction)
+    - No event published
+    - **On retry**: All entries reprocessed from scratch
 2. **Duplicate entry detected** (entry N is duplicate):
-   - Within `postLedgerEntriesAtomic()`, entries processed sequentially in a single transaction
-   - `insertJournalEntry()` returns `0` for entry N (duplicate detected)
-   - **Early return**: Method exits immediately via `return` statement (does not throw exception)
-   - **Transaction commits**: Method returns successfully, Spring transaction commits
-     - If entries 1 to N-1 were successfully inserted: They are committed to DB
-     - If entry N (duplicate) was the first entry: Transaction commits with no inserts (no-op)
-   - **Remaining entries skipped**: Entries N+1 onwards in the batch are not processed
-   - **Processing continues**: Moves to **next `LedgerRecordingCommand`** (not the next entry in current batch)
-   - **On retry**: 
-     - If the same `LedgerRecordingCommand` is retried, same duplicate will be detected at entry N again
-     - Previously committed entries (1 to N-1) remain in DB due to idempotency via `ON CONFLICT`
-     - Entries N+1 onwards remain unprocessed until a new command without duplicates is received
+    - Within `postLedgerEntriesAtomic()`, entries processed sequentially in a single transaction
+    - `insertJournalEntry()` returns `0` for entry N (duplicate detected)
+    - **Early return**: Method exits immediately via `return` statement (does not throw exception)
+    - **Transaction commits**: Method returns successfully, Spring transaction commits
+        - If entries 1 to N-1 were successfully inserted: They are committed to DB
+        - If entry N (duplicate) was the first entry: Transaction commits with no inserts (no-op)
+    - **Remaining entries skipped**: Entries N+1 onwards in the batch are not processed
+    - **Processing continues**: Moves to **next `LedgerRecordingCommand`** (not the next entry in current batch)
+    - **On retry**:
+        - If the same `LedgerRecordingCommand` is retried, same duplicate will be detected at entry N again
+        - Previously committed entries (1 to N-1) remain in DB due to idempotency via `ON CONFLICT`
+        - Entries N+1 onwards remain unprocessed until a new command without duplicates is received
 3. **Publish exception** (after successful persistence of all entries):
-   - Exception propagates to `KafkaTxExecutor`, transaction aborts
-   - Kafka offset not committed - command retried
-   - **Critical**: All ledger entries already persisted from first attempt
-   - **On retry**: `ON CONFLICT` prevents duplicate entries, all entries skipped
-   - Event only published after successful persistence (will succeed on retry)
+    - Exception propagates to `KafkaTxExecutor`, transaction aborts
+    - Kafka offset not committed - command retried
+    - **Critical**: All ledger entries already persisted from first attempt
+    - **On retry**: `ON CONFLICT` prevents duplicate entries, all entries skipped
+    - Event only published after successful persistence (will succeed on retry)
 4. **Status handling**:
     - `SUCCESSFUL_FINAL` with `AuthType.SALE` (default): Creates 2 journal entries via `authHoldAndCapture()` (auth hold + capture)
     - `SUCCESSFUL_FINAL` with other auth types: Creates 1 journal entry via `authHold()` (auth hold only)
@@ -1486,16 +1293,16 @@ sequenceDiagram
 
 **Transaction Boundaries & Consistency**:
 - **Kafka Transaction Boundary**: Each consumer invocation is wrapped in `KafkaTxExecutor`
-  - Commit: Offset + all published events (atomic)
-  - Abort: Offset not committed, all published events not visible
+    - Commit: Offset + all published events (atomic)
+    - Abort: Offset not committed, all published events not visible
 - **Journal Entry Persistence**: All entries processed together via `postLedgerEntriesAtomic(entries)` with `@Transactional`
-  - Transaction wrapping controlled by Spring `@Transactional` on adapter (single transaction for all entries)
-  - **Duplicate Detection Behavior**: When duplicate is detected, method returns early and entire batch is skipped
-  - **Early Exit**: First duplicate entry causes `postLedgerEntriesAtomic()` to return immediately, no remaining entries processed
-  - Rationale: All entries for a payment order processed together, but batch stops at first duplicate (defensive behavior)
+    - Transaction wrapping controlled by Spring `@Transactional` on adapter (single transaction for all entries)
+    - **Duplicate Detection Behavior**: When duplicate is detected, method returns early and entire batch is skipped
+    - **Early Exit**: First duplicate entry causes `postLedgerEntriesAtomic()` to return immediately, no remaining entries processed
+    - Rationale: All entries for a payment order processed together, but batch stops at first duplicate (defensive behavior)
 - **Batch Entry Processing**: All entries processed sequentially within a single transaction context
-  - **Duplicate Handling**: If duplicate detected, entire batch is abandoned, processing moves to next `LedgerRecordingCommand`
-  - On retry: Same command will hit same duplicate again, batch skipped again (requires new command without duplicates)
+    - **Duplicate Handling**: If duplicate detected, entire batch is abandoned, processing moves to next `LedgerRecordingCommand`
+    - On retry: Same command will hit same duplicate again, batch skipped again (requires new command without duplicates)
 - **Event Consistency**: `LedgerEntriesRecorded` only published after all entries processed (success or skipped duplicates)
 
 #### Traceability & Observability
@@ -1517,8 +1324,8 @@ sequenceDiagram
 - Atomic write of domain state **and** outbox rows inside the same DB transaction.
 - `CreatePaymentService` persists the `Payment` aggregate (post-authorization) together with a single `OutboxEvent<PaymentRequestDTO>` — no `PaymentOrder` rows exist yet.
 - **OutboxDispatcherJob** polls `NEW` rows and behaves recursively:
-  1. For `PaymentRequestDTO` rows it hydrates the envelope, materializes seller-level `PaymentOrder` aggregates, inserts them, persists nested `OutboxEvent<PaymentOrderCreated>` rows, publishes `PaymentAuthorized`, and marks the original row `SENT`.
-  2. For derived `PaymentOrderCreated` rows it publishes PSP orchestration events and marks each row `SENT`.
+    1. For `PaymentRequestDTO` rows it hydrates the envelope, materializes seller-level `PaymentOrder` aggregates, inserts them, persists nested `OutboxEvent<PaymentOrderCreated>` rows, publishes `PaymentAuthorized`, and marks the original row `SENT`.
+    2. For derived `PaymentOrderCreated` rows it publishes PSP orchestration events and marks each row `SENT`.
 - This recursion lets one dispatcher expand the payment tree (authorization → seller captures) without multiple schedulers, while ensuring each step is idempotent.
 - Metrics: `outbox_event_backlog` (gauge), `outbox_dispatched_total`, `outbox_dispatch_failed_total`,
   `outbox_dispatcher_duration_seconds{worker=…}`.
@@ -1567,11 +1374,11 @@ Where:
 
 - **MAX_RETRIES = 5**: After 5 failed attempts, payment order is marked `FINAL_FAILED` and routed to Dead Letter Queue
 - **Dead Letter Queues**: Every Kafka topic has a corresponding `.DLQ` (e.g., `payment_order_psp_call_requested_topic.DLQ`)
-- **DLQ Handling**: 
-  - Monitored via Grafana dashboards
-  - Alert threshold: > 100 messages in any DLQ over 5 minutes
-  - Manual replay possible after fixing root cause
-  - Daily reconciliation scripts verify DLQ contents
+- **DLQ Handling**:
+    - Monitored via Grafana dashboards
+    - Alert threshold: > 100 messages in any DLQ over 5 minutes
+    - Manual replay possible after fixing root cause
+    - Daily reconciliation scripts verify DLQ contents
 
 #### Retry Flow
 
@@ -1599,13 +1406,13 @@ The system ensures **no duplicate records** are created through a combination of
 
 - **Kafka Transactions**: All consumers use `KafkaTxExecutor.run()` which wraps operations in `kafkaTemplate.executeInTransaction()`
 - **Atomic Operations**: Within a transaction, the system:
-  1. Executes business logic (DB writes, external calls)
-  2. Publishes downstream events to Kafka
-  3. Commits consumer offset via `sendOffsetsToTransaction()`
+    1. Executes business logic (DB writes, external calls)
+    2. Publishes downstream events to Kafka
+    3. Commits consumer offset via `sendOffsetsToTransaction()`
 - **Failure Behavior**: If any step fails, the transaction aborts:
-  - Offset **not committed** → Event retried by Kafka consumer
-  - Published events **not visible** → No partial state changes
-  - Database changes **rolled back** (if within DB transaction)
+    - Offset **not committed** → Event retried by Kafka consumer
+    - Published events **not visible** → No partial state changes
+    - Database changes **rolled back** (if within DB transaction)
 
 **Consumer Configuration:**
 - `isolation-level: read_committed` - Only reads committed messages (prevents reading uncommitted transactions)
@@ -1615,17 +1422,17 @@ The system ensures **no duplicate records** are created through a combination of
 
 **1. PSP Flow Idempotency**
 
-- **`updateReturningIdempotent()` Pattern**: 
-  - SQL uses `UPDATE ... WHERE ... RETURNING` with idempotent conditions
-  - **Terminal State Protection**: `WHERE p.status NOT IN ('SUCCESSFUL_FINAL','FAILED_FINAL','DECLINED_FINAL')`
-    - Prevents overwriting terminal states even if duplicate events arrive
-  - **Concurrent Update Handling**: Uses `GREATEST()` functions for timestamps and retry counts
-    - `updated_at = GREATEST(p.updated_at, #{updatedAt})` - Only updates if new timestamp is later
-    - `retry_count = GREATEST(p.retry_count, #{retryCount})` - Only increments if new count is higher
-  - **Idempotent Result**: If duplicate event processed:
-    - Returns existing payment order (if terminal) or updated one
-    - No duplicate records created
-    - State remains consistent
+- **`updateReturningIdempotent()` Pattern**:
+    - SQL uses `UPDATE ... WHERE ... RETURNING` with idempotent conditions
+    - **Terminal State Protection**: `WHERE p.status NOT IN ('SUCCESSFUL_FINAL','FAILED_FINAL','DECLINED_FINAL')`
+        - Prevents overwriting terminal states even if duplicate events arrive
+    - **Concurrent Update Handling**: Uses `GREATEST()` functions for timestamps and retry counts
+        - `updated_at = GREATEST(p.updated_at, #{updatedAt})` - Only updates if new timestamp is later
+        - `retry_count = GREATEST(p.retry_count, #{retryCount})` - Only increments if new count is higher
+    - **Idempotent Result**: If duplicate event processed:
+        - Returns existing payment order (if terminal) or updated one
+        - No duplicate records created
+        - State remains consistent
 
 - **Stale Event Filtering** (PaymentOrderPspCallExecutor – PSP **capture** endpoint):
   ```kotlin
@@ -1635,23 +1442,23 @@ The system ensures **no duplicate records** are created through a combination of
       return
   }
   ```
-  - Prevents processing older retry attempts when newer ones already processed
-  - Terminal State Check: `if (current.isTerminal())` - Skips processing if already finalized
+    - Prevents processing older retry attempts when newer ones already processed
+    - Terminal State Check: `if (current.isTerminal())` - Skips processing if already finalized
 
 **2. Ledger Flow Idempotency**
 
 - **Database-Level Duplicate Detection**:
-  - Journal Entries: `ON CONFLICT (id) DO NOTHING` - Unique constraint on journal ID
-  - Postings: `ON CONFLICT (journal_id, account_code) DO NOTHING` - Prevents duplicate postings per journal
+    - Journal Entries: `ON CONFLICT (id) DO NOTHING` - Unique constraint on journal ID
+    - Postings: `ON CONFLICT (journal_id, account_code) DO NOTHING` - Prevents duplicate postings per journal
 - **Individual Entry Processing**:
-  - `LedgerEntryAdapter.appendLedgerEntry()` processes entries one at a time
-  - **On Duplicate Detection**: If `insertJournalEntry()` returns `0` (duplicate):
-    - Entry skipped, no postings inserted
-    - Processing **continues** with next entry
-    - **Rationale**: Each entry processed independently, duplicates skipped gracefully
+    - `LedgerEntryAdapter.appendLedgerEntry()` processes entries one at a time
+    - **On Duplicate Detection**: If `insertJournalEntry()` returns `0` (duplicate):
+        - Entry skipped, no postings inserted
+        - Processing **continues** with next entry
+        - **Rationale**: Each entry processed independently, duplicates skipped gracefully
 - **Idempotent Replay**: If `LedgerRecordingCommand` replayed:
-  - First execution: All entries persisted successfully
-  - Replay: `ON CONFLICT` detects duplicates, entries skipped, remaining entries processed if any
+    - First execution: All entries persisted successfully
+    - Replay: `ON CONFLICT` detects duplicates, entries skipped, remaining entries processed if any
 
 **3. Outbox Pattern Idempotency**
 
@@ -1729,7 +1536,7 @@ The ledger subsystem uses two tables for double-entry bookkeeping:
 - Unique constraint on `postings(journal_id, account_code)` to prevent duplicate postings
 - Indexes on `postings.journal_id` and `postings.account_code` for query performance
 
-**Idempotency**: 
+**Idempotency**:
 - Journal entries use `ON CONFLICT (id) DO NOTHING` to handle duplicate ledger recording requests gracefully.
 - Postings use `ON CONFLICT (journal_id, account_code) DO NOTHING` to prevent duplicate postings per journal entry.
 
@@ -1783,9 +1590,9 @@ Kafka topics use different partitioning strategies based on processing requireme
     - `payment_status_check_scheduler_topic` (1 partition)
 
 - **Partitioning strategy**: **Message key = `paymentOrderId`**
-  - Guarantees **ordering per payment order aggregate**
-  - Ensures all events for a single payment order are processed sequentially within the same partition
-  - Naturally fans out load across partitions
+    - Guarantees **ordering per payment order aggregate**
+    - Ensures all events for a single payment order are processed sequentially within the same partition
+    - Naturally fans out load across partitions
 
 - **Consumer groups & concurrency** (current defaults):
     - `payment-order-enqueuer-consumer-group` → concurrency 8
@@ -1801,15 +1608,15 @@ Kafka topics use different partitioning strategies based on processing requireme
     - `ledger_entries_recorded_topic` (24 partitions)
 
 - **Partitioning strategy**: **Message key = `sellerId` (merchantId)**
-  - **Critical for AccountBalanceConsumer**: All ledger entries for the same merchant route to the same partition
-  - Ensures **sequential processing per merchant** for balance calculations
-  - Prevents race conditions when aggregating debits/credits per account
-  - Enables AccountBalanceConsumer to process all payment orders from a merchant sequentially (future implementation)
+    - **Critical for AccountBalanceConsumer**: All ledger entries for the same merchant route to the same partition
+    - Ensures **sequential processing per merchant** for balance calculations
+    - Prevents race conditions when aggregating debits/credits per account
+    - Enables AccountBalanceConsumer to process all payment orders from a merchant sequentially (future implementation)
 
 - **Why sellerId instead of paymentOrderId?**
-  - Balance aggregation requires processing all entries for a merchant sequentially
-  - Multiple payment orders from same merchant must be processed in order within one partition
-  - Prevents concurrent balance updates from causing inconsistencies
+    - Balance aggregation requires processing all entries for a merchant sequentially
+    - Multiple payment orders from same merchant must be processed in order within one partition
+    - Prevents concurrent balance updates from causing inconsistencies
 
 - **Consumer groups & concurrency**:
     - `ledger-recording-consumer-group` → concurrency 4
@@ -1983,11 +1790,11 @@ Kafka topics use different partitioning strategies based on processing requireme
 - Event type filtering at container level prevents processing wrong event types
 - Idempotent handlers with `ON CONFLICT` and duplicate detection
 - **Consumer Properties** (from `application-local.yml`):
-  - `isolation-level: read_committed` - Only read committed messages
-  - `enable-auto-commit: false` - Manual offset management
-  - `max-poll-records: 120` - Batch size per poll
-  - `max-poll-interval: 240000ms` - 4 minute timeout
-  - `partition.assignment.strategy: CooperativeStickyAssignor` - Cooperative rebalancing
+    - `isolation-level: read_committed` - Only read committed messages
+    - `enable-auto-commit: false` - Manual offset management
+    - `max-poll-records: 120` - Batch size per poll
+    - `max-poll-interval: 240000ms` - 4 minute timeout
+    - `partition.assignment.strategy: CooperativeStickyAssignor` - Cooperative rebalancing
 
 **Dead Letter Queues:**
 - All topics have corresponding `.DLQ` topics created automatically (via `TopicAdminConfig`)
@@ -2193,11 +2000,11 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 - Domain entities (`Payment`, `PaymentOrder`, value objects), domain services, and **ports**.
 - Core business logic with no external dependencies.
 - **Factory-Enforced Invariants**: Core domain classes use private constructors with validated factory methods:
-  - `Account.create(type: AccountType, entityId: String? = "GLOBAL")` - Enforces valid account creation
-  - `Amount.of(quantity: Long, currency: Currency)` - Validated monetary amounts
-  - `Posting.Debit.create(account: Account, amount: Amount)` - Balanced debit postings
-  - `Posting.Credit.create(account: Account, amount: Amount)` - Balanced credit postings
-  - `JournalEntry` uses factory methods (`authHold`, `capture`, `settlement`, etc.) that enforce double-entry balance
+    - `Account.create(type: AccountType, entityId: String? = "GLOBAL")` - Enforces valid account creation
+    - `Amount.of(quantity: Long, currency: Currency)` - Validated monetary amounts
+    - `Posting.Debit.create(account: Account, amount: Amount)` - Balanced debit postings
+    - `Posting.Credit.create(account: Account, amount: Amount)` - Balanced credit postings
+    - `JournalEntry` uses factory methods (`authHold`, `capture`, `settlement`, etc.) that enforce double-entry balance
 - Value objects: `PaymentId`, `PaymentOrderId`, `Amount`, `Currency` (value class), `BuyerId`, `SellerId`, `OrderId`
 - Domain events: `PaymentOrderCreated`, `PaymentOrderSucceeded`, `PaymentOrderFailed`
 - Status enums: `PaymentStatus`, `PaymentOrderStatus`
@@ -2206,11 +2013,11 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 
 - Use cases, orchestrators, and application‑level services.
 - Depends on `payment-domain` and defines the **inbound/outbound ports** it needs.
-- Services: 
-  - `CreatePaymentService` - Payment creation orchestration (performs synchronous PSP authorization, persists `Payment`, enqueues `OutboxEvent<PaymentRequestDTO>`)
-  - `ProcessPaymentService` - PSP result processing + retry logic
-  - `RecordLedgerEntriesService` - Ledger entry recording
-  - `RequestLedgerRecordingService` - Ledger recording request transformation
+- Services:
+    - `CreatePaymentService` - Payment creation orchestration (performs synchronous PSP authorization, persists `Payment`, enqueues `OutboxEvent<PaymentRequestDTO>`)
+    - `ProcessPaymentService` - PSP result processing + retry logic
+    - `RecordLedgerEntriesService` - Ledger entry recording
+    - `RequestLedgerRecordingService` - Ledger recording request transformation
 - Factories: `LedgerEntryFactory` - Creates LedgerEntry from JournalEntry
 - Constants: `IdNamespaces`, `PaymentLogFields`
 - Models: `LedgerEntry` - Persistence model for ledger entries
@@ -2233,9 +2040,9 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
 ### 9.6 Deployables: `payment-service` & `payment-consumers`
 
 - **payment-service**: REST API, DB writes, maintenance jobs.
-    - **Controllers**: 
-      - `PaymentController` - REST endpoints that return `202 Accepted` immediately
-      - `BalanceController` - Balance query endpoints with role-based access control
+    - **Controllers**:
+        - `PaymentController` - REST endpoints that return `202 Accepted` immediately
+        - `BalanceController` - Balance query endpoints with role-based access control
     - **Services**: `PaymentService` - REST service layer (performs synchronous authorization, then persists state)
     - **API Isolation**: Authorization is a single guarded call; all subsequent PSP work (capture, retries) happens asynchronously in `payment-consumers`
     - **Design**: User-facing API remains isolated from long-running PSP latency/availability after the initial authorization
@@ -2243,8 +2050,8 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
     - **Maintenance Jobs**: `OutboxDispatcherJob`, `OutboxPartitionCreator`, `IdResyncStartup`
     - **Security**: `SecurityConfig` (OAuth2/JWT with three authentication scenarios), `TraceFilter` (request tracing)
     - **Balance Endpoints**:
-      - `GET /api/v1/sellers/me/balance` - Seller self-service (Case 1: SELLER role, Case 3: SELLER_API role)
-      - `GET /api/v1/sellers/{sellerId}/balance` - Finance/Admin query (Case 2: FINANCE/ADMIN role)
+        - `GET /api/v1/sellers/me/balance` - Seller self-service (Case 1: SELLER role, Case 3: SELLER_API role)
+        - `GET /api/v1/sellers/{sellerId}/balance` - Finance/Admin query (Case 2: FINANCE/ADMIN role)
 
 - **payment-consumers**: Kafka-driven async processing workers. **All PSP capture/settlement calls execute here, completely decoupled from HTTP request lifecycle (authorization already happened in the web flow).**
     - **Consumers**:
@@ -2260,7 +2067,7 @@ We performed a **comprehensive restructuring** into clear modules plus two deplo
         - `PaymentOrderModificationTxAdapter` → PaymentOrder state updates
     - **Adapters**: `PaymentGatewayAdapter` - PSP client (mock simulator)
     - **Config**: `KafkaTypedConsumerFactoryConfig` - Dynamic consumer factory, `PaymentConsumerConfig` - Consumer beans
-    
+
 - Both depend on `payment-infrastructure` for shared wiring.
 
 ---
@@ -2287,16 +2094,16 @@ The project employs a comprehensive testing strategy with **297 tests** achievin
 - **Spring Boot Tests**: ✅ **YES** - `@SpringBootTest`, `@DataRedisTest`, etc.
 - **Maven Plugin**: **Failsafe** - Runs with `mvn verify`
 - **Test Tagging**: ✅ **ALL TAGGED** - All integration tests use `@Tag("integration")` for future flexibility
-  - **Execution**: 
-    - `mvn test` → Runs unit tests only (Surefire excludes `*IntegrationTest.kt` by filename)
-    - `mvn verify` → Runs integration tests only (Failsafe includes `*IntegrationTest.kt` by filename)
-    - `mvn test && mvn verify` → Runs both unit and integration tests
-  - **Design Rationale**: Lifecycle-based separation (complementary, not competing)
-    - **Surefire (test phase)**: Fast unit tests run on every build for quick feedback
-    - **Failsafe (integration-test + verify phases)**: Slower integration tests run before release/deployment
-    - **Benefits**: Fast CI/CD feedback loop, comprehensive testing before releases, optional integration test execution
-  - **Separation Method**: Maven Surefire/Failsafe plugins use filename patterns (not tags) to separate tests by lifecycle phase
-  - **Consistency**: All 10 integration test files (PostgreSQL + Redis) consistently tagged for future tag-based filtering
+    - **Execution**:
+        - `mvn test` → Runs unit tests only (Surefire excludes `*IntegrationTest.kt` by filename)
+        - `mvn verify` → Runs integration tests only (Failsafe includes `*IntegrationTest.kt` by filename)
+        - `mvn test && mvn verify` → Runs both unit and integration tests
+    - **Design Rationale**: Lifecycle-based separation (complementary, not competing)
+        - **Surefire (test phase)**: Fast unit tests run on every build for quick feedback
+        - **Failsafe (integration-test + verify phases)**: Slower integration tests run before release/deployment
+        - **Benefits**: Fast CI/CD feedback loop, comprehensive testing before releases, optional integration test execution
+    - **Separation Method**: Maven Surefire/Failsafe plugins use filename patterns (not tags) to separate tests by lifecycle phase
+    - **Consistency**: All 10 integration test files (PostgreSQL + Redis) consistently tagged for future tag-based filtering
 
 #### Unit Testing with MockK
 
@@ -2352,7 +2159,7 @@ verify(exactly = 1) {
 }
 ```
 
-**Minimizing `capture()` Usage**: 
+**Minimizing `capture()` Usage**:
 - Use `capture()` **only** when you need to inspect data before an exception is thrown
 - For normal verification, prefer explicit `match {}` checks in `verify` blocks
 - This makes tests more explicit about what they're testing
@@ -2436,12 +2243,12 @@ verify(exactly = 1) {
 
 ### 11.1 Reliability & Resilience
 
-- **API Isolation from External Dependencies**: 
-  - The web layer performs a fast, synchronous PSP authorization to secure the shopper auth hold before persisting payment state.
-  - `payment-service` still returns `202 Accepted` immediately after the authorization+persist step and enqueues seller expansion work.
-  - All long-running PSP work (capture, retries, settlements) executes asynchronously in `payment-consumers`, decoupled from HTTP request lifecycle.
-  - **Benefits**: Capture latency, timeouts, or outages never impact API responsiveness; only the bounded authorization call runs inline, guarded by aggressive timeouts/circuit breakers.
-  - Even if downstream PSP capture flows are slow or fail, shoppers still receive immediate acceptance and Kafka-driven retries recover work.
+- **API Isolation from External Dependencies**:
+    - The web layer performs a fast, synchronous PSP authorization to secure the shopper auth hold before persisting payment state.
+    - `payment-service` still returns `202 Accepted` immediately after the authorization+persist step and enqueues seller expansion work.
+    - All long-running PSP work (capture, retries, settlements) executes asynchronously in `payment-consumers`, decoupled from HTTP request lifecycle.
+    - **Benefits**: Capture latency, timeouts, or outages never impact API responsiveness; only the bounded authorization call runs inline, guarded by aggressive timeouts/circuit breakers.
+    - Even if downstream PSP capture flows are slow or fail, shoppers still receive immediate acceptance and Kafka-driven retries recover work.
 
 - Outbox + event keys keep publishing safe.
 - Retries with jitter and fenced attempts avoid duplicate external actions.
@@ -2451,21 +2258,21 @@ verify(exactly = 1) {
 
 - **OAuth2 Resource Server** with JWT validation (Keycloak integration)
 - **Three Authentication Scenarios** (matching real-world marketplace patterns):
-  - **Case 1**: Seller user via customer-area frontend (`GET /api/v1/sellers/me/balance`)
-    - Role: `SELLER`
-    - Client: `customer-area-frontend`
-    - Grant Type: OIDC Authorization Code flow (production) or Direct Access Grants (testing)
-    - Token Type: User token with `seller_id` claim
-  - **Case 2**: Finance/Admin user via backoffice (`GET /api/v1/sellers/{sellerId}/balance`)
-    - Role: `FINANCE` or `ADMIN`
-    - Client: `backoffice-ui` (user) or `finance-service` (service account)
-    - Grant Type: OIDC Authorization Code flow or Client Credentials
-    - Token Type: User token or service account token
-  - **Case 3**: Merchant API M2M (`GET /api/v1/sellers/me/balance`)
-    - Role: `SELLER_API`
-    - Client: `merchant-api-{SELLER_ID}` (one per merchant)
-    - Grant Type: Client Credentials flow
-    - Token Type: Machine token with hardcoded `seller_id` claim
+    - **Case 1**: Seller user via customer-area frontend (`GET /api/v1/sellers/me/balance`)
+        - Role: `SELLER`
+        - Client: `customer-area-frontend`
+        - Grant Type: OIDC Authorization Code flow (production) or Direct Access Grants (testing)
+        - Token Type: User token with `seller_id` claim
+    - **Case 2**: Finance/Admin user via backoffice (`GET /api/v1/sellers/{sellerId}/balance`)
+        - Role: `FINANCE` or `ADMIN`
+        - Client: `backoffice-ui` (user) or `finance-service` (service account)
+        - Grant Type: OIDC Authorization Code flow or Client Credentials
+        - Token Type: User token or service account token
+    - **Case 3**: Merchant API M2M (`GET /api/v1/sellers/me/balance`)
+        - Role: `SELLER_API`
+        - Client: `merchant-api-{SELLER_ID}` (one per merchant)
+        - Grant Type: Client Credentials flow
+        - Token Type: Machine token with hardcoded `seller_id` claim
 - **Payment Endpoint**: `POST /api/v1/payments` requires `payment:write` authority (service-to-service)
 - **Spring Security Configuration**: Role-based access control with `hasRole()` and `hasAuthority()` checks
 - **JWT Claims Extraction**: `seller_id` claim extracted from tokens for Case 1 and Case 3
@@ -2482,10 +2289,10 @@ verify(exactly = 1) {
 ### 11.4 Performance & Scalability
 
 - **Independent Flow Separation**: PSP flow, ledger flow, and balance generation (planned) operate independently:
-  - **Separate Kafka Topics**: Each flow uses distinct topics, enabling independent scaling per topic
-  - **Separate Consumer Groups**: Different consumer groups allow independent concurrency settings (PSP: 8, Ledger: 4)
-  - **Independent Autoscaling**: Each flow scales based on its own consumer lag, not shared metrics
-  - **Performance Isolation**: PSP processing never slowed by ledger generation; ledger recording never slowed by balance calculations
+    - **Separate Kafka Topics**: Each flow uses distinct topics, enabling independent scaling per topic
+    - **Separate Consumer Groups**: Different consumer groups allow independent concurrency settings (PSP: 8, Ledger: 4)
+    - **Independent Autoscaling**: Each flow scales based on its own consumer lag, not shared metrics
+    - **Performance Isolation**: PSP processing never slowed by ledger generation; ledger recording never slowed by balance calculations
 
 - Three‑stage PSP consumer split enables fine-grained scaling of PSP load.
 - **Lag‑based autoscaling** reacts to backpressure instead of CPU heuristics.
@@ -2571,11 +2378,11 @@ verify(exactly = 1) {
     - **Watermarking Strategy (Two-Level Protection)**:
         - Consumer-level: Filters postings by `ledgerEntryId > lastAppliedEntryId` before computing deltas
         - Database-level: PostgreSQL UPSERT watermark guard (`WHERE last_applied_entry_id < EXCLUDED.last_applied_entry_id`) prevents concurrent overwrites
-    - **Atomic Operations**: 
+    - **Atomic Operations**:
         - Redis Lua scripts: `addDeltaAndWatermark` (HINCRBY + HSET watermark + SADD dirty), `getAndResetDeltaWithWatermark` (HGET + reset to 0)
         - PostgreSQL UPSERT with watermark guard for safe concurrent writes
     - **Delta Reset Mechanism**: Snapshot job resets delta to 0 after reading to prevent double-counting, with recovery mechanisms documented
-    - **Read Patterns**: 
+    - **Read Patterns**:
         - Real-time read: `snapshot + redis.delta` (fast, non-consuming, eventual consistency)
         - Strong consistency read: Consumes delta, merges immediately, returns (slower, consuming, guaranteed accuracy)
     - **Error Recovery**: Comprehensive failure scenarios documented including delta reset failures, concurrent job executions, and Redis loss recovery
