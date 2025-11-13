@@ -1,5 +1,167 @@
 # ecommerce-platform-kotlin · Architecture Guide
 
+## 2 · Functional Requirements
+(placeholder)
+
+### 2.1 System Context
+(placeholder)
+
+### 2.2 Payment Bounded Context & Domain Model
+(placeholder)
+
+### 2.3 High-Level Context Diagram
+(placeholder)
+
+### 2.4 Core Entities
+(placeholder)
+
+### 2.5 API Summary
+(placeholder)
+
+### 2.6 Data Flow Summary
+(placeholder)
+
+## 3 · Non-Functional Requirements
+(placeholder)
+
+### 3.1 Core Design Principles
+(placeholder)
+
+## 4 · Architectural Overview
+(placeholder)
+
+### 4.1 Layering & Hexagonal Architecture
+(placeholder)
+
+### 4.2 Service & Executor Landscape
+(placeholder)
+
+### 4.3 Payment Flow Architecture
+(placeholder)
+
+### 4.4 Complete System Flow Architecture Diagram
+(placeholder)
+
+### 4.5 Ledger Recording Architecture
+(placeholder)
+
+## 5 · Cross‑Cutting Concerns
+(placeholder)
+
+### 5.1 Outbox Pattern
+(placeholder)
+
+### 5.2 Retry & Status‑Check Strategy
+(placeholder)
+
+### 5.3 Idempotency
+(placeholder)
+
+### 5.4 Unique ID Generation
+(placeholder)
+
+## 6 · Data & Messaging Design
+(placeholder)
+
+### 6.1 PostgreSQL Outbox Partitioning
+(placeholder)
+
+### 6.2 Kafka Partitioning by paymentOrderId
+(placeholder)
+
+### 6.3 EventEnvelope Contract
+(placeholder)
+
+## 7 · Infrastructure & Deployment (Helm/K8s)
+(placeholder)
+
+### 7.1 Helm Charts Overview
+(placeholder)
+
+### 7.2 Environments & Values
+(placeholder)
+
+### 7.3 Kubernetes Objects (Deployments, Services, HPA)
+(placeholder)
+
+### 7.4 Lag-Based Autoscaling (consumer lag)
+(placeholder)
+
+### 7.5 CI/CD & Scripts
+(placeholder)
+
+## 8 · Observability & Operations
+(placeholder)
+
+### 8.1 Metrics (Micrometer → Prometheus)
+(placeholder)
+
+### 8.2 Dashboards (Grafana)
+(placeholder)
+
+### 8.3 Logging & Tracing (JSON, OTel)
+(placeholder)
+
+### 8.4 ElasticSearch Search Keys
+(placeholder)
+
+## 9 · Module Structure
+(placeholder)
+
+### 9.1 common
+(placeholder)
+
+### 9.2 common-test
+(placeholder)
+
+### 9.3 payment-domain
+(placeholder)
+
+### 9.4 payment-application
+(placeholder)
+
+### 9.5 payment-infrastructure (Auto‑config)
+(placeholder)
+
+### 9.6 Deployables: payment-service & payment-consumers
+(placeholder)
+
+## 10 · Testing & Quality Assurance
+(placeholder)
+
+### 10.1 Testing Strategy
+(placeholder)
+
+### 10.2 Test Coverage Results
+(placeholder)
+
+## 11 · Quality Attributes
+(placeholder)
+
+### 11.1 Reliability & Resilience
+(placeholder)
+
+### 11.2 Security
+(placeholder)
+
+### 11.3 Cloud‑Native & Deployment
+(placeholder)
+
+### 11.4 Performance & Scalability
+(placeholder)
+
+## 12 · Roadmap
+(placeholder)
+
+## 13 · Glossary
+(placeholder)
+
+## 14 · References
+(placeholder)
+
+## 15 · Changelog
+(placeholder)
+
 *Last updated: **2025‑01‑15** – maintained by **Doğan Çağlar***
 
 ---
@@ -8,9 +170,14 @@
 
 1. [Purpose & Audience](#1--purpose--audience)
 2. [System Context](#2--system-context)  
-   2.1 [High‑Level Context Diagram](#21-highlevel-context-diagram)  
+   2.0 [Functional Requirements](#20-functional-requirements)
+   2.0.1 [Non‑Functional Requirements](#2001-nonfunctional-requirements)
+   2.0.2 [Core Entities](#2002-core-entities)
+   2.0.3 [API Summary](#2003-api-summary)
+   2.0.4 [Data Flow Summary](#2004-data-flow-summary)
+   2.1 [High‑Level Context Diagram](#21-highlevel-context-diagram)
    2.2 [Bounded Context Map](#22-bounded-context-map)
-   2.3 [Payment Bounded Context Domain Model](#23-payment-bounded-context-domain-model)  
+   2.3 [Payment Bounded Context Domain Model](#23-payment-bounded-context-domain-model)
    2.4 [Aggregate Boundaries & Consistency](#24-aggregate-boundaries--consistency)
 3. [Core Design Principles](#3--core-design-principles)
 4. [Architectural Overview](#4--architectural-overview)  
@@ -60,18 +227,132 @@
 15. [Changelog](#15--changelog)
 
 ---
-
 ## 1 · Purpose & Audience
 
-This document is the **single source of truth** for the architectural design of the `ecommerce-platform-kotlin` backend.
-It captures **why** and **how** we build a modular, event‑driven, cloud‑native platform that can scale to multi‑seller,
-high‑throughput workloads while remaining observable, resilient, and easy to evolve.
+- **Demo Scope / Intent**: This platform is a technical showcase designed to
+  demonstrate domain expertise in payments, double-entry ledger design, event-driven
+  architecture, idempotent workflows, and cloud-native patterns.Also  
+- It is not intended
+  as a commercial product but as an educational, interview-ready reference implementation.
 
-- **Audience**: Backend engineers, SREs, architects, and contributors who need to understand the big picture.
-- **Scope**: This is a Payment Platform of a Merchant Of Record commerce business, where we only use psp as gateway in authorization, and relate payment to psp calls, and afterwards asyncroonusly process captures
----
+From this platform’s point of view, all business flows are expressed as combinations of:
+
+- **Pay-ins**: money entering the platform from external parties (e.g., riders/shoppers)
+- **Internal reallocations**: money moving between internal entities and accounts
+- **Pay-outs**: money leaving the platform to external beneficiaries (e.g., drivers, sellers, tax authorities)
+
+The platform does not encode any single marketplace or Merchant-of-Record model.
+Instead, it provides a small and realistic set of financial primitives that large
+multi-entity platforms (e.g., Uber, bol.com, Airbnb, Amazon Marketplace) commonly
+use: authorization, capture, asynchronous processing, idempotent state transitions,
+and double-entry ledger recording.
+
+Only a representative subset is implemented — enough to demonstrate architectural
+thinking, correctness guarantees, and event-driven workflow design without trying
+to recreate a complete enterprise system.
+
+- **Audience**: Backend engineers, SREs, architects, and contributors who need to
+  understand the big picture.
+- **Scope**: Payment + ledger infrastructure for multi-entity, MoR-style platforms,
+  where external PSPs are used as gateways for pay-ins and pay-outs, and all
+  flows are eventually captured in the ledger.
+- 
 
 ## 2 · System Context
+
+### 2.0 Functional Requirements
+
+This platform models **multi-seller Merchant-of-Record** financial flows. All business operations reduce to a combination of **pay-ins, internal reallocations, and pay-outs**, governed by strict financial invariants.
+
+**Core Functional Invariants:**
+1. **Single Shopper Authorization**
+   - One PSP authorization (`pspAuthRef`) per shopper.
+   - PSP never sees internal seller structure.
+
+2. **Multi‑Seller Decomposition**
+   - One `Payment` decomposes into multiple `PaymentOrder`s (one per seller).
+
+3. **Independent Capture Pipeline**
+   - Each seller capture runs asynchronously (auto‑capture or manual).
+   - PSP only receives: `pspAuthRef + amount`.
+
+4. **Seller‑Level Payout Responsibility**
+   - Platform ensures receivable/payable correctness per seller.
+
+5. **Double‑Entry Ledger as Source of Truth**
+   - Every financial event (auth, capture, settlement, fees, commissions, payouts) must produce balanced journal entries.
+
+6. **Event‑Driven Orchestration**
+   - Kafka-based asynchronous workflow for PaymentOrders.
+
+7. **Idempotent, Exactly‑Once Processing**
+   - DB-level idempotency + Kafka transactions guarantee correctness.
+
+8. **Payout‑Safe Accounting**
+   - Sellers can only be paid out after required journal posting.
+
+---
+
+### 2.0.2 Core Entities
+
+From the Payment Bounded Context:
+
+- **Payment (Coordination Aggregate)**  
+  Holds shopper authorization and orchestrates all seller-level flows.
+
+- **PaymentOrder (Processing Aggregate)**  
+  Seller-specific capture/settlement unit with independent retries.
+
+- **JournalEntry (Ledger Aggregate)**  
+  Immutable, balanced accounting event (created via factory).
+
+- **Account**  
+  Encapsulates receivable/payable buckets, typed using `AccountType`.
+
+- **Amount / Currency**  
+  Value objects representing smallest monetary units with validation.
+
+---
+
+### 2.0.3 API Summary
+
+**POST /payments**  
+- Synchronous PSP authorization  
+- Persist Payment + OutboxEvent  
+- Returns `202 Accepted` with `paymentId` & `pspAuthRef`
+
+**POST /payments/{paymentId}/capture**  
+- Manual capture request  
+- Body: `{ sellerId, amount }`  
+- Validates invariants  
+- Writes OutboxEvent<PaymentCaptureCommand>
+
+**GET /balances/{accountCode}**  
+- Real-time (snapshot + redis delta) or strong consistency read
+
+---
+
+### 2.0.4 Data Flow Summary
+
+**Inbound (payment-service)**  
+- REST → DB → Outbox
+
+**Outbox Dispatcher**  
+- Expands Payment → PaymentOrders  
+- Publishes PaymentAuthorized + PaymentOrderCreated
+
+**PSP Flow (payment-consumers)**  
+- Enqueuer → PSP call executor → Result applier  
+- Independent per PaymentOrder  
+- Emits succeeded/failed events
+
+**Ledger Flow**  
+- Dispatcher → ledger topic → ledger recording consumer → journal entries
+
+**Balance Flow**  
+- Ledger delta → Redis → Snapshot job → PostgreSQL durable snapshot
+
+---
 
 ### 2.1 High‑Level Context Diagram
 
@@ -312,6 +593,32 @@ flowchart TB
 
 
 ---
+
+
+
+
+### 2.0.1 Non‑Functional Requirements
+
+1. **Consistency Over Availability**
+    - Financial invariants prioritized over temporary uptime.
+
+2. **High Throughput, Low Contention**
+    - PSP, ledger, and balance flows scale independently.
+
+3. **Fault Tolerance**
+    - PSP retries via Redis ZSET, optimistic concurrency everywhere.
+
+4. **Durability**
+    - Outbox ensures atomic DB writes before publishing.
+
+5. **Observability**
+    - JSON logs (with `traceId`), Prometheus metrics, optional OTel.
+
+6. **Security & Compliance**
+    - OAuth2, PCI‑compatible boundaries (PSP handles card data).
+
+---
+
 
 ## 3 · Core Design Principles
 
