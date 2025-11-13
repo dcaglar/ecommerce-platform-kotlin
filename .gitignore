@@ -42,6 +42,7 @@
 # Keycloak client secrets and access tokens
 keycloak/secrets.txt
 keycloak/output/jwt/
+keycloak/output/secrets.txt
 keycloak/*.token
 /local-dir/
 
