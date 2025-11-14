@@ -747,50 +747,59 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
+    autonumber
     participant Client
-    participant PaymentService
-    participant PSPAuth as PSP (Authorization)
-    participant DB
-    participant OutboxDispatcher
-    participant Kafka
-    participant Enqueuer
-    participant PspCallExecutor
-    participant PspResultApplier
-    participant PSP
+    participant PaymentService as payment-service (API)
+    participant PSPAuth as PSP Authorization API
+    participant PaymentDB as Payment DB (Payment + Outbox)
+    participant OutboxJob as OutboxDispatcherJob
+    participant Kafka as Kafka
+    participant Enqueuer as PaymentOrderEnqueuer
+    participant PspExec as PaymentOrderPspCallExecutor
+    participant PspApply as PaymentOrderPspResultApplier
+    participant Retry as Redis RetryQueue (ZSET)
 
-    Client->>PaymentService: POST /payments
-    PaymentService->>PSPAuth: Authorize shopper payment (sync, single PSP call)
-    PSPAuth-->>PaymentService: Auth result (approved/declined)
-    PaymentService->>DB: Persist Payment aggregate + Outbox<PaymentRequestDTO>
-    Note over PaymentService: Authorization completes inside request;<br/>captures remain async
-    PaymentService-->>Client: 202 Accepted (contains auth reference)
-    Note over Client: Shopper receives immediate response;<br/>seller processing continues async
-    
-    OutboxDispatcher->>DB: Read NEW outbox events
-    OutboxDispatcher->>OutboxDispatcher: Expand PaymentRequestDTO → PaymentOrders<br/>+ nested Outbox<PaymentOrderCreated>
-    OutboxDispatcher->>Kafka: Publish PaymentAuthorized event
-    OutboxDispatcher->>Kafka: Publish PaymentOrderCreated events (per seller)
-    OutboxDispatcher->>DB: Mark processed outbox rows as SENT
-    
-    Enqueuer->>Kafka: Consume PaymentOrderCreated
-    Enqueuer->>Kafka: Publish PaymentOrderPspCallRequested
-    
-    PspCallExecutor->>Kafka: Consume PaymentOrderPspCallRequested
-    PspCallExecutor->>PSP: Call PSP.capture()
-    PspCallExecutor->>Kafka: Publish PaymentOrderPspResultUpdated
-    
-    PspResultApplier->>Kafka: Consume PaymentOrderPspResultUpdated
-    alt PSP Success
-        PspResultApplier->>DB: Update PaymentOrder status
-        PspResultApplier->>Kafka: Publish PaymentOrderSucceeded → payment_order_finalized_topic
-    else PSP Retryable Failure
-        PspResultApplier->>Redis: Schedule retry (ZSet with backoff)
-        PspResultApplier->>DB: Update retry count
-    else PSP Final Failure
-        PspResultApplier->>DB: Mark as FINAL_FAILED
-        PspResultApplier->>Kafka: Publish PaymentOrderFailed → payment_order_finalized_topic
+    %% 1. Synchronous shopper authorization
+    Client->>PaymentService: POST /api/v1/payments\n{buyerId, orderId, totalAmount, paymentOrders}
+    PaymentService->>PSPAuth: authorize(totalAmount, cardInfo)
+    PSPAuth-->>PaymentService: authResult(APPROVED / DECLINED)
+
+    alt Approved
+        PaymentService->>PaymentDB: TX: persist Payment(PENDING_AUTH→AUTHORIZED)\n+ outbox<Payment* event>
+        PaymentService-->>Client: 202 Accepted (auth ok, seller legs async)
+    else Declined
+        PaymentService->>PaymentDB: TX: persist Payment(DECLINED)
+        PaymentService-->>Client: 402 Payment Required
     end
-    Note over Kafka: Both succeeded & failed events<br/>route to payment_order_finalized_topic
+
+    %% 2. Outbox → Payment + seller legs expansion
+    OutboxJob->>PaymentDB: poll NEW outbox events
+    OutboxJob->>OutboxJob: expand Payment* event → N PaymentOrders (one per seller)
+    OutboxJob->>PaymentDB: insert PaymentOrders + nested outbox<PaymentOrderCreated[]>
+    OutboxJob->>Kafka: publish PaymentAuthorized
+    OutboxJob->>Kafka: publish PaymentOrderCreated (per seller)
+    OutboxJob->>PaymentDB: mark outbox rows SENT
+
+    %% 3. PSP capture flow per seller leg
+    Kafka->>Enqueuer: consume PaymentOrderCreated
+    Enqueuer->>Kafka: publish PaymentOrderPspCallRequested
+
+    Kafka->>PspExec: consume PaymentOrderPspCallRequested
+    PspExec->>PSPAuth: capture(sellerAmount, authRef)
+    PSPAuth-->>PspExec: captureResult
+    PspExec->>Kafka: publish PaymentOrderPspResultUpdated
+
+    Kafka->>PspApply: consume PaymentOrderPspResultUpdated
+    alt Retryable PSP status
+        PspApply->>PaymentDB: update PaymentOrder status + retryCount
+        PspApply->>Retry: ZADD retryQueue(dueAt, paymentOrderId)
+    else Final (CAPTURED or FINAL_FAILED)
+        PspApply->>PaymentDB: update PaymentOrder terminal status
+        PspApply->>Kafka: publish PaymentOrderFinalized
+    end
+
+    %% 4. Retry dispatcher (loop)
+    Retry->>Kafka: publish PaymentOrderPspCallRequested\n(for due retry items)
 ```
 
 ### 4.4 End to End Flow Architecture Diagram
@@ -798,103 +807,97 @@ sequenceDiagram
 This diagram shows all three independent flows (PSP, Ledger, Balance) and their complete interaction patterns, partition keys, and scaling characteristics.
 
 ```mermaid
-%%{init:{'theme':'default','flowchart':{'nodeSpacing':60,'rankSpacing':80,'curve':'basis'}}}%%
 flowchart TB
-    classDef api fill:#e3f0fd,stroke:#4285F4,stroke-width:3px;
-    classDef db fill:#fef7e0,stroke:#FBBC05,stroke-width:3px;
-    classDef kafka fill:#f3e8fd,stroke:#A142F4,stroke-width:3px;
-    classDef consumer fill:#e6f5ea,stroke:#34A853,stroke-width:2px;
-    classDef psp fill:#fde8e6,stroke:#EA4335,stroke-width:2px;
-    classDef redis fill:#fff3e0,stroke:#FF9800,stroke-width:2px;
-    classDef planned fill:#f5f5f5,stroke:#9E9E9E,stroke-width:2px,stroke-dasharray: 5 5;
+    classDef api fill:#e3f2fd,stroke:#1976D2,stroke-width:3px,color:#000
+    classDef db fill:#fff8e1,stroke:#FBC02D,stroke-width:2px,color:#000
+    classDef kafka fill:#f3e5f5,stroke:#8E24AA,stroke-width:2px,color:#000
+    classDef svc fill:#e8f5e9,stroke:#388E3C,stroke-width:2px,color:#000
+    classDef ext fill:#ffebee,stroke:#C62828,stroke-width:2px,color:#000
+    classDef redis fill:#fff3e0,stroke:#FB8C00,stroke-width:2px,color:#000
 
-    subgraph API["🌐 API Layer (payment-service)"]
-        REST["REST Controller<br/>POST /payments"]
-        OUTBOX["OutboxDispatcherJob<br/>(Periodic Poll)"]
+    %% API + DB
+    subgraph API["payment-service (REST API)"]
+      REST["PaymentController / PaymentService\nPOST /api/v1/payments"]:::api
+      OutboxJob["OutboxDispatcherJob\n(batch poller)"]:::svc
     end
 
-    subgraph DB_LAYER["💾 Database Layer"]
-        DB[(PostgreSQL<br/>• payment_orders<br/>• outbox_event<br/>• journal_entries<br/>• postings)]
+    subgraph DB["Payment DB (PostgreSQL)"]
+      PaymentTbl["payments\n(Payment aggregate)"]:::db
+      PaymentOrderTbl["payment_orders\n(PaymentOrder aggregate)"]:::db
+      OutboxTbl["outbox_event\n(partitioned)"]:::db
     end
 
-    subgraph REDIS_LAYER["📦 Redis"]
-        RETRY_ZSET["Retry ZSet<br/>(Exponential Backoff)"]
-        SCHEDULER["RetryDispatcherScheduler<br/>(Every 5s)"]
+    %% Kafka backbone
+    subgraph Backbone["Kafka (event backbone)"]
+      PO_CREATED["payment_order_created_topic\nkey = paymentOrderId"]:::kafka
+      PSP_CALL_REQ["payment_order_psp_call_requested_topic\nkey = paymentOrderId"]:::kafka
+      PSP_RESULT["payment_order_psp_result_updated_topic\nkey = paymentOrderId"]:::kafka
+      PO_FINAL["payment_order_finalized_topic\nkey = paymentOrderId"]:::kafka
+      LEDGER_REQ["ledger_record_request_queue_topic\nkey = sellerId"]:::kafka
+      LEDGER_REC["ledger_entries_recorded_topic\nkey = sellerId"]:::kafka
     end
 
-    subgraph PSP_FLOW["📞 PSP Flow (Independent Scaling)"]
-        direction TB
-        T1[payment_order_created_topic<br/>🔑 key: paymentOrderId<br/>📊 48 partitions]:::kafka
-        ENQ["PaymentOrderEnqueuer<br/>👥 concurrency: 8"]:::consumer
-        T2[payment_order_psp_call_requested_topic<br/>🔑 key: paymentOrderId<br/>📊 48 partitions]:::kafka
-        EXEC["PaymentOrderPspCallExecutor<br/>👥 concurrency: 8<br/>Calls PSP capture"]:::consumer
-        PSP_EXT["PSP Client<br/>(Mock Simulator)"]:::psp
-        T3[payment_order_psp_result_updated_topic<br/>🔑 key: paymentOrderId<br/>📊 48 partitions]:::kafka
-        APPLY["PaymentOrderPspResultApplier<br/>👥 concurrency: 8"]:::consumer
-        T4[payment_order_finalized_topic<br/>🔑 key: paymentOrderId<br/>📊 48 partitions<br/>✅ Unified Success/Failure]:::kafka
+    %% PSP flow (payment-consumers)
+    subgraph PSP_FLOW["payment-consumers · PSP flow"]
+      Enqueuer["PaymentOrderEnqueuer\n(consumes PO_CREATED,\nproduces PSP_CALL_REQ)"]:::svc
+      PspExec["PaymentOrderPspCallExecutor\n(consumes PSP_CALL_REQ,\ncalls PSP capture,\nproduces PSP_RESULT)"]:::svc
+      PspApply["PaymentOrderPspResultApplier\n(consumes PSP_RESULT,\nupdates DB, schedules retry,\nproduces PO_FINAL)"]:::svc
     end
 
-    subgraph STATUS_FLOW["⏱️ Status Check Flow"]
-        STATUS["ScheduledPaymentStatusCheckExecutor<br/>👥 concurrency: 1"]:::consumer
-        T5[payment_status_check_scheduler_topic<br/>📊 1 partition]:::kafka
+    subgraph RetryFlow["Redis retry"]
+      RetryZSet["Redis ZSet\nretry queue (backoff)"]:::redis
+      RetrySched["RetryDispatcherScheduler\n(polls ZSet,\nrepublishes PSP_CALL_REQ)"]:::svc
     end
 
-    subgraph LEDGER_FLOW["🧾 Ledger Flow (Independent Scaling)"]
-        direction TB
-        DISPATCH["LedgerRecordingRequestDispatcher<br/>👥 concurrency: 4<br/>🔑 Switch: paymentOrderId → sellerId"]:::consumer
-        T6[ledger_record_request_queue_topic<br/>🔑 key: sellerId<br/>📊 24 partitions]:::kafka
-        LEDGER["LedgerRecordingConsumer<br/>👥 concurrency: 4"]:::consumer
-        T7[ledger_entries_recorded_topic<br/>🔑 key: sellerId<br/>📊 24 partitions]:::kafka
+    %% Ledger flow (payment-consumers)
+    subgraph LedgerFlow["payment-consumers · ledger flow"]
+      LedgerDisp["LedgerRecordingRequestDispatcher\n(consumes PO_FINAL,\nproduces LEDGER_REQ\nkey = sellerId)"]:::svc
+      LedgerCons["LedgerRecordingConsumer\n(consumes LEDGER_REQ,\nappends journal entries,\nproduces LEDGER_REC)"]:::svc
     end
 
-    subgraph BALANCE_FLOW["💰 Balance Flow (Two-Tier Architecture)"]
-        BALANCE["AccountBalanceConsumer<br/>👥 concurrency: 4<br/>Batch Processing"]:::consumer
-        BALANCE_DB[(account_balances<br/>💾 PostgreSQL Snapshots<br/>last_applied_entry_id)]:::db
-        CACHE["AccountBalanceCache<br/>⚡ Redis Deltas<br/>TTL + Watermarking"]:::redis
-        SNAPSHOT_JOB["AccountBalanceSnapshotJob<br/>⏰ Every 1 minute<br/>Merge dirty deltas → snapshots"]:::consumer
+    subgraph LedgerDB["Ledger DB (PostgreSQL)"]
+      Journal["journal_entries"]:::db
+      Postings["postings"]:::db
     end
 
-    REST -->|"1. PSP auth (sync) + Persist Payment + Outbox<br/>(Atomic DB Tx)"| DB
-    REST -->|"2. 202 Accepted<br/>(Immediate)"| CLIENT["👤 Client"]
-    OUTBOX -->|"3. Read NEW events"| DB
-    OUTBOX -->|"4. Publish"| T1
+    PSP["External PSP\n(auth + capture)"]:::ext
 
-    T1 -->|"Consume"| ENQ
-    ENQ -->|"Publish<br/>(Kafka Tx)"| T2
-    T2 -->|"Consume"| EXEC
-    EXEC -->|"Call PSP<br/>(Async, 500ms timeout)"| PSP_EXT
-    PSP_EXT -->|"Response"| EXEC
-    EXEC -->|"Publish Result<br/>(Kafka Tx)"| T3
-    T3 -->|"Consume"| APPLY
-    APPLY -->|"Success?"| DB
-    APPLY -->|"Retry?"| RETRY_ZSET
-    APPLY -->|"Status Check?"| T5
-    APPLY -->|"Finalized<br/>(Success/Failed)<br/>(Kafka Tx)"| T4
+    %% API -> DB
+    REST -->|"POST /payments\n(auth + persist)"| PaymentTbl
+    REST -->|"TX: Payment + Outbox"| OutboxTbl
 
-    RETRY_ZSET -->|"Due Items<br/>(Every 5s)"| SCHEDULER
-    SCHEDULER -->|"Republish<br/>(Same Partition)"| T2
+    %% Outbox dispatcher
+    OutboxTbl -->|"poll NEW"| OutboxJob
+    OutboxJob -->|"expand Payment → PaymentOrders\n+ nested outbox rows"| PaymentOrderTbl
+    OutboxJob -->|"publish PaymentOrderCreated"| PO_CREATED
+    OutboxJob -->|"publish PaymentAuthorized"| Backbone
 
-    T5 -->|"Consume"| STATUS
-    STATUS -->|"PSP Status Check"| PSP_EXT
-    STATUS -->|"Update Status"| DB
+    %% PSP flow wiring
+    PO_CREATED -->|"consume"| Enqueuer
+    Enqueuer -->|"publish PSP call request"| PSP_CALL_REQ
 
-    T4 -->|"Consume<br/>(Different Consumer Group)"| DISPATCH
-    DISPATCH -->|"Transform + Publish<br/>🔑 sellerId<br/>(Kafka Tx)"| T6
-    T6 -->|"Consume<br/>(Kafka Tx)"| LEDGER
-    LEDGER -->|"Persist Journals<br/>(Batch, ON CONFLICT)"| DB
-    LEDGER -->|"Publish Recorded<br/>🔑 sellerId<br/>(Kafka Tx)"| T7
+    PSP_CALL_REQ -->|"consume"| PspExec
+    PspExec -->|"capture() call"| PSP
+    PSP -->|"result"| PspExec
+    PspExec -->|"publish PSP result"| PSP_RESULT
 
-    T7 -->|"Consume<br/>(Batch)"| BALANCE
-    BALANCE -->|"Atomic Delta Update<br/>(Redis Lua)"| CACHE
-    CACHE -->|"Mark Dirty"| CACHE
-    SNAPSHOT_JOB -->|"Read Dirty Accounts"| CACHE
-    SNAPSHOT_JOB -->|"getAndResetDeltaWithWatermark"| CACHE
-    SNAPSHOT_JOB -->|"Merge & Save<br/>(Watermark Check)"| BALANCE_DB
+    PSP_RESULT -->|"consume"| PspApply
+    PspApply -->|"update PaymentOrder\nstatus + retryCount"| PaymentOrderTbl
+    PspApply -->|"finalized"| PO_FINAL
+    PspApply -->|"schedule retry"| RetryZSet
 
-    style PSP_FLOW fill:#fff9c4,stroke:#F57F17,stroke-width:3px
-    style LEDGER_FLOW fill:#e8f5e9,stroke:#388E3C,stroke-width:3px
-    style BALANCE_FLOW fill:#e8f5e9,stroke:#388E3C,stroke-width:3px
-    style API fill:#e3f2fd,stroke:#1976D2,stroke-width:3px
+    %% Retry pipeline
+    RetryZSet -->|"due items"| RetrySched
+    RetrySched -->|"republish PSP call request"| PSP_CALL_REQ
+
+    %% Ledger flow wiring
+    PO_FINAL -->|"consume"| LedgerDisp
+    LedgerDisp -->|"publish LedgerRecordingCommand\n(key = sellerId)"| LEDGER_REQ
+
+    LEDGER_REQ -->|"consume"| LedgerCons
+    LedgerCons -->|"append journal entries"| Journal
+    Journal --> Postings
+    LedgerCons -->|"publish LedgerEntriesRecorded"| LEDGER_REC
 ```
 
 **Key Design Points Illustrated:**
