@@ -167,46 +167,109 @@ end
 
 This diagram shows the Payment Bounded Context and its relationships with downstream contexts, including internal aggregates and integration patterns which means
 ```mermaid
-%%{init:{'theme':'default','flowchart':{'nodeSpacing':50,'rankSpacing':60}}}%%
+%%{init:{'theme':'default','flowchart':{'nodeSpacing':40,'rankSpacing':50}}}%%
 flowchart TB
-    classDef payment fill:#4CAF50,stroke:#2E7D32,stroke-width:3px;
-    classDef downstream fill:#2196F3,stroke:#1565C0,stroke-width:2px;
-    classDef infrastructure fill:#9E9E9E,stroke:#616161,stroke-width:2px;
-    
-    subgraph Payment_BC["Payment Bounded Context (Core Domain)"]
-        Payment_Agg["Payment<br/>Coordination Aggregate<br/>• Synchronous PSP authorization (single PSP call)<br/>• Tracks shopper order + totalAmount<br/>• Status: PENDING_AUTH / AUTHORIZED / PARTIALLY_CAPTURED / CAPTURED_FINAL / DECLINED"]:::payment
-        
-        PaymentOrder_Agg["PaymentOrder<br/>Processing Aggregate<br/>• Created only after PaymentAuthorized<br/>• One per seller / capture leg<br/>• Status: INITIATED_PENDING / CAPTURE_REQUESTED / CAPTURED_FINAL / FINAL_FAILED"]:::payment
-        
-        Ledger_Subdomain["Ledger Subdomain<br/>Double-entry accounting<br/>• Posts entries per successful capture<br/>• Uses AccountType + JournalEntryFactory<br/>• Persists journal_entries + account_balances"]:::payment
-    end
 
-    subgraph Integration["Integration Layer - Kafka Event Bus"]
-        KAFKA[("Kafka Topics<br/>• payment_authorized<br/>• payment_order_created<br/>• payment_order_capture_requested<br/>• payment_order_succeeded / failed<br/>• ledger_entries_recorded")]:::infrastructure
-    end
+%% STYLE
+classDef payment fill:#4CAF50,stroke:#2E7D32,stroke-width:3px,color:#fff
+classDef ledger fill:#9C27B0,stroke:#6A1B9A,stroke-width:2px,color:#fff
+classDef infra fill:#BDBDBD,stroke:#616161,stroke-width:2px,color:#000
+classDef downstream fill:#2196F3,stroke:#0D47A1,stroke-width:2px,color:#fff
 
-    subgraph Downstream_BCs["Downstream Bounded Contexts (Implemented)"]
-        Shipment_BC[("Shipment BC<br/>Listens to payment_order_capture_requested<br/>Triggers shipment per seller")]:::downstream
-    end
+%% PAYMENT BOUNDED CONTEXT (Payment DB)
+subgraph PaymentBC["Payment Bounded Context (Payment DB)"]
+    direction TB
 
-    %% Relationships inside Payment BC
-    Payment_Agg -->|"1 : N contains"| PaymentOrder_Agg
-    PaymentOrder_Agg -->|"On CAPTURED_FINAL<br/>triggers ledger posting"| Ledger_Subdomain
+    PaymentAgg["**Payment (Coordination Aggregate)**  
+    • One synchronous PSP authorization  
+    • buyerId, orderId, totalAmount  
+    • Emits PaymentAuthorized via outbox  
+    • Lives in Payment DB  
+    • Shard = businessCoordShard"]:::payment
 
-    %% Events out of Payment BC
-    Payment_Agg -->|"Emits payment_authorized<br/>after successful PSP auth"| KAFKA
-    PaymentOrder_Agg -->|"Emits payment_order_created<br/>(per seller)"| KAFKA
-    PaymentOrder_Agg -->|"Emits payment_order_capture_requested<br/>(auto or manual capture)"| KAFKA
-    PaymentOrder_Agg -->|"Emits payment_order_succeeded / failed<br/>(final capture result)"| KAFKA
-    Ledger_Subdomain -->|"Emits ledger_entries_recorded"| KAFKA
-    
-    %% Downstream consumption
-    KAFKA -->|"Per-seller capture result<br/>PaymentOrderSucceeded/Failed"| Shipment_BC
+    PaymentOrderAgg["**PaymentOrder (Processing Aggregate)**  
+    • One per seller leg  
+    • Handles CaptureRequested  
+    • Handles PSP responses  
+    • Handles retry  
+    • Emits Finalized events  
+    • Lives in Payment DB  
+    • Seller-sharded"]:::payment
 
-    %% Styling
-    style Payment_BC fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
-    style Integration fill:#F5F5F5,stroke:#757575,stroke-width:2px
-    style Downstream_BCs fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
+    PaymentDB["**Payment DB (Sharded)**  
+    • Payments  
+    • PaymentOrders  
+    • Outbox  
+    • Retry state  
+    • No ledger data"]:::infra
+end
+
+%% INFRASTRUCTURE
+subgraph Infra["Shared Infra"]
+    Outbox["Outbox: DB→Kafka consistency"]:::infra
+    Kafka["Kafka: Event Backbone  
+          • Partitions by sellerId  
+          • Partitions by businessCoordShard"]:::infra
+    Redis["Redis ZSet (Retry Queue)"]:::infra
+end
+
+%% LEDGER BOUNDED CONTEXT (Ledger DB)
+subgraph LedgerBC["Ledger Bounded Context (Ledger DB)"]
+    direction TB
+
+    Ledger["**Ledger (Double-Entry Domain)**  
+    • Balanced JournalEntries  
+    • AuthHold, Capture, Settlement, Fees, Payout  
+    • Idempotent writes  
+    • Append-only  
+    • Snapshot for cumulative capture  
+    • Processing is seller-sharded  
+    • Lives in Ledger DB"]:::ledger
+
+    LedgerDB["**Ledger DB (Separate Cluster)**  
+    • ledger_entries  
+    • journal_entries  
+    • account_balances  
+    • balance_snapshots  
+    • Sharded by sellerId"]:::ledger
+
+    Finance["**Finance / Payouts**  
+    • Consumes LedgerEntriesRecorded  
+    • Maintains balances  
+    • Executes payouts"]:::downstream
+end
+
+%% PSP
+PSP["**PSP (External Provider)**  
+• Sync shopper auth  
+• Async partial captures  
+• Stateless"]:::downstream
+
+%% FLOWS
+
+%% Payment creation
+PaymentAgg -->|"OutboxEvent<PaymentAuthorized>"| Outbox
+PaymentOrderAgg -->|"OutboxEvent<PaymentOrderCreated>"| Outbox
+Outbox -->|"payment_authorized / order_created"| Kafka
+
+Kafka -->|"PaymentAuthorized"| PaymentOrderAgg
+
+%% Capture pipeline
+PaymentOrderAgg -->|"CaptureRequested"| Kafka
+Kafka -->|"CaptureRequested"| PSP
+PSP -->|"PspResultUpdated"| Kafka
+Kafka -->|"PspResultUpdated"| PaymentOrderAgg
+
+%% Retry 
+PaymentOrderAgg -->|"RetryScheduled"| Redis
+Redis -->|"RetryDue"| Kafka
+Kafka -->|"RetryDue"| PaymentOrderAgg
+
+%% Ledger flow
+PaymentOrderAgg -->|"PaymentOrderFinalized"| Kafka
+Kafka -->|"PaymentOrderFinalized"| Ledger
+Ledger -->|"LedgerEntriesRecorded"| LedgerDB
+LedgerDB -->|"BalanceUpdated / Events"| Finance
 ```
 
 
@@ -214,82 +277,105 @@ flowchart TB
 
 
 ```mermaid
-%%{init:{'theme':'default','flowchart':{'nodeSpacing':40,'rankSpacing':50}}}%%
-flowchart TB
-    classDef aggregate fill:#4CAF50,stroke:#2E7D32,stroke-width:4px;
-    classDef entity fill:#2196F3,stroke:#1565C0,stroke-width:2px;
-    classDef vo fill:#FF9800,stroke:#E65100,stroke-width:2px;
-    classDef event fill:#9C27B0,stroke:#6A1B9A,stroke-width:2px;
-    classDef command fill:#00BCD4,stroke:#00838F,stroke-width:2px;
-    classDef service fill:#795548,stroke:#5D4037,stroke-width:2px;
+%%{init:{'theme':'default','flowchart':{'nodeSpacing':60,'rankSpacing':70}}}%%
+flowchart LR
 
-    subgraph Payment_Coordination["💳 Payment (Coordination Aggregate)"]
-        Payment_Agg["Payment<br/>(Coordination Aggregate Root)<br/>• paymentId: PaymentId<br/>• buyerId: BuyerId<br/>• orderId: OrderId<br/>• totalAmount: Amount<br/>• status: PaymentStatus<br/>• paymentOrders: List<PaymentOrder><br/><br/>Purpose:<br/>• Container for payment request<br/>• Tracks overall payment status<br/>• Emits PaymentCompleted/PaymentUpdated<br/>  events for downstream services<br/>  (e.g., Shipment domain)"]
-    end
+classDef aggregate fill:#4CAF50,stroke:#1B5E20,stroke-width:3px,color:white
+classDef entity fill:#66BB6A,stroke:#2E7D32,stroke-width:2px,color:white
+classDef valueobj fill:#A5D6A7,stroke:#558B2F,stroke-width:2px
+classDef event fill:#2196F3,stroke:#0D47A1,stroke-width:2px,color:white
+classDef ledger fill:#9C27B0,stroke:#6A1B9A,stroke-width:3px,color:white
+classDef infra fill:#BDBDBD,stroke:#616161,stroke-width:2px
+classDef consumer fill:#FF9800,stroke:#E65100,stroke-width:2px,color:white
 
-    subgraph PaymentOrder_Processing["📋 PaymentOrder (Processing Aggregate)"]
-        PaymentOrder_Agg["PaymentOrder<br/>(Processing Aggregate Root)<br/>• paymentOrderId: PaymentOrderId<br/>• paymentId: PaymentId (reference)<br/>• sellerId: SellerId<br/>• amount: Amount<br/>• status: PaymentOrderStatus<br/>• retryCount: Int<br/>• retryReason: String?<br/>• lastErrorMessage: String?<br/><br/>Purpose:<br/>• Each PaymentOrder processed<br/>  independently with separate<br/>  PSP calls<br/>• Emits PaymentOrderCreated,<br/>  PaymentOrderSucceeded/Failed"]
-    end
 
-    subgraph Ledger_Subdomain["🧾 Ledger Subdomain"]
-        JournalEntry_Agg["JournalEntry<br/>Aggregate Root<br/>• id: String<br/>• txType: JournalType<br/>• postings: List<Posting><br/><br/>Factory Methods:<br/>• authHold()<br/>• capture()<br/>• settlement()<br/>• feeRegistered()<br/>• payout()<br/>• fullFlow()<br/><br/>Private Constructor<br/>Enforces Balance"]
-        Posting_Entity["Posting Entity<br/>(Factory-Enforced)<br/>• account: Account<br/>• amount: Amount<br/>• direction: Debit/Credit<br/><br/>Factories:<br/>• Posting.Debit.create()<br/>• Posting.Credit.create()"]
-        Account_VO["Account Value Object<br/>(Factory-Enforced)<br/>• accountCode: String<br/>• type: AccountType<br/>• entityId: String<br/><br/>Factory:<br/>• Account.create(type, entityId)"]
-    end
+%% PAYMENT BC
+subgraph Payment_BC["Payment Bounded Context (Payment DB)"]
+direction TB
 
-    subgraph Value_Objects["📦 Value Objects"]
-        PaymentId_VO["PaymentId<br/>(Value Object)"]
-        PaymentOrderId_VO["PaymentOrderId<br/>(Value Object)"]
-        SellerId_VO["SellerId<br/>(Value Object)"]
-        BuyerId_VO["BuyerId<br/>(Value Object)"]
-        Amount_VO["Amount<br/>• quantity: Long<br/>• currency: Currency<br/>(Factory: Amount.of())"]
-        Currency_VO["Currency<br/>(Value Class)<br/>• currencyCode: String"]
-        Account_VO["Account<br/>(Factory-Enforced)<br/>• type: AccountType<br/>• entityId: String<br/>(Factory: Account.create())"]
-    end
+PaymentAgg["**Payment (Coordination Aggregate)**  
+• buyerId, orderId, totalAmount  
+• One synchronous PSP authorization  
+• Emits: PaymentAuthorized  
+• Lives in Payment DB  
+• Shard = PaymentId (business unit)"]:::aggregate
 
-    subgraph Domain_Events["📨 Domain Events"]
-        PaymentCreated_Event["PaymentOrderCreated<br/>(Processing Level)"]
-        PaymentSucceeded_Event["PaymentOrderSucceeded<br/>(Processing Level)"]
-        PaymentFailed_Event["PaymentOrderFailed<br/>(Processing Level)"]
-        PaymentCompleted_Event["PaymentCompleted<br/>(Optional Coordination Level)<br/>Emitted when all<br/>PaymentOrders finalized<br/>(for overall order tracking)"]
-        LedgerRecorded_Event["LedgerEntriesRecorded"]
-    end
+PaymentOrderAgg["**PaymentOrder (Processing Aggregate)**  
+• One per seller leg  
+• Handles CaptureRequested  
+• Handles PSP responses  
+• Handles retry  
+• Emits: PaymentOrderCreated →  
+         PaymentOrderPspResultUpdated →  
+         PaymentOrderFinalized  
+• Lives in Payment DB  
+• Shard = SellerId"]:::aggregate
 
-    subgraph Domain_Commands["⚡ Domain Commands"]
-        CreatePayment_Cmd["CreatePaymentCommand"]
-        LedgerRecording_Cmd["LedgerRecordingCommand"]
-    end
+PaymentOrderEntity["PaymentOrder\n(entity)"]:::entity
 
-    Payment_Agg -->|"Contains (1:N)<br/>Coordination Container"| PaymentOrder_Agg
-    Payment_Agg -->|"Uses"| PaymentId_VO
-    Payment_Agg -->|"Uses"| BuyerId_VO
-    Payment_Agg -->|"Uses"| Amount_VO
-    PaymentOrder_Agg -->|"References"| PaymentId_VO
-    PaymentOrder_Agg -->|"Uses"| PaymentOrderId_VO
-    PaymentOrder_Agg -->|"Uses"| SellerId_VO
-    PaymentOrder_Agg -->|"Uses"| Amount_VO
-    PaymentOrder_Agg -->|"Emits (Processing)"| PaymentCreated_Event
-    PaymentOrder_Agg -->|"Emits (Processing)"| PaymentSucceeded_Event
-    PaymentOrder_Agg -->|"Emits (Processing)"| PaymentFailed_Event
-    Payment_Agg -->|"Emits (Coordination)<br/>When all PaymentOrders<br/>finalized (optional)"| PaymentCompleted_Event["PaymentCompleted<br/>(Optional - for overall<br/>order status tracking)"]
+ValueObjects["Value Objects:\n• PaymentId\n• PaymentOrderId\n• SellerId\n• Amount\n• Currency"]:::valueobj
 
-    JournalEntry_Agg -->|"Contains (1:N)"| Posting_Entity
-    JournalEntry_Agg -->|"Uses"| Account_VO
-    JournalEntry_Agg -->|"Emits"| LedgerRecorded_Event
+Events1["Domain Events:\n• PaymentAuthorized\n• PaymentOrderCreated"]:::event
+Events2["Domain Events:\n• CaptureRequested\n• PaymentOrderPspResultUpdated\n• PaymentOrderFinalized"]:::event
 
-    CreatePayment_Cmd -->|"Creates<br/>Payment + PaymentOrders"| Payment_Agg
-    LedgerRecording_Cmd -->|"Creates"| JournalEntry_Agg
+PaymentAgg --> Events1
+PaymentOrderAgg --> Events2
 
-    style Payment_Agg fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
-    style PaymentOrder_Agg fill:#C8E6C9,stroke:#388E3C,stroke-width:4px
-    style JournalEntry_Agg fill:#C8E6C9,stroke:#388E3C,stroke-width:4px
-    style Posting_Entity fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
-    style PaymentId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
-    style PaymentOrderId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
-    style SellerId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
-    style BuyerId_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
-    style Amount_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
-    style Account_VO fill:#FFE0B2,stroke:#E65100,stroke-width:2px
+PaymentOrderAgg --> PaymentOrderEntity
+PaymentOrderEntity --> ValueObjects
+
+end
+
+
+%% INFRASTRUCTURE
+subgraph Infrastructure["Infrastructure Layer"]
+direction TB
+
+Outbox["Outbox (DB→Kafka)"]:::infra
+Kafka["Kafka (Event Backbone)\nSharded by SellerId for payment-order topics"]:::infra
+Redis["Redis ZSET (Retry Queue)\nBackoff scheduling"]:::infra
+
+Events1 --> Outbox
+Events2 --> Kafka
+
+Outbox --> Kafka
+Redis --> Kafka
+
+end
+
+
+%% LEDGER BC
+subgraph Ledger_BC["Ledger Bounded Context (Separate Ledger DB)"]
+direction TB
+
+LedgerAgg["**Ledger (Double-Entry Aggregate Root)**  
+• Balanced journal entries  
+• AuthHold, Capture, Settlement, Fees, Payout  
+• Append-only  
+• Idempotent  
+• Lives in Ledger DB  
+• Shard = SellerId"]:::ledger
+
+JournalEntry["JournalEntry\nentity"]:::ledger
+Posting["Posting (Debit/Credit)\nvalue object"]:::ledger
+Account["Account / AccountType\n(value objects)"]:::ledger
+AccountBalance["AccountBalance\n(entity, versioned)"]:::ledger
+
+LedgerEvents["Ledger Events:\n• LedgerEntriesRecorded\n• BalanceUpdated"]:::event
+
+LedgerAgg --> JournalEntry --> Posting
+LedgerAgg --> AccountBalance
+LedgerAgg --> Account
+LedgerAgg --> LedgerEvents
+
+end
+
+
+%% EVENT FLOW ACROSS CONTEXTS
+PaymentOrderAgg -.->|"PaymentOrderFinalized"| Kafka
+Kafka -.->|"LedgerRecordingCommand"| LedgerAgg
+
+LedgerEvents -.->|"export to Finance/Payout"| consumer["Finance / Payout Systems"]:::consumer
 ```
 
 In the refreshed Merchant-of-Record scope:
@@ -301,51 +387,83 @@ In the refreshed Merchant-of-Record scope:
 
 
 ```mermaid
-%%{init:{'theme':'default','flowchart':{'nodeSpacing':40,'rankSpacing':50}}}%%
+%%{init:{'theme':'default','flowchart':{'nodeSpacing':70,'rankSpacing':70}}}%%
 flowchart TB
-    classDef aggregate fill:#4CAF50,stroke:#2E7D32,stroke-width:4px;
-    classDef consistency fill:#FF9800,stroke:#E65100,stroke-width:2px;
-    classDef transaction fill:#2196F3,stroke:#1565C0,stroke-width:2px;
 
-    subgraph Payment_Coordination_Boundary["💳 Payment Aggregate (Coordination)"]
-        Payment_Invariants["Invariants:<br/>• totalAmount = sum(paymentOrders.amount)<br/>• All amounts same currency<br/>• Consistency: Immediate<br/><br/>Purpose:<br/>• Coordination aggregate for<br/>  cross-domain integration<br/>• Tracks overall payment completion<br/>• Emits PaymentCompleted when<br/>  all PaymentOrders finalized"]
-        Payment_Actions["Actions:<br/>• markAsPaid()<br/>• markAsFailed()<br/>• addPaymentOrder()<br/>• checkAllPaymentOrdersCompleted()<br/>• emitPaymentCompleted()"]
-        Payment_Events["Coordination Events:<br/>• PaymentCompleted (optional - emitted<br/>  when all PaymentOrders finalized)<br/>• PaymentUpdated<br/><br/>Note: Shipment domain listens to<br/>individual PaymentOrderSucceeded<br/>events (not PaymentCompleted) to<br/>initiate shipment per seller immediately"]
-    end
+classDef agg fill:#4CAF50,stroke:#1B5E20,stroke-width:3px,color:white
+classDef event fill:#2196F3,stroke:#0D47A1,stroke-width:2px,color:white
+classDef infra fill:#9E9E9E,stroke:#555,width:2px,color:white
+classDef bc fill:#673AB7,stroke:#4527A0,stroke-width:3px,color:white
+classDef note fill:#FFF8E1,stroke:#F9A825,color:black
 
-    subgraph PaymentOrder_Aggregate_Boundary["📋 PaymentOrder Aggregate (Processing)"]
-        PO_Invariants["Invariants:<br/>• retryCount ≤ MAX_RETRIES (5)<br/>• Terminal states immutable<br/>• Consistency: Immediate<br/>• Each PaymentOrder processed<br/>  independently with separate PSP call"]
-        PO_Actions["Actions:<br/>• markAsPaid()<br/>• markAsFailed()<br/>• incrementRetry()<br/>• markAsPending()<br/>• withRetryReason()<br/>• withLastError()"]
-        PO_Status["Status Transitions:<br/>INITIATED_PENDING →<br/>SUCCESSFUL_FINAL /<br/>FAILED_FINAL"]
-        PO_Processing["Processing:<br/>• Separate PSP call per PaymentOrder<br/>• Independent retry logic<br/>• Individual status tracking<br/>• Event-driven (PaymentOrderCreated,<br/>  PaymentOrderSucceeded, etc.)<br/>• Events trigger Payment status<br/>  evaluation"]
-    end
+%% ========== PAYMENT BC ==========
+subgraph PaymentBC["Payment Bounded Context (Payment DB)"]
+direction TB
 
-    subgraph Ledger_Aggregate_Boundary["🧾 Ledger Aggregate Boundary"]
-        Ledger_Invariants["Invariants:<br/>• Debits = Credits (balanced)<br/>• JournalEntry immutable<br/>• Consistency: Immediate<br/>• Factory-enforced creation<br/>  (private constructors)"]
-        Ledger_Actions["Actions:<br/>• JournalEntry.fullFlow()<br/>• JournalEntry.failedPayment()<br/>• Account.create()<br/>• Amount.of()<br/>• Posting.Debit.create()<br/>• Posting.Credit.create()"]
-        Ledger_Balance["Balance Rule:<br/>Σ(Posting.debits) =<br/>Σ(Posting.credits)<br/><br/>Enforced at creation via<br/>factory methods"]
-    end
+Payment["**Payment (Coordination Aggregate)**  
+• One per buyer order  
+• Synchronous authorization only  
+• No per-seller correctness  
+• Strict consistency using DB txn  
+• Emits PaymentAuthorized"]:::agg
 
-    subgraph Transaction_Scopes["🔒 Transaction Scopes"]
-        DB_Transaction["Database Transaction<br/>• Payment + PaymentOrders<br/>• JournalEntry + Postings<br/>• Atomic within aggregate"]
-        Kafka_Transaction["Kafka Transaction<br/>• Offset commit<br/>• Event publish<br/>• Atomic across aggregates"]
-    end
+PaymentOrder["**PaymentOrder (Processing Aggregate)**  
+• One per seller leg  
+• Manages capture, retries, PSP responses  
+• Emits: PaymentOrderCreated → PspResultUpdated → Finalized  
+• Fully consistent inside aggregate  
+• Sharded by sellerId"]:::agg
 
-    Payment_Coordination_Boundary -->|"Contains (1:N)<br/>Coordination Container"| PaymentOrder_Aggregate_Boundary
-    PaymentOrder_Aggregate_Boundary -->|"Completion triggers<br/>Payment status evaluation"| Payment_Coordination_Boundary
-    PaymentOrder_Aggregate_Boundary -->|"Emits Events<br/>Eventually Consistent<br/>(Per PaymentOrder)"| Ledger_Aggregate_Boundary
-    Payment_Coordination_Boundary -->|"May emit<br/>PaymentCompleted<br/>(Optional - overall status)"| CrossDomain["🌐 Downstream Services"]
-    PaymentOrder_Aggregate_Boundary -->|"Emits<br/>PaymentOrderSucceeded<br/>(Per seller - immediate action)"| CrossDomain
-    Payment_Coordination_Boundary -->|"Uses<br/>Initial Creation +<br/>Status Updates"| DB_Transaction
-    PaymentOrder_Aggregate_Boundary -->|"Uses<br/>All Processing"| Kafka_Transaction
-    PaymentOrder_Aggregate_Boundary -->|"Uses<br/>Status Updates"| DB_Transaction
-    Ledger_Aggregate_Boundary -->|"Uses"| DB_Transaction
+end
 
-    style Payment_Coordination_Boundary fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
-    style PaymentOrder_Aggregate_Boundary fill:#C8E6C9,stroke:#388E3C,stroke-width:4px
-    style Ledger_Aggregate_Boundary fill:#C8E6C9,stroke:#388E3C,stroke-width:3px
-    style DB_Transaction fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
-    style Kafka_Transaction fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
+%% EVENTS
+Payment -->|"domain event\nPaymentAuthorized"| Outbox:::infra
+PaymentOrder -->|"domain events\n• PaymentOrderCreated\n• PspResultUpdated\n• PaymentOrderFinalized"| Kafka:::infra
+
+%% INFRASTRUCTURE
+Outbox["Outbox Table (DB → Kafka)\nexactly-once bridging"]:::infra
+Kafka["Kafka (Event Backbone)\nTopics sharded by sellerId"]:::infra
+
+
+%% ========== LEDGER BC ==========
+subgraph LedgerBC["Ledger Bounded Context (Ledger DB)"]
+direction TB
+
+Ledger["**Ledger (Double-Entry Aggregate)**  
+• AuthHold, Capture, Settlement  
+• Append-only  
+• Idempotent  
+• Sharded by sellerId  
+• Strict consistency inside aggregate"]:::bc
+
+LedgerEvents["LedgerEntriesRecorded\nBalanceUpdated"]:::event
+
+Ledger --> LedgerEvents
+
+end
+
+
+%% CROSS-BC EVENT FLOW
+Kafka -->|"event\nPaymentOrderFinalized"| Ledger
+
+%% Notes
+note1["**Strict consistency only inside each aggregate**  
+• Payment operations are ACID within Payment aggregate  
+• PaymentOrder operations are ACID within PaymentOrder aggregate  
+• Ledger writes are ACID within Ledger aggregate"]:::note
+
+note2["**No cross-aggregate transactions**  
+Communication between aggregates uses events  
+(Kafka + Outbox + idempotent handlers)"]:::note
+
+note3["**Sharding boundaries**  
+• Payment shard = paymentId  
+• PaymentOrder shard = sellerId  
+• Ledger shard = sellerId"]:::note
+
+note1 --- PaymentBC
+note2 --- Kafka
+note3 --- LedgerBC
 ```
 
 **Key DDD Concepts:**
@@ -440,21 +558,25 @@ Response Codes
 •	401 / 403
 
 ### 2.7 Data Flow Summary
+
 ```mermaid
 sequenceDiagram
     autonumber
-
-    participant Client
-    participant PaymentService
-    participant PSPAuth as PSP Authorization
-    participant DB
+    participant Client as Client
+    participant PaymentService as PaymentService (API)
+    participant PSPAuth as PSP Authorization API
+    participant DB as Payment DB
     participant Outbox as OutboxDispatcherJob
-    participant Kafka
-    participant Enqueuer
-    participant CaptureExec as CaptureExecutor
-    participant ResultApplier
-    participant Redis
-    participant PSP as PSP Capture
+    participant Kafka as Kafka
+    participant Enqueuer as PaymentOrderEnqueuer
+    participant CaptureExec as PaymentOrderCaptureExecutor
+    participant PSP as PSP Capture API
+    participant Applier as PaymentOrderPspResultApplier
+    participant Retry as Redis RetryQueue
+    participant Final as Finalized Dispatcher
+    participant LedgerQ as LedgerRecordingRequestQueue
+    participant LedgerExec as LedgerRecordingConsumer
+    participant LedgerDB as Ledger DB
 
     %% ============================
     %% 1. Synchronous Authorization
@@ -473,7 +595,7 @@ sequenceDiagram
 
 
     %% =============================================
-    %% 2. (NEW) Manual Capture Request per seller
+    %% 2. Manual Capture Request per seller
     %% =============================================
     Client->>PaymentService: POST /payments/{paymentId}/capture\n{sellerId, amount}
     PaymentService->>DB: Validate + Persist outbox<PaymentOrderCaptureCommand>
@@ -483,12 +605,12 @@ sequenceDiagram
     %% =============================================
     %% 3. OutboxDispatcherJob — NEW Responsibilities
     %% =============================================
-    Outbox->>DB: Fetch NEW outbox rows (payment, paymentOrder, captureCmd)
+    Outbox->>DB: Fetch NEW outbox rows (Authorized / PaymentOrder / CaptureCmd)
 
-    %% 3.1 PaymentAuthorized
-    Outbox->>Outbox: Expand PaymentAuthorized → create PaymentOrders
-    Outbox->>DB: Insert PaymentOrders
-    Outbox->>DB: Insert outbox<PaymentOrderCreated[]> 
+    %% 3.1 PaymentAuthorized (EXPANDS)
+    Outbox->>Outbox: Expand PaymentAuthorized → create N PaymentOrders
+    Outbox->>DB: Insert PaymentOrders (per seller)
+    Outbox->>DB: Insert outbox<PaymentOrderCreated[]>
     Outbox->>Kafka: Publish PaymentAuthorized
     Outbox->>Kafka: Publish PaymentOrderCreated (per seller)
 
@@ -496,44 +618,56 @@ sequenceDiagram
     Outbox->>Kafka: Publish PaymentOrderCreated
     Outbox->>DB: Mark SENT
 
-    %% 3.3 PaymentOrderCaptureCommand (NEW)
+    %% 3.3 PaymentOrderCaptureCommand (manual capture)
     Outbox->>DB: Update PaymentOrder → CAPTURE_REQUESTED
     Outbox->>Kafka: Publish PaymentOrderCaptureRequested
-
-    Outbox->>DB: Mark outbox items as SENT
+    Outbox->>DB: Mark SENT
 
 
     %% =============================================
-    %% 4. Enqueuer → PSP Capture Requested
+    %% 4. Enqueuer → PSP Capture Requested (AUTO-CAPTURE)
     %% =============================================
-    Enqueuer->>Kafka: Consume PaymentOrderCreated
-    Enqueuer->>Kafka: Publish PaymentOrderCaptureRequested (auto-capture scenario)
+    Kafka->>Enqueuer: Consume PaymentOrderCreated
+    Enqueuer->>Kafka: Publish PaymentOrderCaptureRequested (auto-capture)
 
 
     %% =============================================
     %% 5. Capture Executor
     %% =============================================
-    CaptureExec->>Kafka: Consume PaymentOrderCaptureRequested
+    Kafka->>CaptureExec: Consume PaymentOrderCaptureRequested
     CaptureExec->>PSP: capture(sellerAmount, authRef)
     PSP-->>CaptureExec: captureResult
     CaptureExec->>Kafka: Publish PaymentOrderPspResultUpdated
 
 
     %% =============================================
-    %% 6. PSP Result Applier
+    %% 6. Result Applier
     %% =============================================
-    ResultApplier->>Kafka: Consume PaymentOrderPspResultUpdated
+    Kafka->>Applier: Consume PaymentOrderPspResultUpdated
+    Applier->>DB: Update PaymentOrder status + retryCount
 
-    alt Capture Success
-        ResultApplier->>DB: Update PaymentOrder → CAPTURED_FINAL
-        ResultApplier->>Kafka: Publish PaymentOrderSucceeded
-    else Retryable Failure
-        ResultApplier->>Redis: ZSET schedule retry
-        ResultApplier->>DB: retry_count++
-    else Final Failure
-        ResultApplier->>DB: Update PaymentOrder → FINAL_FAILED
-        ResultApplier->>Kafka: Publish PaymentOrderFailed
+    alt Retryable PSP status
+        Applier->>Retry: ZADD retryQueue(dueAt)
+    else Final (CAPTURED or FAILED)
+        Applier->>Kafka: Publish PaymentOrderFinalized
     end
+
+
+    %% =============================================
+    %% 7. Redis Retry Dispatcher
+    %% =============================================
+    Retry->>Kafka: Publish PaymentOrderCaptureRequested (due items)
+
+
+    %% =============================================
+    %% 8. Ledger Recording
+    %% =============================================
+    Kafka->>Final: Consume PaymentOrderFinalized
+    Final->>Kafka: Publish LedgerRecordingCommand
+
+    Kafka->>LedgerExec: Consume LedgerRecordingCommand
+    LedgerExec->>LedgerDB: Append journals + update balance
+    LedgerExec->>Kafka: Publish LedgerEntriesRecorded
 ```
 
 
