@@ -563,33 +563,32 @@ Response Codes
 sequenceDiagram
     autonumber
     participant Client as Client
-    participant PaymentService as PaymentService (API)
+    participant PaymentService as payment-service (API)
     participant PSPAuth as PSP Authorization API
-    participant DB as Payment DB
-    participant Outbox as OutboxDispatcherJob
-    participant Kafka as Kafka
+    participant PaymentDB as Payment DB Cluster
+    participant OutboxJob as OutboxDispatcherJob
+    participant Kafka as Kafka (event backbone)
     participant Enqueuer as PaymentOrderEnqueuer
     participant CaptureExec as PaymentOrderCaptureExecutor
     participant PSP as PSP Capture API
     participant Applier as PaymentOrderPspResultApplier
-    participant Retry as Redis RetryQueue
-    participant Final as Finalized Dispatcher
-    participant LedgerQ as LedgerRecordingRequestQueue
-    participant LedgerExec as LedgerRecordingConsumer
-    participant LedgerDB as Ledger DB
+    participant Retry as Redis RetryQueue (ZSET)
+    participant Final as LedgerRecordingRequestDispatcher
+    participant LedgerConsumer as LedgerRecordingConsumer
+    participant LedgerDB as Accounting / Ledger DB Cluster
 
     %% ============================
     %% 1. Synchronous Authorization
     %% ============================
     Client->>PaymentService: POST /payments
     PaymentService->>PSPAuth: authorize(orderTotal, cardInfo)
-    PSPAuth-->>PaymentService: authResult(APPROVED/DECLINED)
+    PSPAuth-->>PaymentService: authResult(APPROVED / DECLINED)
 
     alt Approved
-        PaymentService->>DB: Persist Payment(PENDING_AUTH→AUTHORIZED)\n+ outbox<PaymentAuthorized>
+        PaymentService->>PaymentDB: TX: Persist Payment(PENDING_AUTH→AUTHORIZED)\n+ outbox<PaymentAuthorized>
         PaymentService-->>Client: 202 Accepted
     else Declined
-        PaymentService->>DB: Persist Payment(DECLINED)
+        PaymentService->>PaymentDB: TX: Persist Payment(DECLINED)
         PaymentService-->>Client: 402 Payment Required
     end
 
@@ -598,76 +597,77 @@ sequenceDiagram
     %% 2. Manual Capture Request per seller
     %% =============================================
     Client->>PaymentService: POST /payments/{paymentId}/capture\n{sellerId, amount}
-    PaymentService->>DB: Validate + Persist outbox<PaymentOrderCaptureCommand>
+    PaymentService->>PaymentDB: Validate + insert outbox<PaymentOrderCaptureCommand>
     PaymentService-->>Client: 202 Accepted (capture queued)
 
 
     %% =============================================
-    %% 3. OutboxDispatcherJob — NEW Responsibilities
+    %% 3. OutboxDispatcherJob — on Payment DB
     %% =============================================
-    Outbox->>DB: Fetch NEW outbox rows (Authorized / PaymentOrder / CaptureCmd)
+    OutboxJob->>PaymentDB: Fetch NEW outbox rows\n(PaymentAuthorized / PaymentOrderCreated / CaptureCmd)
 
-    %% 3.1 PaymentAuthorized (EXPANDS)
-    Outbox->>Outbox: Expand PaymentAuthorized → create N PaymentOrders
-    Outbox->>DB: Insert PaymentOrders (per seller)
-    Outbox->>DB: Insert outbox<PaymentOrderCreated[]>
-    Outbox->>Kafka: Publish PaymentAuthorized
-    Outbox->>Kafka: Publish PaymentOrderCreated (per seller)
+    %% 3.1 PaymentAuthorized → expand into PaymentOrders
+    OutboxJob->>OutboxJob: Expand PaymentAuthorized → N PaymentOrders\n(one per seller leg)
+    OutboxJob->>PaymentDB: Insert PaymentOrders (per seller)
+    OutboxJob->>PaymentDB: Insert outbox<PaymentOrderCreated[]>(per seller)
+    OutboxJob->>Kafka: Publish PaymentAuthorized
 
     %% 3.2 PaymentOrderCreated passthrough
-    Outbox->>Kafka: Publish PaymentOrderCreated
-    Outbox->>DB: Mark SENT
+    OutboxJob->>Kafka: Publish PaymentOrderCreated
+    OutboxJob->>PaymentDB: Mark outbox row SENT
 
     %% 3.3 PaymentOrderCaptureCommand (manual capture)
-    Outbox->>DB: Update PaymentOrder → CAPTURE_REQUESTED
-    Outbox->>Kafka: Publish PaymentOrderCaptureRequested
-    Outbox->>DB: Mark SENT
+    OutboxJob->>PaymentDB: Update PaymentOrder → CAPTURE_REQUESTED
+    OutboxJob->>Kafka: Publish PaymentOrderCaptureRequested
+    OutboxJob->>PaymentDB: Mark outbox row SENT
 
 
     %% =============================================
-    %% 4. Enqueuer → PSP Capture Requested (AUTO-CAPTURE)
+    %% 4. Enqueuer → PSP Capture Requested (auto-capture)
     %% =============================================
     Kafka->>Enqueuer: Consume PaymentOrderCreated
-    Enqueuer->>Kafka: Publish PaymentOrderCaptureRequested (auto-capture)
+    Enqueuer->>PaymentDB: Update PaymentOrder status to CAPTURE_REQUESTED
+    Enqueuer->>Kafka: Publish PaymentOrderCaptureRequested\n(auto-capture path)
 
 
     %% =============================================
-    %% 5. Capture Executor
+    %% 5. Capture Executor (PSP call)
     %% =============================================
     Kafka->>CaptureExec: Consume PaymentOrderCaptureRequested
+    CaptureExec->>PaymentDB: Load PaymentOrder snapshot\n(shard = sellerId)
     CaptureExec->>PSP: capture(sellerAmount, authRef)
     PSP-->>CaptureExec: captureResult
-    CaptureExec->>Kafka: Publish PaymentOrderPspResultUpdated
+    CaptureExec->>Kafka: Publish PaymentOrderPspResultUpdated\n(EOS: produce + commit offsets)
 
 
     %% =============================================
-    %% 6. Result Applier
+    %% 6. Result Applier (Payment DB)
     %% =============================================
     Kafka->>Applier: Consume PaymentOrderPspResultUpdated
-    Applier->>DB: Update PaymentOrder status + retryCount
+    Applier->>PaymentDB: Update PaymentOrder status + retryCount
 
     alt Retryable PSP status
-        Applier->>Retry: ZADD retryQueue(dueAt)
+        Applier->>Retry: ZADD retryQueue(dueAt, paymentOrderId)
     else Final (CAPTURED or FAILED)
         Applier->>Kafka: Publish PaymentOrderFinalized
     end
 
 
     %% =============================================
-    %% 7. Redis Retry Dispatcher
+    %% 7. Redis Retry Dispatcher (on seller shard)
     %% =============================================
-    Retry->>Kafka: Publish PaymentOrderCaptureRequested (due items)
+    Retry->>Kafka: Publish PaymentOrderCaptureRequested\n(for due retry items)
 
 
     %% =============================================
-    %% 8. Ledger Recording
+    %% 8. Ledger Recording (Accounting DB)
     %% =============================================
     Kafka->>Final: Consume PaymentOrderFinalized
-    Final->>Kafka: Publish LedgerRecordingCommand
+    Final->>Kafka: Publish LedgerRecordingCommand\n(key = sellerId)
 
-    Kafka->>LedgerExec: Consume LedgerRecordingCommand
-    LedgerExec->>LedgerDB: Append journals + update balance
-    LedgerExec->>Kafka: Publish LedgerEntriesRecorded
+    Kafka->>LedgerConsumer: Consume LedgerRecordingCommand
+    LedgerConsumer->>LedgerDB: Append JournalEntries\n+ update AccountBalance (seller shard)
+    LedgerConsumer->>Kafka: Publish LedgerEntriesRecorded
 ```
 
 
