@@ -5,7 +5,7 @@ architecture, idempotent workflows, and cloud-native patterns.Also
 - It is not intended
   as a commercial product but as an educational and reference for fur projects
 
-*Last updated: **2025‑01‑15** – maintained by **Doğan Çağlar***
+*Last updated: **2025‑01‑14** – maintained by **Doğan Çağlar***
 
 ---
 
