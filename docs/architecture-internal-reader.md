@@ -868,7 +868,7 @@ flowchart TB
     %% Kafka backbone
     subgraph Backbone["Kafka (event backbone)"]
       PO_CREATED["payment_order_created_topic\nkey = paymentOrderId"]:::kafka
-      PSP_CALL_REQ["payment_order_psp_call_requested_topic\nkey = paymentOrderId"]:::kafka
+      PSP_CAPTURE_CALL_REQ["payment_order_capture_request_queue_topic\nkey = paymentOrderId"]:::kafka
       PSP_RESULT["payment_order_psp_result_updated_topic\nkey = paymentOrderId"]:::kafka
       PO_FINAL["payment_order_finalized_topic\nkey = paymentOrderId"]:::kafka
       LEDGER_REQ["ledger_record_request_queue_topic\nkey = sellerId"]:::kafka
@@ -878,7 +878,7 @@ flowchart TB
     %% PSP flow (payment-consumers)
     subgraph PSP_FLOW["payment-consumers · PSP flow"]
       Enqueuer["PaymentOrderEnqueuer\n(consumes PO_CREATED,\nproduces PSP_CALL_REQ)"]:::svc
-      PspExec["PaymentOrderPspCallExecutor\n(consumes PSP_CALL_REQ,\ncalls PSP capture,\nproduces PSP_RESULT)"]:::svc
+      PspExec["PaymentOrderCaptureExecutor\n(consumes PSP_CAPTURE_CALL_REQ,\ncalls PSP capture,\nproduces PSP_RESULT)"]:::svc
       PspApply["PaymentOrderPspResultApplier\n(consumes PSP_RESULT,\nupdates DB, schedules retry,\nproduces PO_FINAL)"]:::svc
     end
 
