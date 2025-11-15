@@ -2,23 +2,19 @@ package com.dogancaglar.paymentservice.application.usecases
 
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.paymentservice.application.constants.IdNamespaces
 import com.dogancaglar.paymentservice.application.constants.PaymentLogFields
+import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
+import com.dogancaglar.paymentservice.domain.model.OutboxEvent
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.domain.commands.CreatePaymentCommand
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.OutboxEvent
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.inbound.AuthorizePaymentUseCase
-import com.dogancaglar.paymentservice.ports.outbound.OutboxEventRepository
-import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
-import com.dogancaglar.paymentservice.ports.outbound.PspAuthGatewayPort
-import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
+import com.dogancaglar.paymentservice.ports.outbound.*
 import org.slf4j.LoggerFactory
-import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import java.time.Clock
 import java.time.LocalDateTime
 import java.util.*
@@ -39,7 +35,7 @@ class AuthorizePaymentService(
 
     override fun authorize(cmd: CreatePaymentCommand): Payment {
         // 1️⃣ Create domain aggregate (Payment)
-        val paymentId = PaymentId(idGeneratorPort.nextId(IdNamespaces.PAYMENT))
+        val paymentId = PaymentId(idGeneratorPort.nextPaymentId(cmd.buyerId,cmd.orderId))
         val payment = Payment.createNew(
             paymentId = paymentId,
             buyerId = cmd.buyerId,
@@ -88,7 +84,7 @@ class AuthorizePaymentService(
         )
 
         val extraLogFields = mapOf(
-            PaymentLogFields.PUBLIC_PAYMENT_ID to updated.publicPaymentId
+            PaymentLogFields.PUBLIC_PAYMENT_ID to updated.paymentId.toPublicPaymentId()
         )
 
         LogContext.with(envelope, additionalContext = extraLogFields) {

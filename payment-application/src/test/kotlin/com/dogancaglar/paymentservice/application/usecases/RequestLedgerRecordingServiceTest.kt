@@ -1,11 +1,11 @@
 package com.dogancaglar.paymentservice.application.usecases
 
 import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.paymentservice.domain.commands.LedgerRecordingCommand
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderEvent
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderFailed
+import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
+import com.dogancaglar.paymentservice.application.events.PaymentOrderEvent
+import com.dogancaglar.paymentservice.application.events.PaymentOrderFailed
+import com.dogancaglar.paymentservice.application.events.PaymentOrderSucceeded
+import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import io.mockk.*
 import org.junit.jupiter.api.BeforeEach
@@ -33,19 +33,15 @@ class RequestLedgerRecordingServiceTest {
 
     // Helper method to create PaymentOrderSucceeded with SUCCESSFUL_FINAL status
     private fun createPaymentOrderSucceeded(
-        paymentOrderId: String = "po-123",
-        publicPaymentOrderId: String = "paymentorder-123",
-        paymentId: String = "p-456",
-        publicPaymentId: String = "payment-456",
+        paymentOrderId: String = "123",
+        paymentId: String = "456",
         sellerId: String = "seller-789",
         amountValue: Long = 10000L,
         currency: String = "EUR",
         retryCount: Int = 0
     ): PaymentOrderSucceeded = PaymentOrderSucceeded.create(
         paymentOrderId = paymentOrderId,
-        publicPaymentOrderId = publicPaymentOrderId,
         paymentId = paymentId,
-        publicPaymentId = publicPaymentId,
         sellerId = sellerId,
         amountValue = amountValue,
         currency = currency,
@@ -57,10 +53,8 @@ class RequestLedgerRecordingServiceTest {
 
     // Helper method to create PaymentOrderFailed with FAILED_FINAL status
     private fun createPaymentOrderFailed(
-        paymentOrderId: String = "po-999",
-        publicPaymentOrderId: String = "paymentorder-999",
-        paymentId: String = "p-999",
-        publicPaymentId: String = "payment-999",
+        paymentOrderId: String = "999",
+        paymentId: String = "999",
         sellerId: String = "seller-789",
         amountValue: Long = 5000L,
         currency: String = "EUR",
@@ -69,9 +63,7 @@ class RequestLedgerRecordingServiceTest {
         lastErrorMessage: String? = null
     ): PaymentOrderFailed = PaymentOrderFailed.create(
         paymentOrderId = paymentOrderId,
-        publicPaymentOrderId = publicPaymentOrderId,
         paymentId = paymentId,
-        publicPaymentId = publicPaymentId,
         sellerId = sellerId,
         amountValue = amountValue,
         currency = currency,

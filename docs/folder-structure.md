@@ -163,8 +163,6 @@ ecommerce-platform-kotlin/
 │   │   │   ├── PaymentValidationException.kt
 │   │   │   └── PspUnavailableException.kt
 │   │   └── util/                         # Domain utilities
-│   │       ├── PaymentFactory.kt         # Payment aggregate factory
-│   │       ├── PaymentOrderFactory.kt     # PaymentOrder aggregate factory
 │   │       ├── PaymentOrderEventMapper.kt # Event ↔ Domain mapping
 │   │       └── PSPStatusMapper.kt        # PSP status conversion
 │   ├── src/test/kotlin/                  # Pure domain unit tests

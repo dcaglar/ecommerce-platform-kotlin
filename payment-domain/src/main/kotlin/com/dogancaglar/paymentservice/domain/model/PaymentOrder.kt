@@ -19,10 +19,7 @@ class PaymentOrder private constructor(
     val updatedAt: LocalDateTime
 ) {
 
-    val publicPaymentOrderId: String
-        get() = "paymentorder-${paymentOrderId.value}"
-    val publicPaymentId: String
-        get() = "payment-${paymentId.value}"
+
     fun incrementRetry() = copy(retryCount = retryCount + 1)
     fun markCaptureRequested(): PaymentOrder {
         require(status == PaymentOrderStatus.INITIATED_PENDING)

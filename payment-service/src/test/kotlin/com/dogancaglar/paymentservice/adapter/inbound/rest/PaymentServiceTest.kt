@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
 import com.dogancaglar.paymentservice.application.usecases.AuthorizePaymentService
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.application.validator.PaymentValidator
 import com.dogancaglar.port.out.web.dto.PaymentRequestDTO
 import com.dogancaglar.port.out.web.dto.AmountDto
@@ -68,7 +69,7 @@ class PaymentServiceTest {
 
         // Then
         assertNotNull(result)
-        assertEquals("payment-123", result.paymentId)
+        assertEquals(expectedPayment.paymentId.toPublicPaymentId(), result.paymentId)
         assertEquals("order-123", result.orderId)
         assertEquals("PENDING_AUTH", result.status)
         assertEquals(10000L, result.totalAmount.quantity)
@@ -160,7 +161,7 @@ class PaymentServiceTest {
         val result = paymentService.createPayment(request)
 
         // Then
-        assertEquals("payment-456", result.paymentId)
+        assertEquals(expectedPayment.paymentId.toPublicPaymentId(), result.paymentId)
         assertEquals("AUTHORIZED", result.status)
         assertEquals(5000L, result.totalAmount.quantity)
         assertEquals(CurrencyEnum.EUR, result.totalAmount.currency)
@@ -197,7 +198,7 @@ class PaymentServiceTest {
         val result = paymentService.createPayment(request)
 
         // Then
-        assertEquals("payment-789", result.paymentId)
+        assertEquals(expectedPayment.paymentId.toPublicPaymentId(), result.paymentId)
         assertEquals(99999999L, result.totalAmount.quantity)
         
         verify { authorizePaymentService.authorize(any()) }

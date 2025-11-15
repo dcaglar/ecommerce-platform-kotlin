@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.outbound.serialization
 
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
@@ -43,7 +44,7 @@ class JacksonSerializationAdapterTest {
 
         assertNotNull(json)
         assertTrue(json.contains("\"paymentOrderId\":${order.paymentOrderId.value}"))
-        assertTrue(json.contains("\"publicPaymentOrderId\":\"${order.publicPaymentOrderId}\""))
+        assertTrue(json.contains("\"paymentId\":${order.paymentId.value}"))
         assertTrue(json.contains("\"retryCount\":${order.retryCount}"))
         assertTrue(json.contains("\"currency\":\"${order.amount.currency.currencyCode}\""))
     }

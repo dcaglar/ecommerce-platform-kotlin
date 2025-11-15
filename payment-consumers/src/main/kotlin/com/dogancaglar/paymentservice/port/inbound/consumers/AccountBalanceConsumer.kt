@@ -1,12 +1,12 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.common.event.CONSUMER_GROUPS
+import com.dogancaglar.paymentservice.application.metadata.CONSUMER_GROUPS
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.event.Topics
+import com.dogancaglar.paymentservice.application.metadata.Topics
 import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
-import com.dogancaglar.paymentservice.domain.event.LedgerEntriesRecorded
-import com.dogancaglar.paymentservice.domain.util.LedgerDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.LedgerDomainEventMapper
 import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceUseCase
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.consumer.OffsetAndMetadata

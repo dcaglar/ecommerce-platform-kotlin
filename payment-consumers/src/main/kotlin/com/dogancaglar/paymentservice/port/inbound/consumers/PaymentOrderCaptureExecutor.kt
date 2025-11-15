@@ -1,18 +1,18 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.common.event.CONSUMER_GROUPS
+import com.dogancaglar.paymentservice.application.metadata.CONSUMER_GROUPS
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.event.Topics
+import com.dogancaglar.paymentservice.application.metadata.Topics
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspResultUpdated
+import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
+import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.PspCaptureGatewayPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
@@ -95,9 +95,7 @@ class PaymentOrderCaptureExecutor(
             // Build result-updated event (extends PaymentOrderEvent)
             val result = PaymentOrderPspResultUpdated.create(
                 paymentOrderId = work.paymentOrderId,
-                publicPaymentOrderId = work.publicPaymentOrderId,
                 paymentId = work.paymentId,
-                publicPaymentId = work.publicPaymentId,
                 sellerId = work.sellerId,
                 amountValue = work.amountValue,
                 currency = work.currency,
@@ -113,7 +111,8 @@ class PaymentOrderCaptureExecutor(
 
             val outEnv = DomainEventEnvelopeFactory.envelopeFor(
                 data = result,
-                eventMetaData = EventMetadatas.PaymentOrderPspResultUpdatedMetadata,
+                eventMetaData = EventMetadatas
+                    .PaymentOrderPspResultUpdatedMetadata,
                 aggregateId = work.paymentOrderId,          // key = paymentOrderId
                 traceId = env.traceId,
                 parentEventId = env.eventId

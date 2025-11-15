@@ -1,18 +1,17 @@
 package com.dogancaglar.paymentservice.application.usecases
 
 import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.paymentservice.domain.commands.LedgerRecordingCommand
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.LedgerEntriesRecorded
+import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
+import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
+import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.ledger.Account
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
-import com.dogancaglar.paymentservice.domain.model.ledger.AuthType
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
-import com.dogancaglar.paymentservice.domain.util.LedgerDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.LedgerDomainEventMapper
 import com.dogancaglar.paymentservice.domain.util.LedgerEntryFactory
 import com.dogancaglar.paymentservice.ports.inbound.RecordLedgerEntriesUseCase
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort

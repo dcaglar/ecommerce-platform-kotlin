@@ -213,3 +213,9 @@ psp:
             retryable: 20
             statusCheck: 0
             nonRetryable: 10
+payments:
+  id:
+    epoch-millis: 1735689600000   # 2025-01-01T00:00:00Z
+    region-id: 1                  # EU1
+    num-coord-shards: 8
+    num-seller-shards: 32

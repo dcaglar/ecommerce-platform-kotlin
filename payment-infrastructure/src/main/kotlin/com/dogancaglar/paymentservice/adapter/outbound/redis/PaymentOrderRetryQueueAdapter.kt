@@ -3,12 +3,13 @@ package com.dogancaglar.paymentservice.adapter.outbound.redis
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.RetryItem
+import com.dogancaglar.paymentservice.application.util.RetryItem
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
 import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -75,7 +76,7 @@ class PaymentOrderRetryQueueAdapter(
                 retryAt
             )
         } catch (e: Exception) {
-            logger.error("❌ Exception during scheduleRetry for agg={}", paymentOrder.publicPaymentOrderId, e)
+            logger.error("❌ Exception during scheduleRetry for agg={}", paymentOrder.paymentOrderId.toPublicPaymentOrderId(), e)
             throw e
         }
     }

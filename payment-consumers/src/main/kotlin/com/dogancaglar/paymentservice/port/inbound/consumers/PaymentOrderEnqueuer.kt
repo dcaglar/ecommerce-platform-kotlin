@@ -1,16 +1,15 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.common.event.CONSUMER_GROUPS
+import com.dogancaglar.paymentservice.application.metadata.CONSUMER_GROUPS
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.event.Topics
+import com.dogancaglar.paymentservice.application.metadata.Topics
 import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
+import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
-import com.dogancaglar.paymentservice.application.util.PaymentOrderFactory
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
@@ -27,7 +26,6 @@ class PaymentOrderEnqueuer(
     private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
-    private val factory = PaymentOrderFactory()
 
     @KafkaListener(
         topics = [Topics.PAYMENT_ORDER_CREATED],
@@ -40,7 +38,7 @@ class PaymentOrderEnqueuer(
     ) {
         val consumed = record.value()
         val created = consumed.data
-        val order = factory.fromEvent(created)
+        val order = paymentOrderDomainEventMapper.fromEvent(created)
 
         val tp = TopicPartition(record.topic(), record.partition())
         val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
@@ -66,7 +64,8 @@ class PaymentOrderEnqueuer(
                 publisher.publishSync(
                     preSetEventIdFromCaller = outEnv.eventId,
                     aggregateId = outEnv.aggregateId,
-                    eventMetaData = EventMetadatas.PaymentOrderCaptureCommandMetadata,
+                    eventMetaData = EventMetadatas
+                        .PaymentOrderCaptureCommandMetadata,
                     data = work,
                     traceId = outEnv.traceId,
                     parentEventId = outEnv.parentEventId

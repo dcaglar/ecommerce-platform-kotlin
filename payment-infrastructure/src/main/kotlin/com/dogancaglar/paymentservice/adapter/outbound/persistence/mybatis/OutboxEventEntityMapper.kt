@@ -1,7 +1,8 @@
 package com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis
 
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.OutboxEventEntity
-import com.dogancaglar.paymentservice.domain.event.OutboxEvent
+import com.dogancaglar.paymentservice.domain.model.OutboxEvent
+
 object OutboxEventEntityMapper {
 
     fun toDomain(entity: OutboxEventEntity): OutboxEvent =

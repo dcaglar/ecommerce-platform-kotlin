@@ -26,8 +26,13 @@ object PaymentEntityMapper {
         )
 
     fun toDomain(entity: PaymentEntity): Payment {
-        val total = Amount.of(entity.totalAmountValue, Currency(entity.currency))
-        val captured = Amount.of(entity.capturedAmountValue, Currency(entity.currency))
+        val currency = Currency(entity.currency)
+        val total = Amount.of(entity.totalAmountValue, currency)
+        val captured = if (entity.capturedAmountValue == 0L) {
+            Amount.zero(currency)
+        } else {
+            Amount.of(entity.capturedAmountValue, currency)
+        }
         return Payment.Companion.rehydrate(
             paymentId = PaymentId(entity.paymentId),
             buyerId = BuyerId(entity.buyerId),

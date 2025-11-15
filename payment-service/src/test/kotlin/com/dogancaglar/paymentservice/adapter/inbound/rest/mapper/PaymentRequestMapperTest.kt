@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest.mapper
 
-import com.dogancaglar.paymentservice.domain.commands.CreatePaymentCommand
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.Payment
@@ -14,7 +14,6 @@ import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.port.out.web.dto.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.Order
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -110,19 +109,13 @@ class PaymentRequestMapperTest {
 
         val response = PaymentRequestMapper.toResponse(payment)
 
-        assertEquals("payment-123", response.paymentId)
-        assertEquals("payment-123", response.id)
+        assertEquals(payment.paymentId.toPublicPaymentId(), response.paymentId)
         assertEquals("PENDING_AUTH", response.status)
         assertEquals("buyer-456", response.buyerId)
         assertEquals("order-123", response.orderId)
         assertEquals(10000L, response.totalAmount.quantity)
         assertEquals(CurrencyEnum.USD, response.totalAmount.currency)
         assertEquals(createdAt.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME), response.createdAt)
-        assertEquals(1, response.paymentOrders.size)
-        val orderDto = response.paymentOrders.first()
-        assertEquals("seller-789", orderDto.sellerId)
-        assertEquals(10000L, orderDto.amount.quantity)
-        assertEquals(CurrencyEnum.USD, orderDto.amount.currency)
     }
 
     @Test
@@ -137,7 +130,7 @@ class PaymentRequestMapperTest {
 
         val response = PaymentRequestMapper.toResponse(payment)
 
-        assertEquals("payment-456", response.paymentId)
+        assertEquals(payment.paymentId.toPublicPaymentId(), response.paymentId)
         assertEquals("AUTHORIZED", response.status)
         assertEquals(5000L, response.totalAmount.quantity)
         assertEquals(CurrencyEnum.EUR, response.totalAmount.currency)

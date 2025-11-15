@@ -9,12 +9,12 @@ import org.springframework.boot.ApplicationRunner
 import org.springframework.context.annotation.DependsOn
 import org.springframework.jdbc.BadSqlGrammarException
 import org.springframework.stereotype.Component
-import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
+import com.dogancaglar.paymentservice.ports.outbound.ExternalIdGeneratorPort
 
 @Component
 @DependsOn("liquibase") // ensure migrations done
 class IdResyncStartup(
-    private val idGeneratorPort: IdGeneratorPort,
+    private val idGeneratorPort: ExternalIdGeneratorPort,
     private val paymentOrderRepository: PaymentOrderRepository,
     private val paymentRepository: PaymentRepository
 ) : ApplicationRunner {

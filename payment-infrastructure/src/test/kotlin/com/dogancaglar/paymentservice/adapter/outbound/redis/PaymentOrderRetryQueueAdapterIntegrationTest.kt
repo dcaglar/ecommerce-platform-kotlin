@@ -7,7 +7,7 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
