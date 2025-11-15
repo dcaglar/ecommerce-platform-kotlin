@@ -21,7 +21,6 @@ import java.time.temporal.ChronoUnit
 
 
 @Component
-@DependsOn("idResyncStartup")
 class OutboxPartitionCreator(
     @Qualifier("maintenanceJdbcTemplate") private val jdbcTemplate: JdbcTemplate,
     private val clock: Clock,

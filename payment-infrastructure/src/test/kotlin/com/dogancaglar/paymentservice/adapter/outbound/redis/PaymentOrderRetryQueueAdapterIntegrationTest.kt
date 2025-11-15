@@ -8,6 +8,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
@@ -379,17 +380,21 @@ class PaymentOrderRetryQueueAdapterIntegrationTest {
         val polled = adapter.pollDueRetriesToInflight(10)
 
         // Then - verify envelope structure
-        val envelope = polled[0].envelope
-        assertNotNull(envelope.eventId)
-        assertEquals("payment_order_capture_requested", envelope.eventType)
-        assertEquals("789", envelope.aggregateId)
-        assertNotNull(envelope.traceId)
-        assertNotNull(envelope.timestamp)
-        
+        val env = polled[0].envelope
+        assertNotNull(env.eventId)
+        assertEquals("payment_order_capture_requested", env.eventType)
+        assertEquals("789", env.aggregateId)
+        assertNotNull(env.traceId)
+        assertNotNull(env.timestamp)
+
         // Verify data
-        val data = envelope.data
+        val data = env.data
+
         assertEquals("789", data.paymentOrderId)
-        assertEquals("paymentorder-789", data.publicPaymentOrderId)
+
+        val expectedPublicPaymentOrderId = PaymentOrderId(789L).toPublicPaymentOrderId()
+        assertEquals(expectedPublicPaymentOrderId, data.publicPaymentOrderId)
+
         assertEquals(3, data.retryCount)
     }
 }

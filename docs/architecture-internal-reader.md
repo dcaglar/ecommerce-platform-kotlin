@@ -21,7 +21,7 @@ architecture, idempotent workflows, and cloud-native patterns.Also
    2.3 [PAyment Bounded Context-Integration Diagram](#23-paymentboundedcontext-integration-diagram-this-diagram-shows-external-integration--boundaries)
    
    2.4 [PAyment Bounded Context-Domain Design](#24-payment-bounded-context-domain-modelthis-diagram-shows-internal-domain-aggregates-value-objects-and-events)
-   
+
    2.5 [Aggregate Boundaries & Consistency(This diagram shows aggregate boundaries, consistency guarantees, and transaction scopes.](#25-aggregate-boundaries--consistencythis-diagram-shows-aggregate-boundaries-consistency-guarantees-and-transaction-scopes)
    
    2.6 [API Summary](#26-api-summary)
@@ -378,11 +378,49 @@ Kafka -.->|"LedgerRecordingCommand"| LedgerAgg
 LedgerEvents -.->|"export to Finance/Payout"| consumer["Finance / Payout Systems"]:::consumer
 ```
 
-In the refreshed Merchant-of-Record scope:
-- `Payment` captures the shopper-level authorization synchronously (stores PSP auth id, status) and acts as the coordination point for all downstream seller obligations.
-- `PaymentOrder` represents each seller capture obligation that will be executed asynchronously via the PSP capture endpoint, independent per seller.
-- The ledger subdomain remains unchanged, recording AUTH_HOLD during authorization and subsequent capture/settlement postings as events progress.
+### 2.4.3 Domain Identity Strategy (Snowflake-Sharded IDs)
 
+The Payment domain uses **Snowflake-style globally unique, time-ordered IDs** for all aggregates:
+
+- `PaymentId`
+- `PaymentOrderId`
+
+These IDs encode:
+
+1. **Timestamp (millisecond precision)**
+2. **Region identifier**
+3. **Shard identifier (0–31)**
+4. **Sequence number**
+
+This ensures:
+
+- Monotonic ordering
+- Deterministic routing
+- Stable idempotency keys
+- High scalability
+- No global coordination bottlenecks
+
+### Shard Sources
+
+| Aggregate | Shard Strategy | Rationale |
+|----------|----------------|-----------|
+| **Payment** | `coordShard(buyerId, orderId)` | Natural grouping around buyer/order lineage. |
+| **PaymentOrder** | `sellerShard(sellerId)` | Scaling horizontally by seller; avoids hot partitions. |
+
+### Domain Invariants
+
+1. IDs are always **generated via IdGeneratorPort**.
+2. Aggregates **never** generate their own IDs.
+3. IDs must remain **stable across retries, outbox recovery, and reprocessing**.
+4. IDs must be **sortable**, ensuring event ordering across flows:
+    - payment → order_created → capture_requested → psp_result → ledger
+
+### Why Snowflake?
+
+- Horizontally scalable
+- Leaderless, zero-coordination
+- Perfect alignment with Kafka partitioning
+- Enables natural isolation for “hot” merchants or buyers
 ### 2.5 Aggregate Boundaries & Consistency(This diagram shows aggregate boundaries, consistency guarantees, and transaction scopes.)
 
 
@@ -1501,11 +1539,51 @@ kafkaTemplate.executeInTransaction { ops ->
 | **Outbox Publishing** | SENT status + atomic DB write | No duplicate publishes, idempotent consumers |
 | **Retry Queue** | Atomic Redis ZPOPMIN | No duplicate retry processing across instances |
 
-### 5.4 Unique ID Generation
+## 5.4 Unique ID Generation (Snowflake-Based Sharded IDs)
 
-- Prefer domain‑level identifiers over DB sequences where practical; ID generator is encapsulated behind a port.
+The platform uses **Snowflake-style sharded ID generation** for all aggregate identifiers.
 
----
+### 5.4.1 Snowflake ID Structure
+
+Each 64-bit ID consists of:
+
+- **timestamp** — milliseconds since custom epoch
+- **regionId** — supports multi-region expansion
+- **shardId** — computed from domain identifiers
+- **sequence** — local counter per shard
+
+### 5.4.2 Shard Derivation Logic
+
+| ID | Shard | Description |
+|----|-------|-------------|
+| **PaymentId** | `coordShard(buyerId, orderId)` | All Payment events remain partition-coherent. |
+| **PaymentOrderId** | `sellerShard(sellerId)` | Merchant-level parallelism & workload isolation. |
+
+### 5.4.3 Kafka Alignment
+
+Snowflake IDs are used as **Kafka keys**, guaranteeing:
+
+- Same `paymentOrderId` → same partition
+- All retries → same partition
+- PSP result updates → same partition
+- Ledger writes → same partition
+
+### 5.4.4 Idempotency Guarantees
+
+Snowflake IDs provide the foundation for:
+
+- Outbox deduplication
+- Redis retry counters
+- PSP replays
+- Idempotent ledger posting (`journalId == paymentOrderId`)
+
+### 5.4.5 Operational Advantages
+
+- Ultra-high throughput
+- No DB-sequence contention
+- Deterministic ordering
+- True horizontal scalability
+- Partition-locality for “hot” merchants
 
 ## 6 · Data & Messaging Design
 
@@ -1649,7 +1727,7 @@ Kafka topics use different partitioning strategies based on processing requireme
 ```json
 {
   "eventId": "4ca349b7-...",
-  "aggregateId": "paymentOrderId-or-paymentId",
+  "aggregateId": "paymentOrderId",
   "parentEventId": "optional-parent-id",
   "traceId": "w3c-or-custom-trace-id",
   "data": {
@@ -1661,115 +1739,18 @@ Kafka topics use different partitioning strategies based on processing requireme
 - **Search keys** (also in logs): `eventId`, `traceId`, `parentEventId`, `aggregateId` (e.g., `paymentOrderId`).
 - JSON logging + Elastic make it trivial to traverse causality chains across services.
 
-### 6.4 Complete Kafka Components Reference
 
-#### Topics & Partitions
+## 6.4 ID Sharding Strategy & Kafka Partition Alignment
 
-| Topic Name | Partitions | Partition Key | Purpose | DLQ Created |
-|------------|-----------|---------------|---------|-------------|
-| `payment_order_created_topic` | 48 | `paymentOrderId` | Initial payment order creation event | ✅ |
-| `payment_order_psp_call_requested_topic` | 48 | `paymentOrderId` | PSP call request queue | ✅ |
-| `payment_order_psp_result_updated_topic` | 48 | `paymentOrderId` | PSP call result publication | ✅ |
-| `payment_order_finalized_topic` | 48 | `paymentOrderId` | Unified finalized events (success/failure) | ✅ |
-| `payment_status_check_scheduler_topic` | 1 | N/A (1 partition) | Async status check requests | ✅ |
-| `ledger_record_request_queue_topic` | 24 | `sellerId` | Ledger recording command queue | ✅ |
-| `ledger_entries_recorded_topic` | 24 | `sellerId` | Ledger recording confirmation events | ✅ |
+Snowflake-generated IDs are tightly aligned with Kafka partitioning to guarantee:
 
-#### Domain Events & Event Types
+- Ordering
+- Isolation
+- Parallelism
+- Retry determinism
+- Idempotency
 
-| Event Class | Event Type | Topic | Partition Key | Emitted By | Metadata Object |
-|-------------|-----------|-------|---------------|------------|-----------------|
-| `PaymentOrderCreated` | `payment_order_created` | `payment_order_created_topic` | `paymentOrderId` | `CreatePaymentService` | `EventMetadatas.PaymentOrderCreatedMetadata` |
-| `PaymentOrderPspCallRequested` | `payment_order_psp_call_requested` | `payment_order_psp_call_requested_topic` | `paymentOrderId` | `PaymentOrderEnqueuer` | `EventMetadatas.PaymentOrderPspCallRequestedMetadata` |
-| `PaymentOrderPspResultUpdated` | `payment_order_psp_result_updated` | `payment_order_psp_result_updated_topic` | `paymentOrderId` | `PaymentOrderPspCallExecutor` | `EventMetadatas.PaymentOrderPspResultUpdatedMetadata` |
-| `PaymentOrderSucceeded` | `payment_order_success` | `payment_order_finalized_topic` | `paymentOrderId` | `ProcessPaymentService` | `EventMetadatas.PaymentOrderSucceededMetadata` |
-| `PaymentOrderFailed` | `payment_order_failed` | `payment_order_finalized_topic` | `paymentOrderId` | `ProcessPaymentService` | `EventMetadatas.PaymentOrderFailedMetadata` |
-| `PaymentOrderStatusCheckRequested` | `payment_order_status_check_requested` | `payment_status_check_scheduler_topic` | N/A | `ProcessPaymentService` | `EventMetadatas.PaymentOrderStatusCheckScheduledMetadata` |
-| `LedgerRecordingCommand` | `ledger_recording_requested` | `ledger_record_request_queue_topic` | `sellerId` | `RequestLedgerRecordingService` | `EventMetadatas.LedgerRecordingCommandMetadata` |
-| `LedgerEntriesRecorded` | `ledger_entries_recorded` | `ledger_entries_recorded_topic` | `sellerId` | `RecordLedgerEntriesService` | `EventMetadatas.LedgerEntriesRecordedMetadata` |
 
-**Note:** Event type constants are defined in `EVENT_TYPE` object (`common/src/main/kotlin/com/dogancaglar/common/event/Topics.kt`), and metadata objects in `EventMetadatas` (`payment-domain/src/main/kotlin/com/dogancaglar/paymentservice/domain/event/EventMetadatas.kt`) provide type-safe access to topic names and event types.
-
-#### Consumers & Consumer Groups
-
-| Consumer Class | Consumer Group | Topic | Concurrency | Container Factory | Flow | Transaction Executor |
-|----------------|----------------|-------|-------------|-------------------|------|---------------------|
-| `PaymentOrderEnqueuer` | `payment-order-enqueuer-consumer-group` | `payment_order_created_topic` | 8 | `payment_order_created_topic-factory` | PSP | `KafkaTxExecutor` |
-| `PaymentOrderPspCallExecutor` | `payment-order-psp-call-executor-consumer-group` | `payment_order_psp_call_requested_topic` | 8 | `payment_order_psp_call_requested_topic-factory` | PSP | `KafkaTxExecutor` |
-| `PaymentOrderPspResultApplier` | `payment-order-psp-result-updated-consumer-group` | `payment_order_psp_result_updated_topic` | 8 | `payment_order_psp_result_updated_topic-factory` | PSP | `KafkaTxExecutor` |
-| `ScheduledPaymentStatusCheckExecutor` | `payment-status-check-scheduler-consumer-group` | `payment_status_check_scheduler_topic` | 1 | `payment_status_check_scheduler_topic-factory` | Status Check | `KafkaTxExecutor` |
-| `LedgerRecordingRequestDispatcher` | `ledger-recording-request-dispatcher-consumer-group` | `payment_order_finalized_topic` | 4 | `payment_order_finalized_topic-factory` | Ledger | `KafkaTxExecutor` (`syncPaymentTx`) |
-| `LedgerRecordingConsumer` | `ledger-recording-consumer-group` | `ledger_record_request_queue_topic` | 4 | `ledger_record_request_queue_topic-factory` | Ledger | `KafkaTxExecutor` (`syncPaymentTx`) |
-| `AccountBalanceConsumer` | `account-balance-consumer-group` | `ledger_entries_recorded_topic` | 4 | `ledger_entries_recorded_topic-factory` | Balance | `KafkaTxExecutor` (`syncPaymentTx`) |
-
-#### Event Flow Map
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         PSP Flow (48 partitions)                         │
-├─────────────────────────────────────────────────────────────────────────┤
-│ payment_order_created_topic                                             │
-│   └─> PaymentOrderEnqueuer                                             │
-│        Consumer Group: payment-order-enqueuer-consumer-group           │
-│        Factory: payment_order_created_topic-factory                     │
-│        Concurrency: 8 | Ack Mode: MANUAL | Event Type: payment_order_created │
-│        └─> payment_order_psp_call_requested_topic                      │
-│             └─> PaymentOrderPspCallExecutor                            │
-│                  Consumer Group: payment-order-psp-call-executor-consumer-group │
-│                  Factory: payment_order_psp_call_requested_topic-factory │
-│                  Concurrency: 8 | Ack Mode: MANUAL                      │
-│                  └─> payment_order_psp_result_updated_topic            │
-│                       └─> PaymentOrderPspResultApplier                  │
-│                            Consumer Group: payment-order-psp-result-updated-consumer-group │
-│                            Factory: payment_order_psp_result_updated_topic-factory │
-│                            Concurrency: 8 | Ack Mode: MANUAL             │
-│                            └─> payment_order_finalized_topic             │
-└─────────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    Status Check Flow (1 partition)                       │
-├─────────────────────────────────────────────────────────────────────────┤
-│ payment_status_check_scheduler_topic                                    │
-│   └─> ScheduledPaymentStatusCheckExecutor                               │
-│        Consumer Group: payment-status-check-scheduler-consumer-group    │
-│        Factory: payment_status_check_scheduler_topic-factory            │
-│        Concurrency: 1 | Ack Mode: MANUAL                                │
-│        Event Type: payment_order_status_check_requested                  │
-└─────────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────┐
-│                       Ledger Flow (24 partitions)                        │
-├─────────────────────────────────────────────────────────────────────────┤
-│ payment_order_finalized_topic (key: paymentOrderId)                    │
-│   └─> LedgerRecordingRequestDispatcher                                  │
-│        Consumer Group: ledger-recording-request-dispatcher-consumer-group │
-│        Factory: payment_order_finalized_topic-factory                    │
-│        Concurrency: 4 | Ack Mode: MANUAL                                │
-│        Event Types: payment_order_success, payment_order_failed          │
-│        [Partition Key Switch: paymentOrderId → sellerId]                │
-│        └─> ledger_record_request_queue_topic (key: sellerId)           │
-│             └─> LedgerRecordingConsumer                                 │
-│                  Consumer Group: ledger-recording-consumer-group         │
-│                  Factory: ledger_record_request_queue_topic-factory     │
-│                  Concurrency: 4 | Ack Mode: MANUAL                       │
-│                  Event Type: ledger_recording_requested                  │
-│                  └─> ledger_entries_recorded_topic (key: sellerId)     │
-│                       └─> AccountBalanceConsumer                        │
-│                            Consumer Group: account-balance-consumer-group │
-│                            Concurrency: 4 | Ack Mode: MANUAL              │
-│                            [Updates Redis deltas atomically]              │
-└─────────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────┐
-│             Balance Snapshot Job (Scheduled, Every 1 minute)             │
-├─────────────────────────────────────────────────────────────────────────┤
-│ AccountBalanceSnapshotJob                                               │
-│   └─> Read Dirty Accounts from Redis                                    │
-│        └─> getAndResetDeltaWithWatermark (Atomic)                       │
-│             └─> Merge delta + snapshot → PostgreSQL                     │
-│                  └─> account_balances table (last_applied_entry_id)     │
-└─────────────────────────────────────────────────────────────────────────┘
-```
 
 #### Key Configuration Details
 
