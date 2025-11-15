@@ -2,12 +2,11 @@ package com.dogancaglar.paymentservice.application.usecases
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.paymentservice.application.util.PaymentOrderFactory
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderEvent
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderFailed
-import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
+import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.application.events.PaymentOrderEvent
+import com.dogancaglar.paymentservice.application.events.PaymentOrderFailed
+import com.dogancaglar.paymentservice.application.events.PaymentOrderSucceeded
+import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
@@ -15,7 +14,7 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
 import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
@@ -38,7 +37,6 @@ class ProcessPaymentServiceTest {
     private lateinit var eventPublisher: EventPublisherPort
     private lateinit var retryQueuePort: RetryQueuePort<PaymentOrderCaptureCommand>
     private lateinit var paymentOrderModificationPort: PaymentOrderModificationPort
-    private lateinit var paymentOrderFactory: PaymentOrderFactory
     private lateinit var paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
     private lateinit var clock: Clock
     private lateinit var service: ProcessPaymentService
@@ -48,7 +46,6 @@ class ProcessPaymentServiceTest {
         eventPublisher = mockk()
         retryQueuePort = mockk(relaxed = true)
         paymentOrderModificationPort = mockk()
-        paymentOrderFactory = mockk()
         paymentOrderDomainEventMapper = mockk()
         clock = Clock.fixed(Instant.parse("2024-01-01T12:00:00Z"), ZoneId.of("UTC"))
 
@@ -60,7 +57,6 @@ class ProcessPaymentServiceTest {
             eventPublisher = eventPublisher,
             retryQueuePort = retryQueuePort,
             paymentOrderModificationPort = paymentOrderModificationPort,
-            paymentOrderFactory = paymentOrderFactory,
             paymentOrderDomainEventMapper = paymentOrderDomainEventMapper,
             clock = clock
         )
@@ -79,21 +75,18 @@ class ProcessPaymentServiceTest {
         val persisted = sampleOrder(status = PaymentOrderStatus.CAPTURED)
         val succeededEvent = PaymentOrderSucceeded.create(
             paymentOrderId = persisted.paymentOrderId.value.toString(),
-            publicPaymentOrderId = persisted.publicPaymentOrderId,
             paymentId = persisted.paymentId.value.toString(),
-            publicPaymentId = persisted.publicPaymentId,
             sellerId = persisted.sellerId.value,
             amountValue = persisted.amount.quantity,
             currency = persisted.amount.currency.currencyCode,
             status = persisted.status.name
         )
-
-        every { paymentOrderFactory.fromEvent(event) } returns order
+        every { paymentOrderDomainEventMapper.fromEvent(event) } returns order
         every { paymentOrderModificationPort.markAsCaptured(order) } returns persisted
         every { paymentOrderDomainEventMapper.toPaymentOrderSucceeded(persisted) } returns succeededEvent
         every {
             eventPublisher.publishSync(
-                aggregateId = persisted.publicPaymentOrderId,
+                aggregateId = persisted.paymentOrderId.value.toString(),
                 eventMetaData = EventMetadatas.PaymentOrderSucceededMetadata,
                 data = succeededEvent,
                 parentEventId = any(),
@@ -107,7 +100,7 @@ class ProcessPaymentServiceTest {
         verify(exactly = 1) { paymentOrderDomainEventMapper.toPaymentOrderSucceeded(persisted) }
         verify(exactly = 1) {
             eventPublisher.publishSync(
-                aggregateId = persisted.publicPaymentOrderId,
+                aggregateId = persisted.paymentOrderId.value.toString(),
                 eventMetaData = EventMetadatas.PaymentOrderSucceededMetadata,
                 data = succeededEvent,
                 parentEventId = any(),
@@ -124,12 +117,12 @@ class ProcessPaymentServiceTest {
         val persisted = sampleOrder(status = PaymentOrderStatus.CAPTURE_FAILED)
         val failedEvent = paymentOrderFailedEvent(persisted)
 
-        every { paymentOrderFactory.fromEvent(event) } returns order
+        every { paymentOrderDomainEventMapper.fromEvent(event) } returns order
         every { paymentOrderModificationPort.markAsCaptureFailed(order) } returns persisted
         every { paymentOrderDomainEventMapper.toPaymentOrderFailed(persisted) } returns failedEvent
         every {
             eventPublisher.publishSync(
-                aggregateId = persisted.publicPaymentOrderId,
+                aggregateId = persisted.paymentOrderId.value.toString(),
                 eventMetaData = EventMetadatas.PaymentOrderFailedMetadata,
                 data = failedEvent,
                 parentEventId = any(),
@@ -178,9 +171,7 @@ class ProcessPaymentServiceTest {
     private fun paymentOrderFailedEvent(order: PaymentOrder): PaymentOrderFailed =
         PaymentOrderFailed.create(
             paymentOrderId = order.paymentOrderId.value.toString(),
-            publicPaymentOrderId = order.publicPaymentOrderId,
             paymentId = order.paymentId.value.toString(),
-            publicPaymentId = order.publicPaymentId,
             sellerId = order.sellerId.value,
             amountValue = order.amount.quantity,
             currency = order.amount.currency.currencyCode,

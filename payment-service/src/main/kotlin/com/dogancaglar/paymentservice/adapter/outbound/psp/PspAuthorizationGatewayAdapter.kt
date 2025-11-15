@@ -48,7 +48,7 @@ class PspAuthorizationGatewayAdapter(
                 val t0 = System.nanoTime()
                 try {
                     //use your unique paymetid as idempotency key.
-                    doAuth(order.publicPaymentId)
+                    doAuth(order.idempotencyKey)
                 } finally {
                     pspExecDuration.record(System.nanoTime() - t0, TimeUnit.NANOSECONDS)
                 }

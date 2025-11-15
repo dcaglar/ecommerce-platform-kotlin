@@ -20,10 +20,6 @@ class Payment private constructor(
     val updatedAt: LocalDateTime,
     val paymentOrders: List<PaymentOrder>
 ) {
-
-    val publicPaymentId: String
-        get() = "payment-${paymentId.value}"
-
     // --- Domain Behavior ---
 
     fun authorize(updatedAt: LocalDateTime= LocalDateTime.now(Clock.systemUTC())): Payment {

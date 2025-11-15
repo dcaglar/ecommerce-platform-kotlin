@@ -7,4 +7,7 @@ interface EventMetadata<T> {
     val eventType: String
     val clazz: Class<T>
     val typeRef: TypeReference<out EventEnvelope<T>>
+
+    val partitionKeyExtractor: (T) -> String
+
 }

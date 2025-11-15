@@ -1,19 +1,12 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.common.event.CONSUMER_GROUPS
-import com.dogancaglar.common.event.DomainEventEnvelopeFactory
+import com.dogancaglar.paymentservice.application.metadata.CONSUMER_GROUPS
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.event.Topics
+import com.dogancaglar.paymentservice.application.metadata.Topics
 import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.paymentservice.application.util.PaymentFactory
+import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
-import com.dogancaglar.paymentservice.application.util.PaymentOrderFactory
-import com.dogancaglar.paymentservice.domain.event.PaymentAuthorized
-import com.dogancaglar.paymentservice.domain.model.PaymentStatus
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -33,7 +26,6 @@ class PaymentAuthorizedConsumer(
     private val clock: Clock
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
-    private val factory = PaymentFactory(clock)
 
     @KafkaListener(
         topics = [Topics.PAYMENT_AUTHORIZED],
@@ -45,29 +37,23 @@ class PaymentAuthorizedConsumer(
         consumer: Consumer<*, *>
     ) {
         val consumed = record.value()
-        val created = consumed.data
-        val order = factory.createPayment(created)
 
         val tp = TopicPartition(record.topic(), record.partition())
         val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
         val groupMeta =
             consumer.groupMetadata()                        // <— real metadata (generation, member id, epoch)
         LogContext.with(consumed) {
+            /*
             if (order.status != PaymentStatus.AUTHORIZED) {
                 kafkaTx.run(offsets, groupMeta) {}
                 logger.warn("⏩ Skip authorized consumer (status={}) agg={}", order.status, consumed.aggregateId)
                 return@with
             }
+            */
+
             //todo we will request a ledger recording here
             /*
-            val work = paymentOrderDomainEventMapper.toPaymentOrderCaptureCommand(order, attempt = 0)
-            val outEnv = DomainEventEnvelopeFactory.envelopeFor(
-                data = work,
-                eventMetaData = EventMetadatas.PaymentOrderCaptureCommandMetadata,
-                aggregateId = work.paymentOrderId, // Kafka key = paymentOrderId
-                traceId = consumed.traceId,
-                parentEventId = consumed.eventId
-            )
+
 
             kafkaTx.run(offsets, groupMeta) {
                 publisher.publishSync(

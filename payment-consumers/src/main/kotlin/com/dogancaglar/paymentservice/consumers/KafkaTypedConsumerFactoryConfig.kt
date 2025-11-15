@@ -2,17 +2,17 @@
 package com.dogancaglar.paymentservice.consumers
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.event.Topics
+import com.dogancaglar.paymentservice.application.metadata.Topics
 import com.dogancaglar.common.logging.GenericLogFields
 import com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaSerializer
-import com.dogancaglar.paymentservice.domain.commands.LedgerRecordingCommand
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderEvent
-import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspResultUpdated
-import com.dogancaglar.paymentservice.domain.event.LedgerEntriesRecorded
-import com.dogancaglar.paymentservice.domain.event.PaymentAuthorized
+import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
+import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
+import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
+import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
+import com.dogancaglar.paymentservice.application.events.PaymentOrderEvent
+import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
+import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord

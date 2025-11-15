@@ -1,5 +1,6 @@
 package com.dogancaglar.common.event
 
+import com.fasterxml.jackson.core.type.TypeReference
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Test
@@ -13,6 +14,9 @@ class DomainEventEnvelopeFactoryTest {
         override val eventType = "TestEvent"
         override val clazz = DummyClass::class.java
         override val typeRef = object : com.fasterxml.jackson.core.type.TypeReference<EventEnvelope<DummyClass>>() {}
+        override val partitionKeyExtractor = { evt: DummyClass ->
+             "dummy-partition-key"
+        }
     }
 
     @Test
@@ -59,5 +63,33 @@ class DomainEventEnvelopeFactoryTest {
         assertEquals(aggregateId, envelope.aggregateId)
         assertEquals(data, envelope.data)
         assertEquals(traceId, envelope.traceId)
+    }
+
+    @Test
+    fun `partitionKeyExtractor returns dummy key`() {
+        val key = dummyEventMetadata.partitionKeyExtractor(DummyClass())
+        assertEquals("dummy-partition-key", key)
+    }
+
+    @Test
+    fun `envelopeFor ignores partitionKeyExtractor logic entirely`() {
+        val meta = object : EventMetadata<DummyClass> {
+            override val topic = "dummy-topic"
+            override val eventType = "TestEvent"
+            override val clazz = DummyClass::class.java
+            override val typeRef = object : TypeReference<EventEnvelope<DummyClass>>() {}
+            override val partitionKeyExtractor = { _: DummyClass ->
+                "should-not-affect-envelope"
+            }
+        }
+
+        val envelope = DomainEventEnvelopeFactory.envelopeFor(
+            data = DummyClass(),
+            eventMetaData = meta,
+            aggregateId = "agg-x",
+            traceId = "trace-x"
+        )
+
+        assertEquals("agg-x", envelope.aggregateId)
     }
 }

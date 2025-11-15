@@ -1,6 +1,5 @@
 package com.dogancaglar.paymentservice.ports.inbound
 
-import com.dogancaglar.paymentservice.domain.event.LedgerEntryEventData
 import com.dogancaglar.paymentservice.domain.model.ledger.LedgerEntry
 
 /**

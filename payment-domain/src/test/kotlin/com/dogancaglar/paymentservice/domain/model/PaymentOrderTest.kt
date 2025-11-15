@@ -27,9 +27,7 @@ class PaymentOrderTest {
         )
 
         assertEquals(paymentOrderId, order.paymentOrderId)
-        assertEquals(publicPaymentOrderId, order.publicPaymentOrderId)
         assertEquals(paymentId, order.paymentId)
-        assertEquals(publicPaymentId, order.publicPaymentId)
         assertEquals(sellerId, order.sellerId)
         assertEquals(amount, order.amount)
         assertEquals(PaymentOrderStatus.INITIATED_PENDING, order.status)

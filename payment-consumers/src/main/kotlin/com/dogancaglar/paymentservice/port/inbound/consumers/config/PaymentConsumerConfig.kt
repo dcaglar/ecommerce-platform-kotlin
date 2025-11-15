@@ -6,9 +6,7 @@ import com.dogancaglar.paymentservice.adapter.outbound.redis.PaymentOrderRetryQu
 import com.dogancaglar.paymentservice.application.usecases.ProcessPaymentService
 import com.dogancaglar.paymentservice.application.usecases.RecordLedgerEntriesService
 import com.dogancaglar.paymentservice.application.usecases.RequestLedgerRecordingService
-import com.dogancaglar.paymentservice.application.util.PaymentFactory
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
-import com.dogancaglar.paymentservice.application.util.PaymentOrderFactory
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.application.usecases.AccountBalanceService
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
@@ -28,10 +26,6 @@ class PaymentConsumerConfig {
     fun paymentOrderDomainEventMapper(clock: Clock): PaymentOrderDomainEventMapper =
         PaymentOrderDomainEventMapper(clock)
 
-    @Bean
-    fun paymentOrderFactory(): PaymentOrderFactory =
-        PaymentOrderFactory()
-
 
     @Bean
     fun processPaymentService(
@@ -39,7 +33,6 @@ class PaymentConsumerConfig {
         @Qualifier("syncPaymentEventPublisher") syncPaymentEventPublisher: PaymentEventPublisher,
         paymentOrderRetryQueueAdapter: PaymentOrderRetryQueueAdapter,
         clock: Clock,
-        paymentOrderFactory: PaymentOrderFactory,
         paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
     ): ProcessPaymentService {
         return ProcessPaymentService(
@@ -47,7 +40,6 @@ class PaymentConsumerConfig {
             eventPublisher = syncPaymentEventPublisher,
             retryQueuePort = paymentOrderRetryQueueAdapter,
             clock = clock,
-            paymentOrderFactory = paymentOrderFactory,
             paymentOrderDomainEventMapper = paymentOrderDomainEventMapper
         )
     }
@@ -74,14 +66,6 @@ class PaymentConsumerConfig {
     }
 
 
-
-    @Bean
-    fun createPaymentFactory(clock: Clock) =
-        PaymentFactory(clock = clock)
-
-    @Bean
-    fun createPaymentOrderFactory(clock: Clock) =
-        PaymentOrderFactory()
 
     @Bean
     fun accountBalanceService(

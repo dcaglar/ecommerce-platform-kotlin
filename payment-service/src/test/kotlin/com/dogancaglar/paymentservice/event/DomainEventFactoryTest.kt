@@ -3,8 +3,8 @@ package com.dogancaglar.paymentservice.event
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.GenericLogFields
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
+import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
+import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
 import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -24,10 +24,8 @@ class DomainEventFactoryTest {
             val envelope: EventEnvelope<PaymentOrderCreated> = DomainEventEnvelopeFactory.envelopeFor(
                 traceId = traceIdFromMDC,
                 data = PaymentOrderCreated.create(
-                    paymentOrderId = "po-1001",
-                    publicPaymentOrderId = "paymentorder-1001",
-                    paymentId = "p-123",
-                    publicPaymentId = "payment-123",
+                    paymentOrderId = "1001",
+                    paymentId = "123",
                     sellerId = "seller-1",
                     amountValue = 25000L, // $250.00
                     currency = "EUR",
@@ -57,9 +55,7 @@ class DomainEventFactoryTest {
                 traceId = MDC.get(GenericLogFields.TRACE_ID) ?: throw IllegalStateException("TraceId missing"),
                 data = PaymentOrderCreated.create(
                     paymentOrderId = "po-1",
-                    publicPaymentOrderId = "paymentorder-1",
                     paymentId = "p-1",
-                    publicPaymentId = "payment-1",
                     sellerId = "s-1",
                     amountValue = 1000L, // $10.00
                     currency = "EUR",
@@ -83,10 +79,8 @@ class DomainEventFactoryTest {
             val event1 = DomainEventEnvelopeFactory.envelopeFor(
                 traceId = traceIdFromMDC,
                 data = PaymentOrderCreated.create(
-                    paymentOrderId = "po-1",
-                    publicPaymentOrderId = "paymentorder-1",
-                    paymentId = "p-1",
-                    publicPaymentId = "payment-1",
+                    paymentOrderId = "1",
+                    paymentId = "2",
                     sellerId = "s-1",
                     amountValue = 1000L, // $10.00
                     currency = "EUR",
@@ -101,10 +95,8 @@ class DomainEventFactoryTest {
             val event2 = DomainEventEnvelopeFactory.envelopeFor(
                 traceId = traceIdFromMDC,
                 data = PaymentOrderCreated.create(
-                    paymentOrderId = "po-3",
-                    publicPaymentOrderId = "paymentorder-1",
-                    paymentId = "p-2",
-                    publicPaymentId = "payment-1",
+                    paymentOrderId = "3",
+                    paymentId = "2",
                     sellerId = "s-1",
                     amountValue = 1000L, // $10.00
                     currency = "EUR",
@@ -131,10 +123,8 @@ class DomainEventFactoryTest {
         MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
             val event = PaymentOrderCreated.create(
-                paymentOrderId = "po-1001",
-                publicPaymentOrderId = "paymentorder-1001",
-                paymentId = "p-123",
-                publicPaymentId = "payment-123",
+                paymentOrderId = "1001",
+                paymentId = "123",
                 sellerId = "seller-1",
                 amountValue = 25000L, // $250.00
                 currency = "EUR",
@@ -168,10 +158,8 @@ class DomainEventFactoryTest {
         try {
             val parentId = UUID.randomUUID()
             val event = PaymentOrderCreated.create(
-                paymentOrderId = "po-1001",
-                publicPaymentOrderId = "paymentorder-1001",
-                paymentId = "p-123",
-                publicPaymentId = "payment-123",
+                paymentOrderId = "1001",
+                paymentId = "123",
                 sellerId = "seller-1",
                 amountValue = 25000L, // $250.00
                 currency = "EUR",

@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.ports.inbound
 
-import com.dogancaglar.paymentservice.domain.commands.LedgerRecordingCommand
+import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
 
 
 /**

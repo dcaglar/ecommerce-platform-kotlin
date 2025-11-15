@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.domain.event
 
-import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
-import com.dogancaglar.paymentservice.domain.event.OutboxEvent.Status
+
+import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.time.LocalDateTime
@@ -329,6 +329,6 @@ class OutboxEventTest {
             outboxEvent.markAsSent()
         }
 
-        assertTrue(exception.message!!.contains("Invalid transition from SENT to ${Status.SENT}"))
+        assertTrue(exception.message!!.contains("Invalid transition from SENT to ${OutboxEvent.Status.SENT}"))
     }
 }

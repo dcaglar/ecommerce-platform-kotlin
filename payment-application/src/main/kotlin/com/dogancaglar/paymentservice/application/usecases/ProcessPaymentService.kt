@@ -1,13 +1,13 @@
 package com.dogancaglar.paymentservice.application.usecases
 
 import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderEvent
-import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.application.events.PaymentOrderEvent
+import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
-import com.dogancaglar.paymentservice.application.util.PaymentOrderFactory
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
 import com.dogancaglar.paymentservice.domain.util.PSPCaptureStatusMapper
 import com.dogancaglar.paymentservice.ports.inbound.ProcessPspResultUseCase
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
@@ -29,7 +29,6 @@ open class ProcessPaymentService(
     private val eventPublisher: EventPublisherPort,
     private val retryQueuePort: RetryQueuePort<PaymentOrderCaptureCommand>,
     private val paymentOrderModificationPort: PaymentOrderModificationPort,
-    private val paymentOrderFactory: PaymentOrderFactory,
     private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
     private val clock: Clock
 ) : ProcessPspResultUseCase {
@@ -42,7 +41,7 @@ open class ProcessPaymentService(
 
     override fun processPspResult(event: PaymentOrderEvent, pspStatus: PaymentOrderStatus) {
         val totalStart = System.currentTimeMillis()
-        val order = paymentOrderFactory.fromEvent(event)
+        val order = paymentOrderDomainEventMapper.fromEvent(event)
 
         try {
             when {
@@ -119,7 +118,7 @@ open class ProcessPaymentService(
 
         eventPublisher.publishSync(
             eventMetaData = EventMetadatas.PaymentOrderSucceededMetadata,
-            aggregateId = persisted.publicPaymentOrderId,
+            aggregateId = persisted.paymentOrderId.value.toString(),
             data = succeededEvent,
             parentEventId = LogContext.getEventId(),
             traceId = LogContext.getTraceId()
@@ -132,7 +131,7 @@ open class ProcessPaymentService(
 
         eventPublisher.publishSync(
             eventMetaData = EventMetadatas.PaymentOrderFailedMetadata,
-            aggregateId = updated.publicPaymentOrderId,
+            aggregateId = updated.paymentOrderId.value.toString(),
             data = paymentOrderFailed,
             parentEventId = LogContext.getEventId(),
             traceId = LogContext.getTraceId()
@@ -151,14 +150,14 @@ open class ProcessPaymentService(
 
         logger.info(
             "Scheduling retry for paymentOrderId={} [attempt {}/{}] due at {} (local, {}) / {} (UTC)",
-            order.publicPaymentOrderId, nextRetryCount, MAX_RETRIES,
+            order.paymentOrderId.toPublicPaymentOrderId(), nextRetryCount, MAX_RETRIES,
             formattedLocal, clock.zone, formattedUtc,
         )
     }
 
 
     fun mapEventToDomain(event: PaymentOrderEvent): PaymentOrder =
-        paymentOrderFactory.fromEvent(event)
+        paymentOrderDomainEventMapper.fromEvent(event)
 
     fun computeEqualJitterBackoff(
         attempt: Int,

@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.ports.outbound
 
-import com.dogancaglar.paymentservice.domain.event.OutboxEvent
+import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 
 
 interface OutboxEventRepository {

@@ -3,13 +3,11 @@ package com.dogancaglar.paymentservice.port.inbound.consumers
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.paymentservice.application.events.PaymentOrderEvent
+import com.dogancaglar.paymentservice.application.events.PaymentOrderFailed
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
-import com.dogancaglar.paymentservice.domain.commands.LedgerRecordingCommand
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderEvent
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderFailed
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderSucceeded
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.application.events.PaymentOrderSucceeded
+import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
@@ -24,7 +22,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
-import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.UUID
 
@@ -45,7 +42,6 @@ class LedgerRecordingRequestDispatcherTest {
         
         dispatcher = LedgerRecordingRequestDispatcher(
             kafkaTx = kafkaTxExecutor,
-            publisher = eventPublisherPort,
             requestLedgerRecordingUseCase = requestLedgerRecordingUseCase
         )
     }
@@ -62,9 +58,7 @@ class LedgerRecordingRequestDispatcherTest {
         
         val successEvent = PaymentOrderSucceeded.create(
             paymentOrderId = paymentOrderId.value.toString(),
-            publicPaymentOrderId = "public-123",
             paymentId = PaymentId(456L).value.toString(),
-            publicPaymentId = "public-payment-456",
             sellerId = SellerId("seller-789").value,
             amountValue = 10000L,
             currency = "EUR",
@@ -141,9 +135,7 @@ class LedgerRecordingRequestDispatcherTest {
         
         val failedEvent = PaymentOrderFailed.create(
             paymentOrderId = paymentOrderId.value.toString(),
-            publicPaymentOrderId = "public-456",
             paymentId = PaymentId(789L).value.toString(),
-            publicPaymentId = "public-payment-789",
             sellerId = SellerId("seller-101").value,
             amountValue = 5000L,
             currency = "USD",
@@ -215,9 +207,7 @@ class LedgerRecordingRequestDispatcherTest {
         val paymentOrderId = PaymentOrderId(789L)
         val successEvent = PaymentOrderSucceeded.create(
             paymentOrderId = paymentOrderId.value.toString(),
-            publicPaymentOrderId = "public-789",
             paymentId = PaymentId(101L).value.toString(),
-            publicPaymentId = "public-payment-101",
             sellerId = SellerId("seller-202").value,
             amountValue = 10000L,
             currency = "EUR",

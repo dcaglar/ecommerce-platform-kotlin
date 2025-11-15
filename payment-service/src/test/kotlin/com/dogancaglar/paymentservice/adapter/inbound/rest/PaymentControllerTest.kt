@@ -42,19 +42,12 @@ class PaymentControllerTest {
         )
         
         val expectedResponse = PaymentResponseDTO(
-            id = "payment-123",
             paymentId = "payment-123",
             orderId = "order-123",
             buyerId = "buyer-456",
             totalAmount = AmountDto(10000L, CurrencyEnum.USD),
             status = "CREATED",
-            createdAt = "2023-01-01T10:00:00",
-            paymentOrders = listOf(
-                PaymentOrderResponseDTO(
-                    sellerId = "seller-789",
-                    amount = AmountDto(10000L, CurrencyEnum.USD)
-                )
-            )
+            createdAt = "2023-01-01T10:00:00"
         )
         
         every { paymentService.createPayment(request) } returns expectedResponse
@@ -127,19 +120,12 @@ class PaymentControllerTest {
         )
         
         val expectedResponse = PaymentResponseDTO(
-            id = "payment-123",
             paymentId = "payment-123",
             orderId = "order-123",
             buyerId = "buyer-456",
             totalAmount = AmountDto(10000L, CurrencyEnum.USD),
             status = "CREATED",
-            createdAt = "2023-01-01T10:00:00",
-            paymentOrders = listOf(
-                PaymentOrderResponseDTO(
-                    sellerId = "seller-789",
-                    amount = AmountDto(10000L, CurrencyEnum.USD)
-                )
-            )
+            createdAt = "2023-01-01T10:00:00"
         )
         
         every { paymentService.createPayment(request) } returns expectedResponse

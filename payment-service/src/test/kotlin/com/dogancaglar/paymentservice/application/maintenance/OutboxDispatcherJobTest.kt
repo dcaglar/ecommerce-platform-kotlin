@@ -4,9 +4,9 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventMetadata
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.OutboxOutboundAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentOrderOutboundAdapter
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.event.OutboxEvent
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
-import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -66,7 +65,7 @@ class OutboxDispatcherJobTest {
             backlogResyncInterval = "PT5M",
             serializationPort = serializationPort,
             paymentOrderDomainEventMapper = paymentOrderDomaainEventMapper,
-            idGeneratorPort = idGeneratorPort,
+            idGeneratorPort = idGeneratorPort
         )
     }
 
@@ -233,10 +232,8 @@ class OutboxDispatcherJobTest {
 
     private fun createEventPayload(eventId: String): String {
         val event = PaymentOrderCreated.create(
-            paymentOrderId = "po-123",
-            publicPaymentOrderId = "public-po-123",
-            paymentId = "p-456",
-            publicPaymentId = "public-p-456",
+            paymentOrderId = "123",
+            paymentId = "456",
             sellerId = "seller-789",
             amountValue = 10000L,
             currency = "USD",

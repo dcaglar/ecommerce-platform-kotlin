@@ -1,13 +1,12 @@
 package com.dogancaglar.paymentservice.application.config
 
+import com.dogancaglar.paymentservice.adapter.outbound.id.SnowflakeIdGeneratorAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.OutboxOutboundAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentOutboundAdapter
-import com.dogancaglar.paymentservice.adapter.outbound.redis.RedisIdGeneratorPortAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.serialization.JacksonSerializationAdapter
 import com.dogancaglar.paymentservice.application.usecases.AccountBalanceReadService
 import com.dogancaglar.paymentservice.application.usecases.AuthorizePaymentService
-import com.dogancaglar.paymentservice.application.util.PaymentFactory
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceReadUseCase
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
@@ -25,13 +24,10 @@ class PaymentServiceConfig {
     fun paymentOrderDomainEventMapper(clock: Clock): PaymentOrderDomainEventMapper =
         PaymentOrderDomainEventMapper(clock)
 
-    @Bean
-    fun paymentFactory(clock: Clock): PaymentFactory =
-        PaymentFactory(clock)
 
     @Bean
     fun createAuthorizePaymentService(
-        idGeneratorPort: RedisIdGeneratorPortAdapter,
+        idGeneratorPort: SnowflakeIdGeneratorAdapter,
         paymentRepository: PaymentOutboundAdapter,
         outboxOutboundAdapter: OutboxOutboundAdapter,
         serializationPort: JacksonSerializationAdapter,

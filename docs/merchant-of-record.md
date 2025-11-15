@@ -498,7 +498,6 @@ Implementation Outline
 @Service class OutboxDispatcherJob( private val outboxEventPort:OutboxEventPort,`
 private val serializationPort: SerializationPort,
 private val paymentOrderRepository: PaymentOrderRepository,
-private val paymentOrderFactory: PaymentOrderFactory,
 private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
 private val eventPublisherPort: EventPublisherPort,
 private val clock: Clock
@@ -528,7 +527,7 @@ val paymentId = dto.orderId
 
 // 1️⃣ Expand into PaymentOrders
 val orders = dto.paymentOrders.map { line ->
-paymentOrderFactory.create(
+paymentOrder.createNew(
 paymentId = PaymentId(paymentId),
 sellerId = SellerId(line.sellerId),
 amount = line.amount.toDomain(),

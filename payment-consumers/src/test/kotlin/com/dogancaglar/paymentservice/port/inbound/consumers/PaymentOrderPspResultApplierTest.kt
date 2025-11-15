@@ -3,9 +3,9 @@ package com.dogancaglar.paymentservice.port.inbound.consumers
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
+import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
@@ -52,9 +52,7 @@ class PaymentOrderPspResultApplierTest {
         val parentEventId = UUID.fromString("22222222-2222-2222-2222-222222222222")
         val pspResultUpdated = PaymentOrderPspResultUpdated.create(
             paymentOrderId = paymentOrderId.value.toString(),
-            publicPaymentOrderId = "public-123",
             paymentId = PaymentId(456L).value.toString(),
-            publicPaymentId = "public-payment-123",
             sellerId = SellerId("seller-123").value,
             amountValue = 10000L,
             currency = "USD",
@@ -62,8 +60,6 @@ class PaymentOrderPspResultApplierTest {
             createdAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
             updatedAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
             retryCount = 0,
-            retryReason = null,
-            lastErrorMessage = null,
             pspStatus = PaymentOrderStatus.CAPTURED.name,
             pspErrorCode = null,
             pspErrorDetail = null,
@@ -138,9 +134,7 @@ class PaymentOrderPspResultApplierTest {
         val parentEventId = UUID.fromString("44444444-4444-4444-4444-444444444444")
         val pspResultUpdated = PaymentOrderPspResultUpdated.create(
             paymentOrderId = paymentOrderId.value.toString(),
-            publicPaymentOrderId = "public-123",
             paymentId = PaymentId(456L).value.toString(),
-            publicPaymentId = "public-payment-123",
             sellerId = SellerId("seller-123").value,
             amountValue = 10000L,
             currency = "USD",
@@ -148,8 +142,6 @@ class PaymentOrderPspResultApplierTest {
             createdAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
             updatedAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
             retryCount = 0,
-            retryReason = null,
-            lastErrorMessage = null,
             pspStatus = PaymentOrderStatus.PENDING_CAPTURE.name,
             pspErrorCode = "INSUFFICIENT_FUNDS",
             pspErrorDetail = "Account has insufficient funds",

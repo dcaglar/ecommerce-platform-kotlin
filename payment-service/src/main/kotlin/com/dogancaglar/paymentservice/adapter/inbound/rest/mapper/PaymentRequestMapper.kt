@@ -1,6 +1,8 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest.mapper
 
 
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
 import com.dogancaglar.paymentservice.domain.commands.CreatePaymentCommand
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
@@ -29,19 +31,18 @@ object PaymentRequestMapper {
 
     fun toResponse(domain: Payment): PaymentResponseDTO {
         return PaymentResponseDTO(
-            id = domain.publicPaymentId,// or use requireNotNull(domain.id)
-            paymentId = domain.publicPaymentId,
+            paymentId = domain.paymentId.toPublicPaymentId(),
             status = domain.status.name,
             buyerId = domain.buyerId.value,
             orderId = domain.orderId.value,
             totalAmount = AmountMapper.toDto(domain.totalAmount),
-            createdAt = domain.createdAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-            paymentOrders = domain.paymentOrders.map { toDto(it) }
+            createdAt = domain.createdAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
         )
     }
 
     private fun toDto(order: PaymentOrder): PaymentOrderResponseDTO {
         return PaymentOrderResponseDTO(
+            paymentOrderId = order.paymentOrderId.toPublicPaymentOrderId(),
             sellerId = order.sellerId.value,
             amount = AmountDto(order.amount.quantity, CurrencyEnum.valueOf(order.amount.currency.currencyCode))
         )

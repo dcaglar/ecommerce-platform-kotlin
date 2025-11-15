@@ -12,7 +12,6 @@ import java.time.ZoneOffset
 class PaymentTest {
 
     private val paymentId = PaymentId(1L)
-    private val publicPaymentId = "payment-1"
     private val buyerId = BuyerId("buyer-xyz")
     private val orderId = OrderId("order-xyz")
     private val currency = Currency("EUR")
@@ -26,7 +25,6 @@ class PaymentTest {
         val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount, clock)
 
         assertEquals(paymentId, payment.paymentId)
-        assertEquals(publicPaymentId, payment.publicPaymentId)
         assertEquals(buyerId, payment.buyerId)
         assertEquals(orderId, payment.orderId)
         assertEquals(totalAmount, payment.totalAmount)

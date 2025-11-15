@@ -1,15 +1,15 @@
 package com.dogancaglar.paymentservice.ports.outbound
 
+import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
+import com.dogancaglar.paymentservice.domain.model.vo.OrderId
+import com.dogancaglar.paymentservice.domain.model.vo.SellerId
+
 interface IdGeneratorPort {
 
+     fun nextPaymentId(buyerId: BuyerId, orderId: OrderId): Long
 
-    fun nextId(namespace: String): Long
-
-
-    fun getRawValue(namespace: String): Long?
+     fun nextPaymentOrderId(sellerId: SellerId): Long
 
 
-    fun setMinValue(namespace: String, value: Long)
 
-
-}
+    }

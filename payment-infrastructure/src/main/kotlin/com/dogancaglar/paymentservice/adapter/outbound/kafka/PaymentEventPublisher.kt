@@ -9,13 +9,10 @@ import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.core.KafkaTemplate
-import org.springframework.stereotype.Component
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.util.*
-import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
@@ -137,10 +134,11 @@ class PaymentEventPublisher(
     private fun <T> buildRecord(
         eventMetaData: EventMetadata<T>,
         envelope: EventEnvelope<T>
-    ): ProducerRecord<String, EventEnvelope<*>> =
-        ProducerRecord<String, EventEnvelope<*>>(
+    ): ProducerRecord<String, EventEnvelope<*>> {
+        val aggregateId = eventMetaData.partitionKeyExtractor(envelope.data)
+        return ProducerRecord<String, EventEnvelope<*>>(
             eventMetaData.topic,
-            envelope.aggregateId,
+            aggregateId,
             envelope
         ).apply {
             headers().add(
@@ -170,6 +168,8 @@ class PaymentEventPublisher(
                 )
             }
         }
+
+    }
 }
 
 

@@ -4,14 +4,16 @@ import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
+import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import io.mockk.*
 import org.apache.kafka.clients.consumer.Consumer
@@ -49,7 +51,7 @@ class PaymentOrderEnqueuerTest {
     fun `should enqueue payment order for PSP call when status is INITIATED_PENDING`() {
         // Given
         val paymentOrderId = PaymentOrderId(123L)
-        val paymentId = PaymentId(2L)
+        val paymentId =PaymentId(456L)
         val expectedTraceId = "trace-123"
         val expectedCreatedAt = clock.instant().atZone(clock.zone).toLocalDateTime()
         val consumedEventId = UUID.fromString("11111111-1111-1111-1111-111111111111")
@@ -57,9 +59,7 @@ class PaymentOrderEnqueuerTest {
         
         val paymentOrderCreated = PaymentOrderCreated.create(
             paymentOrderId = paymentOrderId.value.toString(),
-            publicPaymentOrderId = "public-123",
-            paymentId = PaymentId(456L).value.toString(),
-            publicPaymentId = "public-payment-123",
+            paymentId = paymentId.value.toString(),
             sellerId = SellerId("seller-123").value,
             amountValue = 10000L,
             currency = "USD",
@@ -113,9 +113,9 @@ class PaymentOrderEnqueuerTest {
                 data = match { data ->
                     data is PaymentOrderCaptureCommand &&
                     data.paymentOrderId == paymentOrderId.value.toString() &&
-                    data.publicPaymentOrderId == "paymentorder-${paymentOrderId.value}" &&
-                    data.paymentId == PaymentId(456L).value.toString() &&
-                    data.publicPaymentId == "payment-${PaymentId(456L).value}" &&
+                    data.publicPaymentOrderId == paymentOrderId.toPublicPaymentOrderId() &&
+                    data.paymentId == paymentId.value.toString() &&
+                    data.publicPaymentId == paymentId.toPublicPaymentId() &&
                     data.sellerId == SellerId("seller-123").value &&
                     data.amountValue == 10000L &&
                     data.currency == "USD" &&
@@ -152,9 +152,7 @@ class PaymentOrderEnqueuerTest {
         val parentEventId = UUID.fromString("66666666-6666-6666-6666-666666666666")
         val paymentOrderCreated = PaymentOrderCreated.create(
             paymentOrderId = paymentOrderId.value.toString(),
-            publicPaymentOrderId = "public-123",
             paymentId = PaymentId(456L).value.toString(),
-            publicPaymentId = "public-payment-123",
             sellerId = SellerId("seller-123").value,
             amountValue = 10000L,
             currency = "USD",

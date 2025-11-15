@@ -3,25 +3,25 @@ package com.dogancaglar.paymentservice.application.maintenance
 import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.paymentservice.application.constants.IdNamespaces
+import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.OutboxEventType
 import com.dogancaglar.paymentservice.application.constants.PaymentLogFields
-import com.dogancaglar.paymentservice.domain.event.EventMetadatas
-import com.dogancaglar.paymentservice.domain.event.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.event.OutboxEvent
-import com.dogancaglar.paymentservice.domain.event.OutboxEventType
-import com.dogancaglar.paymentservice.domain.event.PaymentAuthorized
+import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
+import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_DISPATCHED_TOTAL
 import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_DISPATCHER_DURATION
 import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_DISPATCH_FAILED_TOTAL
 import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_EVENT_BACKLOG
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
+import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import com.dogancaglar.paymentservice.ports.outbound.OutboxEventRepository
 import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -36,10 +36,10 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import java.time.Clock
 import java.util.UUID
+import kotlin.collections.isNotEmpty
 
 @Service
 @DependsOn("outboxPartitionCreator")
@@ -181,7 +181,8 @@ class OutboxDispatcherJob(
         logger.info("Expanding PaymentAuthorized → PaymentOrderCreated for paymentId=${data.paymentId}")
         // Expand PaymentOrders from the authorized payload from paymentline
         val paymentOrders = data.paymentLines.map { line ->
-            PaymentOrder.createNew(paymentOrderId = PaymentOrderId(idGeneratorPort.nextId(IdNamespaces.PAYMENT_ORDER)),
+            val sellerId = SellerId(line.sellerId)
+            PaymentOrder.createNew(paymentOrderId = PaymentOrderId(idGeneratorPort.nextPaymentOrderId(sellerId)),
                         paymentId = PaymentId(data.paymentId.toLong()),
                             sellerId = SellerId(line.sellerId ),
                             amount = Amount.of(line.amountValue, Currency(line.currency))

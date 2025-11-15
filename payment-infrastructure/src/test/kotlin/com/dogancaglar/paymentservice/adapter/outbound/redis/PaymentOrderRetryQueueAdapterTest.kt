@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.outbound.redis
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.domain.commands.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
@@ -9,7 +9,9 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
-import com.dogancaglar.paymentservice.domain.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
@@ -94,8 +96,8 @@ class PaymentOrderRetryQueueAdapterTest {
                     try {
                         val node = objectMapper.readTree(json)
                         node["eventType"].asText() == "payment_order_capture_requested" &&
-                            node["data"]["paymentOrderId"].asText() == "123" &&
-                            node["data"]["publicPaymentOrderId"].asText() == "paymentorder-123"
+                            node["data"]["publicPaymentOrderId"].asText() == paymentOrder.paymentOrderId.toPublicPaymentOrderId() &&
+                            node["data"]["publicPaymentId"].asText() == paymentOrder.paymentId.toPublicPaymentId()
                     } catch (ex: Exception) {
                         false
                     }

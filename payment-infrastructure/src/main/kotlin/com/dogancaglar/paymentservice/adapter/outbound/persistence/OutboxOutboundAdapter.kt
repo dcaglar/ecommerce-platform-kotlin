@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.persistence
 
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.OutboxEventEntityMapper
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.OutboxEventMapper
-import com.dogancaglar.paymentservice.domain.event.OutboxEvent
+import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.ports.outbound.OutboxEventRepository
 import org.springframework.stereotype.Repository
 

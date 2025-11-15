@@ -2,12 +2,12 @@ package com.dogancaglar.paymentservice.adapter.outbound.redis
 
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
-import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
+import com.dogancaglar.paymentservice.ports.outbound.ExternalIdGeneratorPort
 
-@Component
+
 class RedisIdGeneratorPortAdapter(
     private val redis: StringRedisTemplate
-) : IdGeneratorPort {
+) : ExternalIdGeneratorPort {
 
     override fun nextId(namespace: String): Long {
         return redis.opsForValue().increment(namespace)
