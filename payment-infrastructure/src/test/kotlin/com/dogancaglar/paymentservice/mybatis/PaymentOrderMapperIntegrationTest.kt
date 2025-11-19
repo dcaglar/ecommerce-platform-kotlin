@@ -215,5 +215,140 @@ class PaymentOrderMapperIntegrationTest {
         assertEquals(0, paymentOrderMapper.countAll())
         assertNull(paymentOrderMapper.updateReturningIdempotent(paymentOrderEntity(501L)))
     }
+
+    @Test
+    fun `updateReturningIdempotentInitialCaptureRequest updates only INITIATED_PENDING with retry_count=0`() {
+        upsertPayment(5001L)
+        val baseTime = LocalDateTime.now().withNano(0)
+        
+        // Test 1: Successfully updates when status is INITIATED_PENDING and retry_count=0
+        val eligible = paymentOrderEntity(
+            id = 601L,
+            paymentId = 5001L,
+            status = PaymentOrderStatus.INITIATED_PENDING,
+            retryCount = 0,
+            createdAt = baseTime,
+            updatedAt = baseTime
+        )
+        paymentOrderMapper.insert(eligible)
+        
+        val futureTime = baseTime.plusHours(1)
+        val updated = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(601L, futureTime)
+        
+        assertNotNull(updated)
+        assertEquals(PaymentOrderStatus.CAPTURE_REQUESTED, updated!!.status)
+        assertEquals(0, updated.retryCount)
+        assertEquals(futureTime, updated.updatedAt)
+        
+        // Test 2: Returns null when status is not INITIATED_PENDING
+        val nonEligibleStatus = paymentOrderEntity(
+            id = 602L,
+            paymentId = 5001L,
+            status = PaymentOrderStatus.CAPTURE_REQUESTED,
+            retryCount = 0,
+            createdAt = baseTime,
+            updatedAt = baseTime
+        )
+        paymentOrderMapper.insert(nonEligibleStatus)
+        
+        val notUpdated1 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(602L, futureTime)
+        assertNull(notUpdated1)
+        
+        // Verify status didn't change
+        val stillCaptureRequested = paymentOrderMapper.findByPaymentOrderId(602L).first()
+        assertEquals(PaymentOrderStatus.CAPTURE_REQUESTED, stillCaptureRequested.status)
+        
+        // Test 3: Returns null when retry_count != 0
+        val nonEligibleRetry = paymentOrderEntity(
+            id = 603L,
+            paymentId = 5001L,
+            status = PaymentOrderStatus.INITIATED_PENDING,
+            retryCount = 1,
+            createdAt = baseTime,
+            updatedAt = baseTime
+        )
+        paymentOrderMapper.insert(nonEligibleRetry)
+        
+        val notUpdated2 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(603L, futureTime)
+        assertNull(notUpdated2)
+        
+        // Verify status didn't change
+        val stillInitiated = paymentOrderMapper.findByPaymentOrderId(603L).first()
+        assertEquals(PaymentOrderStatus.INITIATED_PENDING, stillInitiated.status)
+        assertEquals(1, stillInitiated.retryCount)
+        
+        // Test 4: GREATEST logic for updated_at - if provided timestamp is older, keeps existing
+        val eligible2 = paymentOrderEntity(
+            id = 604L,
+            paymentId = 5001L,
+            status = PaymentOrderStatus.INITIATED_PENDING,
+            retryCount = 0,
+            createdAt = baseTime,
+            updatedAt = baseTime.plusHours(2)
+        )
+        paymentOrderMapper.insert(eligible2)
+        
+        val pastTime = baseTime.plusMinutes(30)
+        val updated2 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(604L, pastTime)
+        
+        assertNotNull(updated2)
+        assertEquals(PaymentOrderStatus.CAPTURE_REQUESTED, updated2!!.status)
+        // updated_at should be the greater of the two (existing: baseTime+2h, provided: baseTime+30m)
+        assertEquals(baseTime.plusHours(2), updated2.updatedAt)
+        
+        // Test 5: Does not update when status is CAPTURE_FAILED
+        val captureFailed = paymentOrderEntity(
+            id = 605L,
+            paymentId = 5001L,
+            status = PaymentOrderStatus.CAPTURE_FAILED,
+            retryCount = 0,
+            createdAt = baseTime,
+            updatedAt = baseTime
+        )
+        paymentOrderMapper.insert(captureFailed)
+        
+        val notUpdated3 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(605L, futureTime)
+        assertNull(notUpdated3)
+        
+        val stillCaptureFailed = paymentOrderMapper.findByPaymentOrderId(605L).first()
+        assertEquals(PaymentOrderStatus.CAPTURE_FAILED, stillCaptureFailed.status)
+        assertEquals(baseTime, stillCaptureFailed.updatedAt) // updated_at should remain unchanged
+        
+        // Test 6: Does not update when status is CAPTURED
+        val captured = paymentOrderEntity(
+            id = 606L,
+            paymentId = 5001L,
+            status = PaymentOrderStatus.CAPTURED,
+            retryCount = 0,
+            createdAt = baseTime,
+            updatedAt = baseTime
+        )
+        paymentOrderMapper.insert(captured)
+        
+        val notUpdated4 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(606L, futureTime)
+        assertNull(notUpdated4)
+        
+        val stillCaptured = paymentOrderMapper.findByPaymentOrderId(606L).first()
+        assertEquals(PaymentOrderStatus.CAPTURED, stillCaptured.status)
+        assertEquals(baseTime, stillCaptured.updatedAt) // updated_at should remain unchanged
+        
+        // Test 7: Does not update when status is PENDING_CAPTURE
+        val pendingCapture = paymentOrderEntity(
+            id = 607L,
+            paymentId = 5001L,
+            status = PaymentOrderStatus.PENDING_CAPTURE,
+            retryCount = 0,
+            createdAt = baseTime,
+            updatedAt = baseTime
+        )
+        paymentOrderMapper.insert(pendingCapture)
+        
+        val notUpdated5 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(607L, futureTime)
+        assertNull(notUpdated5)
+        
+        val stillPendingCapture = paymentOrderMapper.findByPaymentOrderId(607L).first()
+        assertEquals(PaymentOrderStatus.PENDING_CAPTURE, stillPendingCapture.status)
+        assertEquals(baseTime, stillPendingCapture.updatedAt) // updated_at should remain unchanged
+    }
 }
 

@@ -50,7 +50,7 @@ class PaymentOrderDomainEventMapper(
         )
 
     /** 🔹 Domain → Event: PSP call requested */
-    fun toPaymentOrderCaptureCommand(order: PaymentOrderSnapshot, attempt: Int): PaymentOrderCaptureCommand =
+    fun toPaymentOrderCaptureCommand(order: PaymentOrder, attempt: Int): PaymentOrderCaptureCommand =
         PaymentOrderCaptureCommand.from(
             order = order,
             attempt = attempt,

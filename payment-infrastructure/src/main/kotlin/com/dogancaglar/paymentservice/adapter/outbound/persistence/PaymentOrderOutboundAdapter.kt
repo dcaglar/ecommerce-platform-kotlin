@@ -8,6 +8,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDateTime
 
 @Repository
 class PaymentOrderOutboundAdapter(
@@ -25,8 +26,8 @@ class PaymentOrderOutboundAdapter(
         return found?.let(PaymentOrderEntityMapper::toDomain)
     }
 
-    override fun updateReturningIdempotentEnqueuer(paymentOrderId: Long): PaymentOrder? {
-        val updated = paymentOrderMapper.updateReturningIdempotentEnqueuer(paymentOrderId)
+    override fun updateReturningIdempotentInitialCaptureRequest(paymentOrderId: Long,updatedAt: LocalDateTime): PaymentOrder? {
+        val updated = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(paymentOrderId,updatedAt)
         if (updated != null) return PaymentOrderEntityMapper.toDomain(updated)
 
         // No row updated →  missing. Re-read to reflect truth if present.

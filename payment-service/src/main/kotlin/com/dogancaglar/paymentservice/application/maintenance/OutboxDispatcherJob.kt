@@ -5,6 +5,7 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.OutboxEventType
+import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.application.constants.PaymentLogFields
 import com.dogancaglar.paymentservice.application.events.PaymentPipelineAuthorized
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
@@ -145,9 +146,9 @@ class OutboxDispatcherJob(
                         }
 
                         OutboxEventType.PAYMENT_ORDER_CAPTURE_COMMAND -> {
-                          /*  val ok = handlePaymentOrderCaptureCommand(evt)
+                            val ok = handlePaymentOrderCaptureCommand(evt)
                             if (ok) succeeded += evt.markAsSent()
-                            else failed += evt*/
+                            else failed += evt
                         }
 
                         else -> {
@@ -252,25 +253,21 @@ class OutboxDispatcherJob(
         return ok
     }
 
-    /*
-        private fun handlePaymentOrderCaptureCommand(evt: OutboxEvent) {
+
+        private fun handlePaymentOrderCaptureCommand(evt: OutboxEvent) : Boolean {
             val envelopeType = objectMapper.typeFactory
                 .constructParametricType(EventEnvelope::class.java, PaymentOrderCaptureCommand::class.java)
             val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentOrderCaptureCommand>
 
-            // Update status (capture requested)
-            paymentOrderOutboundAdapter.markCaptureRequested(envelope.data.paymentOrderId)
-
             // Publish to capture queue topic
-            syncPaymentEventPublisher.publishBatchAtomically(
+            val ok  = syncPaymentEventPublisher.publishBatchAtomically(
                 envelopes = listOf(envelope),
-                eventMetaData = PaymentEventMetadataCatalog.PaymentOrderCaptureCommandMetadata,
                 timeout = java.time.Duration.ofSeconds(10)
             )
 
             logger.info("📤 Published PaymentOrderCaptureCommand event ${envelope.eventId}")
+            return ok
         }
-    */
 
 
 

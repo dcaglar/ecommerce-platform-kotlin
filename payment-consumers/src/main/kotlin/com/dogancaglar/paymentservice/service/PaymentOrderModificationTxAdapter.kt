@@ -26,7 +26,7 @@ class PaymentOrderModificationTxAdapter(
 
 
     @Transactional(timeout = 2)
-    override fun markAsCapturePending(order: String): PaymentOrder {
+    override fun markAsCapturePending(order: PaymentOrder): PaymentOrder {
         val draft = order.markCaptureDeclined()
             .incrementRetry()
             .withUpdateAt(LocalDateTime.now(clock))
@@ -42,6 +42,14 @@ class PaymentOrderModificationTxAdapter(
         val draft = order.markCaptureDeclined().withUpdateAt(LocalDateTime.now())
         val persisted = paymentOrderRepository.updateReturningIdempotent(draft)
             ?: throw MissingPaymentOrderException(order.paymentOrderId.value)
+        return persisted
+    }
+
+    @Transactional(timeout = 2)
+    override fun markAsCaptureRequested(paymentOrderId: Long): PaymentOrder {
+        val persisted = paymentOrderRepository.updateReturningIdempotentInitialCaptureRequest(paymentOrderId,
+            LocalDateTime.now())
+            ?: throw MissingPaymentOrderException(paymentOrderId)
         return persisted
     }
 }

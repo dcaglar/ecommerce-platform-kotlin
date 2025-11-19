@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.application.commands
 
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCommand
+import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.application.util.PaymentOrderSnapshot
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
@@ -30,11 +31,10 @@ data class PaymentOrderCaptureCommand private constructor(
     companion object {
         const val EVENT_TYPE = "payment_order_capture_requested"
 
-        fun from(order: PaymentOrderSnapshot, attempt: Int, now: LocalDateTime): PaymentOrderCaptureCommand {
-            require(attempt >= 0)
-            return PaymentOrderCaptureCommand(
-                paymentOrderId = order.paymentOrderId,
-                publicPaymentOrderId = order ,
+        fun from(order: PaymentOrder, now: LocalDateTime,attempt: Int): PaymentOrderCaptureCommand =
+            PaymentOrderCaptureCommand(
+                paymentOrderId = order.paymentOrderId.value.toString(),
+                publicPaymentOrderId = order.paymentOrderId.toPublicPaymentOrderId(),
                 paymentId = order.paymentId.value.toString(),
                 publicPaymentId = order.paymentId.toPublicPaymentId(),
                 sellerId = order.sellerId.value,
@@ -43,7 +43,6 @@ data class PaymentOrderCaptureCommand private constructor(
                 attempt = attempt,
                 timestamp = now
             )
-        }
 
         @JsonCreator
         internal fun fromJson(

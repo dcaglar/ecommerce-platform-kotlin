@@ -3,10 +3,10 @@ package com.dogancaglar.paymentservice.adapter.inbound.rest
 import com.dogancaglar.paymentservice.application.usecases.AuthorizePaymentService
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.application.validator.PaymentValidator
-import com.dogancaglar.port.out.web.dto.PaymentRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentRequestDTO
 import com.dogancaglar.port.out.web.dto.AmountDto
 import com.dogancaglar.port.out.web.dto.CurrencyEnum
-import com.dogancaglar.port.out.web.dto.PaymentOrderRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentOrderRequestDTO
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency

@@ -155,17 +155,15 @@
         SELECT * FROM updated
     </select>
 
-    <select id="updateReturningIdempotentEnqueuer"
-            parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentOrderEntity"
+    <select id="updateReturningIdempotentInitialCaptureRequest"
             resultMap="PaymentOrderResultMap">
         WITH updated AS (
         UPDATE payment_orders p
         SET
-        status = 'CAPTURE_REQUESTED'
-        updated_at = GREATEST(p.updated_at, #{updatedAt}),
+        status = 'CAPTURE_REQUESTED',
+        updated_at = GREATEST(p.updated_at, #{updateAt})
         WHERE p.payment_order_id = #{paymentOrderId} and
-        p.status='INITIATED_PENDING'
-
+        p.status='INITIATED_PENDING' and p.retry_count=0
         RETURNING
         p.payment_order_id,
         p.payment_id,

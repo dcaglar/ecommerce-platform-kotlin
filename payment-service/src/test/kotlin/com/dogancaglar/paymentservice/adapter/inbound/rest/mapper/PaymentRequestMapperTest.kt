@@ -1,5 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest.mapper
 
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentOrderRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentRequestDTO
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
