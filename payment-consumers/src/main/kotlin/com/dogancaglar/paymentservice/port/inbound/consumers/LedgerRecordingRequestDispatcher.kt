@@ -1,10 +1,12 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.paymentservice.application.metadata.CONSUMER_GROUPS
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.application.metadata.Topics
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
+import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.EVENT_TYPE
 import com.dogancaglar.paymentservice.application.events.PaymentOrderEvent
+import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.ports.inbound.RequestLedgerRecordingUseCase
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -27,17 +29,16 @@ class LedgerRecordingRequestDispatcher(
         groupId = CONSUMER_GROUPS.LEDGER_RECORDING_REQUEST_DISPATCHER
     )
     fun onPaymentOrderFinalized(
-        record: ConsumerRecord<String, EventEnvelope<PaymentOrderEvent>>,
+        record: ConsumerRecord<String, EventEnvelope<PaymentOrderFinalized>>,
         consumer: org.apache.kafka.clients.consumer.Consumer<*, *>
     ) {
         val env = record.value()
         val event = env.data
-
         val tp = TopicPartition(record.topic(), record.partition())
         val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
         val groupMeta = consumer.groupMetadata()
 
-        LogContext.with(env) {
+        EventLogContext.with(env) {
             kafkaTx.run(offsets, groupMeta) {
                 logger.info(
                     "🟢 Received finalized PaymentOrder (status={}) → dispatching LedgerRecordingCommand for agg={} traceId={}",

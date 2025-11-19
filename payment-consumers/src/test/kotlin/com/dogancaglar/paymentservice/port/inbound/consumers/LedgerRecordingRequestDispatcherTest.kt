@@ -1,13 +1,12 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.common.event.DomainEventEnvelopeFactory
+import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.events.PaymentOrderEvent
-import com.dogancaglar.paymentservice.application.events.PaymentOrderFailed
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
-import com.dogancaglar.paymentservice.application.events.PaymentOrderSucceeded
-import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
+import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
@@ -23,7 +22,11 @@ import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
-import java.util.UUID
+import java.time.LocalDateTime
+import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 
 class LedgerRecordingRequestDispatcherTest {
 
@@ -53,38 +56,41 @@ class LedgerRecordingRequestDispatcherTest {
         // Given
         val paymentOrderId = PaymentOrderId(123L)
         val expectedTraceId = "trace-123"
-        val consumedEventId = UUID.fromString("11111111-1111-1111-1111-111111111111")
-        val parentEventId = UUID.fromString("22222222-2222-2222-2222-222222222222")
+        val consumedEventId = "11111111-1111-1111-1111-111111111111"
+        val parentEventId = "22222222-2222-2222-2222-222222222222"
+        val now = LocalDateTime.now(clock)
+        val paymentId = PaymentId(456L)
         
-        val successEvent = PaymentOrderSucceeded.create(
-            paymentOrderId = paymentOrderId.value.toString(),
-            paymentId = PaymentId(456L).value.toString(),
-            sellerId = SellerId("seller-789").value,
-            amountValue = 10000L,
-            currency = "EUR",
-            status = "SUCCESSFUL_FINAL"
+        val paymentOrder = PaymentOrder.rehydrate(
+            paymentOrderId = paymentOrderId,
+            paymentId = paymentId,
+            sellerId = SellerId("seller-789"),
+            amount = com.dogancaglar.paymentservice.domain.model.Amount.of(10000L, com.dogancaglar.paymentservice.domain.model.Currency("EUR")),
+            status = com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus.CAPTURED,
+            retryCount = 0,
+            createdAt = now,
+            updatedAt = now
         )
+        val successEvent = PaymentOrderFinalized.from(paymentOrder, now, "SUCCESSFUL_FINAL")
         
-        val envelope = DomainEventEnvelopeFactory.envelopeFor(
-            preSetEventId = consumedEventId,
+        val envelope = EventEnvelopeFactory.envelopeFor(
             data = successEvent,
-            eventMetaData = EventMetadatas.PaymentOrderSucceededMetadata,
             aggregateId = paymentOrderId.value.toString(),
             traceId = expectedTraceId,
             parentEventId = parentEventId
         )
         
-        val record = ConsumerRecord<String, EventEnvelope<PaymentOrderEvent>>(
+        val record = ConsumerRecord<String, EventEnvelope<PaymentOrderFinalized>>(
             "payment-order-finalized",
             0,
             0L,
             paymentOrderId.value.toString(),
-            envelope as EventEnvelope<PaymentOrderEvent>
+            envelope
         )
         
-        // Mock LogContext
-        mockkObject(LogContext)
-        every { LogContext.with(any<EventEnvelope<*>>(), any(), any()) } answers { 
+        // Mock EventLogContext
+        mockkObject(EventLogContext)
+        every { EventLogContext.with(any<EventEnvelope<*>>(), any(), any()) } answers {
             val lambda = thirdArg<() -> Unit>()
             lambda.invoke()
         }
@@ -107,12 +113,12 @@ class LedgerRecordingRequestDispatcherTest {
             )
         }
         
-        // Verify LogContext was called with the correct envelope for tracing
+        // Verify EventLogContext was called with the correct envelope for tracing
         verify(exactly = 1) {
-            LogContext.with<PaymentOrderEvent>(
+            EventLogContext.with<PaymentOrderFinalized>(
                 match { env ->
                     env is EventEnvelope<*> &&
-                    env.eventId == consumedEventId &&
+                    env.eventId == successEvent.deterministicEventId() &&
                     env.aggregateId == paymentOrderId.value.toString() &&
                     env.traceId == expectedTraceId &&
                     env.parentEventId == parentEventId
@@ -130,37 +136,40 @@ class LedgerRecordingRequestDispatcherTest {
         // Given
         val paymentOrderId = PaymentOrderId(456L)
         val expectedTraceId = "trace-456"
-        val consumedEventId = UUID.fromString("33333333-3333-3333-3333-333333333333")
-        val parentEventId = UUID.fromString("44444444-4444-4444-4444-444444444444")
+        val consumedEventId = "33333333-3333-3333-3333-333333333333"
+        val parentEventId = "44444444-4444-4444-4444-444444444444"
+        val now = LocalDateTime.now(clock)
+        val paymentId = PaymentId(789L)
         
-        val failedEvent = PaymentOrderFailed.create(
-            paymentOrderId = paymentOrderId.value.toString(),
-            paymentId = PaymentId(789L).value.toString(),
-            sellerId = SellerId("seller-101").value,
-            amountValue = 5000L,
-            currency = "USD",
-            status = "FAILED_FINAL"
+        val paymentOrder = PaymentOrder.rehydrate(
+            paymentOrderId = paymentOrderId,
+            paymentId = paymentId,
+            sellerId = SellerId("seller-101"),
+            amount = Amount.of(5000L, Currency("USD")),
+            status = PaymentOrderStatus.CAPTURE_FAILED,
+            retryCount = 0,
+            createdAt = now,
+            updatedAt = now
         )
+        val failedEvent = PaymentOrderFinalized.from(paymentOrder, now, "FAILED_FINAL")
         
-        val envelope = DomainEventEnvelopeFactory.envelopeFor(
-            preSetEventId = consumedEventId,
+        val envelope = EventEnvelopeFactory.envelopeFor(
             data = failedEvent,
-            eventMetaData = EventMetadatas.PaymentOrderFailedMetadata,
             aggregateId = paymentOrderId.value.toString(),
             traceId = expectedTraceId,
             parentEventId = parentEventId
         )
         
-        val record = ConsumerRecord<String, EventEnvelope<PaymentOrderEvent>>(
+        val record = ConsumerRecord<String, EventEnvelope<PaymentOrderFinalized>>(
             "payment-order-finalized",
             0,
             0L,
             paymentOrderId.value.toString(),
-            envelope as EventEnvelope<PaymentOrderEvent>
+            envelope
         )
         
-        mockkObject(LogContext)
-        every { LogContext.with(any<EventEnvelope<*>>(), any(), any()) } answers { 
+        mockkObject(EventLogContext)
+        every { EventLogContext.with(any<EventEnvelope<*>>(), any(), any()) } answers {
             val lambda = thirdArg<() -> Unit>()
             lambda.invoke()
         }
@@ -183,12 +192,12 @@ class LedgerRecordingRequestDispatcherTest {
             )
         }
         
-        // Verify LogContext was called with the correct envelope for tracing
+        // Verify EventLogContext was called with the correct envelope for tracing
         verify(exactly = 1) {
-            LogContext.with<PaymentOrderEvent>(
+            EventLogContext.with<PaymentOrderFinalized>(
                 match { env ->
                     env is EventEnvelope<*> &&
-                    env.eventId == consumedEventId &&
+                    env.eventId == failedEvent.deterministicEventId() &&
                     env.aggregateId == paymentOrderId.value.toString() &&
                     env.traceId == expectedTraceId &&
                     env.parentEventId == parentEventId
@@ -205,33 +214,38 @@ class LedgerRecordingRequestDispatcherTest {
     fun `should propagate exception when use case throws`() {
         // Given
         val paymentOrderId = PaymentOrderId(789L)
-        val successEvent = PaymentOrderSucceeded.create(
-            paymentOrderId = paymentOrderId.value.toString(),
-            paymentId = PaymentId(101L).value.toString(),
-            sellerId = SellerId("seller-202").value,
-            amountValue = 10000L,
-            currency = "EUR",
-            status = "SUCCESSFUL_FINAL"
-        )
+        val now = LocalDateTime.now(clock)
+        val paymentId = PaymentId(101L)
         
-        val envelope = DomainEventEnvelopeFactory.envelopeFor(
+        val paymentOrder = PaymentOrder.rehydrate(
+            paymentOrderId = paymentOrderId,
+            paymentId = paymentId,
+            sellerId = SellerId("seller-202"),
+            amount = Amount.of(10000L, Currency("EUR")),
+            status = PaymentOrderStatus.CAPTURED,
+            retryCount = 0,
+            createdAt = now,
+            updatedAt = now
+        )
+        val successEvent = PaymentOrderFinalized.from(paymentOrder, now, "SUCCESSFUL_FINAL")
+        
+        val envelope = EventEnvelopeFactory.envelopeFor(
             data = successEvent,
-            eventMetaData = EventMetadatas.PaymentOrderSucceededMetadata,
             aggregateId = paymentOrderId.value.toString(),
             traceId = "trace-789",
             parentEventId = null
         )
         
-        val record = ConsumerRecord<String, EventEnvelope<PaymentOrderEvent>>(
+        val record = ConsumerRecord<String, EventEnvelope<PaymentOrderFinalized>>(
             "payment-order-finalized",
             0,
             0L,
             paymentOrderId.value.toString(),
-            envelope as EventEnvelope<PaymentOrderEvent>
+            envelope
         )
         
-        mockkObject(LogContext)
-        every { LogContext.with(any<EventEnvelope<*>>(), any(), any()) } answers { 
+        mockkObject(EventLogContext)
+        every { EventLogContext.with(any<EventEnvelope<*>>(), any(), any()) } answers {
             val lambda = thirdArg<() -> Unit>()
             lambda.invoke()
         }

@@ -1,9 +1,9 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.paymentservice.application.metadata.CONSUMER_GROUPS
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.application.metadata.Topics
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
+import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.ports.inbound.RecordLedgerEntriesUseCase
@@ -38,12 +38,12 @@ class LedgerRecordingConsumer(
         val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
         val groupMeta = consumer.groupMetadata()
 
-        LogContext.with(env) {
+        EventLogContext.with(env) {
             try {
                 kafkaTx.run(offsets, groupMeta) {
                     logger.info(
                         "🧾 Recording ledger entries for paymentOrderId={} status={} traceId={}",
-                        command.paymentOrderId, command.status, env.traceId
+                        command.paymentOrderId, command.finalStatus, env.traceId
                     )
                     recordLedgerEntriesUseCase.recordLedgerEntries(command)
 
@@ -55,7 +55,7 @@ class LedgerRecordingConsumer(
             } catch (e: Exception) {
                 logger.error(
                     "❌ Failed to record ledger entries for paymentOrderId={} status={} traceId={}: {}",
-                    command.paymentOrderId, command.status, env.traceId, e.message, e
+                    command.paymentOrderId, command.finalStatus, env.traceId, e.message, e
                 )
                 throw e // Re-throw to let Spring Kafka error handler process it
             }

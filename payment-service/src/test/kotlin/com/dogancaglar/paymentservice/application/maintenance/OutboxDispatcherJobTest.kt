@@ -1,12 +1,19 @@
 package com.dogancaglar.paymentservice.application.maintenance
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.event.EventMetadata
+import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.OutboxOutboundAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentOrderOutboundAdapter
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
+import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
+import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -40,16 +47,20 @@ class OutboxDispatcherJobTest {
 
     @BeforeEach
     fun setUp() {
+        clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
         outboxEventRepository = mockk<OutboxOutboundAdapter>(relaxed = true)
         paymentOrderRepository = mockk<PaymentOrderOutboundAdapter>(relaxed = true)
         eventPublisherPort = mockk(relaxed = true)
         meterRegistry = mockk(relaxed = true)
         serializationPort = mockk(relaxed = true)
-        paymentOrderDomaainEventMapper = mockk(relaxed = true)
+        paymentOrderDomaainEventMapper = PaymentOrderDomainEventMapper(clock)
         idGeneratorPort = mockk(relaxed = true)
-        objectMapper = ObjectMapper().registerModule(KotlinModule.Builder().build()).registerModule(JavaTimeModule())
+        objectMapper = ObjectMapper().apply {
+            registerModule(KotlinModule.Builder().build())
+            registerModule(JavaTimeModule())
+            disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+        }
         taskScheduler = mockk()
-        clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
         
         outboxDispatcherJob = OutboxDispatcherJob(
             outboxEventRepository = outboxEventRepository,
@@ -110,7 +121,7 @@ class OutboxDispatcherJobTest {
             createOutboxEvent(2L, createEventPayload("event2"))
         )
         
-        every { eventPublisherPort.publishBatchAtomically(any<List<EventEnvelope<*>>>(), any<EventMetadata<*>>(), any<Duration>()) } returns true
+        every { eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(any(), any<Duration>()) } returns true
 
         // When
         val (succeeded, failed, keepClaimed) = outboxDispatcherJob.publishBatch(outboxEvents)
@@ -119,7 +130,7 @@ class OutboxDispatcherJobTest {
         assertEquals(2, succeeded.size)
         assertTrue(failed.isEmpty())
         assertTrue(keepClaimed.isEmpty())
-        verify { eventPublisherPort.publishBatchAtomically(any<List<EventEnvelope<*>>>(), any<EventMetadata<*>>(), any<Duration>()) }
+        verify { eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(any(), any<Duration>()) }
     }
 
     @Test
@@ -130,7 +141,7 @@ class OutboxDispatcherJobTest {
             createOutboxEvent(2L, createEventPayload("event2"))
         )
         
-        every { eventPublisherPort.publishBatchAtomically(any<List<EventEnvelope<*>>>(), any<EventMetadata<*>>(), any<Duration>()) } returns false
+        every { eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(any(), any<Duration>()) } returns false
 
         // When
         val (succeeded, failed, keepClaimed) = outboxDispatcherJob.publishBatch(outboxEvents)
@@ -139,7 +150,7 @@ class OutboxDispatcherJobTest {
         assertTrue(succeeded.isEmpty())
         assertEquals(2, failed.size)
         assertTrue(keepClaimed.isEmpty())
-        verify { eventPublisherPort.publishBatchAtomically(any<List<EventEnvelope<*>>>(), any<EventMetadata<*>>(), any<Duration>()) }
+        verify { eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(any(), any<Duration>()) }
     }
 
     @Test
@@ -150,7 +161,7 @@ class OutboxDispatcherJobTest {
             createOutboxEvent(2L, createEventPayload("event2"))
         )
         
-        every { eventPublisherPort.publishBatchAtomically(any<List<EventEnvelope<*>>>(), any<EventMetadata<*>>(), any<Duration>()) } throws RuntimeException("Publish failed")
+        every { eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(any(), any<Duration>()) } throws RuntimeException("Publish failed")
 
         // When
         val (succeeded, failed, keepClaimed) = outboxDispatcherJob.publishBatch(outboxEvents)
@@ -159,7 +170,7 @@ class OutboxDispatcherJobTest {
         assertTrue(succeeded.isEmpty())
         assertEquals(2, failed.size)
         assertTrue(keepClaimed.isEmpty())
-        verify { eventPublisherPort.publishBatchAtomically(any<List<EventEnvelope<*>>>(), any<EventMetadata<*>>(), any<Duration>()) }
+        verify { eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(any(), any<Duration>()) }
     }
 
     @Test
@@ -217,7 +228,7 @@ class OutboxDispatcherJobTest {
         assertTrue(succeeded.isEmpty())
         assertTrue(failed.isEmpty())
         assertTrue(keepClaimed.isEmpty())
-        verify(exactly = 0) { eventPublisherPort.publishBatchAtomically(any<List<EventEnvelope<*>>>(), any<EventMetadata<*>>(), any<Duration>()) }
+        verify(exactly = 0) { eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(any(), any<Duration>()) }
     }
 
     private fun createOutboxEvent(oeid: Long, payload: String): OutboxEvent {
@@ -231,25 +242,24 @@ class OutboxDispatcherJobTest {
     }
 
     private fun createEventPayload(eventId: String): String {
-        val event = PaymentOrderCreated.create(
-            paymentOrderId = "123",
-            paymentId = "456",
-            sellerId = "seller-789",
-            amountValue = 10000L,
-            currency = "USD",
-            status = "CREATED",
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
-            updatedAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
-            retryCount = 0
+        val now = clock.instant().atZone(clock.zone).toLocalDateTime()
+        val paymentOrder = PaymentOrder.rehydrate(
+            paymentOrderId = PaymentOrderId(123L),
+            paymentId = PaymentId(456L),
+            sellerId = SellerId("seller-789"),
+            amount = Amount.of(10000L, Currency("USD")),
+            status = PaymentOrderStatus.INITIATED_PENDING,
+            retryCount = 0,
+            createdAt = now,
+            updatedAt = now
         )
+        val event = paymentOrderDomaainEventMapper.toPaymentOrderCreated(paymentOrder)
         
-        val envelope = EventEnvelope(
-            eventId = java.util.UUID.randomUUID(),
-            eventType = "payment_order_created",
-            aggregateId = "test-aggregate",
+        val envelope = EventEnvelopeFactory.envelopeFor(
+            data = event,
+            aggregateId = event.paymentOrderId,
             traceId = "test-trace",
-            parentEventId = null,
-            data = event
+            parentEventId = null
         )
         
         return objectMapper.writeValueAsString(envelope)

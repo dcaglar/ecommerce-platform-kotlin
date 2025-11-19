@@ -1,12 +1,11 @@
-package com.dogancaglar.paymentservice.application.metadata
+package com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata
 
 object EVENT_TYPE {
 
     const val PAYMENT_AUTHORIZED = "payment_authorized"
 
 
-    const val PAYMENT_ORDER_SUCCEDED = "payment_order_success"
-    const val PAYMENT_ORDER_FAILED = "payment_order_failed"
+    const val PAYMENT_ORDER_FINALIZED = "payment_order_finalized"
     const val PAYMENT_ORDER_CREATED = "payment_order_created"
     const val PAYMENT_ORDER_CAPTURE_REQUESTED = "payment_order_capture_requested"
     const val PAYMENT_ORDER_PSP_RESULT_UPDATED = "payment_order_psp_result_updated"

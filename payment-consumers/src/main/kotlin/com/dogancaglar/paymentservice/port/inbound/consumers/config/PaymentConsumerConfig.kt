@@ -8,6 +8,7 @@ import com.dogancaglar.paymentservice.application.usecases.RecordLedgerEntriesSe
 import com.dogancaglar.paymentservice.application.usecases.RequestLedgerRecordingService
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.application.usecases.AccountBalanceService
+import com.dogancaglar.paymentservice.consumers.EventDedupCache
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
@@ -64,6 +65,9 @@ class PaymentConsumerConfig {
 
         return RecordLedgerEntriesService(ledgerEntrPort,syncPaymentEventPublisher,accountDirectoryImpl,clock)
     }
+
+    @Bean
+    fun eventDedupCache(): EventDedupCache = EventDedupCache()
 
 
 

@@ -15,11 +15,11 @@
     <dependencies>
         <dependency>
             <groupId>com.dogancaglar</groupId>
-            <artifactId>common</artifactId>
+            <artifactId>payment-application</artifactId>
         </dependency>
         <dependency>
             <groupId>com.dogancaglar</groupId>
-            <artifactId>payment-application</artifactId>
+            <artifactId>payment-domain</artifactId>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>

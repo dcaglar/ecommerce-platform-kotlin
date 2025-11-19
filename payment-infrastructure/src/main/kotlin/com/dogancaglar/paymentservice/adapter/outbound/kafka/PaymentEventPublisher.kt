@@ -1,9 +1,11 @@
 package com.dogancaglar.paymentservice.adapter.outbound.kafka
 
-import com.dogancaglar.common.event.DomainEventEnvelopeFactory
+import com.dogancaglar.common.event.Event
+import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.event.EventMetadata
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.common.event.metadata.EventMetadata
+import com.dogancaglar.common.event.metadata.EventMetadataRegistry
+import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.producer.ProducerRecord
@@ -12,165 +14,112 @@ import org.slf4j.LoggerFactory
 import org.springframework.kafka.core.KafkaTemplate
 import java.nio.charset.StandardCharsets
 import java.time.Duration
-import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
-/**
- * Publishes any domain event wrapped in [EventEnvelope] to Kafka,
- * adding correlation headers so consumer interceptors can propagate
- * trace information to the MDC before logging.
- */
-
 class PaymentEventPublisher(
     private val kafkaTemplate: KafkaTemplate<String, EventEnvelope<*>>,
-    private val meterRegistry: MeterRegistry
+    private val eventMetadataRegistry: EventMetadataRegistry,
+    private val meterRegistry: MeterRegistry,
 ) : EventPublisherPort {
+
     private val logger = LoggerFactory.getLogger(javaClass)
 
-
-
-
-    override fun <T> publishSync(
-        preSetEventIdFromCaller: UUID?,
+    // ======================================================================
+    // SYNC PUBLISH
+    // ======================================================================
+    override fun <T : Event> publishSync(
         aggregateId: String,
-        eventMetaData: EventMetadata<T>,
         data: T,
-        traceId: String?,
-        parentEventId: UUID?,
+        traceId: String,
+        parentEventId: String?,
         timeoutSeconds: Long
     ): EventEnvelope<T> {
-        val envelope = buildEnvelope(preSetEventIdFromCaller, aggregateId, eventMetaData, data, traceId, parentEventId)
+        val eventMetaData = eventMetadataRegistry.metadataForEvent(data)
+        val envelope = EventEnvelopeFactory.envelopeFor(
+            data = data,
+            aggregateId = aggregateId,
+            traceId = traceId,
+            parentEventId = parentEventId
+        )
+
         val record = buildRecord(eventMetaData, envelope)
 
-        LogContext.with(envelope) {
-            val fut = kafkaTemplate.send(record)
+        EventLogContext.with(envelope) {
             try {
-                fut.get(timeoutSeconds, TimeUnit.SECONDS)
-                logger.debug("📨 publishSync OK topic={} key={} eventId={}",
-                    eventMetaData.topic, envelope.aggregateId, envelope.eventId)
-            } catch (ex: TimeoutException) {
-                logger.warn("⏱️ publishSync TIMEOUT {}s topic={} key={} eventId={}",
-                    timeoutSeconds, eventMetaData.topic, envelope.aggregateId, envelope.eventId)
-                throw ex
-            } catch (ex: InterruptedException) {
-                Thread.currentThread().interrupt()
-                logger.warn("🛑 publishSync INTERRUPTED topic={} key={} eventId={}",
-                    eventMetaData.topic, envelope.aggregateId, envelope.eventId, ex)
-                throw ex
-            } catch (ex: java.util.concurrent.ExecutionException) {
-                val rc = ex.cause ?: ex
-                when (rc) {
-                    is org.apache.kafka.common.errors.RetriableException,
-                    is org.apache.kafka.common.errors.TransactionAbortedException -> {
-                        logger.warn("🔁 RETRIABLE publishSync failure topic={} key={} eventId={} cause={}",
-                            eventMetaData.topic, envelope.aggregateId, envelope.eventId, rc::class.simpleName, rc)
-                    }
-                    else -> {
-                        logger.error("❌ NON-RETRIABLE publishSync failure topic={} key={} eventId={} cause={}: {}",
-                            eventMetaData.topic, envelope.aggregateId, envelope.eventId, rc::class.simpleName, rc.message, rc)
-                    }
-                }
-                throw rc
+                kafkaTemplate.send(record).get(timeoutSeconds, TimeUnit.SECONDS)
+                logger.debug(
+                    "📨 publishSync OK topic={} key={} eventId={}",
+                    eventMetaData.topic, envelope.aggregateId, envelope.eventId
+                )
+            } catch (e: TimeoutException) {
+                logger.warn(
+                    "⏱️ publishSync TIMEOUT {}s topic={} key={} eventId={}",
+                    timeoutSeconds, eventMetaData.topic, envelope.aggregateId, envelope.eventId
+                )
+                throw e
             }
         }
+
         return envelope
     }
 
-
-    override fun <T> publishBatchAtomically(
-        envelopes: List<EventEnvelope<*>>,
-        eventMetaData: EventMetadata<T>,
-        timeout: Duration
+    // ======================================================================
+    // BATCH PUBLISH
+    // ======================================================================
+    override fun <T : Event> publishBatchAtomically(
+        envelopes: List<EventEnvelope<T>>, timeout: Duration
     ): Boolean {
         if (envelopes.isEmpty()) return true
 
         return try {
             kafkaTemplate.executeInTransaction<Unit> { kt ->
-                val futures = envelopes.map { anyEnv ->
-                    @Suppress("UNCHECKED_CAST")
-                    val envT = anyEnv as EventEnvelope<T>
-                    val rec = buildRecord(eventMetaData, envT)
-                    kt.send(rec)
+                val futures = envelopes.map { env ->
+                    val eventMetaData = eventMetadataRegistry.metadataForEvent(env.data)
+                    kt.send(buildRecord(eventMetaData, env))
                 }
+
                 java.util.concurrent.CompletableFuture
                     .allOf(*futures.toTypedArray())
-                    .get(timeout.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS)
+                    .get(timeout.toMillis(), TimeUnit.MILLISECONDS)
+
                 Unit
             }
             true
-        } catch (t: java.util.concurrent.TimeoutException) {
-            logger.warn("⏱️ batch publish TIMEOUT after {} ms for {} events", timeout.toMillis(), envelopes.size)
-            false
         } catch (t: Throwable) {
-            logger.warn("❌ batch publish ABORT for {} events: {}", envelopes.size, t.toString())
+            logger.warn("❌ batch publish aborted for {} events: {}", envelopes.size, t.toString())
             false
         }
     }
 
-
-    private fun <T> buildEnvelope(
-        preSetEventIdFromCaller: UUID?,
-        aggregateId: String,
-        eventMetaData: EventMetadata<T>,
-        data: T,
-        traceId: String?,
-        parentEventId: UUID?
-    ): EventEnvelope<T> {
-        val preSetEventId = preSetEventIdFromCaller
-        val resolvedTraceId = traceId ?: LogContext.getTraceId()
-        ?: error("Missing traceId: either pass explicitly or set via LogContext.with(...)")
-        val resolvedParentId = parentEventId ?: LogContext.getEventId()
-        return DomainEventEnvelopeFactory.envelopeFor(
-            preSetEventId = preSetEventId,
-            traceId = resolvedTraceId,
-            data = data,
-            eventMetaData = eventMetaData,
-            aggregateId = aggregateId,
-            parentEventId = resolvedParentId
-        )
-    }
-
-    private fun <T> buildRecord(
-        eventMetaData: EventMetadata<T>,
+    // ======================================================================
+    // BUILD RECORD
+    // ======================================================================
+    // ======================================================================
+    private fun <T : Event> buildRecord(
+        metadata: EventMetadata<T>,
         envelope: EventEnvelope<T>
     ): ProducerRecord<String, EventEnvelope<*>> {
-        val aggregateId = eventMetaData.partitionKeyExtractor(envelope.data)
-        return ProducerRecord<String, EventEnvelope<*>>(
-            eventMetaData.topic,
-            aggregateId,
-            envelope
+
+        val key: String = metadata.partitionKey(envelope.data)
+
+        @Suppress("UNCHECKED_CAST")
+        val anyEnvelope: EventEnvelope<*> = envelope as EventEnvelope<*>
+
+        return ProducerRecord(
+            metadata.topic,
+            key,
+            anyEnvelope
         ).apply {
-            headers().add(
-                RecordHeader(
-                    "traceId",
-                    envelope.traceId.toByteArray(StandardCharsets.UTF_8)
-                )
-            )
-            headers().add(
-                RecordHeader(
-                    "eventId",
-                    envelope.eventId.toString().toByteArray(StandardCharsets.UTF_8)
-                )
-            )
-            headers().add(
-                RecordHeader(
-                    "eventType", envelope.eventType.toByteArray(StandardCharsets.UTF_8)
-                )
-            )
-
-            envelope.parentEventId?.let {
-                headers().add(
-                    RecordHeader(
-                        "parentEventId",
-                        it.toString().toByteArray(StandardCharsets.UTF_8)
-                    )
-                )
-            }
+            headers().addString("traceId", envelope.traceId)
+            headers().addString("eventId", envelope.eventId)
+            headers().addString("eventType", envelope.eventType)
+            envelope.parentEventId?.let { headers().addString("parentEventId", it) }
         }
+    }
 
+    // Helper for adding string headers safely
+    private fun org.apache.kafka.common.header.Headers.addString(key: String, value: String) {
+        add(RecordHeader(key, value.toByteArray(StandardCharsets.UTF_8)))
     }
 }
-
-
-

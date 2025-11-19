@@ -1,95 +1,67 @@
 package com.dogancaglar.paymentservice.application.events
 
-import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
-import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
+import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.LocalDateTime
 
-/**
- * Domain event published when PSP result is updated for a payment order.
- * 
- * This event is only created through the factory method to ensure invariants are maintained.
- * The @JsonCreator annotation allows Jackson to deserialize from JSON (e.g., Kafka messages).
- */
+
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class PaymentOrderPspResultUpdated private @JsonCreator constructor(
-    @JsonProperty("paymentOrderId") override val paymentOrderId: String,
-    @JsonProperty("publicPaymentOrderId") override val publicPaymentOrderId: String,
-    @JsonProperty("paymentId") override val paymentId: String,
-    @JsonProperty("publicPaymentId") override val publicPaymentId: String,
-    @JsonProperty("sellerId") override val sellerId: String,
-    @JsonProperty("amountValue") override val amountValue: Long,
-    @JsonProperty("currency") override val currency: String,
-    @JsonProperty("status") override val status: String, // last known domain status (from request)
-    @JsonProperty("createdAt") override val createdAt: LocalDateTime,
-    @JsonProperty("updatedAt") override val updatedAt: LocalDateTime,
-    @JsonProperty("retryCount") override val retryCount: Int, // attempt index (0..n)
-    // PSP result payload (minimal, enough for Applier to decide)
-    @JsonProperty("pspStatus") val pspStatus: String, // maps to PaymentOrderStatus via PSPStatusMapper
-    @JsonProperty("pspErrorCode") val pspErrorCode: String? = null,
-    @JsonProperty("pspErrorDetail") val pspErrorDetail: String? = null,
-    @JsonProperty("latencyMs") val latencyMs: Long? = null
-) : PaymentOrderEvent {
-    
+data class PaymentOrderPspResultUpdated private constructor(
+    override val paymentOrderId: String,
+    override val publicPaymentOrderId: String,
+    override val paymentId: String,
+    override val publicPaymentId: String,
+    override val sellerId: String,
+    override val amountValue: Long,
+    override val currency: String,
+    val pspStatus: String,
+    val latencyMs: Long,
+    override val timestamp: LocalDateTime
+) : PaymentOrderEvent() {
+
+    override val eventType = EVENT_TYPE
+
+    override fun deterministicEventId(): String =
+        "$publicPaymentOrderId:$eventType:$pspStatus"
+
     companion object {
-        /**
-         * Factory method to create PaymentOrderPspResultUpdated event.
-         * 
-         * @param paymentOrderId Internal payment order ID
-         * @param publicPaymentOrderId Public payment order ID
-         * @param paymentId Internal payment ID
-         * @param publicPaymentId Public payment ID
-         * @param sellerId Seller/merchant ID
-         * @param amountValue Amount in minor currency units
-         * @param currency Currency code
-         * @param status Payment order status (last known domain status from request)
-         * @param createdAt Timestamp when payment order was created
-         * @param updatedAt Timestamp when payment order was last updated
-         * @param retryCount Number of retry attempts
-         * @param pspStatus PSP status (maps to PaymentOrderStatus via PSPStatusMapper)
-         * @param retryReason Reason for retry (optional)
-         * @param lastErrorMessage Last error message (optional)
-         * @param pspErrorCode PSP error code (optional)
-         * @param pspErrorDetail PSP error detail (optional)
-         * @param latencyMs Latency in milliseconds (optional)
-         * @return PaymentOrderPspResultUpdated event instance
-         */
-        fun create(
-            paymentOrderId: String,
-            paymentId: String,
-            sellerId: String,
-            amountValue: Long,
-            currency: String,
-            status: String,
-            createdAt: LocalDateTime,
-            updatedAt: LocalDateTime,
-            retryCount: Int,
+        const val EVENT_TYPE = "payment_order_psp_result_updated"
+
+        fun from(
+            cmd: PaymentOrderCaptureCommand,
             pspStatus: String,
-            pspErrorCode: String? = null,
-            pspErrorDetail: String? = null,
-            latencyMs: Long? = null
-        ): PaymentOrderPspResultUpdated {
-            return PaymentOrderPspResultUpdated(
-                paymentOrderId = paymentOrderId,
-                publicPaymentOrderId = PaymentOrderId(paymentOrderId.toLong()).toPublicPaymentOrderId(),
-                paymentId = paymentId,
-                publicPaymentId = PaymentId(paymentId.toLong()).toPublicPaymentId(),
-                sellerId = sellerId,
-                amountValue = amountValue,
-                currency = currency,
-                status = status,
-                createdAt = createdAt,
-                updatedAt = updatedAt,
-                retryCount = retryCount,
+            latencyMs: Long,
+            now: LocalDateTime
+        ): PaymentOrderPspResultUpdated =
+            PaymentOrderPspResultUpdated(
+                paymentOrderId = cmd.paymentOrderId,
+                publicPaymentOrderId = cmd.publicPaymentOrderId,
+                paymentId = cmd.paymentId,
+                publicPaymentId = cmd.publicPaymentId,
+                sellerId = cmd.sellerId,
+                amountValue = cmd.amountValue,
+                currency = cmd.currency,
                 pspStatus = pspStatus,
-                pspErrorCode = pspErrorCode,
-                pspErrorDetail = pspErrorDetail,
-                latencyMs = latencyMs
+                latencyMs = latencyMs,
+                timestamp = now
             )
-        }
+
+        @JsonCreator
+        internal fun fromJson(
+            @JsonProperty("paymentOrderId") pOrderId: String,
+            @JsonProperty("publicPaymentOrderId") pubOrderId: String,
+            @JsonProperty("paymentId") pId: String,
+            @JsonProperty("publicPaymentId") pubPId: String,
+            @JsonProperty("sellerId") sellerId: String,
+            @JsonProperty("amountValue") amount: Long,
+            @JsonProperty("currency") currency: String,
+            @JsonProperty("pspStatus") pspStatus: String,
+            @JsonProperty("latencyMs") latencyMs: Long,
+            @JsonProperty("timestamp") timestamp: LocalDateTime
+        ) = PaymentOrderPspResultUpdated(
+            pOrderId, pubOrderId, pId, pubPId, sellerId, amount, currency, pspStatus, latencyMs, timestamp
+        )
     }
 }

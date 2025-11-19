@@ -24,8 +24,9 @@ class PaymentOrderModificationTxAdapter(
         return persisted
     }
 
+
     @Transactional(timeout = 2)
-    override fun markAsCapturePending(order: PaymentOrder): PaymentOrder {
+    override fun markAsCapturePending(order: String): PaymentOrder {
         val draft = order.markCaptureDeclined()
             .incrementRetry()
             .withUpdateAt(LocalDateTime.now(clock))

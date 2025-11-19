@@ -1,18 +1,27 @@
 package com.dogancaglar.common.logging
 
 
+import com.dogancaglar.common.event.Event
 import com.dogancaglar.common.event.EventEnvelope
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import java.util.*
 
-object LogContext {
-    private val logger = LoggerFactory.getLogger(LogContext::class.java)
-    fun getTraceId(): String? = MDC.get(GenericLogFields.TRACE_ID)
-    fun getEventId(): UUID? =
-        MDC.get(GenericLogFields.EVENT_ID)?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+object EventLogContext {
+    private val logger = LoggerFactory.getLogger(EventLogContext::class.java)
+    fun getTraceId(): String = MDC.get(GenericLogFields.TRACE_ID)
+    fun getEventId(): String? =
+        MDC.get(GenericLogFields.EVENT_ID)
+    fun getParentEventId(): String? =
+        MDC.get(GenericLogFields.PARENT_EVENT_ID)
 
-    fun <T> with(
+    fun getAggregateId(): String? =
+        MDC.get(GenericLogFields.AGGREGATE_ID)
+
+    fun getEventType(): String? =
+        MDC.get(GenericLogFields.EVENT_TYPE)
+
+    fun <T : Event> with(
         envelope: EventEnvelope<T>,
         additionalContext: Map<String, String> = emptyMap(),
         block: () -> Unit
@@ -21,11 +30,11 @@ object LogContext {
         val previous = MDC.getCopyOfContextMap()
         try {
             MDC.put(GenericLogFields.TRACE_ID, envelope.traceId)
-            MDC.put(GenericLogFields.EVENT_ID, envelope.eventId.toString())
+            MDC.put(GenericLogFields.EVENT_ID, envelope.eventId)
             MDC.put(GenericLogFields.AGGREGATE_ID, envelope.aggregateId)
             MDC.put(GenericLogFields.EVENT_TYPE, envelope.eventType)
             envelope.parentEventId?.let {
-                MDC.put(GenericLogFields.PARENT_EVENT_ID, it.toString())
+                MDC.put(GenericLogFields.PARENT_EVENT_ID, it)
             }
             additionalContext.forEach(MDC::put)
             block()

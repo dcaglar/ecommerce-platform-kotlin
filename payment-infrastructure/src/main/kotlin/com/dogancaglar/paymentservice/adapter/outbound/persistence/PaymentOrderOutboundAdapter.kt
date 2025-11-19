@@ -25,6 +25,16 @@ class PaymentOrderOutboundAdapter(
         return found?.let(PaymentOrderEntityMapper::toDomain)
     }
 
+    override fun updateReturningIdempotentEnqueuer(paymentOrderId: Long): PaymentOrder? {
+        val updated = paymentOrderMapper.updateReturningIdempotentEnqueuer(paymentOrderId)
+        if (updated != null) return PaymentOrderEntityMapper.toDomain(updated)
+
+        // No row updated →  missing. Re-read to reflect truth if present.
+        val found = paymentOrderMapper.findByPaymentOrderId(paymentOrderId).firstOrNull()
+        return found?.let(PaymentOrderEntityMapper::toDomain)
+    }
+
+
 
     override fun insertAll(orders: List<PaymentOrder>): Unit {
         val entities = orders.map { PaymentOrderEntityMapper.toEntity(it) }

@@ -143,17 +143,17 @@ ecommerce-platform-kotlin/
 │   │   │       └── PaymentLine.kt
 │   │   ├── event/                        # Domain events
 │   │   │   ├── PaymentOrderCreated.kt
-│   │   │   ├── PaymentOrderSucceeded.kt
+│   │   │   ├── PaymentOrderFinalized.kt
 │   │   │   ├── PaymentOrderFailed.kt
 │   │   │   ├── PaymentOrderPspCallRequested.kt
 │   │   │   ├── PaymentOrderPspResultUpdated.kt
 │   │   │   ├── PaymentOrderStatusCheckRequested.kt
 │   │   │   ├── PaymentOrderEvent.kt      # Base event interface
-│   │   │   ├── PaymentEvent.kt
+│   │   │   ├── PaymentOrderEvent.kt
 │   │   │   ├── LedgerEntriesRecorded.kt  # Ledger confirmation event
 │   │   │   ├── LedgerEvent.kt
 │   │   │   ├── OutboxEvent.kt            # Outbox event wrapper
-│   │   │   └── EventMetadatas.kt         # Event metadata registry
+│   │   │   └── PaymentEventMetadataCatalog.kt         # Event metadata registry
 │   │   ├── commands/                     # Command objects
 │   │   │   ├── CreatePaymentCommand.kt
 │   │   │   ├── LedgerRecordingCommand.kt

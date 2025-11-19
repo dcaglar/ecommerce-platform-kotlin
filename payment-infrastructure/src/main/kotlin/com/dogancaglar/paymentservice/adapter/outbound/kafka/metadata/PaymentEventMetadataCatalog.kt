@@ -1,18 +1,17 @@
-package com.dogancaglar.paymentservice.application.metadata
+package com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.event.EventMetadata
+import com.dogancaglar.common.event.metadata.EventMetadata
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
-import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
+import com.dogancaglar.paymentservice.application.events.PaymentPipelineAuthorized
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
-import com.dogancaglar.paymentservice.application.events.PaymentOrderFailed
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
-import com.dogancaglar.paymentservice.application.events.PaymentOrderSucceeded
+import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
 import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
 import com.fasterxml.jackson.core.type.TypeReference
 
-object EventMetadatas {
+object PaymentEventMetadataCatalog {
 
 
     object PaymentOrderCreatedMetadata : EventMetadata<PaymentOrderCreated> {
@@ -20,7 +19,7 @@ object EventMetadatas {
         override val eventType = EVENT_TYPE.PAYMENT_ORDER_CREATED
         override val clazz = PaymentOrderCreated::class.java
         override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderCreated>>() {}
-        override val partitionKeyExtractor = { evt: PaymentOrderCreated ->
+        override val partitionKey = { evt: PaymentOrderCreated ->
             evt.paymentOrderId   // <-- INTERNAL ID string
         }
     }
@@ -28,12 +27,12 @@ object EventMetadatas {
 
 
 
-    object PaymentAuthorizedMetadata : EventMetadata<PaymentAuthorized> {
+    object PaymentAuthorizedMetadata : EventMetadata<PaymentPipelineAuthorized> {
         override val topic = Topics.PAYMENT_AUTHORIZED
         override val eventType = EVENT_TYPE.PAYMENT_AUTHORIZED
-        override val clazz = PaymentAuthorized::class.java
-        override val typeRef = object : TypeReference<EventEnvelope<PaymentAuthorized>>() {}
-        override val partitionKeyExtractor = { evt: PaymentAuthorized ->
+        override val clazz = PaymentPipelineAuthorized::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<PaymentPipelineAuthorized>>() {}
+        override val partitionKey = { evt: PaymentPipelineAuthorized ->
             evt.paymentId   // <-- INTERNAL ID string
         }
     }
@@ -43,7 +42,7 @@ object EventMetadatas {
         override val eventType = EVENT_TYPE.PAYMENT_ORDER_CAPTURE_REQUESTED
         override val clazz = PaymentOrderCaptureCommand::class.java
         override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderCaptureCommand>>() {}
-        override val partitionKeyExtractor = { evt: PaymentOrderCaptureCommand ->
+        override val partitionKey = { evt: PaymentOrderCaptureCommand ->
             evt.paymentOrderId
         }
     }
@@ -53,27 +52,17 @@ object EventMetadatas {
         override val eventType = EVENT_TYPE.PAYMENT_ORDER_PSP_RESULT_UPDATED
         override val clazz = PaymentOrderPspResultUpdated::class.java
         override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderPspResultUpdated>>() {}
-        override val partitionKeyExtractor = { evt: PaymentOrderPspResultUpdated ->
+        override val partitionKey = { evt: PaymentOrderPspResultUpdated ->
             evt.paymentOrderId
         }
     }
 
-    object PaymentOrderSucceededMetadata : EventMetadata<PaymentOrderSucceeded> {
+    object PaymentOrderFinalizedMetadata : EventMetadata<PaymentOrderFinalized> {
         override val topic = Topics.PAYMENT_ORDER_FINALIZED
-        override val eventType = EVENT_TYPE.PAYMENT_ORDER_SUCCEDED
-        override val clazz = PaymentOrderSucceeded::class.java
-        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderSucceeded>>() {}
-        override val partitionKeyExtractor = { evt: PaymentOrderSucceeded ->
-            evt.paymentOrderId
-        }
-    }
-
-    object PaymentOrderFailedMetadata : EventMetadata<PaymentOrderFailed> {
-        override val topic = Topics.PAYMENT_ORDER_FINALIZED
-        override val eventType = EVENT_TYPE.PAYMENT_ORDER_FAILED
-        override val clazz = PaymentOrderFailed::class.java
-        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderFailed>>() {}
-        override val partitionKeyExtractor = { evt: PaymentOrderFailed ->
+        override val eventType = EVENT_TYPE.PAYMENT_ORDER_FINALIZED
+        override val clazz = PaymentOrderFinalized::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderFinalized>>() {}
+        override val partitionKey = { evt: PaymentOrderFinalized ->
             evt.paymentOrderId
         }
     }
@@ -83,7 +72,7 @@ object EventMetadatas {
         override val eventType = EVENT_TYPE.LEDGER_RECORDING_REQUESTED
         override val clazz = LedgerRecordingCommand::class.java
         override val typeRef = object : TypeReference<EventEnvelope<LedgerRecordingCommand>>() {}
-        override val partitionKeyExtractor = { evt: LedgerRecordingCommand ->
+        override val partitionKey = { evt: LedgerRecordingCommand ->
             evt.sellerId
         }
     }
@@ -93,7 +82,7 @@ object EventMetadatas {
         override val eventType = EVENT_TYPE.LEDGER_ENTRIES_RECORDED
         override val clazz = LedgerEntriesRecorded::class.java
         override val typeRef = object : TypeReference<EventEnvelope<LedgerEntriesRecorded>>() {}
-        override val partitionKeyExtractor = { evt: LedgerEntriesRecorded ->
+        override val partitionKey = { evt: LedgerEntriesRecorded ->
             evt.sellerId
         }
     }
@@ -105,8 +94,7 @@ object EventMetadatas {
         PaymentAuthorizedMetadata,
         PaymentOrderCreatedMetadata,
         PaymentOrderCaptureCommandMetadata,
-        PaymentOrderSucceededMetadata,
-        PaymentOrderFailedMetadata,
+        PaymentOrderFinalizedMetadata,
         PaymentOrderPspResultUpdatedMetadata,
         LedgerRecordingCommandMetadata,
         LedgerEntriesRecordedMetadata

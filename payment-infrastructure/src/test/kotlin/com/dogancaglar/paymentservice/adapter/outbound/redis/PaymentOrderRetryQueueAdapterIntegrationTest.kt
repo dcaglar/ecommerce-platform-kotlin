@@ -143,7 +143,7 @@ class PaymentOrderRetryQueueAdapterIntegrationTest {
         
         val retryItem = polled[0]
         assertEquals("123", retryItem.envelope.data.paymentOrderId)
-        assertEquals(1, retryItem.envelope.data.retryCount)
+        assertEquals(1, retryItem.envelope.data.attempt)
     }
 
     @Test
@@ -395,7 +395,7 @@ class PaymentOrderRetryQueueAdapterIntegrationTest {
         val expectedPublicPaymentOrderId = PaymentOrderId(789L).toPublicPaymentOrderId()
         assertEquals(expectedPublicPaymentOrderId, data.publicPaymentOrderId)
 
-        assertEquals(3, data.retryCount)
+        assertEquals(3, data.attempt)
     }
 }
 

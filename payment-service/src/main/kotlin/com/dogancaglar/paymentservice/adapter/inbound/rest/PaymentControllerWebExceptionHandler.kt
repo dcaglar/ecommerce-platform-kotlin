@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.servlet.NoHandlerFoundException
 import org.springframework.web.servlet.resource.NoResourceFoundException
 import org.springframework.transaction.TransactionTimedOutException
-import io.github.resilience4j.bulkhead.BulkheadFullException
 import org.postgresql.util.PSQLException
 import org.postgresql.util.PSQLState
 import java.time.Instant

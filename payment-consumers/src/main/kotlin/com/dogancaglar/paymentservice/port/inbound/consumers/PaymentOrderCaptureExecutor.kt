@@ -1,14 +1,14 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.paymentservice.application.metadata.CONSUMER_GROUPS
-import com.dogancaglar.common.event.DomainEventEnvelopeFactory
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
+import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.application.metadata.Topics
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
+import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
-import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
@@ -25,6 +25,8 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
+import java.time.Clock
+import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
 
 @Component
@@ -34,7 +36,8 @@ class PaymentOrderCaptureExecutor(
     @param:Qualifier("syncPaymentTx") private val kafkaTx: KafkaTxExecutor,
     @param:Qualifier("syncPaymentEventPublisher") private val publisher: EventPublisherPort,
     private val paymentOrderRepository: PaymentOrderRepository, //read only
-    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
+    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
+    private  val clock: Clock
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -59,20 +62,20 @@ class PaymentOrderCaptureExecutor(
         val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
         val groupMeta = consumer.groupMetadata()
 
-        LogContext.with(env) {
+        EventLogContext.with(env) {
             val current = paymentOrderRepository
                 .findByPaymentOrderId(PaymentOrderId(work.paymentOrderId.toLong()))
                 .firstOrNull()
             if (current == null) {
                 logger.warn(
                     "Dropping PSP call: no PaymentOrder row found for agg={} attempt={}",
-                    env.aggregateId, work.retryCount
+                    env.aggregateId, work.attempt
                 )
                 kafkaTx.run(offsets, groupMeta) {}
                 return@with
             }
 
-            val attempt = work.retryCount
+            val attempt = work.attempt
             if (current.retryCount > attempt) {
                 logger.warn(
                     "Dropping PSP call: stale attempt agg={} dbRetryCount={} > eventRetryCount={}",
@@ -82,37 +85,19 @@ class PaymentOrderCaptureExecutor(
                 return@with
             }
             // Build domain snapshot (no DB load)
-            val orderForPsp: PaymentOrder = paymentOrderDomainEventMapper.fromEvent(work)
 
             // Call PSP (adapter handles timeouts/interrupts)
             var mappedStatus: PaymentOrderStatus? = null
             var errorCode: String? = null
             var errorDetail: String? = null
             val startMs = System.currentTimeMillis()
-            mappedStatus = captureClient.capture(orderForPsp)
+            mappedStatus = captureClient.capture(current)
             val tookMs = System.currentTimeMillis() - startMs
             pspLatency.record(tookMs, TimeUnit.MILLISECONDS)
             // Build result-updated event (extends PaymentOrderEvent)
-            val result = PaymentOrderPspResultUpdated.create(
-                paymentOrderId = work.paymentOrderId,
-                paymentId = work.paymentId,
-                sellerId = work.sellerId,
-                amountValue = work.amountValue,
-                currency = work.currency,
-                status = work.status,               // last known status
-                createdAt = work.createdAt,
-                updatedAt = work.updatedAt,
-                retryCount = work.retryCount,       // attempt index (0..n)
-                pspStatus = mappedStatus.name,      // will be interpreted by the Applier
-                pspErrorCode = errorCode,
-                pspErrorDetail = errorDetail,
-                latencyMs = tookMs
-            )
-
-            val outEnv = DomainEventEnvelopeFactory.envelopeFor(
+           val result= PaymentOrderPspResultUpdated.from(work,mappedStatus.name,tookMs, LocalDateTime.now(clock))
+            val outEnv = EventEnvelopeFactory.envelopeFor(
                 data = result,
-                eventMetaData = EventMetadatas
-                    .PaymentOrderPspResultUpdatedMetadata,
                 aggregateId = work.paymentOrderId,          // key = paymentOrderId
                 traceId = env.traceId,
                 parentEventId = env.eventId
@@ -121,16 +106,14 @@ class PaymentOrderCaptureExecutor(
             // Publish PSP_RESULT_UPDATED under Kafka tx, then commit offsets
             kafkaTx.run(offsets, groupMeta) {
                 publisher.publishSync(
-                    preSetEventIdFromCaller = outEnv.eventId,
                     aggregateId = outEnv.aggregateId,
-                    eventMetaData = EventMetadatas.PaymentOrderPspResultUpdatedMetadata,
                     data = result,
                     traceId = outEnv.traceId,
                     parentEventId = outEnv.parentEventId
                 )
                 logger.info(
-                    "📤 Published PSP_RESULT_UPDATED attempt={} agg={} traceId={}",
-                    result.retryCount, outEnv.aggregateId, outEnv.traceId
+                    "📤 Published PSP_RESULT_UPDATED agg={} traceId={},psp status {}",
+                  outEnv.aggregateId, outEnv.traceId,outEnv,result.pspStatus
                 )
             }
         }

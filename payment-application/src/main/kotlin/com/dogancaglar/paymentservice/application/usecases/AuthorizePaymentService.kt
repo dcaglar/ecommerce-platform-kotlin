@@ -1,9 +1,8 @@
 package com.dogancaglar.paymentservice.application.usecases
 
-import com.dogancaglar.common.event.DomainEventEnvelopeFactory
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.common.event.EventEnvelopeFactory
+import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.constants.PaymentLogFields
-import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.domain.commands.CreatePaymentCommand
@@ -62,7 +61,7 @@ class AuthorizePaymentService(
             else -> payment
         }
 
-        // 5️⃣ On success: persist outcome + emit Outbox<PaymentAuthorized>
+        // 5️⃣ On success: persist outcome + emit Outbox<PaymentPipelineAuthorized>
         if (updated.status == PaymentStatus.AUTHORIZED) {
             paymentRepository.updatePayment(updated)
             val paymentAuthorized = toOutboxEvent(updated,cmd.paymentLines)
@@ -76,10 +75,9 @@ class AuthorizePaymentService(
 
     private fun toOutboxEvent(updated: Payment,paymentLines: List<PaymentLine>): OutboxEvent {
         val paymentAuthorizedEvent = paymentOrderDomainEventMapper.toPaymentAuthorized(updated,paymentLines)
-        val envelope = DomainEventEnvelopeFactory.envelopeFor(
-            traceId = LogContext.getTraceId() ?: UUID.randomUUID().toString(),
+        val envelope = EventEnvelopeFactory.envelopeFor(
+            traceId = EventLogContext.getTraceId() ?: UUID.randomUUID().toString(),
             data = paymentAuthorizedEvent,
-            eventMetaData = EventMetadatas.PaymentAuthorizedMetadata,
             aggregateId = updated.paymentId.value.toString()
         )
 
@@ -87,7 +85,7 @@ class AuthorizePaymentService(
             PaymentLogFields.PUBLIC_PAYMENT_ID to updated.paymentId.toPublicPaymentId()
         )
 
-        LogContext.with(envelope, additionalContext = extraLogFields) {
+        EventLogContext.with(envelope, additionalContext = extraLogFields) {
             logger.debug(
                 "Creating OutboxEvent for eventType={}, aggregateId={}, eventId={}",
                 envelope.eventType,

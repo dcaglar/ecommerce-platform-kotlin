@@ -1,9 +1,8 @@
 package com.dogancaglar.paymentservice.application.usecases
 
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
-import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
@@ -33,8 +32,8 @@ open class RecordLedgerEntriesService(
 
     override fun recordLedgerEntries(event: LedgerRecordingCommand) {
         val createdAt = LocalDateTime.now(clock)
-        val traceId = LogContext.getTraceId() ?: UUID.randomUUID().toString()
-        val parentEventId = LogContext.getEventId()
+        val traceId = EventLogContext.getTraceId() ?: UUID.randomUUID().toString()
+        val parentEventId = EventLogContext.getEventId()
 
         val amount = Amount.of(event.amountValue, Currency(event.currency))
         val merchantAccount = Account.fromProfile(
@@ -50,7 +49,7 @@ open class RecordLedgerEntriesService(
             accountDirectory.getAccountProfile(AccountType.PSP_RECEIVABLES, "GLOBAL")
         )
 
-        val journalEntries: List<JournalEntry> = when (event.status.uppercase()) {
+        val journalEntries: List<JournalEntry> = when (event.finalStatus.uppercase()) {
             PaymentStatus.AUTHORIZED.name ->
                     JournalEntry.authHold(
                         journalIdentifier = event.paymentId,
@@ -93,21 +92,11 @@ open class RecordLedgerEntriesService(
             LedgerDomainEventMapper.toLedgerEntryEventData(it)
         }
 
-        // 4️⃣ Build and publish domain event
-        val recordedEvent = LedgerEntriesRecorded.create(
-            ledgerBatchId = "ledger-batch-${UUID.randomUUID()}",
-            paymentOrderId = event.paymentOrderId,
-            sellerId = event.sellerId,
-            currency = event.currency,
-            status = event.status,
-            recordedAt = createdAt,
-            ledgerEntries = ledgerEntryEventDataList,
-            traceId = traceId,
-            parentEventId = parentEventId?.toString()
-        )
+
+
+        val recordedEvent = LedgerEntriesRecorded.from(event,"ledger-batch-${UUID.randomUUID()}",ledgerEntryEventDataList,createdAt)
 
         eventPublisherPort.publishSync(
-            eventMetaData = EventMetadatas.LedgerEntriesRecordedMetadata,
             aggregateId = event.sellerId,
             data = recordedEvent,
             parentEventId = parentEventId,

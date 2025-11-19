@@ -1,9 +1,8 @@
 package com.dogancaglar.paymentservice.application.usecases
 
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
-import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountCategory
@@ -79,10 +78,9 @@ class RecordLedgerEntriesServiceTest {
         val recordedEventSlot = slot<LedgerEntriesRecorded>()
         every {
             eventPublisherPort.publishSync(
-                eventMetaData = EventMetadatas.LedgerEntriesRecordedMetadata,
                 aggregateId = command.sellerId,
                 data = capture(recordedEventSlot),
-                parentEventId = eventId,
+                parentEventId = eventId.toString(),
                 traceId = traceId
             )
         } returns mockk()
@@ -96,7 +94,7 @@ class RecordLedgerEntriesServiceTest {
         val recordedEvent = recordedEventSlot.captured
         assertTrue(recordedEvent.ledgerBatchId.startsWith("ledger-batch-"))
         assertEquals(command.paymentOrderId, recordedEvent.paymentOrderId)
-        assertEquals(1, recordedEvent.entryCount)
+        assertEquals(1, recordedEvent.ledgerEntries.size)
 
         val ledgerEntryEvent = recordedEvent.ledgerEntries.single()
         assertEquals(1000L, ledgerEntryEvent.ledgerEntryId)
@@ -107,16 +105,13 @@ class RecordLedgerEntriesServiceTest {
         verify(exactly = 1) { ledgerWritePort.postLedgerEntriesAtomic(any()) }
         verify(exactly = 1) {
             eventPublisherPort.publishSync<LedgerEntriesRecorded>(
-                preSetEventIdFromCaller = null,
                 aggregateId = command.sellerId,
-                eventMetaData = EventMetadatas.LedgerEntriesRecordedMetadata,
                 data = any(),
                 traceId = traceId,
-                parentEventId = eventId,
-                timeoutSeconds = 5
+                parentEventId = eventId.toString()
             )
         }
-        unmockkObject(LogContext)
+        unmockkObject(EventLogContext)
     }
 
     @Test
@@ -135,10 +130,9 @@ class RecordLedgerEntriesServiceTest {
         val recordedEventSlot = slot<LedgerEntriesRecorded>()
         every {
             eventPublisherPort.publishSync(
-                eventMetaData = EventMetadatas.LedgerEntriesRecordedMetadata,
                 aggregateId = command.sellerId,
                 data = capture(recordedEventSlot),
-                parentEventId = eventId,
+                parentEventId = eventId.toString(),
                 traceId = traceId
             )
         } returns mockk()
@@ -150,7 +144,7 @@ class RecordLedgerEntriesServiceTest {
         assertEquals(4, captureEntry.journalEntry.postings.size)
 
         val event = recordedEventSlot.captured
-        assertEquals(1, event.entryCount)
+        assertEquals(1, event.ledgerEntries.size)
         assertEquals("CAPTURE:${command.paymentOrderId}", event.ledgerEntries.single().journalEntryId)
 
         val postings = event.ledgerEntries.single().postings
@@ -168,30 +162,36 @@ class RecordLedgerEntriesServiceTest {
         verify(exactly = 1) { ledgerWritePort.postLedgerEntriesAtomic(any()) }
         verify(exactly = 1) {
             eventPublisherPort.publishSync<LedgerEntriesRecorded>(
-                preSetEventIdFromCaller = null,
                 aggregateId = command.sellerId,
-                eventMetaData = EventMetadatas.LedgerEntriesRecordedMetadata,
                 data = any(),
                 traceId = traceId,
-                parentEventId = eventId,
-                timeoutSeconds = 5
+                parentEventId = eventId.toString()
             )
         }
-        unmockkObject(LogContext)
+        unmockkObject(EventLogContext)
     }
 
     @Test
     fun `recordLedgerEntries skips publishing when journal entries are empty`() {
+        mockkObject(EventLogContext)
+        every { EventLogContext.getTraceId() } returns "test-trace"
+        every { EventLogContext.getEventId() } returns null
+        
         listOf("FAILED_FINAL", "FAILED").forEach { status ->
             service.recordLedgerEntries(sampleCommand(status))
         }
 
         verify { ledgerWritePort wasNot Called }
         verify { eventPublisherPort wasNot Called }
+        unmockkObject(EventLogContext)
     }
 
     @Test
     fun `recordLedgerEntries returns when persistence yields no entries`() {
+        mockkObject(EventLogContext)
+        every { EventLogContext.getTraceId() } returns "test-trace"
+        every { EventLogContext.getEventId() } returns null
+        
         val command = sampleCommand(PaymentStatus.AUTHORIZED.name)
         every { ledgerWritePort.postLedgerEntriesAtomic(any()) } returns emptyList()
 
@@ -199,6 +199,7 @@ class RecordLedgerEntriesServiceTest {
 
         verify(exactly = 1) { ledgerWritePort.postLedgerEntriesAtomic(any()) }
         verify { eventPublisherPort wasNot Called }
+        unmockkObject(EventLogContext)
     }
 
     @Test
@@ -215,10 +216,9 @@ class RecordLedgerEntriesServiceTest {
         }
         every {
             eventPublisherPort.publishSync(
-                eventMetaData = EventMetadatas.LedgerEntriesRecordedMetadata,
                 aggregateId = command.sellerId,
                 data = any(),
-                parentEventId = eventId,
+                parentEventId = eventId.toString(),
                 traceId = traceId
             )
         } throws RuntimeException("publish failed")
@@ -227,39 +227,37 @@ class RecordLedgerEntriesServiceTest {
             service.recordLedgerEntries(command)
         }
         assertEquals("publish failed", thrown.message)
-        unmockkObject(LogContext)
+        unmockkObject(EventLogContext)
 
         verify(exactly = 1) { ledgerWritePort.postLedgerEntriesAtomic(any()) }
         verify(exactly = 1) {
             eventPublisherPort.publishSync<LedgerEntriesRecorded>(
-                preSetEventIdFromCaller = null,
                 aggregateId = command.sellerId,
-                eventMetaData = EventMetadatas.LedgerEntriesRecordedMetadata,
                 data = any(),
                 traceId = traceId,
-                parentEventId = eventId,
-                timeoutSeconds = 5
+                parentEventId = eventId.toString()
             )
         }
     }
 
-    private fun sampleCommand(status: String) = LedgerRecordingCommand(
-        paymentOrderId = "po-123",
-        paymentId = "pay-456",
-        sellerId = "seller-789",
-        amountValue = 10_000L,
+    private fun sampleCommand(status: String) = LedgerRecordingCommand.fromJson(
+        pOrderId = "po-123",
+        pubOrderId = "paymentorder-po-123",
+        pId = "pay-456",
+        pubPId = "payment-pay-456",
+        seller = "seller-789",
+        amount = 10_000L,
         currency = "EUR",
-        status = status,
-        createdAt = LocalDateTime.now(clock),
-        updatedAt = LocalDateTime.now(clock)
+        finalStatus = status,
+        timestamp = LocalDateTime.now(clock)
     )
 
-    private fun withMockedLogContext(): Pair<UUID, String> {
-        val expectedEventId = UUID.randomUUID()
-        val expectedTraceId = "trace-${expectedEventId.toString().take(8)}"
-        mockkObject(LogContext)
-        every { LogContext.getEventId() } returns expectedEventId
-        every { LogContext.getTraceId() } returns expectedTraceId
+    private fun withMockedLogContext(): Pair<String, String> {
+        val expectedEventId = UUID.randomUUID().toString()
+        val expectedTraceId = "trace-${expectedEventId.take(8)}"
+        mockkObject(EventLogContext)
+        every { EventLogContext.getEventId() } returns expectedEventId
+        every { EventLogContext.getTraceId() } returns expectedTraceId
         return expectedEventId to expectedTraceId
     }
 

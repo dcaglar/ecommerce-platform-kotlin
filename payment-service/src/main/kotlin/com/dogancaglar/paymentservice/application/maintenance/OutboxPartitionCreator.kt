@@ -1,13 +1,12 @@
 package com.dogancaglar.paymentservice.application.maintenance
 
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.common.logging.EventLogContext
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.context.annotation.DependsOn
 import org.springframework.context.event.EventListener
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.scheduling.annotation.Scheduled
@@ -68,7 +67,7 @@ class OutboxPartitionCreator(
         val toStr = to.format(sqlFormatter)
 
         val mdcContext = mapOf("partitionName" to partitionName, "from" to fromStr, "to" to toStr)
-        LogContext.with(mdcContext) {
+        EventLogContext.with(mdcContext) {
             val sql = """
                 CREATE TABLE IF NOT EXISTS $partitionName
                 PARTITION OF outbox_event
@@ -135,7 +134,7 @@ class OutboxPartitionCreator(
         val mdcContext = mapOf(
             "currWindowStart" to currWindowStart.toString(),
         )
-        LogContext.with(mdcContext) {
+        EventLogContext.with(mdcContext) {
             val sql = """
             DO $$
             DECLARE

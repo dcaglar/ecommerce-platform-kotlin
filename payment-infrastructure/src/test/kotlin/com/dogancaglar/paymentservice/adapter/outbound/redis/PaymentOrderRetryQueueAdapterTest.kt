@@ -1,6 +1,8 @@
 package com.dogancaglar.paymentservice.adapter.outbound.redis
 
 import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.common.event.EventEnvelopeFactory
+import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
@@ -14,7 +16,9 @@ import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.mockk.*
@@ -47,10 +51,17 @@ class PaymentOrderRetryQueueAdapterTest {
         meterRegistry = SimpleMeterRegistry()
         objectMapper = ObjectMapper().apply {
             registerModule(JavaTimeModule())
+            registerKotlinModule()
+            disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
         }
         
         // Mock zsetSize for gauge registration
         every { paymentOrderRetryRedisCache.zsetSize() } returns 0L
+        
+        // Mock EventLogContext
+        mockkObject(EventLogContext)
+        every { EventLogContext.getTraceId() } returns "test-trace-id"
+        every { EventLogContext.getEventId() } returns null
         
         adapter = PaymentOrderRetryQueueAdapter(
             paymentOrderRetryRedisCache,
@@ -142,7 +153,7 @@ class PaymentOrderRetryQueueAdapterTest {
         verify(exactly = 1) {
             paymentOrderRetryRedisCache.scheduleRetry(
                 match { json ->
-                    json.contains("\"retryCount\":3")
+                    json.contains("\"attempt\":3")
                 },
                 any()
             )
@@ -181,23 +192,13 @@ class PaymentOrderRetryQueueAdapterTest {
     @Test
     fun `pollDueRetriesToInflight should deserialize valid event envelopes`() {
         // Given
-        val eventEnvelope = EventEnvelope(
-            eventId = UUID.randomUUID(),
-            eventType = "payment_order_capture_requested",
-            aggregateId = "123",
-            timestamp = LocalDateTime.now(),
+        val now = LocalDateTime.now()
+        val paymentOrder = createTestPaymentOrder(id = 123L, retryCount = 1)
+        val captureCommand = PaymentOrderCaptureCommand.from(paymentOrder, attempt = 1, now = now)
+        val eventEnvelope = EventEnvelopeFactory.envelopeFor(
+            data = captureCommand,
+            aggregateId = captureCommand.paymentOrderId,
             traceId = UUID.randomUUID().toString(),
-            data = PaymentOrderCaptureCommand.create(
-                paymentOrderId = "123",
-                publicPaymentOrderId = "paymentorder-123",
-                paymentId = "999",
-                publicPaymentId = "payment-999",
-                sellerId = "111",
-                amountValue = 10000L,
-                currency = "USD",
-                status = "INITIATED_PENDING",
-                retryCount = 1
-            ),
             parentEventId = null
         )
         
@@ -233,23 +234,13 @@ class PaymentOrderRetryQueueAdapterTest {
     @Test
     fun `pollDueRetriesToInflight should handle mixed valid and invalid messages`() {
         // Given
-        val validEnvelope = EventEnvelope(
-            eventId = UUID.randomUUID(),
-            eventType = "payment_order_capture_requested",
-            aggregateId = "123",
-            timestamp = LocalDateTime.now(),
+        val now = LocalDateTime.now()
+        val paymentOrder = createTestPaymentOrder(id = 123L, retryCount = 1)
+        val captureCommand = PaymentOrderCaptureCommand.from(paymentOrder, attempt = 1, now = now)
+        val validEnvelope = EventEnvelopeFactory.envelopeFor(
+            data = captureCommand,
+            aggregateId = captureCommand.paymentOrderId,
             traceId = UUID.randomUUID().toString(),
-            data = PaymentOrderCaptureCommand.create(
-                paymentOrderId = "123",
-                publicPaymentOrderId = "paymentorder-123",
-                paymentId = "999",
-                publicPaymentId = "payment-999",
-                sellerId = "111",
-                amountValue = 10000L,
-                currency = "USD",
-                status = "INITIATED_PENDING",
-                retryCount = 1
-            ),
             parentEventId = null
         )
         

@@ -1,9 +1,9 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.paymentservice.application.metadata.CONSUMER_GROUPS
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.application.metadata.Topics
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
+import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.application.util.LedgerDomainEventMapper
@@ -53,7 +53,7 @@ class AccountBalanceConsumer(
             val groupMeta = consumer.groupMetadata()
             // Use first event's traceId for MDC (all events in batch share partition, so likely same sellerId)
             val firstEnvelope = records.first().value()
-            LogContext.with(firstEnvelope) {
+            EventLogContext.with(firstEnvelope) {
                 // Wrap in KafkaTxExecutor for atomic offset commit
                 kafkaTx.run(offsets, groupMeta) {
                     logger.info(

@@ -1,9 +1,9 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.paymentservice.application.metadata.CONSUMER_GROUPS
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.application.metadata.Topics
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
+import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
@@ -38,7 +38,7 @@ class PaymentOrderPspResultApplier(
         val tp = TopicPartition(record.topic(), record.partition())
         val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
         val groupMeta = consumer.groupMetadata()
-        LogContext.with(env) {
+        EventLogContext.with(env) {
             val mapped = PaymentOrderStatus.valueOf(result.pspStatus)
 
             kafkaTx.run(offsets, groupMeta) {

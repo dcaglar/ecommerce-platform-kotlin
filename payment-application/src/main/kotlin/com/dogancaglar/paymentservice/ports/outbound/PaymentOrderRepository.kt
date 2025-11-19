@@ -7,7 +7,8 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 
 interface PaymentOrderRepository {
     fun updateReturningIdempotent(paymentOrder: PaymentOrder): PaymentOrder?
-    fun insertAll(orders: List<PaymentOrder>)
+     fun updateReturningIdempotentEnqueuer(paymentOrderId: Long): PaymentOrder?
+        fun insertAll(orders: List<PaymentOrder>)
     fun countByPaymentId(paymentId: PaymentId): Long
     fun countByPaymentIdAndStatusIn(paymentId: PaymentId, statuses: List<String>): Long
     fun existsByPaymentIdAndStatus(paymentId: PaymentId, status: String): Boolean

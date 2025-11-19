@@ -1,12 +1,12 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.common.event.DomainEventEnvelopeFactory
+import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
-import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
@@ -25,13 +25,17 @@ import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
-import java.util.UUID
+import java.time.LocalDateTime
+import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 
 class PaymentOrderEnqueuerTest {
 
     private lateinit var kafkaTxExecutor: KafkaTxExecutor
     private lateinit var eventPublisherPort: EventPublisherPort
     private lateinit var clock: Clock
+    private lateinit var paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
     private lateinit var enqueuer: PaymentOrderEnqueuer
 
     @BeforeEach
@@ -39,11 +43,12 @@ class PaymentOrderEnqueuerTest {
         kafkaTxExecutor = mockk()
         eventPublisherPort = mockk()
         clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
+        paymentOrderDomainEventMapper = mockk()
 
         enqueuer = PaymentOrderEnqueuer(
             kafkaTx = kafkaTxExecutor,
             publisher = eventPublisherPort,
-            paymentOrderDomainEventMapper = PaymentOrderDomainEventMapper(clock)
+            paymentOrderDomainEventMapper = paymentOrderDomainEventMapper
         )
     }
 
@@ -54,24 +59,27 @@ class PaymentOrderEnqueuerTest {
         val paymentId =PaymentId(456L)
         val expectedTraceId = "trace-123"
         val expectedCreatedAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        val consumedEventId = UUID.fromString("11111111-1111-1111-1111-111111111111")
-        val parentEventId = UUID.fromString("22222222-2222-2222-2222-222222222222")
+        val consumedEventId = "11111111-1111-1111-1111-111111111111"
+        val parentEventId = "22222222-2222-2222-2222-222222222222"
         
-        val paymentOrderCreated = PaymentOrderCreated.create(
-            paymentOrderId = paymentOrderId.value.toString(),
-            paymentId = paymentId.value.toString(),
-            sellerId = SellerId("seller-123").value,
-            amountValue = 10000L,
-            currency = "USD",
-            status = PaymentOrderStatus.INITIATED_PENDING.name,
+        val paymentOrder = PaymentOrder.rehydrate(
+            paymentOrderId = paymentOrderId,
+            paymentId = paymentId,
+            sellerId = SellerId("seller-123"),
+            amount = Amount.of(10000L, Currency("USD")),
+            status = PaymentOrderStatus.INITIATED_PENDING,
+            retryCount = 0,
             createdAt = expectedCreatedAt,
-            updatedAt = expectedCreatedAt,
+            updatedAt = expectedCreatedAt
         )
+        val paymentOrderCreated = PaymentOrderDomainEventMapper(clock).toPaymentOrderCreated(paymentOrder)
         
-        val envelope = DomainEventEnvelopeFactory.envelopeFor(
-            preSetEventId = consumedEventId,
+        // Mock the mapper to return the order when fromEvent is called
+        every { paymentOrderDomainEventMapper.fromEvent(paymentOrderCreated) } returns paymentOrder
+        every { paymentOrderDomainEventMapper.toPaymentOrderCaptureCommand(paymentOrder, 0) } returns PaymentOrderDomainEventMapper(clock).toPaymentOrderCaptureCommand(paymentOrder, 0)
+        
+        val envelope = EventEnvelopeFactory.envelopeFor(
             data = paymentOrderCreated,
-            eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
             aggregateId = paymentOrderId.value.toString(),
             traceId = expectedTraceId,
             parentEventId = parentEventId
@@ -86,9 +94,9 @@ class PaymentOrderEnqueuerTest {
             envelope
         )
 
-        // Mock LogContext to allow test code execution
-        mockkObject(LogContext)
-        every { LogContext.with(any<EventEnvelope<*>>(), any(), any()) } answers { 
+        // Mock EventLogContext to allow test code execution
+        mockkObject(EventLogContext)
+        every { EventLogContext.with(any<EventEnvelope<*>>(), any(), any()) } answers {
             val lambda = thirdArg<() -> Unit>()
             lambda.invoke()
         }
@@ -97,7 +105,7 @@ class PaymentOrderEnqueuerTest {
             val lambda = thirdArg<() -> Unit>()
             lambda.invoke()
         }
-        every { eventPublisherPort.publishSync<PaymentOrderCaptureCommand>(any(), any(), any(), any(), any(), any(), any()) } returns mockk()
+        every { eventPublisherPort.publishSync<PaymentOrderCaptureCommand>(any(), any(), any(), any()) } returns mockk()
 
         // When
         val consumer = mockk<Consumer<*, *>>()
@@ -107,9 +115,7 @@ class PaymentOrderEnqueuerTest {
         // Then - verify publishSync called with exact parameters
         verify(exactly = 1) {
             eventPublisherPort.publishSync<PaymentOrderCaptureCommand>(
-                preSetEventIdFromCaller = any(),
                 aggregateId = paymentOrderId.value.toString(),
-                eventMetaData = EventMetadatas.PaymentOrderCaptureCommandMetadata,
                 data = match { data ->
                     data is PaymentOrderCaptureCommand &&
                     data.paymentOrderId == paymentOrderId.value.toString() &&
@@ -119,20 +125,19 @@ class PaymentOrderEnqueuerTest {
                     data.sellerId == SellerId("seller-123").value &&
                     data.amountValue == 10000L &&
                     data.currency == "USD" &&
-                    data.status == PaymentOrderStatus.INITIATED_PENDING.name &&
-                    data.retryCount == 0
+                    data.attempt == 0
                 },
                 traceId = expectedTraceId,
                 parentEventId = expectedParentEventId
             )
         }
         
-        // Verify LogContext was called with the correct envelope for tracing
+        // Verify EventLogContext was called with the correct envelope for tracing
         verify(exactly = 1) {
-            LogContext.with<PaymentOrderCreated>(
+            EventLogContext.with<PaymentOrderCreated>(
                 match { env ->
                     env is EventEnvelope<*> &&
-                    env.eventId == consumedEventId &&
+                    env.eventId == paymentOrderCreated.deterministicEventId() &&
                     env.aggregateId == paymentOrderId.value.toString() &&
                     env.traceId == expectedTraceId &&
                     env.parentEventId == parentEventId
@@ -148,23 +153,28 @@ class PaymentOrderEnqueuerTest {
         // Given
         val paymentOrderId = PaymentOrderId(123L)
         val expectedTraceId = "trace-456"
-        val consumedEventId = UUID.fromString("55555555-5555-5555-5555-555555555555")
-        val parentEventId = UUID.fromString("66666666-6666-6666-6666-666666666666")
-        val paymentOrderCreated = PaymentOrderCreated.create(
-            paymentOrderId = paymentOrderId.value.toString(),
-            paymentId = PaymentId(456L).value.toString(),
-            sellerId = SellerId("seller-123").value,
-            amountValue = 10000L,
-            currency = "USD",
-            status = PaymentOrderStatus.CAPTURED.name,
-            createdAt = clock.instant().atZone(clock.zone).toLocalDateTime(),
-            updatedAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-        )
+        val consumedEventId = "55555555-5555-5555-5555-555555555555"
+        val parentEventId = "66666666-6666-6666-6666-666666666666"
+        val now = clock.instant().atZone(clock.zone).toLocalDateTime()
+        val paymentId = PaymentId(456L)
         
-        val envelope = DomainEventEnvelopeFactory.envelopeFor(
-            preSetEventId = consumedEventId,
+        val paymentOrder = PaymentOrder.rehydrate(
+            paymentOrderId = paymentOrderId,
+            paymentId = paymentId,
+            sellerId = SellerId("seller-123"),
+            amount = Amount.of(10000L, Currency("USD")),
+            status = PaymentOrderStatus.CAPTURED,
+            retryCount = 0,
+            createdAt = now,
+            updatedAt = now
+        )
+        val paymentOrderCreated = PaymentOrderDomainEventMapper(clock).toPaymentOrderCreated(paymentOrder)
+        
+        // Mock the mapper to return the order when fromEvent is called
+        every { paymentOrderDomainEventMapper.fromEvent(paymentOrderCreated) } returns paymentOrder
+        
+        val envelope = EventEnvelopeFactory.envelopeFor(
             data = paymentOrderCreated,
-            eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
             aggregateId = paymentOrderId.value.toString(),
             traceId = expectedTraceId,
             parentEventId = parentEventId
@@ -178,8 +188,8 @@ class PaymentOrderEnqueuerTest {
             envelope
         )
 
-        mockkObject(LogContext)
-        every { LogContext.with(any<EventEnvelope<*>>(), any(), any()) } answers { 
+        mockkObject(EventLogContext)
+        every { EventLogContext.with(any<EventEnvelope<*>>(), any(), any()) } answers {
             val lambda = thirdArg<() -> Unit>()
             lambda.invoke()
         }
@@ -188,6 +198,8 @@ class PaymentOrderEnqueuerTest {
             val lambda = thirdArg<() -> Unit>()
             lambda.invoke()
         }
+        // Mock publishSync to return a mock envelope in case it's called (shouldn't be)
+        every { eventPublisherPort.publishSync<PaymentOrderCaptureCommand>(any(), any(), any(), any()) } returns mockk()
 
         // When
         val consumer = mockk<Consumer<*, *>>()
@@ -195,14 +207,14 @@ class PaymentOrderEnqueuerTest {
         enqueuer.onCreated(record, consumer)
 
         // Then
-        verify(exactly = 0) { eventPublisherPort.publishSync<PaymentOrderCaptureCommand>(any(), any(), any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { eventPublisherPort.publishSync<PaymentOrderCaptureCommand>(any(), any(), any(), any()) }
         
-        // Verify LogContext was called with the correct envelope for tracing
+        // Verify EventLogContext was called with the correct envelope for tracing
         verify(exactly = 1) {
-            LogContext.with<PaymentOrderCreated>(
+            EventLogContext.with<PaymentOrderCreated>(
                 match { env ->
                     env is EventEnvelope<*> &&
-                    env.eventId == consumedEventId &&
+                    env.eventId == paymentOrderCreated.deterministicEventId() &&
                     env.aggregateId == paymentOrderId.value.toString() &&
                     env.traceId == expectedTraceId &&
                     env.parentEventId == parentEventId

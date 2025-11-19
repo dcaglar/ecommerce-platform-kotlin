@@ -1,10 +1,10 @@
 package com.dogancaglar.paymentservice.adapter.outbound.redis
 
-import com.dogancaglar.common.event.DomainEventEnvelopeFactory
+import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
-import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.application.util.RetryItem
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
@@ -49,12 +49,11 @@ class PaymentOrderRetryQueueAdapter(
                 order = paymentOrder,
                 attempt = paymentOrder.retryCount
             )
-            val envelope = DomainEventEnvelopeFactory.envelopeFor(
+            val envelope = EventEnvelopeFactory.envelopeFor(
                 data = pspCallRequested,
-                eventMetaData = EventMetadatas.PaymentOrderCaptureCommandMetadata,
                 aggregateId = pspCallRequested.paymentOrderId,
-                traceId = LogContext.getTraceId() ?: UUID.randomUUID().toString(),
-                parentEventId = LogContext.getEventId()
+                traceId = EventLogContext.getTraceId() ?: UUID.randomUUID().toString(),
+                parentEventId = EventLogContext.getEventId()
             )
 
             val serializationStart = System.currentTimeMillis()
@@ -72,7 +71,6 @@ class PaymentOrderRetryQueueAdapter(
                 (redisEnd - redisStart),
                 (totalEnd - totalStart),
                 envelope.aggregateId,
-                pspCallRequested.retryCount,
                 retryAt
             )
         } catch (e: Exception) {

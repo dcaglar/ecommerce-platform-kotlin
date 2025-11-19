@@ -1,12 +1,12 @@
 package com.dogancaglar.paymentservice.application.maintenance
 
-import com.dogancaglar.common.event.DomainEventEnvelopeFactory
+import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.logging.LogContext
-import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
+import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.OutboxEventType
 import com.dogancaglar.paymentservice.application.constants.PaymentLogFields
-import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
+import com.dogancaglar.paymentservice.application.events.PaymentPipelineAuthorized
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
@@ -174,11 +174,11 @@ class OutboxDispatcherJob(
     @Transactional(transactionManager = "outboxTxManager")
     fun handlePaymentAuthorized(evt: OutboxEvent):Boolean {
         val envelopeType = objectMapper.typeFactory
-            .constructParametricType(EventEnvelope::class.java, PaymentAuthorized::class.java)
-        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentAuthorized>
+            .constructParametricType(EventEnvelope::class.java, PaymentPipelineAuthorized::class.java)
+        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentPipelineAuthorized>
         val data = envelope.data
 
-        logger.info("Expanding PaymentAuthorized → PaymentOrderCreated for paymentId=${data.paymentId}")
+        logger.info("Expanding PaymentPipelineAuthorized → PaymentOrderCreated for paymentId=${data.paymentId}")
         // Expand PaymentOrders from the authorized payload from paymentline
         val paymentOrders = data.paymentLines.map { line ->
             val sellerId = SellerId(line.sellerId)
@@ -198,7 +198,6 @@ class OutboxDispatcherJob(
         logger.info("✅ Created ${paymentOrders.size} OutboxEvent<PaymentOrderCreated> for paymentId=${data.paymentId}")
         val ok =syncPaymentEventPublisher.publishBatchAtomically(
             envelopes = listOf(envelope),
-            eventMetaData = EventMetadatas.PaymentAuthorizedMetadata,
             timeout = java.time.Duration.ofSeconds(10)
         )
         return ok
@@ -207,10 +206,9 @@ class OutboxDispatcherJob(
 
     private fun toOutboxEvent(paymentOrder: PaymentOrder): OutboxEvent {
         val paymentOrderCreatedEvent = paymentOrderDomainEventMapper.toPaymentOrderCreated(paymentOrder)
-        val envelope = DomainEventEnvelopeFactory.envelopeFor(
-            traceId = LogContext.getTraceId() ?: UUID.randomUUID().toString(),
+        val envelope = EventEnvelopeFactory.envelopeFor(
+            traceId = EventLogContext.getTraceId() ?: UUID.randomUUID().toString(),
             data = paymentOrderCreatedEvent,
-            eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
             aggregateId = paymentOrderCreatedEvent.paymentOrderId
         )
 
@@ -219,7 +217,7 @@ class OutboxDispatcherJob(
             PaymentLogFields.PUBLIC_PAYMENT_ID to paymentOrderCreatedEvent.publicPaymentId
         )
 
-        LogContext.with(envelope, additionalContext = extraLogFields) {
+        EventLogContext.with(envelope, additionalContext = extraLogFields) {
             logger.debug(
                 "Creating OutboxEvent for eventType={}, aggregateId={}, eventId={}",
                 envelope.eventType,
@@ -247,7 +245,6 @@ class OutboxDispatcherJob(
 
          val ok =syncPaymentEventPublisher.publishBatchAtomically(
             envelopes = listOf(envelope),
-            eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
             timeout = java.time.Duration.ofSeconds(10)
         )
 
@@ -267,7 +264,7 @@ class OutboxDispatcherJob(
             // Publish to capture queue topic
             syncPaymentEventPublisher.publishBatchAtomically(
                 envelopes = listOf(envelope),
-                eventMetaData = EventMetadatas.PaymentOrderCaptureCommandMetadata,
+                eventMetaData = PaymentEventMetadataCatalog.PaymentOrderCaptureCommandMetadata,
                 timeout = java.time.Duration.ofSeconds(10)
             )
 

@@ -1,11 +1,12 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers.base
 
+import com.dogancaglar.common.event.Event
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.GenericLogFields
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.common.logging.EventLogContext
 import org.apache.kafka.clients.consumer.ConsumerRecord
 
-abstract class BaseSingleKafkaConsumer<T : Any> {
+abstract class BaseSingleKafkaConsumer<T : Event> {
     abstract fun filter(envelope: EventEnvelope<T>): Boolean
     abstract fun consume(
         envelope: EventEnvelope<T>,
@@ -19,7 +20,7 @@ abstract class BaseSingleKafkaConsumer<T : Any> {
                 envelope, mapOf(
                     // Add standard fields, can be extended in subclass if needed
                     GenericLogFields.TOPIC_NAME to record.topic(),
-                    GenericLogFields.EVENT_ID to envelope.eventId.toString(),
+                    GenericLogFields.EVENT_ID to envelope.eventId,
                     GenericLogFields.AGGREGATE_ID to envelope.aggregateId,
                     GenericLogFields.TRACE_ID to envelope.traceId,
                     GenericLogFields.EVENT_TYPE to envelope.eventType
@@ -35,7 +36,7 @@ abstract class BaseSingleKafkaConsumer<T : Any> {
         additionalContext: Map<String, String> = emptyMap(),
         block: () -> Unit
     ) {
-        LogContext.with(envelope, additionalContext, block)
+        EventLogContext.with(envelope, additionalContext, block)
     }
 
     protected open fun buildLogContext(

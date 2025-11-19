@@ -1,9 +1,8 @@
 package com.dogancaglar.paymentservice.application.usecases
 
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.application.events.PaymentOrderEvent
-import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
@@ -114,27 +113,25 @@ open class ProcessPaymentService(
 
     private fun handleCapturedPaymentOrder(order: PaymentOrder) {
         val persisted = paymentOrderModificationPort.markAsCaptured(order)
-        val succeededEvent = paymentOrderDomainEventMapper.toPaymentOrderSucceeded(persisted)
+        val succeededEvent = paymentOrderDomainEventMapper.toPaymentOrderFinalized(persisted, LocalDateTime.now(clock),"SUCCESFUL")
 
         eventPublisher.publishSync(
-            eventMetaData = EventMetadatas.PaymentOrderSucceededMetadata,
             aggregateId = persisted.paymentOrderId.value.toString(),
             data = succeededEvent,
-            parentEventId = LogContext.getEventId(),
-            traceId = LogContext.getTraceId()
+            parentEventId = EventLogContext.getEventId(),
+            traceId = EventLogContext.getTraceId()
         )
     }
 
     private fun handleNonRetryableFailEvent(order: PaymentOrder) {
         val updated = paymentOrderModificationPort.markAsCaptureFailed(order)
-        val paymentOrderFailed = paymentOrderDomainEventMapper.toPaymentOrderFailed(updated)
+        val paymentOrderFailed = paymentOrderDomainEventMapper.toPaymentOrderFinalized(updated, LocalDateTime.now(clock),"FAILED")
 
         eventPublisher.publishSync(
-            eventMetaData = EventMetadatas.PaymentOrderFailedMetadata,
             aggregateId = updated.paymentOrderId.value.toString(),
             data = paymentOrderFailed,
-            parentEventId = LogContext.getEventId(),
-            traceId = LogContext.getTraceId()
+            parentEventId = EventLogContext.getEventId(),
+            traceId = EventLogContext.getTraceId()
         )
     }
 
