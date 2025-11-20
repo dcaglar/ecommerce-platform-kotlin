@@ -3,8 +3,8 @@ package com.dogancaglar.paymentservice.application.usecases
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
-import com.dogancaglar.paymentservice.application.events.PaymentOrderEvent
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
+import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
@@ -68,18 +68,17 @@ class ProcessPaymentServiceTest {
 
     @Test
     fun `processPspResult publishes success for captured status`() {
-        val event = sampleEvent(PaymentOrderStatus.CAPTURED)
-        val order = sampleOrder()
+        val event = samplePspResultEvent(PaymentOrderStatus.CAPTURED)
+        val order = sampleOrder(status = PaymentOrderStatus.CAPTURE_REQUESTED)
         val persisted = sampleOrder(status = PaymentOrderStatus.CAPTURED)
         val now = LocalDateTime.now(clock)
         val succeededEvent = PaymentOrderFinalized.from(
             order = persisted,
             now = now,
-            status = "SUCCESFUL"
+            status = PaymentOrderStatus.CAPTURED
         )
-        every { paymentOrderDomainEventMapper.fromEvent(event) } returns order
         every { paymentOrderModificationPort.markAsCaptured(order) } returns persisted
-        every { paymentOrderDomainEventMapper.toPaymentOrderFinalized(persisted, any(), "SUCCESFUL") } returns succeededEvent
+        every { paymentOrderDomainEventMapper.toPaymentOrderFinalized(persisted, any(), PaymentOrderStatus.CAPTURED) } returns succeededEvent
         every {
             eventPublisher.publishSync(
                 aggregateId = persisted.paymentOrderId.value.toString(),
@@ -89,10 +88,10 @@ class ProcessPaymentServiceTest {
             )
         } returns mockk<EventEnvelope<PaymentOrderFinalized>>()
 
-        service.processPspResult(event, PaymentOrderStatus.CAPTURED)
+        service.processPspResult(event, order)
 
         verify(exactly = 1) { paymentOrderModificationPort.markAsCaptured(order) }
-        verify(exactly = 1) { paymentOrderDomainEventMapper.toPaymentOrderFinalized(persisted, any(), "SUCCESFUL") }
+        verify(exactly = 1) { paymentOrderDomainEventMapper.toPaymentOrderFinalized(persisted, any(), PaymentOrderStatus.CAPTURED) }
         verify(exactly = 1) {
             eventPublisher.publishSync(
                 aggregateId = persisted.paymentOrderId.value.toString(),
@@ -106,19 +105,18 @@ class ProcessPaymentServiceTest {
 
     @Test
     fun `processPspResult publishes failure for capture failed status`() {
-        val event = sampleEvent(PaymentOrderStatus.CAPTURE_FAILED)
-        val order = sampleOrder()
+        val event = samplePspResultEvent(PaymentOrderStatus.CAPTURE_FAILED)
+        val order = sampleOrder(status = PaymentOrderStatus.CAPTURE_REQUESTED)
         val persisted = sampleOrder(status = PaymentOrderStatus.CAPTURE_FAILED)
         val now = LocalDateTime.now(clock)
         val failedEvent = PaymentOrderFinalized.from(
             order = persisted,
             now = now,
-            status = "FAILED"
+            status = PaymentOrderStatus.CAPTURE_FAILED
         )
 
-        every { paymentOrderDomainEventMapper.fromEvent(event) } returns order
         every { paymentOrderModificationPort.markAsCaptureFailed(order) } returns persisted
-        every { paymentOrderDomainEventMapper.toPaymentOrderFinalized(persisted, any(), "FAILED") } returns failedEvent
+        every { paymentOrderDomainEventMapper.toPaymentOrderFinalized(persisted, any(), PaymentOrderStatus.CAPTURE_FAILED) } returns failedEvent
         every {
             eventPublisher.publishSync(
                 aggregateId = persisted.paymentOrderId.value.toString(),
@@ -128,7 +126,7 @@ class ProcessPaymentServiceTest {
             )
         } returns mockk<EventEnvelope<PaymentOrderFinalized>>()
 
-        service.processPspResult(event, PaymentOrderStatus.CAPTURE_FAILED)
+        service.processPspResult(event, order)
 
         verify(exactly = 1) { paymentOrderModificationPort.markAsCaptureFailed(order) }
         verify(exactly = 0) { paymentOrderModificationPort.markAsCaptured(any()) }
@@ -151,18 +149,20 @@ class ProcessPaymentServiceTest {
         )
     }
 
-    private fun sampleEvent(status: PaymentOrderStatus): PaymentOrderEvent =
-        object : PaymentOrderEvent() {
-            override val paymentOrderId: String = "123"
-            override val publicPaymentOrderId: String = "paymentorder-123"
-            override val paymentId: String = "456"
-            override val publicPaymentId: String = "payment-456"
-            override val sellerId: String = "seller-789"
-            override val amountValue: Long = 1000L
-            override val currency: String = "EUR"
-            override val timestamp: LocalDateTime = LocalDateTime.now(clock)
-            override val eventType: String = "payment_order_event"
-            override fun deterministicEventId(): String = "$publicPaymentOrderId:$eventType"
-        }
+    private fun samplePspResultEvent(pspStatus: PaymentOrderStatus): PaymentOrderPspResultUpdated {
+        val now = LocalDateTime.now(clock)
+        return PaymentOrderPspResultUpdated.fromJson(
+            pOrderId = "123",
+            pubOrderId = "paymentorder-123",
+            pId = "456",
+            pubPId = "payment-456",
+            sellerId = "seller-789",
+            amount = 1000L,
+            currency = "EUR",
+            pspStatus = pspStatus.name,
+            latencyMs = 100L,
+            timestamp = now
+        )
+    }
 }
 

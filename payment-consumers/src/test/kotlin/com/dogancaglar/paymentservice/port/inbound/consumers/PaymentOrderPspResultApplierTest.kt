@@ -11,6 +11,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.paymentservice.ports.inbound.ProcessPspResultUseCase
+import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
 import io.mockk.*
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -32,18 +33,25 @@ class PaymentOrderPspResultApplierTest {
 
     private lateinit var kafkaTxExecutor: KafkaTxExecutor
     private lateinit var processPspResultUseCase: ProcessPspResultUseCase
+    private lateinit var paymentOrderModificationPort: PaymentOrderModificationPort
     private lateinit var clock: Clock
     private lateinit var applier: PaymentOrderPspResultApplier
+
+    private lateinit var dedupe: com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 
     @BeforeEach
     fun setUp() {
         kafkaTxExecutor = mockk()
         processPspResultUseCase = mockk()
+        paymentOrderModificationPort = mockk()
         clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
+        dedupe = mockk(relaxed = true)
 
         applier = PaymentOrderPspResultApplier(
             kafkaTx = kafkaTxExecutor,
-            processPspResult = processPspResultUseCase
+            processPspResult = processPspResultUseCase,
+            dedupe = dedupe,
+            paymentOrderModificationPort = paymentOrderModificationPort
         )
     }
 
@@ -57,12 +65,13 @@ class PaymentOrderPspResultApplierTest {
         val now = clock.instant().atZone(clock.zone).toLocalDateTime()
         val paymentId = PaymentId(456L)
         
+        // PaymentOrderCaptureCommand requires CAPTURE_REQUESTED or PENDING_CAPTURE status
         val paymentOrder = PaymentOrder.rehydrate(
             paymentOrderId = paymentOrderId,
             paymentId = paymentId,
             sellerId = SellerId("seller-123"),
             amount = Amount.of(10000L, Currency("USD")),
-            status = PaymentOrderStatus.INITIATED_PENDING,
+            status = PaymentOrderStatus.CAPTURE_REQUESTED,
             retryCount = 0,
             createdAt = now,
             updatedAt = now
@@ -97,6 +106,8 @@ class PaymentOrderPspResultApplierTest {
             lambda.invoke()
         }
 
+        every { dedupe.exists(any()) } returns false
+        every { paymentOrderModificationPort.findByPaymentOrderId(paymentOrderId) } returns paymentOrder
         every { kafkaTxExecutor.run(any<Map<TopicPartition, OffsetAndMetadata>>(), any(), any<() -> Unit>()) } answers {
             val lambda = thirdArg<() -> Unit>()
             lambda.invoke()
@@ -112,7 +123,7 @@ class PaymentOrderPspResultApplierTest {
         verify(exactly = 1) {
             processPspResultUseCase.processPspResult(
                 event = pspResultUpdated,
-                pspStatus = PaymentOrderStatus.CAPTURED
+                paymentOrder = paymentOrder
             )
         }
 
@@ -142,12 +153,13 @@ class PaymentOrderPspResultApplierTest {
         val now = clock.instant().atZone(clock.zone).toLocalDateTime()
         val paymentId = PaymentId(456L)
         
+        // PaymentOrderCaptureCommand requires CAPTURE_REQUESTED or PENDING_CAPTURE status
         val paymentOrder = PaymentOrder.rehydrate(
             paymentOrderId = paymentOrderId,
             paymentId = paymentId,
             sellerId = SellerId("seller-123"),
             amount = Amount.of(10000L, Currency("USD")),
-            status = PaymentOrderStatus.INITIATED_PENDING,
+            status = PaymentOrderStatus.CAPTURE_REQUESTED,
             retryCount = 0,
             createdAt = now,
             updatedAt = now
@@ -181,6 +193,8 @@ class PaymentOrderPspResultApplierTest {
             lambda.invoke()
         }
 
+        every { dedupe.exists(any()) } returns false
+        every { paymentOrderModificationPort.findByPaymentOrderId(paymentOrderId) } returns paymentOrder
         every { kafkaTxExecutor.run(any<Map<TopicPartition, OffsetAndMetadata>>(), any(), any<() -> Unit>()) } answers {
             val lambda = thirdArg<() -> Unit>()
             lambda.invoke()
@@ -196,7 +210,7 @@ class PaymentOrderPspResultApplierTest {
         verify(exactly = 1) {
             processPspResultUseCase.processPspResult(
                 event = pspResultUpdated,
-                pspStatus = PaymentOrderStatus.PENDING_CAPTURE
+                paymentOrder = paymentOrder
             )
         }
 

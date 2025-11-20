@@ -83,12 +83,6 @@ class PaymentControllerWebExceptionHandler {
         return respond(HttpStatus.GATEWAY_TIMEOUT, request, "Timed out while processing the request")
     }
 
-    @ExceptionHandler(BulkheadFullException::class)
-    fun handleBulkheadFull(ex: BulkheadFullException, request: HttpServletRequest): ResponseEntity<ErrorResponse> {
-        logger.warn("Bulkhead full at {}: {}", request.requestURI, causeSummary(ex))
-        val headers = HttpHeaders().apply { add(HttpHeaders.RETRY_AFTER, "1") }
-        return ResponseEntity(body(HttpStatus.TOO_MANY_REQUESTS, "Too many concurrent requests", request), headers, HttpStatus.TOO_MANY_REQUESTS)
-    }
 
     @ExceptionHandler(PSQLException::class)
     fun handlePSQL(ex: PSQLException, request: HttpServletRequest): ResponseEntity<ErrorResponse> {
@@ -182,27 +176,6 @@ class PaymentControllerWebExceptionHandler {
         )
     }
 
-    // -------- Wrapped async exceptions --------
-    @ExceptionHandler(ExecutionException::class, CompletionException::class)
-    fun handleWrapped(ex: Throwable, request: HttpServletRequest): ResponseEntity<ErrorResponse> {
-        val root = deepestCause(ex)
-        return when (root) {
-            is TimeoutException -> {
-                logger.warn("Wrapped timeout at {}: {}", request.requestURI, causeSummary(root))
-                respond(HttpStatus.GATEWAY_TIMEOUT, request, "Timed out while processing the request")
-            }
-            is BulkheadFullException -> {
-                logger.warn("Wrapped bulkhead-full at {}: {}", request.requestURI, causeSummary(root))
-                val headers = HttpHeaders().apply { add(HttpHeaders.RETRY_AFTER, "1") }
-                ResponseEntity(body(HttpStatus.TOO_MANY_REQUESTS, "Too many concurrent requests", request), headers, HttpStatus.TOO_MANY_REQUESTS)
-            }
-            is PSQLException -> handlePSQL(root, request)
-            else -> {
-                logger.error("Wrapped error at {}: {}", request.requestURI, causeSummary(root))
-                respond(HttpStatus.SERVICE_UNAVAILABLE, request, trunc(root.message))
-            }
-        }
-    }
 
     // -------- Generic fallback (no stack) --------
     @ExceptionHandler(Exception::class)

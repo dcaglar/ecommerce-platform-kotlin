@@ -1,6 +1,8 @@
 package com.dogancaglar.paymentservice.service
 
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentOrderEntityMapper
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderStatusCheckRepository
@@ -24,10 +26,16 @@ class PaymentOrderModificationTxAdapter(
         return persisted
     }
 
+    @Transactional(timeout = 2, readOnly = true)
+    override fun findByPaymentOrderId(paymentOrderId: PaymentOrderId): PaymentOrder {
+        return paymentOrderRepository.findByPaymentOrderId(paymentOrderId)
+            .firstOrNull()?: throw MissingPaymentOrderException(paymentOrderId.value)
+    }
+
 
     @Transactional(timeout = 2)
     override fun markAsCapturePending(order: PaymentOrder): PaymentOrder {
-        val draft = order.markCaptureDeclined()
+        val draft = order.markCapturePending()
             .incrementRetry()
             .withUpdateAt(LocalDateTime.now(clock))
         val persisted = paymentOrderRepository.updateReturningIdempotent(draft)

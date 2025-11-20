@@ -6,6 +6,7 @@ import com.dogancaglar.paymentservice.application.util.PaymentOrderSnapshot
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -31,8 +32,11 @@ data class PaymentOrderCaptureCommand private constructor(
     companion object {
         const val EVENT_TYPE = "payment_order_capture_requested"
 
-        fun from(order: PaymentOrder, now: LocalDateTime,attempt: Int): PaymentOrderCaptureCommand =
-            PaymentOrderCaptureCommand(
+        fun from(order: PaymentOrder, now: LocalDateTime,attempt: Int): PaymentOrderCaptureCommand {
+            require(order.status == PaymentOrderStatus.CAPTURE_REQUESTED || order.status== PaymentOrderStatus.PENDING_CAPTURE ){
+                "Invalid PaymentOrderCommandGeneration creation, payment order status was ${order.status.name}"
+            }
+            return PaymentOrderCaptureCommand(
                 paymentOrderId = order.paymentOrderId.value.toString(),
                 publicPaymentOrderId = order.paymentOrderId.toPublicPaymentOrderId(),
                 paymentId = order.paymentId.value.toString(),
@@ -43,7 +47,7 @@ data class PaymentOrderCaptureCommand private constructor(
                 attempt = attempt,
                 timestamp = now
             )
-
+        }
         @JsonCreator
         internal fun fromJson(
             @JsonProperty("paymentOrderId") pOrderId: String,

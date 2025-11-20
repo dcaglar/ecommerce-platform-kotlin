@@ -69,7 +69,7 @@ class LedgerRecordingConsumerTest {
             createdAt = expectedCreatedAt,
             updatedAt = expectedCreatedAt
         )
-        val finalizedEvent = PaymentOrderFinalized.from(paymentOrder, expectedCreatedAt, "SUCCESSFUL_FINAL")
+        val finalizedEvent = PaymentOrderFinalized.from(paymentOrder, expectedCreatedAt, PaymentOrderStatus.CAPTURED)
         val command = LedgerRecordingCommand.from(finalizedEvent, expectedCreatedAt)
         
         val envelope = EventEnvelopeFactory.envelopeFor(
@@ -159,7 +159,7 @@ class LedgerRecordingConsumerTest {
             createdAt = now,
             updatedAt = now
         )
-        val finalizedEvent = PaymentOrderFinalized.from(paymentOrder, now, "FAILED_FINAL")
+        val finalizedEvent = PaymentOrderFinalized.from(paymentOrder, now, PaymentOrderStatus.CAPTURE_FAILED)
         val command = LedgerRecordingCommand.from(finalizedEvent, now)
         
         val envelope = EventEnvelopeFactory.envelopeFor(
@@ -242,7 +242,7 @@ class LedgerRecordingConsumerTest {
             createdAt = now,
             updatedAt = now
         )
-        val finalizedEvent = PaymentOrderFinalized.from(paymentOrder, now, "SUCCESSFUL_FINAL")
+        val finalizedEvent = PaymentOrderFinalized.from(paymentOrder, now, PaymentOrderStatus.CAPTURED)
         val command = LedgerRecordingCommand.from(finalizedEvent, now)
         
         val envelope = EventEnvelopeFactory.envelopeFor(

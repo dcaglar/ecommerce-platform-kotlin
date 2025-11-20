@@ -168,33 +168,7 @@ class RequestLedgerRecordingServiceTest {
         assertEquals(event.eventType, capturedCommand.captured.finalStatus)
     }
 
-    @Test
-    fun `should skip publishing for non-finalized events`() {
-        // given - Event that is not PaymentOrderFinalized
-        val eventWithInvalidStatus = object : PaymentOrderEvent() {
-            override val paymentOrderId = "po-invalid-success"
-            override val publicPaymentOrderId = "paymentorder-invalid-success"
-            override val paymentId = "p-invalid-success"
-            override val publicPaymentId = "payment-invalid-success"
-            override val sellerId = "seller-invalid"
-            override val amountValue = 15000L
-            override val currency = "USD"
-            override val timestamp = LocalDateTime.now(clock)
-            override val eventType = "payment_order_created"
-            override fun deterministicEventId(): String = "$publicPaymentOrderId:$eventType"
-        }
-        
-        // when - service processes the event
-        service.requestLedgerRecording(eventWithInvalidStatus)
-
-        // then - verify publishSync was NOT called because event is not PaymentOrderFinalized
-        verify(exactly = 0) {
-            eventPublisherPort.publishSync<LedgerRecordingCommand>(
-                aggregateId = any(),
-                data = any(),
-                parentEventId = any(),
-                traceId = any()
-            )
-        }
-    }
+    // Note: The requestLedgerRecording method only accepts PaymentOrderFinalized,
+    // so we cannot test with non-finalized events at compile time.
+    // The type system ensures only finalized events can trigger ledger recording.
 }

@@ -23,3 +23,14 @@ enum class PaymentOrderStatus {
     PSP_UNAVAILABLE_TRANSIENT,
 
 }
+
+fun PaymentOrderStatus.isExternalCapturePspResponse(): Boolean =
+    isRetryablePspResponse() ||  isTerminalPspResponse()
+
+
+fun PaymentOrderStatus.isTerminalPspResponse(): Boolean=
+    this in setOf(PaymentOrderStatus.CAPTURE_FAILED, PaymentOrderStatus.CAPTURED)
+
+
+fun PaymentOrderStatus.isRetryablePspResponse(): Boolean=
+    this in setOf(PaymentOrderStatus.PENDING_CAPTURE, PaymentOrderStatus.CAPTURED)

@@ -36,6 +36,8 @@ class PaymentOrderEnqueuerTest {
     private lateinit var eventPublisherPort: EventPublisherPort
     private lateinit var clock: Clock
     private lateinit var paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
+    private lateinit var dedupe: com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
+    private lateinit var modification: com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
     private lateinit var enqueuer: PaymentOrderEnqueuer
 
     @BeforeEach
@@ -43,12 +45,16 @@ class PaymentOrderEnqueuerTest {
         kafkaTxExecutor = mockk()
         eventPublisherPort = mockk()
         clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
-        paymentOrderDomainEventMapper = mockk()
+        paymentOrderDomainEventMapper = PaymentOrderDomainEventMapper(clock)
+        dedupe = mockk()
+        modification = mockk()
 
         enqueuer = PaymentOrderEnqueuer(
             kafkaTx = kafkaTxExecutor,
             publisher = eventPublisherPort,
-            paymentOrderDomainEventMapper = paymentOrderDomainEventMapper
+            dedupe = dedupe,
+            modification = modification,
+            mapper = paymentOrderDomainEventMapper
         )
     }
 
@@ -72,11 +78,15 @@ class PaymentOrderEnqueuerTest {
             createdAt = expectedCreatedAt,
             updatedAt = expectedCreatedAt
         )
-        val paymentOrderCreated = PaymentOrderDomainEventMapper(clock).toPaymentOrderCreated(paymentOrder)
+        val paymentOrderCreated = paymentOrderDomainEventMapper.toPaymentOrderCreated(paymentOrder)
         
-        // Mock the mapper to return the order when fromEvent is called
-        every { paymentOrderDomainEventMapper.fromEvent(paymentOrderCreated) } returns paymentOrder
-        every { paymentOrderDomainEventMapper.toPaymentOrderCaptureCommand(paymentOrder, 0) } returns PaymentOrderDomainEventMapper(clock).toPaymentOrderCaptureCommand(paymentOrder, 0)
+        // Mock the modification port to return the updated order
+        val updatedOrder = paymentOrder.markCaptureRequested()
+        every { dedupe.exists(any()) } returns false
+        every { dedupe.markProcessed(any(), any()) } just Runs
+        every { modification.markAsCaptureRequested(paymentOrderId.value) } returns updatedOrder
+        // The mapper is a real object, so we can use it directly
+        val captureCommand = paymentOrderDomainEventMapper.toPaymentOrderCaptureCommand(updatedOrder, 0)
         
         val envelope = EventEnvelopeFactory.envelopeFor(
             data = paymentOrderCreated,
@@ -168,10 +178,24 @@ class PaymentOrderEnqueuerTest {
             createdAt = now,
             updatedAt = now
         )
-        val paymentOrderCreated = PaymentOrderDomainEventMapper(clock).toPaymentOrderCreated(paymentOrder)
+        // Create a valid PaymentOrderCreated event (requires INITIATED_PENDING)
+        val validOrder = PaymentOrder.rehydrate(
+            paymentOrderId = paymentOrderId,
+            paymentId = paymentId,
+            sellerId = SellerId("seller-123"),
+            amount = Amount.of(10000L, Currency("USD")),
+            status = PaymentOrderStatus.INITIATED_PENDING, // Must be INITIATED_PENDING for PaymentOrderCreated
+            retryCount = 0,
+            createdAt = now,
+            updatedAt = now
+        )
+        val paymentOrderCreated = paymentOrderDomainEventMapper.toPaymentOrderCreated(validOrder)
         
-        // Mock the mapper to return the order when fromEvent is called
-        every { paymentOrderDomainEventMapper.fromEvent(paymentOrderCreated) } returns paymentOrder
+        // Mock the dedupe and modification ports
+        // The test simulates a scenario where markAsCaptureRequested throws MissingPaymentOrderException
+        // (e.g., order was already processed or doesn't exist)
+        every { dedupe.exists(any()) } returns false
+        every { modification.markAsCaptureRequested(paymentOrderId.value) } throws com.dogancaglar.paymentservice.service.MissingPaymentOrderException(paymentOrderId.value)
         
         val envelope = EventEnvelopeFactory.envelopeFor(
             data = paymentOrderCreated,

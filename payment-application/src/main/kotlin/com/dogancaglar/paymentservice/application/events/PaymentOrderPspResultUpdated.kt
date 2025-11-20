@@ -1,6 +1,8 @@
 package com.dogancaglar.paymentservice.application.events
 
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.isExternalCapturePspResponse
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -47,6 +49,31 @@ data class PaymentOrderPspResultUpdated private constructor(
                 latencyMs = latencyMs,
                 timestamp = now
             )
+
+
+        fun from(
+            cmd: PaymentOrderCaptureCommand,
+            pspStatus: PaymentOrderStatus,
+            latencyMs: Long,
+            now: LocalDateTime
+        ): PaymentOrderPspResultUpdated {
+            require(pspStatus.isExternalCapturePspResponse()) {
+                "Cannot emit PSP_RESULT_UPDATED for non-terminal or invalid PSP status: $pspStatus"
+            }
+
+            return PaymentOrderPspResultUpdated(
+                paymentOrderId = cmd.paymentOrderId,
+                publicPaymentOrderId = cmd.publicPaymentOrderId,
+                paymentId = cmd.paymentId,
+                publicPaymentId = cmd.publicPaymentId,
+                sellerId = cmd.sellerId,
+                amountValue = cmd.amountValue,
+                currency = cmd.currency,
+                pspStatus = pspStatus.name,
+                latencyMs = latencyMs,
+                timestamp = now
+            )
+        }
 
         @JsonCreator
         internal fun fromJson(

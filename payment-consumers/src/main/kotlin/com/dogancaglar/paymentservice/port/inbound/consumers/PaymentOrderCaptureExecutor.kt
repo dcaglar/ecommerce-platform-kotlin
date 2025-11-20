@@ -13,6 +13,7 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.PspCaptureGatewayPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
@@ -28,16 +29,18 @@ import org.springframework.stereotype.Component
 import java.time.Clock
 import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
-
 @Component
 class PaymentOrderCaptureExecutor(
-    private val captureClient: PspCaptureGatewayPort,
+    private val psp: PspCaptureGatewayPort,
     private val meterRegistry: MeterRegistry,
-    @param:Qualifier("syncPaymentTx") private val kafkaTx: KafkaTxExecutor,
-    @param:Qualifier("syncPaymentEventPublisher") private val publisher: EventPublisherPort,
-    private val paymentOrderRepository: PaymentOrderRepository, //read only
-    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
-    private  val clock: Clock
+    @Qualifier("syncPaymentTx")
+    private val kafkaTx: KafkaTxExecutor,
+    @Qualifier("syncPaymentEventPublisher")
+    private val publisher: EventPublisherPort,
+    private val paymentOrderRepository: PaymentOrderRepository,
+    private val mapper: PaymentOrderDomainEventMapper,
+    private val dedupe: EventDeduplicationPort,
+    private val clock: Clock
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -57,63 +60,120 @@ class PaymentOrderCaptureExecutor(
     ) {
         val env = record.value()
         val work = env.data
+        val eventId = env.eventId
 
         val tp = TopicPartition(record.topic(), record.partition())
         val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
         val groupMeta = consumer.groupMetadata()
 
         EventLogContext.with(env) {
+
+            // ---------------------------------------
+            // 1. DEDUPE CHECK
+            // ---------------------------------------
+            if (dedupe.exists(eventId)) {
+                logger.debug("🔁 Redis dedupe skip PSP executor eventId={}", eventId)
+                kafkaTx.run(offsets, groupMeta) {}
+                return@with
+            }
+
+            // ---------------------------------------
+            // 2. LOAD ORDER + IDENTITY CHECK
+            // ---------------------------------------
             val current = paymentOrderRepository
                 .findByPaymentOrderId(PaymentOrderId(work.paymentOrderId.toLong()))
                 .firstOrNull()
+
             if (current == null) {
-                logger.warn(
-                    "Dropping PSP call: no PaymentOrder row found for agg={} attempt={}",
-                    env.aggregateId, work.attempt
+                logger.warn("⏭️ Missing PaymentOrder row for PSP call poId={} eventId={}",
+                    work.paymentOrderId, eventId
                 )
                 kafkaTx.run(offsets, groupMeta) {}
                 return@with
             }
 
-            val attempt = work.attempt
-            if (current.retryCount > attempt) {
+            // stale attempt check
+            if (current.retryCount > work.attempt) {
                 logger.warn(
-                    "Dropping PSP call: stale attempt agg={} dbRetryCount={} > eventRetryCount={}",
-                    env.aggregateId, current.retryCount, attempt
+                    "⏭️ Stale PSP attempt dbRetryCount={} > eventRetryCount={} poId={}",
+                    current.retryCount, work.attempt, work.paymentOrderId
                 )
                 kafkaTx.run(offsets, groupMeta) {}
                 return@with
             }
-            // Build domain snapshot (no DB load)
 
-            // Call PSP (adapter handles timeouts/interrupts)
-            var mappedStatus: PaymentOrderStatus? = null
-            var errorCode: String? = null
-            var errorDetail: String? = null
+            // status check (must still be CAPTURE_REQUESTED or PENDING_CAPTURE before psp call)
+            if (current.status != PaymentOrderStatus.CAPTURE_REQUESTED && current.status!= PaymentOrderStatus.PENDING_CAPTURE) {
+                logger.warn(
+                    "⏭️ Skip PSP: dbStatus={} expected=CAPTURE_REQUESTED or CAPTURE_PENDING poId={}",
+                    current.status, current.paymentOrderId
+                )
+                kafkaTx.run(offsets, groupMeta) {}
+                return@with
+            }
+
+            // ---------------------------------------
+            // 3. PSP CALL
+            // ---------------------------------------
             val startMs = System.currentTimeMillis()
-            mappedStatus = captureClient.capture(current)
+
+            val pspStatus = psp.capture(current)
+
             val tookMs = System.currentTimeMillis() - startMs
             pspLatency.record(tookMs, TimeUnit.MILLISECONDS)
-            // Build result-updated event (extends PaymentOrderEvent)
-           val result= PaymentOrderPspResultUpdated.from(work,mappedStatus.name,tookMs, LocalDateTime.now(clock))
+
+            // ---------------------------------------
+            // 4. BUILD UPDATED EVENT
+            // ---------------------------------------
+            val result = try {
+                PaymentOrderPspResultUpdated.from(
+                    work,
+                    pspStatus,
+                    tookMs,
+                    LocalDateTime.now(clock)
+                )
+            } catch (ex: IllegalArgumentException) {
+                // domain invariant failed (invalid PSP status or order state)
+                logger.warn(
+                    "⏭️ Skipping PSP_RESULT_UPDATED creation: poId={} status={} reason={}",
+                    current.paymentOrderId, current.status, ex.message
+                )
+                kafkaTx.run(offsets, groupMeta) {} // commit offset and skip
+                return@with
+            } catch (ex: Exception) {
+                // unexpected serialization or mapping issue
+                logger.error(
+                    "❌ Unexpected error building PSP_RESULT_UPDATED for poId={} eventId={}",
+                    current.paymentOrderId, eventId, ex
+                )
+                kafkaTx.run(offsets, groupMeta) {}
+                return@with
+            }
+
             val outEnv = EventEnvelopeFactory.envelopeFor(
                 data = result,
-                aggregateId = work.paymentOrderId,          // key = paymentOrderId
+                aggregateId = work.paymentOrderId,
                 traceId = env.traceId,
                 parentEventId = env.eventId
             )
 
-            // Publish PSP_RESULT_UPDATED under Kafka tx, then commit offsets
+            // ---------------------------------------
+            // 5. TX: publish + commit + mark dedupe
+            // ---------------------------------------
             kafkaTx.run(offsets, groupMeta) {
+
                 publisher.publishSync(
                     aggregateId = outEnv.aggregateId,
                     data = result,
                     traceId = outEnv.traceId,
                     parentEventId = outEnv.parentEventId
                 )
+
+                dedupe.markProcessed(eventId, 3600)
+
                 logger.info(
-                    "📤 Published PSP_RESULT_UPDATED agg={} traceId={},psp status {}",
-                  outEnv.aggregateId, outEnv.traceId,outEnv,result.pspStatus
+                    "📤 PSP_RESULT_UPDATED published poId={} traceId={} status={}",
+                    work.paymentOrderId, outEnv.traceId, result.pspStatus
                 )
             }
         }

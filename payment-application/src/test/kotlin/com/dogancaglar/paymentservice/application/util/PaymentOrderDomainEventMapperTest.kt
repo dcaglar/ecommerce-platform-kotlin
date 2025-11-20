@@ -77,7 +77,8 @@ class PaymentOrderDomainEventMapperTest {
     // ---------------------------------------------------------
     @Test
     fun `toPaymentOrderCaptureCommand maps retry count`() {
-        val order = sampleOrder()
+        // PaymentOrderCaptureCommand requires order to be in CAPTURE_REQUESTED or PENDING_CAPTURE status
+        val order = sampleOrder().markCaptureRequested()
 
         val event = mapper.toPaymentOrderCaptureCommand(order, attempt = 3)
 
@@ -93,7 +94,7 @@ class PaymentOrderDomainEventMapperTest {
     fun `toPaymentOrderSucceeded maps correctly`() {
         val order = sampleOrder()
         val now = LocalDateTime.now(fixedClock)
-        val event = mapper.toPaymentOrderFinalized(order, now, "CAPTURED")
+        val event = mapper.toPaymentOrderFinalized(order, now, PaymentOrderStatus.CAPTURED)
 
         assertEquals("${order.paymentOrderId.value}", event.paymentOrderId)
         assertEquals(order.paymentOrderId.toPublicPaymentOrderId(), event.publicPaymentOrderId)
@@ -104,7 +105,7 @@ class PaymentOrderDomainEventMapperTest {
     fun `toPaymentOrderFinalized maps correctly for failed status`() {
         val order = sampleOrder()
         val now = LocalDateTime.now(fixedClock)
-        val event = mapper.toPaymentOrderFinalized(order, now, "CAPTURE_FAILED")
+        val event = mapper.toPaymentOrderFinalized(order, now, PaymentOrderStatus.CAPTURE_FAILED)
 
         assertEquals("10", event.paymentOrderId)
         assertEquals(order.paymentId.toPublicPaymentId(), event.publicPaymentId)

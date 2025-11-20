@@ -71,7 +71,7 @@ class LedgerRecordingRequestDispatcherTest {
             createdAt = now,
             updatedAt = now
         )
-        val successEvent = PaymentOrderFinalized.from(paymentOrder, now, "SUCCESSFUL_FINAL")
+        val successEvent = PaymentOrderFinalized.from(paymentOrder, now, PaymentOrderStatus.CAPTURED)
         
         val envelope = EventEnvelopeFactory.envelopeFor(
             data = successEvent,
@@ -151,7 +151,7 @@ class LedgerRecordingRequestDispatcherTest {
             createdAt = now,
             updatedAt = now
         )
-        val failedEvent = PaymentOrderFinalized.from(paymentOrder, now, "FAILED_FINAL")
+        val failedEvent = PaymentOrderFinalized.from(paymentOrder, now, PaymentOrderStatus.CAPTURE_FAILED)
         
         val envelope = EventEnvelopeFactory.envelopeFor(
             data = failedEvent,
@@ -227,7 +227,7 @@ class LedgerRecordingRequestDispatcherTest {
             createdAt = now,
             updatedAt = now
         )
-        val successEvent = PaymentOrderFinalized.from(paymentOrder, now, "SUCCESSFUL_FINAL")
+        val successEvent = PaymentOrderFinalized.from(paymentOrder, now, PaymentOrderStatus.CAPTURED)
         
         val envelope = EventEnvelopeFactory.envelopeFor(
             data = successEvent,

@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.application.events
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -28,8 +29,9 @@ data class PaymentOrderCreated private constructor(
     companion object {
         const val EVENT_TYPE = "payment_order_created"
 
-        fun from(order: PaymentOrder, now: LocalDateTime): PaymentOrderCreated =
-            PaymentOrderCreated(
+        fun from(order: PaymentOrder, now: LocalDateTime): PaymentOrderCreated {
+            require(order.status == PaymentOrderStatus.INITIATED_PENDING)
+            return PaymentOrderCreated(
                 paymentOrderId = order.paymentOrderId.value.toString(),
                 publicPaymentOrderId = order.paymentOrderId.toPublicPaymentOrderId(),
                 paymentId = order.paymentId.value.toString(),
@@ -39,7 +41,7 @@ data class PaymentOrderCreated private constructor(
                 currency = order.amount.currency.currencyCode,
                 timestamp = now
             )
-
+        }
         @JsonCreator
         internal fun fromJson(
             @JsonProperty("paymentOrderId") pOrderId: String,

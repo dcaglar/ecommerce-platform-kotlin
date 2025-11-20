@@ -9,9 +9,7 @@ import java.time.LocalDateTime
 class PaymentOrderTest {
 
     private val paymentOrderId = PaymentOrderId(1L)
-    private val publicPaymentOrderId ="paymentorder-1"
     private val paymentId = PaymentId(10L)
-    private val publicPaymentId = "payment-10"
     private val sellerId = SellerId("seller-abc")
     private val amount = Amount.of(1000L, Currency("EUR")) // €10.00
 
@@ -46,7 +44,7 @@ class PaymentOrderTest {
                 Amount.of(-1000, Currency("EUR"))
             )
         }
-        assertTrue(ex.message!!.contains("greater than zero"))
+        assertTrue(ex.message!!.contains("Amount quantity must be greater than zero"))
     }
 
     @Test
@@ -59,7 +57,7 @@ class PaymentOrderTest {
                 amount
             )
         }
-        assertTrue(ex.message!!.contains("Seller id cant be blank"))
+        assertTrue(ex.message!!.contains("Seller ID cannot be blank"))
     }
 
     // --- ✅ State transition tests ---

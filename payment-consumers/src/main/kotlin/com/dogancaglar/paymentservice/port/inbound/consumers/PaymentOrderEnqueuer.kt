@@ -8,6 +8,7 @@ import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.domain.util.PSPCaptureStatusMapper
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
@@ -53,7 +54,7 @@ class PaymentOrderEnqueuer(
 
         EventLogContext.with(env) {
 
-            // 1. DEDUPE CHECK
+            // 1. DEDUPE CHECK,if it's captured alreadyv,it already exist in dedup
             if (dedupe.exists(eventId)) {
                 logger.debug("🔁 Redis dedupe skip eventId={}", eventId)
                 kafkaTx.run(offsets, groupMeta) {}
@@ -70,7 +71,23 @@ class PaymentOrderEnqueuer(
             }
 
             // 3. Build new event
-            val work = mapper.toPaymentOrderCaptureCommand(updated, attempt = 0)
+            val work = try {
+                mapper.toPaymentOrderCaptureCommand(updated, attempt = 0)
+            } catch (ex: IllegalArgumentException) {
+                // this comes from require(...) in from()
+                logger.warn(
+                    "⏭️ Skipping invalid PaymentOrderCaptureCommand creation: poId={} status={} reason={}",
+                    evt.paymentOrderId,
+                    updated.status,
+                    ex.message
+                )
+                kafkaTx.run(offsets, groupMeta) {}
+                return@with
+            } catch (ex: Exception) {
+                logger.error("❌ Unexpected error creating PaymentOrderCaptureCommand for poId={} eventId={}", evt.paymentOrderId, eventId, ex)
+                kafkaTx.run(offsets, groupMeta) {}
+                return@with
+            }
 
             val outEnv = EventEnvelopeFactory.envelopeFor(
                 data = work,

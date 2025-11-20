@@ -134,7 +134,7 @@
         UPDATE payment_orders p
         SET
         status = CASE
-        WHEN p.status IN ('CAPTURED','REFUNDED') THEN p.status
+        WHEN p.status IN ('CAPTURED','CAPTURE_FAILED') THEN p.status
         ELSE
         #{status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.PaymentOrderStatusTypeHandler}
         END,

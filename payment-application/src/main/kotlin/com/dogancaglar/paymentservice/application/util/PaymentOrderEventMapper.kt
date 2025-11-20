@@ -58,7 +58,7 @@ class PaymentOrderDomainEventMapper(
         )
 
     /** 🔹 Domain → Event: successful final state */
-    fun toPaymentOrderFinalized(order: PaymentOrder,now: LocalDateTime,status:String): PaymentOrderFinalized =
+    fun toPaymentOrderFinalized(order: PaymentOrder,now: LocalDateTime,status: PaymentOrderStatus): PaymentOrderFinalized =
         PaymentOrderFinalized.from(
            order = order,
             now = now,
