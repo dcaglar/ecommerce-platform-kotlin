@@ -1,5 +1,8 @@
 package com.dogancaglar.paymentservice.adapter.outbound.redis
 
+import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
@@ -7,11 +10,15 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
-import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
-import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import io.mockk.every
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
@@ -29,9 +36,10 @@ import org.testcontainers.containers.GenericContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
+import java.time.Clock
 import java.time.LocalDateTime
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -59,19 +67,25 @@ class PaymentOrderRetryQueueAdapterIntegrationTest {
         fun objectMapper(): ObjectMapper {
             return ObjectMapper().apply {
                 registerModule(JavaTimeModule())
+                registerKotlinModule()
+                disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             }
         }
 
         @Bean
+        fun clock(): Clock = Clock.systemUTC()
+        
+        @Bean
         fun paymentOrderRetryQueueAdapter(
             cache: PaymentOrderRetryRedisCache,
-            objectMapper: ObjectMapper
+            objectMapper: ObjectMapper,
+            clock: Clock
         ): PaymentOrderRetryQueueAdapter {
             return PaymentOrderRetryQueueAdapter(
                 cache,
                 SimpleMeterRegistry(),
                 objectMapper,
-                PaymentOrderDomainEventMapper()
+                PaymentOrderDomainEventMapper(clock)
             )
         }
     }
@@ -103,12 +117,22 @@ class PaymentOrderRetryQueueAdapterIntegrationTest {
     @BeforeEach
     fun setUp() {
         redisTemplate.connectionFactory?.connection?.flushAll()
+        
+        // Mock EventLogContext
+        mockkObject(EventLogContext)
+        every { EventLogContext.getTraceId() } returns "test-trace-id"
+        every { EventLogContext.getEventId() } returns null
+    }
+    
+    @AfterEach
+    fun tearDown() {
+        unmockkObject(EventLogContext)
     }
 
     private fun createTestPaymentOrder(
         id: Long = 123L,
         retryCount: Int = 0,
-        status: PaymentOrderStatus = PaymentOrderStatus.INITIATED_PENDING,
+        status: PaymentOrderStatus = PaymentOrderStatus.CAPTURE_REQUESTED,
         createdAt: LocalDateTime = LocalDateTime.now(),
         updatedAt: LocalDateTime = createdAt
     ): PaymentOrder =
@@ -128,18 +152,21 @@ class PaymentOrderRetryQueueAdapterIntegrationTest {
     @Test
     fun `should schedule and poll retry with real Redis`() {
         // Given
-        val paymentOrder = createTestPaymentOrder(id = 123L, retryCount = 1)
+        val paymentOrder = createTestPaymentOrder(id = 123L, retryCount = 1, status = PaymentOrderStatus.CAPTURE_REQUESTED)
         val backOffMillis = 100L // Short delay for testing
 
         // When - schedule retry
         adapter.scheduleRetry(paymentOrder, backOffMillis)
+        
+        // Verify item was scheduled
+        assertEquals(1L, cache.zsetSize(), "Item should be in queue after scheduling")
 
         // Wait for retry to become due
         Thread.sleep(150)
 
         // Then - poll should return the scheduled item
         val polled = adapter.pollDueRetriesToInflight(10)
-        assertEquals(1, polled.size)
+        assertEquals(1, polled.size, "Should poll 1 item after delay")
         
         val retryItem = polled[0]
         assertEquals("123", retryItem.envelope.data.paymentOrderId)

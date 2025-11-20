@@ -171,26 +171,50 @@ class PaymentOrderMapperIntegrationTest {
         assertEquals(PaymentOrderStatus.CAPTURE_FAILED, updated!!.status)
         assertEquals(3, updated.retryCount)
 
-        // Attempt to override terminal status CAPTURED -> should remain CAPTURED
-        val terminal = paymentOrderMapper.updateReturningIdempotent(
+        // Attempt to override terminal status CAPTURE_FAILED -> CAPTURED should remain CAPTURE_FAILED
+        // SQL protects terminal statuses: once terminal, cannot be changed to another terminal status
+        val attemptToChangeTerminal = paymentOrderMapper.updateReturningIdempotent(
             updated.copy(
                 status = PaymentOrderStatus.CAPTURED,
                 updatedAt = updated.updatedAt.plusMinutes(5)
             )
         )
-        assertNotNull(terminal)
-        assertEquals(PaymentOrderStatus.CAPTURED, terminal!!.status)
+        assertNotNull(attemptToChangeTerminal)
+        // SQL protection: terminal status CAPTURE_FAILED cannot be changed to CAPTURED
+        assertEquals(PaymentOrderStatus.CAPTURE_FAILED, attemptToChangeTerminal!!.status)
 
-        val afterTerminal = paymentOrderMapper.updateReturningIdempotent(
-            terminal.copy(
-                status = PaymentOrderStatus.CAPTURE_FAILED,
-                updatedAt = terminal.updatedAt.plusMinutes(10)
+        // Now test the other direction: create a CAPTURED order and try to change it to CAPTURE_FAILED
+        val captured = paymentOrderMapper.updateReturningIdempotent(
+            updated.copy(
+                status = PaymentOrderStatus.CAPTURED,
+                updatedAt = updated.updatedAt.plusMinutes(10)
             )
         )
-        // status stays CAPTURED but retryCount updates via GREATEST
+        // This should also fail - we're still trying to change from CAPTURE_FAILED to CAPTURED
+        assertNotNull(captured)
+        assertEquals(PaymentOrderStatus.CAPTURE_FAILED, captured!!.status)
+        
+        // To test CAPTURED protection, we need to start with a CAPTURED status
+        // Insert a new order with CAPTURED status
+        val capturedOrder = paymentOrderEntity(
+            id = 302L,
+            paymentId = 2001L,
+            status = PaymentOrderStatus.CAPTURED,
+            retryCount = 0
+        )
+        paymentOrderMapper.insert(capturedOrder)
+        
+        // Attempt to change CAPTURED to CAPTURE_FAILED - should remain CAPTURED
+        val afterTerminal = paymentOrderMapper.updateReturningIdempotent(
+            capturedOrder.copy(
+                status = PaymentOrderStatus.CAPTURE_FAILED,
+                updatedAt = capturedOrder.updatedAt.plusMinutes(10)
+            )
+        )
+        // status stays CAPTURED (terminal status protection)
         assertNotNull(afterTerminal)
         assertEquals(PaymentOrderStatus.CAPTURED, afterTerminal!!.status)
-        assertEquals(terminal.retryCount, afterTerminal.retryCount)
+        assertEquals(capturedOrder.retryCount, afterTerminal.retryCount)
     }
 
     @Test
