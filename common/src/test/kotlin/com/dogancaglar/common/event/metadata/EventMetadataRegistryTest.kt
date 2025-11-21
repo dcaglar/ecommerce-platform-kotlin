@@ -2,10 +2,11 @@ package com.dogancaglar.common.event.metadata
 
 import com.dogancaglar.common.event.Event
 import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.common.time.Utc
 import com.fasterxml.jackson.core.type.TypeReference
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import java.time.LocalDateTime
+import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -13,7 +14,7 @@ class EventMetadataRegistryTest {
 
     data class TestEvent(
         override val eventType: String,
-        override val timestamp: LocalDateTime = LocalDateTime.now()
+        override val timestamp: Instant = Utc.nowInstant()
     ) : Event {
         override fun deterministicEventId() = "id-$eventType"
     }
@@ -36,20 +37,20 @@ class EventMetadataRegistryTest {
 
     @Test
     fun `metadataFor returns correct metadata`() {
-        val reg = EventMetadataRegistry(listOf(TestMetadataA, TestMetadataB))
+        val reg = EventMetaDataRegistry(listOf(TestMetadataA, TestMetadataB))
         assertEquals("topic-a", reg.metadataFor<TestEvent>("a").topic)
     }
 
     @Test
     fun `metadataForEvent resolves via event`() {
         val evt = TestEvent(eventType = "b")
-        val reg = EventMetadataRegistry(listOf(TestMetadataA, TestMetadataB))
+        val reg = EventMetaDataRegistry(listOf(TestMetadataA, TestMetadataB))
         assertEquals("topic-b", reg.metadataForEvent(evt).topic)
     }
 
     @Test
     fun `metadataFor throws if type missing`() {
-        val reg = EventMetadataRegistry(listOf(TestMetadataA))
+        val reg = EventMetaDataRegistry(listOf(TestMetadataA))
         assertThrows<IllegalStateException> {
             reg.metadataFor<TestEvent>("missing")
         }
@@ -58,7 +59,7 @@ class EventMetadataRegistryTest {
     @Test
     fun `partitionKey function works`() {
         val evt = TestEvent("a")
-        val reg = EventMetadataRegistry(listOf(TestMetadataA))
+        val reg = EventMetaDataRegistry(listOf(TestMetadataA))
         val m = reg.metadataForEvent(evt)
 
         assertEquals("key-a", m.partitionKey(evt))
@@ -66,7 +67,7 @@ class EventMetadataRegistryTest {
 
     @Test
     fun `registry all returns all metadata`() {
-        val reg = EventMetadataRegistry(listOf(TestMetadataA, TestMetadataB))
+        val reg = EventMetaDataRegistry(listOf(TestMetadataA, TestMetadataB))
         val all = reg.all().map { it.eventType }
 
         assertTrue(all.contains("a"))

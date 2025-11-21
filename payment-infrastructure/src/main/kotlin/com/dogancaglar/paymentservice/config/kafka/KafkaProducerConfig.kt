@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.config.kafka
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.event.metadata.EventMetadataRegistry
+import com.dogancaglar.common.event.metadata.EventMetaDataRegistry
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.producer.ProducerConfig
@@ -75,15 +75,15 @@ class KafkaProducerConfig(
     fun syncPaymentEventPublisher(
         @Qualifier("syncPaymentEventKafkaTemplate",
         ) kt: KafkaTemplate<String, EventEnvelope<*>>,
-        eventMetaDataRegistry: EventMetadataRegistry,
+        eventMetaDataRegistry: EventMetaDataRegistry,
         mr: MeterRegistry
     ) = com.dogancaglar.paymentservice.adapter.outbound.kafka.PaymentEventPublisher(kt, eventMetaDataRegistry,mr)
 
 
 
     @Bean
-    fun eventMetadataRegistry() =
-        EventMetadataRegistry(PaymentEventMetadataCatalog.all)
+    fun eventMetaDataRegistry() =
+        EventMetaDataRegistry(PaymentEventMetadataCatalog.all)
 
     @Bean("syncPaymentTx")
     fun syncPaymentTx(
@@ -126,7 +126,7 @@ class KafkaProducerConfig(
     fun batchPaymentEventPublisher(
         @Qualifier("batchPaymentKafkaTemplate") kt: KafkaTemplate<String, EventEnvelope<*>>,
         mr: MeterRegistry,
-        eventMetaDataRegistry: EventMetadataRegistry
+        eventMetaDataRegistry: EventMetaDataRegistry
         ) = com.dogancaglar.paymentservice.adapter.outbound.kafka.PaymentEventPublisher(kt, eventMetaDataRegistry,mr)
 
     @Bean("batchPaymentTx")

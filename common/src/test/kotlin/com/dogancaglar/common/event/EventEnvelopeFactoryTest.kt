@@ -1,6 +1,8 @@
 package com.dogancaglar.common.event
 
+import com.dogancaglar.common.time.Utc
 import org.junit.jupiter.api.Test
+import java.time.Instant
 import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -11,7 +13,7 @@ class EventEnvelopeFactoryTest {
     data class TestEvent(
         override val eventType: String = "test_event",
         val payload: String,
-        override val timestamp: LocalDateTime = LocalDateTime.now()
+        override val timestamp: Instant = Utc.nowInstant()
     ) : Event {
         override fun deterministicEventId() = "fixed-id"
     }
@@ -48,7 +50,7 @@ class EventEnvelopeFactoryTest {
 
     @Test
     fun `envelopeFor uses explicit timestamp when passed`() {
-        val t = LocalDateTime.of(2020, 1, 1, 10, 0)
+        val t = Utc.toInstant(LocalDateTime.of(2020, 1, 1, 10, 0))
         val evt = TestEvent(payload = "test-payload", timestamp = t)
 
         val env = EventEnvelopeFactory.envelopeFor(

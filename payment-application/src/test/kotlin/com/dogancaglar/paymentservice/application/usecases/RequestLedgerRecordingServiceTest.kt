@@ -6,27 +6,22 @@ import com.dogancaglar.paymentservice.application.events.PaymentOrderEvent
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import io.mockk.*
+import com.dogancaglar.common.time.Utc
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class RequestLedgerRecordingServiceTest {
 
     private lateinit var eventPublisherPort: EventPublisherPort
-    private lateinit var clock: Clock
     private lateinit var service: RequestLedgerRecordingService
 
     @BeforeEach
     fun setup() {
         eventPublisherPort = mockk(relaxed = true)
-        clock = Clock.fixed(Instant.parse("2025-01-01T10:00:00Z"), ZoneOffset.UTC)
-        service = RequestLedgerRecordingService(eventPublisherPort, clock)
+        service = RequestLedgerRecordingService(eventPublisherPort)
     }
 
     // Helper method to create PaymentOrderFinalized with SUCCESSFUL_FINAL status
@@ -45,7 +40,7 @@ class RequestLedgerRecordingServiceTest {
         status = "SUCCESSFUL_FINAL",
         amount = amountValue,
         currency = currency,
-        timestamp = LocalDateTime.now(clock)
+        timestamp = Utc.nowInstant()
     )
 
     // Helper method to create PaymentOrderFinalized with FAILED_FINAL status
@@ -64,7 +59,7 @@ class RequestLedgerRecordingServiceTest {
         status = "FAILED_FINAL",
         amount = amountValue,
         currency = currency,
-        timestamp = LocalDateTime.now(clock)
+        timestamp = Utc.nowInstant()
     )
     @Test
     fun `should publish LedgerRecordingCommand for PaymentOrderSucceeded with SUCCESSFUL_FINAL status`() {
@@ -85,6 +80,7 @@ class RequestLedgerRecordingServiceTest {
         service.requestLedgerRecording(event)
 
         // then - verify publishSync called with exact parameters and correct status
+        val now = Utc.nowInstant()
         verify(exactly = 1) {
             eventPublisherPort.publishSync(
                 aggregateId = event.sellerId,
@@ -96,7 +92,8 @@ class RequestLedgerRecordingServiceTest {
                     cmd.amountValue == event.amountValue &&
                     cmd.currency == event.currency &&
                     cmd.finalStatus == event.eventType &&
-                    cmd.timestamp == LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
+                    cmd.timestamp.isAfter(now.minusSeconds(5)) &&
+                    cmd.timestamp.isBefore(now.plusSeconds(5))
                 },
                 parentEventId = expectedEventId,
                 traceId = expectedTraceId
@@ -124,6 +121,7 @@ class RequestLedgerRecordingServiceTest {
         service.requestLedgerRecording(failedEvent)
 
         // then - verify publishSync called with exact parameters and FAILED_FINAL status
+        val now = Utc.nowInstant()
         verify(exactly = 1) {
             eventPublisherPort.publishSync(
                 aggregateId = failedEvent.sellerId,
@@ -135,7 +133,8 @@ class RequestLedgerRecordingServiceTest {
                     cmd.sellerId == failedEvent.sellerId &&
                     cmd.amountValue == failedEvent.amountValue &&
                     cmd.currency == failedEvent.currency &&
-                    cmd.timestamp == LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
+                    cmd.timestamp.isAfter(now.minusSeconds(5)) &&
+                    cmd.timestamp.isBefore(now.plusSeconds(5))
                 },
                 parentEventId = expectedEventId,
                 traceId = expectedTraceId

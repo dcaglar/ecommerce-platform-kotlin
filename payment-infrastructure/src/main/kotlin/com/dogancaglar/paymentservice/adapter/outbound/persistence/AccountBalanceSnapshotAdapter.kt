@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.outbound.persistence
 
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.AccountBalanceEntity
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.AccountBalanceMapper
 import com.dogancaglar.paymentservice.domain.model.balance.AccountBalanceSnapshot
@@ -22,8 +23,8 @@ class AccountBalanceSnapshotAdapter(
             accountCode = snapshot.accountCode,
             balance = snapshot.balance,
             lastAppliedEntryId = snapshot.lastAppliedEntryId,
-            lastSnapshotAt = snapshot.lastSnapshotAt,
-            updatedAt = snapshot.updatedAt
+            lastSnapshotAt = Utc.toInstant(snapshot.lastSnapshotAt),
+            updatedAt = Utc.toInstant(snapshot.updatedAt)
         )
         accountBalanceMapper.insertOrUpdateSnapshot(entity)
     }
@@ -44,8 +45,8 @@ class AccountBalanceSnapshotAdapter(
             accountCode = entity.accountCode,
             balance = entity.balance,
             lastAppliedEntryId = entity.lastAppliedEntryId,
-            lastSnapshotAt = entity.lastSnapshotAt,
-            updatedAt = entity.updatedAt
+            lastSnapshotAt = Utc.fromInstant(entity.lastSnapshotAt),
+            updatedAt = Utc.fromInstant(entity.updatedAt)
         )
     }
 }

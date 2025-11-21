@@ -4,7 +4,7 @@ import com.dogancaglar.paymentservice.application.commands.LedgerRecordingComman
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
-import java.time.LocalDateTime
+import java.time.Instant
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class LedgerEntriesRecorded private constructor(
@@ -19,7 +19,7 @@ data class LedgerEntriesRecorded private constructor(
     @JsonProperty("ledgerBatchId") val ledgerBatchId: String,
     @JsonProperty("ledgerEntries") val ledgerEntries: List<LedgerEntryEventData>,
 
-    @JsonProperty("timestamp") override val timestamp: LocalDateTime
+    @JsonProperty("timestamp") override val timestamp: Instant
 ) : PaymentOrderEvent() {
 
     override val eventType: String = EVENT_TYPE
@@ -43,7 +43,7 @@ data class LedgerEntriesRecorded private constructor(
             cmd: LedgerRecordingCommand,
             batchId: String,
             entries: List<LedgerEntryEventData>,
-            now: LocalDateTime
+            now: Instant
         ) = LedgerEntriesRecorded(
             paymentOrderId = cmd.paymentOrderId,
             publicPaymentOrderId = cmd.publicPaymentOrderId,
@@ -71,7 +71,7 @@ data class LedgerEntriesRecorded private constructor(
             @JsonProperty("currency") currency: String,
             @JsonProperty("ledgerBatchId") batchId: String,
             @JsonProperty("ledgerEntries") ledgerEntries: List<LedgerEntryEventData>,
-            @JsonProperty("timestamp") timestamp: LocalDateTime
+            @JsonProperty("timestamp") timestamp: Instant
         ) = LedgerEntriesRecorded(
             pOrderId,
             pubOrderId,

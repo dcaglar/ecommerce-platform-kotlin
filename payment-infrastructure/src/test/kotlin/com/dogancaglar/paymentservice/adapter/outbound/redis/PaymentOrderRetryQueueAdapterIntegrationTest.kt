@@ -36,8 +36,8 @@ import org.testcontainers.containers.GenericContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
-import java.time.Clock
-import java.time.LocalDateTime
+import com.dogancaglar.common.time.Utc
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -73,19 +73,15 @@ class PaymentOrderRetryQueueAdapterIntegrationTest {
         }
 
         @Bean
-        fun clock(): Clock = Clock.systemUTC()
-        
-        @Bean
         fun paymentOrderRetryQueueAdapter(
             cache: PaymentOrderRetryRedisCache,
-            objectMapper: ObjectMapper,
-            clock: Clock
+            objectMapper: ObjectMapper
         ): PaymentOrderRetryQueueAdapter {
             return PaymentOrderRetryQueueAdapter(
                 cache,
                 SimpleMeterRegistry(),
                 objectMapper,
-                PaymentOrderDomainEventMapper(clock)
+                PaymentOrderDomainEventMapper()
             )
         }
     }
@@ -133,8 +129,8 @@ class PaymentOrderRetryQueueAdapterIntegrationTest {
         id: Long = 123L,
         retryCount: Int = 0,
         status: PaymentOrderStatus = PaymentOrderStatus.CAPTURE_REQUESTED,
-        createdAt: LocalDateTime = LocalDateTime.now(),
-        updatedAt: LocalDateTime = createdAt
+        createdAt: Instant = Utc.nowInstant(),
+        updatedAt: Instant = createdAt
     ): PaymentOrder =
         PaymentOrder.rehydrate(
             paymentOrderId = PaymentOrderId(id),
@@ -143,8 +139,8 @@ class PaymentOrderRetryQueueAdapterIntegrationTest {
             amount = Amount.of(10000L, Currency("USD")),
             status = status,
             retryCount = retryCount,
-            createdAt = createdAt,
-            updatedAt = updatedAt
+            createdAt = Utc.fromInstant(createdAt),
+            updatedAt = Utc.fromInstant(updatedAt)
         )
 
     // ==================== End-to-End Retry Flow ====================

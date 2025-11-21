@@ -3,17 +3,18 @@ package logging
 import com.dogancaglar.common.event.Event
 import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.common.time.Utc
 import junit.framework.TestCase.assertTrue
 import org.junit.jupiter.api.Test
 import org.slf4j.MDC
-import java.time.LocalDateTime
+import java.time.Instant
 import kotlin.test.assertEquals
 
 class EventLogContextTest {
 
     data class TestEvent(
         override val eventType: String = "x",
-        override val timestamp: LocalDateTime = LocalDateTime.now()
+        override val timestamp: Instant = Utc.nowInstant()
     ) : Event {
         override fun deterministicEventId() = "id-x"
     }

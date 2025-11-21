@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.port.inbound.consumers
 import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
@@ -19,11 +20,6 @@ import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
-import java.time.LocalDateTime
-import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
@@ -34,7 +30,6 @@ class PaymentOrderPspResultApplierTest {
     private lateinit var kafkaTxExecutor: KafkaTxExecutor
     private lateinit var processPspResultUseCase: ProcessPspResultUseCase
     private lateinit var paymentOrderModificationPort: PaymentOrderModificationPort
-    private lateinit var clock: Clock
     private lateinit var applier: PaymentOrderPspResultApplier
 
     private lateinit var dedupe: com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
@@ -44,7 +39,6 @@ class PaymentOrderPspResultApplierTest {
         kafkaTxExecutor = mockk()
         processPspResultUseCase = mockk()
         paymentOrderModificationPort = mockk()
-        clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
         dedupe = mockk(relaxed = true)
 
         applier = PaymentOrderPspResultApplier(
@@ -62,7 +56,7 @@ class PaymentOrderPspResultApplierTest {
         val expectedTraceId = "trace-123"
         val consumedEventId = "11111111-1111-1111-1111-111111111111"
         val parentEventId = "22222222-2222-2222-2222-222222222222"
-        val now = clock.instant().atZone(clock.zone).toLocalDateTime()
+        val now = Utc.nowLocalDateTime()
         val paymentId = PaymentId(456L)
         
         // PaymentOrderCaptureCommand requires CAPTURE_REQUESTED or PENDING_CAPTURE status
@@ -76,12 +70,12 @@ class PaymentOrderPspResultApplierTest {
             createdAt = now,
             updatedAt = now
         )
-        val captureCommand = PaymentOrderDomainEventMapper(clock).toPaymentOrderCaptureCommand(paymentOrder, attempt = 0)
+        val captureCommand = PaymentOrderDomainEventMapper().toPaymentOrderCaptureCommand(paymentOrder, attempt = 0)
         val pspResultUpdated = PaymentOrderPspResultUpdated.from(
             cmd = captureCommand,
-            pspStatus = PaymentOrderStatus.CAPTURED.name,
+            pspStatus = PaymentOrderStatus.CAPTURED,
             latencyMs = 150L,
-            now = now
+            now = Utc.nowInstant()
         )
 
         val envelope = EventEnvelopeFactory.envelopeFor(
@@ -150,7 +144,7 @@ class PaymentOrderPspResultApplierTest {
         val expectedTraceId = "trace-456"
         val consumedEventId = "33333333-3333-3333-3333-333333333333"
         val parentEventId = "44444444-4444-4444-4444-444444444444"
-        val now = clock.instant().atZone(clock.zone).toLocalDateTime()
+        val now = Utc.nowLocalDateTime()
         val paymentId = PaymentId(456L)
         
         // PaymentOrderCaptureCommand requires CAPTURE_REQUESTED or PENDING_CAPTURE status
@@ -164,12 +158,12 @@ class PaymentOrderPspResultApplierTest {
             createdAt = now,
             updatedAt = now
         )
-        val captureCommand = PaymentOrderDomainEventMapper(clock).toPaymentOrderCaptureCommand(paymentOrder, attempt = 0)
+        val captureCommand = PaymentOrderDomainEventMapper().toPaymentOrderCaptureCommand(paymentOrder, attempt = 0)
         val pspResultUpdated = PaymentOrderPspResultUpdated.from(
             cmd = captureCommand,
-            pspStatus = PaymentOrderStatus.PENDING_CAPTURE.name,
+            pspStatus = PaymentOrderStatus.PENDING_CAPTURE,
             latencyMs = 200L,
-            now = now
+            now = Utc.nowInstant()
         )
 
         val envelope = EventEnvelopeFactory.envelopeFor(

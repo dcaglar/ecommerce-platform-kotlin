@@ -4,7 +4,7 @@ import com.dogancaglar.common.event.Event
 import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.metadata.EventMetadata
-import com.dogancaglar.common.event.metadata.EventMetadataRegistry
+import com.dogancaglar.common.event.metadata.EventMetaDataRegistry
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import io.micrometer.core.instrument.MeterRegistry
@@ -19,7 +19,7 @@ import java.util.concurrent.TimeoutException
 
 class PaymentEventPublisher(
     private val kafkaTemplate: KafkaTemplate<String, EventEnvelope<*>>,
-    private val eventMetadataRegistry: EventMetadataRegistry,
+    private val eventMetaDataRegistry: EventMetaDataRegistry,
     private val meterRegistry: MeterRegistry,
 ) : EventPublisherPort {
 
@@ -35,7 +35,7 @@ class PaymentEventPublisher(
         parentEventId: String?,
         timeoutSeconds: Long
     ): EventEnvelope<T> {
-        val eventMetaData = eventMetadataRegistry.metadataForEvent(data)
+        val eventMetaData = eventMetaDataRegistry.metadataForEvent(data)
         val envelope = EventEnvelopeFactory.envelopeFor(
             data = data,
             aggregateId = aggregateId,
@@ -75,7 +75,7 @@ class PaymentEventPublisher(
         return try {
             kafkaTemplate.executeInTransaction<Unit> { kt ->
                 val futures = envelopes.map { env ->
-                    val eventMetaData = eventMetadataRegistry.metadataForEvent(env.data)
+                    val eventMetaData = eventMetaDataRegistry.metadataForEvent(env.data)
                     kt.send(buildRecord(eventMetaData, env))
                 }
 

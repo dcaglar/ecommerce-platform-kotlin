@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.application.usecases
 
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
@@ -16,22 +17,20 @@ import com.dogancaglar.paymentservice.ports.inbound.RecordLedgerEntriesUseCase
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
+import org.slf4j.LoggerFactory
 import java.time.Clock
-import java.time.LocalDateTime
 import java.util.UUID
 
 open class RecordLedgerEntriesService(
     private val ledgerWritePort: LedgerEntryPort,
     private val eventPublisherPort: EventPublisherPort,
-    private val accountDirectory: AccountDirectoryPort,
-    private val clock: Clock
-) : RecordLedgerEntriesUseCase {
+    private val accountDirectory: AccountDirectoryPort) : RecordLedgerEntriesUseCase {
 
-    private val ledgerEntryFactory = LedgerEntryFactory(clock)
-    private val logger = org.slf4j.LoggerFactory.getLogger(javaClass)
+    private val ledgerEntryFactory = LedgerEntryFactory()
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     override fun recordLedgerEntries(event: LedgerRecordingCommand) {
-        val createdAt = LocalDateTime.now(clock)
+        val createdAt = Utc.nowLocalDateTime()
         val traceId = EventLogContext.getTraceId() ?: UUID.randomUUID().toString()
         val parentEventId = EventLogContext.getEventId()
 
@@ -94,7 +93,7 @@ open class RecordLedgerEntriesService(
 
 
 
-        val recordedEvent = LedgerEntriesRecorded.from(event,"ledger-batch-${UUID.randomUUID()}",ledgerEntryEventDataList,createdAt)
+        val recordedEvent = LedgerEntriesRecorded.from(event,"ledger-batch-${UUID.randomUUID()}",ledgerEntryEventDataList,Utc.toInstant(createdAt))
 
         eventPublisherPort.publishSync(
             aggregateId = event.sellerId,

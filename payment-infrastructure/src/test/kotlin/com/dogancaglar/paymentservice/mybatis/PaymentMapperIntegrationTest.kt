@@ -20,7 +20,8 @@ import org.springframework.test.context.TestPropertySource
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
-import java.time.LocalDateTime
+import com.dogancaglar.common.time.Utc
+import java.time.Instant
 
 @Tag("integration")
 @MybatisTest
@@ -74,13 +75,13 @@ class PaymentMapperIntegrationTest {
             idempotencyKey = key,
             currency = "USD",
             status = "PENDING_AUTH",
-            createdAt = LocalDateTime.now().withNano(0),
-            updatedAt = LocalDateTime.now().withNano(0)
+            createdAt = Utc.nowInstant(),
+            updatedAt = Utc.nowInstant()
         )
 
     @Test
     fun `insert find update and delete payment`() {
-        val createdAt = LocalDateTime.now().withNano(0)
+        val createdAt = Utc.nowInstant()
         val entity = PaymentEntity(
             paymentId = 101L,
             buyerId = "buyer-1",
@@ -102,7 +103,7 @@ class PaymentMapperIntegrationTest {
 
         assertEquals(101L, paymentMapper.getMaxPaymentId())
 
-        val updatedAt = createdAt.plusMinutes(5)
+        val updatedAt = createdAt.plusSeconds(300) // 5 minutes
         val updatedEntity = entity.copy(
             capturedAmountValue = 5_000,
             status = "CAPTURED_PARTIALLY",

@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.event
 import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.GenericLogFields
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
@@ -16,16 +17,11 @@ import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.slf4j.MDC
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneOffset
 import java.util.UUID
 
 class DomainEventFactoryTest {
 
-    private val clock = Clock.fixed(Instant.parse("2024-01-01T12:00:00Z"), ZoneOffset.UTC)
-    private val mapper = PaymentOrderDomainEventMapper(clock)
+    private val mapper = PaymentOrderDomainEventMapper()
 
     @Test
     fun `should create EventEnvelope with generated eventId and traceid from mdc`() {
@@ -33,7 +29,7 @@ class DomainEventFactoryTest {
         val traceIdFromMDC = "test-traceid"
         MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
-            val now = LocalDateTime.now(clock)
+            val now = Utc.nowLocalDateTime()
             val paymentOrder = PaymentOrder.rehydrate(
                 paymentOrderId = PaymentOrderId(1001L),
                 paymentId = PaymentId(123L),
@@ -66,7 +62,7 @@ class DomainEventFactoryTest {
     fun `should generate new traceId when not present in MDC`() {
         // when
         assertThrows<IllegalStateException> {
-            val now = LocalDateTime.now(clock)
+            val now = Utc.nowLocalDateTime()
             val paymentOrder = PaymentOrder.rehydrate(
                 paymentOrderId = PaymentOrderId(1L),
                 paymentId = PaymentId(1L),
@@ -92,7 +88,7 @@ class DomainEventFactoryTest {
         val traceIdFromMDC = "test-traceid"
         MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
-            val now = LocalDateTime.now(clock)
+            val now = Utc.nowLocalDateTime()
             val paymentOrder1 = PaymentOrder.rehydrate(
                 paymentOrderId = PaymentOrderId(1L),
                 paymentId = PaymentId(2L),
@@ -140,7 +136,7 @@ class DomainEventFactoryTest {
         val traceIdFromMDC = "test-traceid"
         MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
-            val now = LocalDateTime.now(clock)
+            val now = Utc.nowLocalDateTime()
             val paymentOrder = PaymentOrder.rehydrate(
                 paymentOrderId = PaymentOrderId(1001L),
                 paymentId = PaymentId(123L),
@@ -175,7 +171,7 @@ class DomainEventFactoryTest {
         MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
             val parentId = UUID.randomUUID().toString()
-            val now = LocalDateTime.now(clock)
+            val now = Utc.nowLocalDateTime()
             val paymentOrder = PaymentOrder.rehydrate(
                 paymentOrderId = PaymentOrderId(1001L),
                 paymentId = PaymentId(123L),

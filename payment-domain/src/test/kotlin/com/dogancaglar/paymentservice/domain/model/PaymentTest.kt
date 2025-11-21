@@ -1,13 +1,10 @@
 package com.dogancaglar.paymentservice.domain.model
 
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.vo.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneOffset
 
 class PaymentTest {
 
@@ -16,13 +13,12 @@ class PaymentTest {
     private val orderId = OrderId("order-xyz")
     private val currency = Currency("EUR")
     private val totalAmount = Amount.of(10000L, currency) // €100.00
-    private val clock = Clock.fixed(Instant.parse("2024-01-01T00:00:00Z"), ZoneOffset.UTC)
 
     // --- ✅ Creation ---
 
     @Test
     fun `should create new payment with initial state`() {
-        val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount, clock)
+        val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount)
 
         assertEquals(paymentId, payment.paymentId)
         assertEquals(buyerId, payment.buyerId)
@@ -31,7 +27,8 @@ class PaymentTest {
         assertEquals(Amount.zero(currency), payment.capturedAmount)
         assertEquals(PaymentStatus.PENDING_AUTH, payment.status)
         assertEquals(0, payment.paymentOrders.size)
-        assertEquals(LocalDateTime.now(clock), payment.createdAt)
+        assertNotNull(payment.createdAt)
+        assertNotNull(payment.updatedAt)
     }
 
     @Test

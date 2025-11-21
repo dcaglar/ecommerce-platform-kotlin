@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.domain.model
 
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.vo.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -157,8 +158,8 @@ class PaymentOrderTest {
             Amount.of(2000L, Currency("USD")),
             PaymentOrderStatus.CAPTURED,
             retryCount = 2,
-            createdAt = LocalDateTime.now().minusDays(1),
-            updatedAt = LocalDateTime.now()
+            createdAt = Utc.nowLocalDateTime().minusDays(1),
+            updatedAt = Utc.nowLocalDateTime()
         )
 
         assertEquals(PaymentOrderStatus.CAPTURED, persisted.status)

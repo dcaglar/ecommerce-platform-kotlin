@@ -20,7 +20,8 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import java.time.LocalDateTime
+import com.dogancaglar.common.time.Utc
+import java.time.Instant
 
 class JacksonSerializationAdapterTest {
 
@@ -69,7 +70,7 @@ class JacksonSerializationAdapterTest {
 
     @Test
     fun `toJson serializes LocalDateTime values`() {
-        val timestamp = LocalDateTime.of(2024, 1, 1, 12, 0)
+        val timestamp = Utc.fromInstant(Instant.parse("2024-01-01T12:00:00Z"))
 
         val json = adapter.toJson(mapOf("createdAt" to timestamp))
 
@@ -118,8 +119,8 @@ class JacksonSerializationAdapterTest {
             amount = Amount.of(10000L, Currency("USD")),
             status = status,
             retryCount = retryCount,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
+            createdAt = Utc.nowLocalDateTime(),
+            updatedAt = Utc.nowLocalDateTime()
         )
 }
 

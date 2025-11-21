@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest.mapper
 
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentOrderRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentRequestDTO
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
@@ -16,13 +17,9 @@ import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.port.out.web.dto.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
 
 class PaymentRequestMapperTest {
 
-    private val clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
 
     @Test
     fun `should map PaymentRequestDTO to CreatePaymentCommand correctly`() {
@@ -86,14 +83,11 @@ class PaymentRequestMapperTest {
 
     @Test
     fun `should map Payment to PaymentResponseDTO correctly`() {
-        val createdAt = clock.instant().atZone(clock.zone).toLocalDateTime()
-
         val basePayment = Payment.createNew(
             paymentId = PaymentId(123L),
             buyerId = BuyerId("buyer-456"),
             orderId = OrderId("order-123"),
             totalAmount = Amount.of(10000L, Currency("USD")),
-            clock = clock
         )
 
         val paymentOrder = PaymentOrder.rehydrate(
@@ -103,8 +97,8 @@ class PaymentRequestMapperTest {
             amount = Amount.of(10000L, Currency("USD")),
             status = PaymentOrderStatus.INITIATED_PENDING,
             retryCount = 0,
-            createdAt = createdAt,
-            updatedAt = createdAt
+            createdAt = basePayment.createdAt,
+            updatedAt = basePayment.createdAt
         )
 
         val payment = basePayment.addPaymentOrder(paymentOrder)
@@ -117,7 +111,7 @@ class PaymentRequestMapperTest {
         assertEquals("order-123", response.orderId)
         assertEquals(10000L, response.totalAmount.quantity)
         assertEquals(CurrencyEnum.USD, response.totalAmount.currency)
-        assertEquals(createdAt.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME), response.createdAt)
+        assertEquals(payment.createdAt.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME), response.createdAt)
     }
 
     @Test
@@ -127,7 +121,6 @@ class PaymentRequestMapperTest {
             buyerId = BuyerId("buyer-789"),
             orderId = OrderId("order-456"),
             totalAmount = Amount.of(5000L, Currency("EUR")),
-            clock = clock
         ).authorize()
 
         val response = PaymentRequestMapper.toResponse(payment)

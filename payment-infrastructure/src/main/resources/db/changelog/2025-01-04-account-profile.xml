@@ -22,8 +22,14 @@
             <column name="category" type="VARCHAR(32)"/>
             <column name="country" type="VARCHAR(2)"/>
             <column name="status" type="VARCHAR(16)" defaultValue="ACTIVE"/>
-            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
-            <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE"
+                    defaultValueComputed="(now() AT TIME ZONE 'UTC')">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITHOUT TIME ZONE"
+                    defaultValueComputed="(now() AT TIME ZONE 'UTC')">
+                <constraints nullable="false"/>
+            </column>
         </createTable>
 
         <createIndex tableName="account_directory" indexName="idx_account_directory_entity">

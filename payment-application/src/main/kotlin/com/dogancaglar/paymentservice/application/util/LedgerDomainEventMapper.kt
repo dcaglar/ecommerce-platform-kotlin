@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.application.util
 
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.events.LedgerEntryEventData
 import com.dogancaglar.paymentservice.application.events.PostingDirection
 import com.dogancaglar.paymentservice.application.events.PostingEventData
@@ -10,11 +11,10 @@ import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
 import com.dogancaglar.paymentservice.domain.model.ledger.LedgerEntry
 import com.dogancaglar.paymentservice.domain.model.ledger.Posting
 import com.dogancaglar.paymentservice.domain.util.LedgerEntryFactory
-import java.time.Clock
 
 object LedgerDomainEventMapper {
 
-    private val ledgerEntryFactory = LedgerEntryFactory(Clock.systemUTC())
+    private val ledgerEntryFactory = LedgerEntryFactory()
 
     /**
      * Maps LedgerEntry domain model to LedgerEntryEventData DTO.
@@ -26,7 +26,7 @@ object LedgerDomainEventMapper {
             journalEntryId = journal.id,
             journalType = journal.txType,
             journalName = journal.name,
-            createdAt = ledgerEntry.createdAt,
+            createdAt = Utc.toInstant(ledgerEntry.createdAt),
             postings = journal.postings.map { toPostingEventData(it) }
         )
     }
@@ -35,7 +35,7 @@ object LedgerDomainEventMapper {
     fun toDomain(ledgerEntryEvent: LedgerEntryEventData): LedgerEntry {
         val postingsDomain = ledgerEntryEvent.postings.map { it.toDomain() }
 
-        val journal = JournalEntry.JournalFactory.fromPersistence(
+        val journal = JournalEntry.fromPersistence(
             id = ledgerEntryEvent.journalEntryId,
             txType = ledgerEntryEvent.journalType,
             name = ledgerEntryEvent.journalName ?: "Ledger Entry",
@@ -45,7 +45,7 @@ object LedgerDomainEventMapper {
         return ledgerEntryFactory.fromPersistence(
             ledgerEntryId = ledgerEntryEvent.ledgerEntryId,
             journalEntry = journal,
-            createdAt = ledgerEntryEvent.createdAt
+            createdAt = ledgerEntryEvent.createdAt,
         )
     }
 

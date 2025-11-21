@@ -4,11 +4,11 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.metadata.EventMetadata
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
-import com.dogancaglar.paymentservice.application.events.PaymentPipelineAuthorized
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
 import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
+import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
 import com.fasterxml.jackson.core.type.TypeReference
 
 object PaymentEventMetadataCatalog {
@@ -27,12 +27,12 @@ object PaymentEventMetadataCatalog {
 
 
 
-    object PaymentAuthorizedMetadata : EventMetadata<PaymentPipelineAuthorized> {
+    object PaymentAuthorizedMetadata : EventMetadata<PaymentAuthorized> {
         override val topic = Topics.PAYMENT_AUTHORIZED
         override val eventType = EVENT_TYPE.PAYMENT_AUTHORIZED
-        override val clazz = PaymentPipelineAuthorized::class.java
-        override val typeRef = object : TypeReference<EventEnvelope<PaymentPipelineAuthorized>>() {}
-        override val partitionKey = { evt: PaymentPipelineAuthorized ->
+        override val clazz = PaymentAuthorized::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<PaymentAuthorized>>() {}
+        override val partitionKey = { evt: PaymentAuthorized ->
             evt.paymentId   // <-- INTERNAL ID string
         }
     }

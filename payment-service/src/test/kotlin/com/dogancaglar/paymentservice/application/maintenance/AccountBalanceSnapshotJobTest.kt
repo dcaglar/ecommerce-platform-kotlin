@@ -6,8 +6,8 @@ import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import io.mockk.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import com.dogancaglar.common.time.Utc
 import java.time.Duration
-import java.time.LocalDateTime
 
 class AccountBalanceSnapshotJobTest {
 
@@ -33,8 +33,8 @@ class AccountBalanceSnapshotJobTest {
             accountCode = accountCode,
             balance = 100000L,
             lastAppliedEntryId = 100L,
-            lastSnapshotAt = LocalDateTime.now().minusHours(1),
-            updatedAt = LocalDateTime.now().minusHours(1)
+            lastSnapshotAt = Utc.nowLocalDateTime().minusHours(1),
+            updatedAt = Utc.nowLocalDateTime().minusHours(1)
         )
         
         val delta = 5000L
@@ -114,8 +114,8 @@ class AccountBalanceSnapshotJobTest {
             accountCode = accountCode,
             balance = 50000L,
             lastAppliedEntryId = 50L,
-            lastSnapshotAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
+            lastSnapshotAt = Utc.nowLocalDateTime(),
+            updatedAt = Utc.nowLocalDateTime()
         )
         
         val delta = -10000L
@@ -150,15 +150,15 @@ class AccountBalanceSnapshotJobTest {
             accountCode = accountCode1,
             balance = 100000L,
             lastAppliedEntryId = 100L,
-            lastSnapshotAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
+            lastSnapshotAt = Utc.nowLocalDateTime(),
+            updatedAt = Utc.nowLocalDateTime()
         )
         val snapshot2 = AccountBalanceSnapshot(
             accountCode = accountCode2,
             balance = 50000L,
             lastAppliedEntryId = 50L,
-            lastSnapshotAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
+            lastSnapshotAt = Utc.nowLocalDateTime(),
+            updatedAt = Utc.nowLocalDateTime()
         )
         
         every { accountBalanceCachePort.getDirtyAccounts() } returns setOf(accountCode1, accountCode2)

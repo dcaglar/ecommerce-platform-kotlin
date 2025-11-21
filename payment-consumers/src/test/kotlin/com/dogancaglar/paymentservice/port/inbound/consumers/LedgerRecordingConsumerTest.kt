@@ -18,10 +18,7 @@ import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneOffset
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.common.id.PublicIdFactory
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
 import com.dogancaglar.paymentservice.domain.model.Amount
@@ -32,14 +29,12 @@ class LedgerRecordingConsumerTest {
 
     private lateinit var kafkaTxExecutor: KafkaTxExecutor
     private lateinit var recordLedgerEntriesUseCase: RecordLedgerEntriesUseCase
-    private lateinit var clock: Clock
     private lateinit var consumer: LedgerRecordingConsumer
 
     @BeforeEach
     fun setUp() {
         kafkaTxExecutor = mockk()
         recordLedgerEntriesUseCase = mockk()
-        clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
         
         this.consumer = LedgerRecordingConsumer(
             kafkaTx = kafkaTxExecutor,
@@ -56,7 +51,7 @@ class LedgerRecordingConsumerTest {
         val expectedTraceId = "trace-123"
         val consumedEventId = "11111111-1111-1111-1111-111111111111"
         val parentEventId = "22222222-2222-2222-2222-222222222222"
-        val expectedCreatedAt = LocalDateTime.now(clock)
+        val expectedCreatedAt = Utc.nowLocalDateTime()
         val paymentId = PaymentId(456L)
         
         val paymentOrder = PaymentOrder.rehydrate(
@@ -69,8 +64,8 @@ class LedgerRecordingConsumerTest {
             createdAt = expectedCreatedAt,
             updatedAt = expectedCreatedAt
         )
-        val finalizedEvent = PaymentOrderFinalized.from(paymentOrder, expectedCreatedAt, PaymentOrderStatus.CAPTURED)
-        val command = LedgerRecordingCommand.from(finalizedEvent, expectedCreatedAt)
+        val finalizedEvent = PaymentOrderFinalized.from(paymentOrder, Utc.toInstant(expectedCreatedAt), PaymentOrderStatus.CAPTURED)
+        val command = LedgerRecordingCommand.from(finalizedEvent, Utc.toInstant(expectedCreatedAt))
         
         val envelope = EventEnvelopeFactory.envelopeFor(
             data = command,
@@ -147,7 +142,7 @@ class LedgerRecordingConsumerTest {
         val consumedEventId = "33333333-3333-3333-3333-333333333333"
         val parentEventId = "44444444-4444-4444-4444-444444444444"
         val paymentId = PaymentId(789L)
-        val now = clock.instant().atZone(clock.zone).toLocalDateTime()
+        val now = Utc.nowLocalDateTime()
         
         val paymentOrder = PaymentOrder.rehydrate(
             paymentOrderId = paymentOrderId,
@@ -159,8 +154,8 @@ class LedgerRecordingConsumerTest {
             createdAt = now,
             updatedAt = now
         )
-        val finalizedEvent = PaymentOrderFinalized.from(paymentOrder, now, PaymentOrderStatus.CAPTURE_FAILED)
-        val command = LedgerRecordingCommand.from(finalizedEvent, now)
+        val finalizedEvent = PaymentOrderFinalized.from(paymentOrder, Utc.toInstant(now), PaymentOrderStatus.CAPTURE_FAILED)
+        val command = LedgerRecordingCommand.from(finalizedEvent, Utc.toInstant(now))
         
         val envelope = EventEnvelopeFactory.envelopeFor(
             data = command,
@@ -230,7 +225,7 @@ class LedgerRecordingConsumerTest {
         // Given
         val paymentOrderId = PaymentOrderId(789L)
         val paymentId = PaymentId(101L)
-        val now = clock.instant().atZone(clock.zone).toLocalDateTime()
+        val now = Utc.nowLocalDateTime()
         
         val paymentOrder = PaymentOrder.rehydrate(
             paymentOrderId = paymentOrderId,
@@ -242,8 +237,8 @@ class LedgerRecordingConsumerTest {
             createdAt = now,
             updatedAt = now
         )
-        val finalizedEvent = PaymentOrderFinalized.from(paymentOrder, now, PaymentOrderStatus.CAPTURED)
-        val command = LedgerRecordingCommand.from(finalizedEvent, now)
+        val finalizedEvent = PaymentOrderFinalized.from(paymentOrder, Utc.toInstant(now), PaymentOrderStatus.CAPTURED)
+        val command = LedgerRecordingCommand.from(finalizedEvent, Utc.toInstant(now))
         
         val envelope = EventEnvelopeFactory.envelopeFor(
             data = command,

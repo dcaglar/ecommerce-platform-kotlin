@@ -15,6 +15,7 @@ import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
 import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
 import org.slf4j.LoggerFactory
+import com.dogancaglar.common.time.Utc
 import org.springframework.beans.factory.annotation.Qualifier
 import java.time.Clock
 import java.time.Instant
@@ -31,7 +32,6 @@ open class ProcessPaymentService(
     private val retryQueuePort: RetryQueuePort<PaymentOrderCaptureCommand>,
     private val paymentOrderModificationPort: PaymentOrderModificationPort,
     private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
-    private val clock: Clock
 ) : ProcessPspResultUseCase {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -68,7 +68,7 @@ open class ProcessPaymentService(
 
     private fun handleCaptured(order: PaymentOrder) {
         val persisted = paymentOrderModificationPort.markAsCaptured(order)
-        val evt = paymentOrderDomainEventMapper.toPaymentOrderFinalized(persisted, LocalDateTime.now(clock),
+        val evt = paymentOrderDomainEventMapper.toPaymentOrderFinalized(persisted, Utc.nowLocalDateTime(),
             PaymentOrderStatus.CAPTURED)
         eventPublisher.publishSync(
             persisted.paymentOrderId.value.toString(),
@@ -80,7 +80,7 @@ open class ProcessPaymentService(
 
     private fun handleFailed(order: PaymentOrder) {
         val persisted = paymentOrderModificationPort.markAsCaptureFailed(order)
-        val evt = paymentOrderDomainEventMapper.toPaymentOrderFinalized(persisted, LocalDateTime.now(clock),
+        val evt = paymentOrderDomainEventMapper.toPaymentOrderFinalized(persisted, Utc.nowLocalDateTime(),
             PaymentOrderStatus.CAPTURE_FAILED)
         eventPublisher.publishSync(
             persisted.paymentOrderId.value.toString(),
@@ -94,17 +94,16 @@ open class ProcessPaymentService(
         nextRetryCount: Int,
         scheduledAt: Long,
     ) {
-        val scheduledLocal = LocalDateTime.ofInstant(Instant.ofEpochMilli(scheduledAt), clock.zone)
+        val scheduledInstant = Instant.ofEpochMilli(scheduledAt)
+        val amsterdamZone = ZoneId.of("Europe/Amsterdam")
+        val scheduledLocal = LocalDateTime.ofInstant(scheduledInstant, amsterdamZone)
         val formattedLocal = scheduledLocal.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))
-        val scheduledUtc = LocalDateTime.ofInstant(Instant.ofEpochMilli(scheduledAt), ZoneId.of("UTC"))
-        val formattedUtc = scheduledUtc.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))
 
         logger.info(
-            "Scheduling retry for paymentOrderId={} [attempt {}/{}] due at {} (local, {}) / {} (UTC)",
-            order.paymentOrderId.toPublicPaymentOrderId(), nextRetryCount, MAX_RETRIES,
-            formattedLocal, clock.zone, formattedUtc,
+            "Scheduling retry for paymentOrderId=${order.paymentOrderId.toPublicPaymentOrderId()} " +
+                    "[attempt $nextRetryCount/$MAX_RETRIES] due at $formattedLocal (Amsterdam time)"
         )
-    }
+            }
 
 
     private fun computeEqualJitterBackoff(attempt: Int, minDelayMs: Long = 2000L, maxDelayMs: Long = 60000L): Long {

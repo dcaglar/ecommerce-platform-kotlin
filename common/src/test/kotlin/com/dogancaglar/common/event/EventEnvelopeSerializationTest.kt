@@ -1,5 +1,6 @@
 package com.dogancaglar.common.event
 
+import com.dogancaglar.common.time.Utc
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
@@ -8,7 +9,7 @@ import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import junit.framework.TestCase.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertNull
-import java.time.LocalDateTime
+import java.time.Instant
 import kotlin.test.assertEquals
 
 class EventEnvelopeSerializationTest {
@@ -21,7 +22,7 @@ class EventEnvelopeSerializationTest {
     data class TestEvent(
         override val eventType: String = "test_event",
         val x: Int,
-        override val timestamp: LocalDateTime = LocalDateTime.now()
+        override val timestamp: Instant = Utc.nowInstant()
     ) : Event {
         override fun deterministicEventId() = "id-$x"
     }

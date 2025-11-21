@@ -1,8 +1,9 @@
 package com.dogancaglar.common.event
 
+import com.dogancaglar.common.time.Utc
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
-import java.time.LocalDateTime
+import java.time.Instant
 
 data class EventEnvelope<T : Event> @JsonCreator constructor(
     @JsonProperty("eventId")
@@ -18,7 +19,7 @@ data class EventEnvelope<T : Event> @JsonCreator constructor(
     val data: T,
 
     @JsonProperty("timestamp")
-    val timestamp: LocalDateTime = LocalDateTime.now(),
+    val timestamp: Instant = Utc.nowInstant(),
 
     @JsonProperty("traceId")
     val traceId: String,

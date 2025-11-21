@@ -9,7 +9,7 @@ import java.util.*
 
 object EventLogContext {
     private val logger = LoggerFactory.getLogger(EventLogContext::class.java)
-    fun getTraceId(): String = MDC.get(GenericLogFields.TRACE_ID)
+    fun getTraceId(): String = MDC.get(GenericLogFields.TRACE_ID)?: UUID.randomUUID().toString()
     fun getEventId(): String? =
         MDC.get(GenericLogFields.EVENT_ID)
     fun getParentEventId(): String? =

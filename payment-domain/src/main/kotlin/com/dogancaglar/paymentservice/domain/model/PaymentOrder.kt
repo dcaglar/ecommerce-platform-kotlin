@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.domain.model
 
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
@@ -126,7 +127,7 @@ class PaymentOrder private constructor(
     private fun copy(
         status: PaymentOrderStatus = this.status,
         retryCount: Int = this.retryCount,
-        updatedAt: LocalDateTime = LocalDateTime.now()
+        updatedAt: LocalDateTime = Utc.nowLocalDateTime()
     ): PaymentOrder = PaymentOrder(
         paymentOrderId = paymentOrderId,
         paymentId = paymentId,
@@ -188,7 +189,7 @@ class PaymentOrder private constructor(
                 "Seller ID cannot be blank. " +
                         "PaymentOrderId: ${paymentOrderId.value}"
             }
-            val now = LocalDateTime.now()
+            val now = Utc.nowLocalDateTime()
             return PaymentOrder(
                 paymentOrderId = paymentOrderId,
                 paymentId = paymentId,

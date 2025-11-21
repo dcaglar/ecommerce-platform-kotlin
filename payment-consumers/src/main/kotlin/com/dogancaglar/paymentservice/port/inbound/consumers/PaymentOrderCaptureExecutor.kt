@@ -26,8 +26,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
-import java.time.Clock
-import java.time.LocalDateTime
+import com.dogancaglar.common.time.Utc
 import java.util.concurrent.TimeUnit
 @Component
 class PaymentOrderCaptureExecutor(
@@ -39,8 +38,7 @@ class PaymentOrderCaptureExecutor(
     private val publisher: EventPublisherPort,
     private val paymentOrderRepository: PaymentOrderRepository,
     private val mapper: PaymentOrderDomainEventMapper,
-    private val dedupe: EventDeduplicationPort,
-    private val clock: Clock
+    private val dedupe: EventDeduplicationPort
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -130,7 +128,7 @@ class PaymentOrderCaptureExecutor(
                     work,
                     pspStatus,
                     tookMs,
-                    LocalDateTime.now(clock)
+                    Utc.nowInstant()
                 )
             } catch (ex: IllegalArgumentException) {
                 // domain invariant failed (invalid PSP status or order state)
@@ -173,7 +171,7 @@ class PaymentOrderCaptureExecutor(
 
                 logger.info(
                     "📤 PSP_RESULT_UPDATED published poId={} traceId={} status={}",
-                    work.paymentOrderId, outEnv.traceId, result.pspStatus
+                    work.paymentOrderId, outEnv.traceId, result
                 )
             }
         }

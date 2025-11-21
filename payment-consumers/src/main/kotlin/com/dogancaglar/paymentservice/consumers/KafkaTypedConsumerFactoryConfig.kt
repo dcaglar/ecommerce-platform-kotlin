@@ -1,6 +1,7 @@
 // KafkaTypedConsumerFactoryConfig.kt
 package com.dogancaglar.paymentservice.consumers
 
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.common.event.Event
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
@@ -9,9 +10,8 @@ import com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaSerializer
 import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
-import com.dogancaglar.paymentservice.application.events.PaymentPipelineAuthorized
+import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
-import com.dogancaglar.paymentservice.application.events.PaymentOrderEvent
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
@@ -104,7 +104,7 @@ class KafkaTypedConsumerFactoryConfig(
                 add("x-error-message", ((ex?.message ?: "")
                     .take(8_000)).toByteArray()) // cap to avoid jumbo headers
                 add("x-error-stacktrace", stackTraceString(ex, 16_000).toByteArray())
-                add("x-recovered-at", java.time.Instant.now().toString().toByteArray())
+                add("x-recovered-at", Utc.nowInstant().toString().toByteArray())
                 add("x-consumer-group", (rec.headers()
                     .lastHeader(org.springframework.kafka.support.KafkaHeaders.GROUP_ID)?.let { String(it.value()) }
                     ?: "unknown").toByteArray())
@@ -207,7 +207,7 @@ class KafkaTypedConsumerFactoryConfig(
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
         customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler
-    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentPipelineAuthorized>> {
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentAuthorized>> {
         val cfg = cfgFor(PaymentEventMetadataCatalog.PaymentAuthorizedMetadata.topic, "${Topics.PAYMENT_AUTHORIZED}-factory")
         return createFactory(
             clientId = cfg.id,

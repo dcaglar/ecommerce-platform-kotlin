@@ -9,6 +9,7 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -23,7 +24,8 @@ import org.springframework.test.context.TestPropertySource
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
-import java.time.LocalDateTime
+import com.dogancaglar.common.time.Utc
+import java.time.Instant
 
 @Tag("integration")
 @MybatisTest
@@ -71,7 +73,7 @@ class PaymentOrderMapperIntegrationTest {
     lateinit var paymentOrderMapper: PaymentOrderMapper
 
     private fun upsertPayment(paymentId: Long) {
-        val now = LocalDateTime.now().withNano(0)
+        val now = Utc.nowInstant()
         paymentMapper.insertIgnore(
             PaymentEntity(
                 paymentId = paymentId,
@@ -94,8 +96,8 @@ class PaymentOrderMapperIntegrationTest {
         paymentId: Long = 1001L,
         status: PaymentOrderStatus = PaymentOrderStatus.INITIATED_PENDING,
         retryCount: Int = 0,
-        createdAt: LocalDateTime = LocalDateTime.now().withNano(0),
-        updatedAt: LocalDateTime = createdAt
+        createdAt: Instant = Utc.nowInstant(),
+        updatedAt: Instant = createdAt
     ) = PaymentOrderEntity(
         paymentOrderId = id,
         paymentId = paymentId,
@@ -164,7 +166,7 @@ class PaymentOrderMapperIntegrationTest {
             base.copy(
                 status = PaymentOrderStatus.CAPTURE_FAILED,
                 retryCount = 3,
-                updatedAt = base.updatedAt.plusMinutes(5)
+                updatedAt = base.updatedAt.plusSeconds(300) // 5 minutes
             )
         )
         assertNotNull(updated)
@@ -176,7 +178,7 @@ class PaymentOrderMapperIntegrationTest {
         val attemptToChangeTerminal = paymentOrderMapper.updateReturningIdempotent(
             updated.copy(
                 status = PaymentOrderStatus.CAPTURED,
-                updatedAt = updated.updatedAt.plusMinutes(5)
+                updatedAt = updated.updatedAt.plusSeconds(300) // 5 minutes
             )
         )
         assertNotNull(attemptToChangeTerminal)
@@ -187,7 +189,7 @@ class PaymentOrderMapperIntegrationTest {
         val captured = paymentOrderMapper.updateReturningIdempotent(
             updated.copy(
                 status = PaymentOrderStatus.CAPTURED,
-                updatedAt = updated.updatedAt.plusMinutes(10)
+                updatedAt = updated.updatedAt.plusSeconds(600) // 10 minutes
             )
         )
         // This should also fail - we're still trying to change from CAPTURE_FAILED to CAPTURED
@@ -208,7 +210,7 @@ class PaymentOrderMapperIntegrationTest {
         val afterTerminal = paymentOrderMapper.updateReturningIdempotent(
             capturedOrder.copy(
                 status = PaymentOrderStatus.CAPTURE_FAILED,
-                updatedAt = capturedOrder.updatedAt.plusMinutes(10)
+                updatedAt = capturedOrder.updatedAt.plusSeconds(600) // 10 minutes
             )
         )
         // status stays CAPTURED (terminal status protection)
@@ -243,7 +245,7 @@ class PaymentOrderMapperIntegrationTest {
     @Test
     fun `updateReturningIdempotentInitialCaptureRequest updates only INITIATED_PENDING with retry_count=0`() {
         upsertPayment(5001L)
-        val baseTime = LocalDateTime.now().withNano(0)
+        val baseTime = Utc.nowInstant()
         
         // Test 1: Successfully updates when status is INITIATED_PENDING and retry_count=0
         val eligible = paymentOrderEntity(
@@ -256,12 +258,15 @@ class PaymentOrderMapperIntegrationTest {
         )
         paymentOrderMapper.insert(eligible)
         
-        val futureTime = baseTime.plusHours(1)
-        val updated = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(601L, futureTime)
+        val futureTime = baseTime.plusSeconds(3600) // 1 hour
+        val futureTimeLocal = Utc.fromInstant(futureTime)
+        val updated = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(601L, futureTimeLocal)
         
         assertNotNull(updated)
         assertEquals(PaymentOrderStatus.CAPTURE_REQUESTED, updated!!.status)
         assertEquals(0, updated.retryCount)
+        // The GREATEST function should return futureTime since it's greater than baseTime
+        // With InstantTypeHandler, TIMESTAMP WITHOUT TIME ZONE is always interpreted as UTC
         assertEquals(futureTime, updated.updatedAt)
         
         // Test 2: Returns null when status is not INITIATED_PENDING
@@ -275,7 +280,7 @@ class PaymentOrderMapperIntegrationTest {
         )
         paymentOrderMapper.insert(nonEligibleStatus)
         
-        val notUpdated1 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(602L, futureTime)
+        val notUpdated1 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(602L, futureTimeLocal)
         assertNull(notUpdated1)
         
         // Verify status didn't change
@@ -293,7 +298,7 @@ class PaymentOrderMapperIntegrationTest {
         )
         paymentOrderMapper.insert(nonEligibleRetry)
         
-        val notUpdated2 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(603L, futureTime)
+        val notUpdated2 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(603L, futureTimeLocal)
         assertNull(notUpdated2)
         
         // Verify status didn't change
@@ -302,23 +307,26 @@ class PaymentOrderMapperIntegrationTest {
         assertEquals(1, stillInitiated.retryCount)
         
         // Test 4: GREATEST logic for updated_at - if provided timestamp is older, keeps existing
+        val baseTimePlus2h = baseTime.plusSeconds(7200) // 2 hours
         val eligible2 = paymentOrderEntity(
             id = 604L,
             paymentId = 5001L,
             status = PaymentOrderStatus.INITIATED_PENDING,
             retryCount = 0,
             createdAt = baseTime,
-            updatedAt = baseTime.plusHours(2)
+            updatedAt = baseTimePlus2h
         )
         paymentOrderMapper.insert(eligible2)
         
-        val pastTime = baseTime.plusMinutes(30)
-        val updated2 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(604L, pastTime)
+        val pastTime = baseTime.plusSeconds(1800) // 30 minutes
+        val pastTimeLocal = Utc.fromInstant(pastTime)
+        val updated2 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(604L, pastTimeLocal)
         
         assertNotNull(updated2)
         assertEquals(PaymentOrderStatus.CAPTURE_REQUESTED, updated2!!.status)
         // updated_at should be the greater of the two (existing: baseTime+2h, provided: baseTime+30m)
-        assertEquals(baseTime.plusHours(2), updated2.updatedAt)
+        // With InstantTypeHandler, TIMESTAMP WITHOUT TIME ZONE is always interpreted as UTC
+        assertEquals(baseTimePlus2h, updated2.updatedAt)
         
         // Test 5: Does not update when status is CAPTURE_FAILED
         val captureFailed = paymentOrderEntity(
@@ -331,7 +339,7 @@ class PaymentOrderMapperIntegrationTest {
         )
         paymentOrderMapper.insert(captureFailed)
         
-        val notUpdated3 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(605L, futureTime)
+        val notUpdated3 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(605L, futureTimeLocal)
         assertNull(notUpdated3)
         
         val stillCaptureFailed = paymentOrderMapper.findByPaymentOrderId(605L).first()
@@ -349,7 +357,7 @@ class PaymentOrderMapperIntegrationTest {
         )
         paymentOrderMapper.insert(captured)
         
-        val notUpdated4 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(606L, futureTime)
+        val notUpdated4 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(606L, futureTimeLocal)
         assertNull(notUpdated4)
         
         val stillCaptured = paymentOrderMapper.findByPaymentOrderId(606L).first()
@@ -367,7 +375,7 @@ class PaymentOrderMapperIntegrationTest {
         )
         paymentOrderMapper.insert(pendingCapture)
         
-        val notUpdated5 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(607L, futureTime)
+        val notUpdated5 = paymentOrderMapper.updateReturningIdempotentInitialCaptureRequest(607L, futureTimeLocal)
         assertNull(notUpdated5)
         
         val stillPendingCapture = paymentOrderMapper.findByPaymentOrderId(607L).first()

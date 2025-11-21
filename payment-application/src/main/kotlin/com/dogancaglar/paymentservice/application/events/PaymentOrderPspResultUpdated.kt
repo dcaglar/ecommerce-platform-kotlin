@@ -6,6 +6,7 @@ import com.dogancaglar.paymentservice.domain.model.isExternalCapturePspResponse
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
+import java.time.Instant
 import java.time.LocalDateTime
 
 
@@ -20,7 +21,7 @@ data class PaymentOrderPspResultUpdated private constructor(
     override val currency: String,
     val pspStatus: String,
     val latencyMs: Long,
-    override val timestamp: LocalDateTime
+    override val timestamp: Instant
 ) : PaymentOrderEvent() {
 
     override val eventType = EVENT_TYPE
@@ -31,31 +32,12 @@ data class PaymentOrderPspResultUpdated private constructor(
     companion object {
         const val EVENT_TYPE = "payment_order_psp_result_updated"
 
-        fun from(
-            cmd: PaymentOrderCaptureCommand,
-            pspStatus: String,
-            latencyMs: Long,
-            now: LocalDateTime
-        ): PaymentOrderPspResultUpdated =
-            PaymentOrderPspResultUpdated(
-                paymentOrderId = cmd.paymentOrderId,
-                publicPaymentOrderId = cmd.publicPaymentOrderId,
-                paymentId = cmd.paymentId,
-                publicPaymentId = cmd.publicPaymentId,
-                sellerId = cmd.sellerId,
-                amountValue = cmd.amountValue,
-                currency = cmd.currency,
-                pspStatus = pspStatus,
-                latencyMs = latencyMs,
-                timestamp = now
-            )
-
 
         fun from(
             cmd: PaymentOrderCaptureCommand,
             pspStatus: PaymentOrderStatus,
             latencyMs: Long,
-            now: LocalDateTime
+            now: Instant
         ): PaymentOrderPspResultUpdated {
             require(pspStatus.isExternalCapturePspResponse()) {
                 "Cannot emit PSP_RESULT_UPDATED for non-terminal or invalid PSP status: $pspStatus"
@@ -86,7 +68,7 @@ data class PaymentOrderPspResultUpdated private constructor(
             @JsonProperty("currency") currency: String,
             @JsonProperty("pspStatus") pspStatus: String,
             @JsonProperty("latencyMs") latencyMs: Long,
-            @JsonProperty("timestamp") timestamp: LocalDateTime
+            @JsonProperty("timestamp") timestamp: Instant
         ) = PaymentOrderPspResultUpdated(
             pOrderId, pubOrderId, pId, pubPId, sellerId, amount, currency, pspStatus, latencyMs, timestamp
         )

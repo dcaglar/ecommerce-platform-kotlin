@@ -28,9 +28,7 @@ class CapturePaymentService(
     private val outboxEventPort: OutboxEventRepository,
     private val idGeneratorPort: IdGeneratorPort,
     private val serializationPort: SerializationPort,
-    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
-    private val clock : Clock
-) : CapturePaymentUseCase {
+    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper) : CapturePaymentUseCase {
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -70,7 +68,6 @@ class CapturePaymentService(
             eventType = envelope.eventType,
             aggregateId = envelope.aggregateId,
             payload = serializationPort.toJson(envelope),
-            createdAt = updated.createdAt
         )
     }
 }

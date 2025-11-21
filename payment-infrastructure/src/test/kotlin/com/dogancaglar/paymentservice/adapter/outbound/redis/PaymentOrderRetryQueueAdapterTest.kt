@@ -25,7 +25,8 @@ import io.mockk.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.time.LocalDateTime
+import com.dogancaglar.common.time.Utc
+import java.time.Instant
 import java.util.*
 
 /**
@@ -75,8 +76,8 @@ class PaymentOrderRetryQueueAdapterTest {
         id: Long = 123L,
         retryCount: Int = 0,
         status: PaymentOrderStatus = PaymentOrderStatus.CAPTURE_REQUESTED,
-        createdAt: LocalDateTime = LocalDateTime.now(),
-        updatedAt: LocalDateTime = createdAt
+        createdAt: Instant = Utc.nowInstant(),
+        updatedAt: Instant = createdAt
     ): PaymentOrder =
         PaymentOrder.rehydrate(
             paymentOrderId = PaymentOrderId(id),
@@ -85,8 +86,8 @@ class PaymentOrderRetryQueueAdapterTest {
             amount = Amount.of(10000L, Currency("USD")), // cents
             status = status,
             retryCount = retryCount,
-            createdAt = createdAt,
-            updatedAt = updatedAt
+            createdAt = Utc.fromInstant(createdAt),
+            updatedAt = Utc.fromInstant(updatedAt)
         )
 
     // ==================== Schedule Retry Tests ====================
@@ -192,7 +193,7 @@ class PaymentOrderRetryQueueAdapterTest {
     @Test
     fun `pollDueRetriesToInflight should deserialize valid event envelopes`() {
         // Given
-        val now = LocalDateTime.now()
+        val now = Utc.nowInstant()
         val paymentOrder = createTestPaymentOrder(id = 123L, retryCount = 1)
         val captureCommand = PaymentOrderCaptureCommand.from(paymentOrder, attempt = 1, now = now)
         val eventEnvelope = EventEnvelopeFactory.envelopeFor(
@@ -234,7 +235,7 @@ class PaymentOrderRetryQueueAdapterTest {
     @Test
     fun `pollDueRetriesToInflight should handle mixed valid and invalid messages`() {
         // Given
-        val now = LocalDateTime.now()
+        val now = Utc.nowInstant()
         val paymentOrder = createTestPaymentOrder(id = 123L, retryCount = 1)
         val captureCommand = PaymentOrderCaptureCommand.from(paymentOrder, attempt = 1, now = now)
         val validEnvelope = EventEnvelopeFactory.envelopeFor(

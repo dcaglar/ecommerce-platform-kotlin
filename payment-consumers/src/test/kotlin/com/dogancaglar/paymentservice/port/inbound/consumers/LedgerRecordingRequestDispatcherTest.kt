@@ -19,10 +19,7 @@ import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
-import java.time.LocalDateTime
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
@@ -33,7 +30,6 @@ class LedgerRecordingRequestDispatcherTest {
     private lateinit var kafkaTxExecutor: KafkaTxExecutor
     private lateinit var eventPublisherPort: EventPublisherPort
     private lateinit var requestLedgerRecordingUseCase: RequestLedgerRecordingUseCase
-    private lateinit var clock: Clock
     private lateinit var dispatcher: LedgerRecordingRequestDispatcher
 
     @BeforeEach
@@ -41,7 +37,6 @@ class LedgerRecordingRequestDispatcherTest {
         kafkaTxExecutor = mockk()
         eventPublisherPort = mockk()
         requestLedgerRecordingUseCase = mockk()
-        clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
         
         dispatcher = LedgerRecordingRequestDispatcher(
             kafkaTx = kafkaTxExecutor,
@@ -58,7 +53,7 @@ class LedgerRecordingRequestDispatcherTest {
         val expectedTraceId = "trace-123"
         val consumedEventId = "11111111-1111-1111-1111-111111111111"
         val parentEventId = "22222222-2222-2222-2222-222222222222"
-        val now = LocalDateTime.now(clock)
+        val now = Utc.nowLocalDateTime()
         val paymentId = PaymentId(456L)
         
         val paymentOrder = PaymentOrder.rehydrate(
@@ -71,7 +66,7 @@ class LedgerRecordingRequestDispatcherTest {
             createdAt = now,
             updatedAt = now
         )
-        val successEvent = PaymentOrderFinalized.from(paymentOrder, now, PaymentOrderStatus.CAPTURED)
+        val successEvent = PaymentOrderFinalized.from(paymentOrder, Utc.toInstant(now), PaymentOrderStatus.CAPTURED)
         
         val envelope = EventEnvelopeFactory.envelopeFor(
             data = successEvent,
@@ -138,7 +133,7 @@ class LedgerRecordingRequestDispatcherTest {
         val expectedTraceId = "trace-456"
         val consumedEventId = "33333333-3333-3333-3333-333333333333"
         val parentEventId = "44444444-4444-4444-4444-444444444444"
-        val now = LocalDateTime.now(clock)
+        val now = Utc.nowLocalDateTime()
         val paymentId = PaymentId(789L)
         
         val paymentOrder = PaymentOrder.rehydrate(
@@ -151,7 +146,7 @@ class LedgerRecordingRequestDispatcherTest {
             createdAt = now,
             updatedAt = now
         )
-        val failedEvent = PaymentOrderFinalized.from(paymentOrder, now, PaymentOrderStatus.CAPTURE_FAILED)
+        val failedEvent = PaymentOrderFinalized.from(paymentOrder, Utc.toInstant(now), PaymentOrderStatus.CAPTURE_FAILED)
         
         val envelope = EventEnvelopeFactory.envelopeFor(
             data = failedEvent,
@@ -214,7 +209,7 @@ class LedgerRecordingRequestDispatcherTest {
     fun `should propagate exception when use case throws`() {
         // Given
         val paymentOrderId = PaymentOrderId(789L)
-        val now = LocalDateTime.now(clock)
+        val now = Utc.nowLocalDateTime()
         val paymentId = PaymentId(101L)
         
         val paymentOrder = PaymentOrder.rehydrate(
@@ -227,7 +222,7 @@ class LedgerRecordingRequestDispatcherTest {
             createdAt = now,
             updatedAt = now
         )
-        val successEvent = PaymentOrderFinalized.from(paymentOrder, now, PaymentOrderStatus.CAPTURED)
+        val successEvent = PaymentOrderFinalized.from(paymentOrder, Utc.toInstant(now), PaymentOrderStatus.CAPTURED)
         
         val envelope = EventEnvelopeFactory.envelopeFor(
             data = successEvent,

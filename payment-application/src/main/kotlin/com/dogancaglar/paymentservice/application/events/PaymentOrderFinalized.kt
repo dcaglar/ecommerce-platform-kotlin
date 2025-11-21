@@ -8,7 +8,7 @@ import com.dogancaglar.paymentservice.domain.model.isTerminalPspResponse
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
-import java.time.LocalDateTime
+import java.time.Instant
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class PaymentOrderFinalized private constructor(
@@ -20,7 +20,7 @@ data class PaymentOrderFinalized private constructor(
     override val amountValue: Long,
     override val currency: String,
     val status : String,
-    override val timestamp: LocalDateTime
+    override val timestamp: Instant
 ) : PaymentOrderEvent() {
 
     override val eventType = EVENT_TYPE
@@ -31,7 +31,7 @@ data class PaymentOrderFinalized private constructor(
     companion object {
         const val EVENT_TYPE = "payment_order_finalized"
 
-        fun from(order: PaymentOrder, now: LocalDateTime,status: PaymentOrderStatus) : PaymentOrderFinalized{
+        fun from(order: PaymentOrder, now: Instant,status: PaymentOrderStatus) : PaymentOrderFinalized{
             require(status.isTerminalPspResponse()){
                 "PaymentOrderFinalized can only be created termnial psp responses, but was ${order.status}"
             }
@@ -57,7 +57,7 @@ data class PaymentOrderFinalized private constructor(
             @JsonProperty("status") status: String,
             @JsonProperty("amountValue") amount: Long,
             @JsonProperty("currency") currency: String,
-            @JsonProperty("timestamp") timestamp: LocalDateTime
+            @JsonProperty("timestamp") timestamp: Instant
         ) = PaymentOrderFinalized(
             pOrderId, pubOrderId, pId, pubPId, sellerId, amount, currency, status,timestamp
         )

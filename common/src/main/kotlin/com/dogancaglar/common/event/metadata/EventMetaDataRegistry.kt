@@ -10,7 +10,7 @@ import com.dogancaglar.common.event.Event
  *  - payment-infra registers its own metadata list at runtime.
  *  - publishers and consumers resolve metadata dynamically.
  */
-class EventMetadataRegistry(
+class EventMetaDataRegistry(
     metadatas: List<EventMetadata<*>>
 ) {
 

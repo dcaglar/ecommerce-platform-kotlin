@@ -1,14 +1,17 @@
 package com.dogancaglar.paymentservice.application.events
 
+import com.dogancaglar.common.event.Event
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.Payment
+import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
-import java.time.LocalDateTime
+import java.time.Instant
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class PaymentPipelineAuthorized private @JsonCreator constructor(
+data class PaymentAuthorized private @JsonCreator constructor(
     @JsonProperty("paymentId") val paymentId: String,
     @JsonProperty("publicPaymentId") val publicPaymentId: String,
     @JsonProperty("buyerId") val buyerId: String,
@@ -16,36 +19,33 @@ data class PaymentPipelineAuthorized private @JsonCreator constructor(
     @JsonProperty("totalAmountValue") val totalAmountValue: Long,
     @JsonProperty("currency") val currency: String,
     @JsonProperty("paymentLines") val paymentLines: List<PaymentAuthorizedLine>,
-    @JsonProperty("authorizedAt") override val timestamp: LocalDateTime = LocalDateTime.now(),
-) : com.dogancaglar.common.event.Event {
+    @JsonProperty("authorizedAt") override val timestamp: Instant = Utc.nowInstant(),
+) : Event {
 
     override val eventType: String
-        get() = "PAYMENT_AUTHORIZED"
+        get() = "payment_authorized"
 
     override fun deterministicEventId(): String =
         "$publicPaymentId:authorized"
 
     companion object {
-        fun create(
-            paymentId: String,
-            buyerId: String,
-            orderId: String,
-            totalAmountValue: Long,
-            currency: String,
+        fun from(
+            payment: Payment,
             paymentLines: List<PaymentAuthorizedLine>,
-            status: String = "AUTHORIZED",
-            authorizedAt: LocalDateTime,
-        ): PaymentPipelineAuthorized {
+            authorizedAt: Instant,
+        ): PaymentAuthorized {
             require(paymentLines.isNotEmpty())
-            require(paymentLines.all { it.currency == currency })
-
-            return PaymentPipelineAuthorized(
-                paymentId = paymentId,
-                publicPaymentId = PaymentId(paymentId.toLong()).toPublicPaymentId(),
-                buyerId = buyerId,
-                orderId = orderId,
-                totalAmountValue = totalAmountValue,
-                currency = currency,
+            require(paymentLines.all { it.currency == payment.totalAmount.currency.currencyCode })
+            require(payment.status == PaymentStatus.AUTHORIZED){
+                "PaymentAuthorized can only be created if payment status was authorized, but was ${payment.status}"
+            }
+            return PaymentAuthorized(
+                paymentId = payment.paymentId.value.toString(),
+                publicPaymentId = payment.paymentId.toPublicPaymentId(),
+                buyerId = payment.buyerId.value,
+                orderId = payment.orderId.value,
+                totalAmountValue = payment.totalAmount.quantity,
+                currency = payment.totalAmount.currency.currencyCode,
                 paymentLines = paymentLines,
                 timestamp = authorizedAt,
             )

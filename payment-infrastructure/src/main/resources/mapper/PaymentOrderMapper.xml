@@ -12,8 +12,10 @@
         <result property="amountCurrency" column="amount_currency"/>
         <result property="status" column="status"
                 typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.PaymentOrderStatusTypeHandler"/>
-        <result property="createdAt" column="created_at"/>
-        <result property="updatedAt" column="updated_at"/>
+        <result property="createdAt" column="created_at"
+                typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.InstantTypeHandler"/>
+        <result property="updatedAt" column="updated_at"
+                typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.InstantTypeHandler"/>
         <result property="retryCount" column="retry_count"/>
     </resultMap>
 
@@ -138,7 +140,7 @@
         ELSE
         #{status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.PaymentOrderStatusTypeHandler}
         END,
-        updated_at = GREATEST(p.updated_at, #{updatedAt}),
+        updated_at = GREATEST(p.updated_at, #{updatedAt, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.InstantTypeHandler}),
         retry_count = GREATEST(p.retry_count, #{retryCount})
         WHERE p.payment_order_id = #{paymentOrderId}
         RETURNING

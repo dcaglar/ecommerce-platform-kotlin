@@ -24,11 +24,8 @@ import io.mockk.unmockkObject
 import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
+import com.dogancaglar.common.time.Utc
 import org.junit.jupiter.api.Test
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneId
 
 class ProcessPaymentServiceTest {
 
@@ -36,7 +33,6 @@ class ProcessPaymentServiceTest {
     private lateinit var retryQueuePort: RetryQueuePort<PaymentOrderCaptureCommand>
     private lateinit var paymentOrderModificationPort: PaymentOrderModificationPort
     private lateinit var paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
-    private lateinit var clock: Clock
     private lateinit var service: ProcessPaymentService
 
     @BeforeEach
@@ -45,8 +41,6 @@ class ProcessPaymentServiceTest {
         retryQueuePort = mockk(relaxed = true)
         paymentOrderModificationPort = mockk()
         paymentOrderDomainEventMapper = mockk()
-        clock = Clock.fixed(Instant.parse("2024-01-01T12:00:00Z"), ZoneId.of("UTC"))
-
         mockkObject(EventLogContext)
         every { EventLogContext.getEventId() } returns null
         every { EventLogContext.getTraceId() } returns "test-trace-id"
@@ -56,7 +50,6 @@ class ProcessPaymentServiceTest {
             retryQueuePort = retryQueuePort,
             paymentOrderModificationPort = paymentOrderModificationPort,
             paymentOrderDomainEventMapper = paymentOrderDomainEventMapper,
-            clock = clock
         )
     }
 
@@ -71,7 +64,7 @@ class ProcessPaymentServiceTest {
         val event = samplePspResultEvent(PaymentOrderStatus.CAPTURED)
         val order = sampleOrder(status = PaymentOrderStatus.CAPTURE_REQUESTED)
         val persisted = sampleOrder(status = PaymentOrderStatus.CAPTURED)
-        val now = LocalDateTime.now(clock)
+        val now = Utc.nowInstant()
         val succeededEvent = PaymentOrderFinalized.from(
             order = persisted,
             now = now,
@@ -108,7 +101,7 @@ class ProcessPaymentServiceTest {
         val event = samplePspResultEvent(PaymentOrderStatus.CAPTURE_FAILED)
         val order = sampleOrder(status = PaymentOrderStatus.CAPTURE_REQUESTED)
         val persisted = sampleOrder(status = PaymentOrderStatus.CAPTURE_FAILED)
-        val now = LocalDateTime.now(clock)
+        val now = Utc.nowInstant()
         val failedEvent = PaymentOrderFinalized.from(
             order = persisted,
             now = now,
@@ -136,7 +129,7 @@ class ProcessPaymentServiceTest {
     private fun sampleOrder(
         status: PaymentOrderStatus = PaymentOrderStatus.INITIATED_PENDING
     ): PaymentOrder {
-        val now = LocalDateTime.now(clock)
+        val now = Utc.nowLocalDateTime()
         return PaymentOrder.rehydrate(
             paymentOrderId = PaymentOrderId(123L),
             paymentId = PaymentId(456L),
@@ -150,7 +143,7 @@ class ProcessPaymentServiceTest {
     }
 
     private fun samplePspResultEvent(pspStatus: PaymentOrderStatus): PaymentOrderPspResultUpdated {
-        val now = LocalDateTime.now(clock)
+        val now = Utc.nowInstant()
         return PaymentOrderPspResultUpdated.fromJson(
             pOrderId = "123",
             pubOrderId = "paymentorder-123",

@@ -18,7 +18,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException
 import org.springframework.transaction.TransactionTimedOutException
 import org.postgresql.util.PSQLException
 import org.postgresql.util.PSQLState
-import java.time.Instant
+import com.dogancaglar.common.time.Utc
 import java.util.concurrent.CompletionException
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeoutException
@@ -38,7 +38,7 @@ class PaymentControllerWebExceptionHandler {
             .joinToString(" -> ") { "${it::class.simpleName}:${trunc(it.message)}" }
 
     data class ErrorResponse(
-        val timestamp: String = Instant.now().toString(),
+        val timestamp: String = Utc.nowInstant().toString(),
         val status: Int,
         val error: String,
         val message: String?,

@@ -1,6 +1,7 @@
 package com.dogancaglar.common.event
 
-import java.time.LocalDateTime
+import com.dogancaglar.common.time.Utc
+import java.time.Instant
 import java.util.UUID
 
 object EventEnvelopeFactory {
@@ -10,7 +11,7 @@ object EventEnvelopeFactory {
         aggregateId: String,
         traceId: String,
         parentEventId: String? = null,
-        timestamp: LocalDateTime = LocalDateTime.now()
+        timestamp: Instant = Utc.nowInstant()
     ): EventEnvelope<T> {
         val id = data.deterministicEventId()
         val resolvedParent = parentEventId ?: id
@@ -35,7 +36,7 @@ object EventEnvelopeFactory {
         aggregateId: String,
         traceId: String,
         parentEventId: String? = null,
-        timestamp: LocalDateTime = LocalDateTime.now()
+        timestamp: Instant = Utc.nowInstant()
     ): EventEnvelope<T> {
         val id = UUID.randomUUID().toString()
         val resolvedParent = parentEventId ?: id

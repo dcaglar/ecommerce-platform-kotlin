@@ -22,10 +22,7 @@ import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
-import java.time.LocalDateTime
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
@@ -34,7 +31,6 @@ class PaymentOrderEnqueuerTest {
 
     private lateinit var kafkaTxExecutor: KafkaTxExecutor
     private lateinit var eventPublisherPort: EventPublisherPort
-    private lateinit var clock: Clock
     private lateinit var paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
     private lateinit var dedupe: com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
     private lateinit var modification: com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
@@ -44,8 +40,7 @@ class PaymentOrderEnqueuerTest {
     fun setUp() {
         kafkaTxExecutor = mockk()
         eventPublisherPort = mockk()
-        clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
-        paymentOrderDomainEventMapper = PaymentOrderDomainEventMapper(clock)
+        paymentOrderDomainEventMapper = PaymentOrderDomainEventMapper()
         dedupe = mockk()
         modification = mockk()
 
@@ -64,7 +59,7 @@ class PaymentOrderEnqueuerTest {
         val paymentOrderId = PaymentOrderId(123L)
         val paymentId =PaymentId(456L)
         val expectedTraceId = "trace-123"
-        val expectedCreatedAt = clock.instant().atZone(clock.zone).toLocalDateTime()
+        val expectedCreatedAt = Utc.nowLocalDateTime()
         val consumedEventId = "11111111-1111-1111-1111-111111111111"
         val parentEventId = "22222222-2222-2222-2222-222222222222"
         
@@ -165,7 +160,7 @@ class PaymentOrderEnqueuerTest {
         val expectedTraceId = "trace-456"
         val consumedEventId = "55555555-5555-5555-5555-555555555555"
         val parentEventId = "66666666-6666-6666-6666-666666666666"
-        val now = clock.instant().atZone(clock.zone).toLocalDateTime()
+        val now = Utc.nowLocalDateTime()
         val paymentId = PaymentId(456L)
         
         val paymentOrder = PaymentOrder.rehydrate(

@@ -7,7 +7,7 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
-import java.time.LocalDateTime
+import java.time.Instant
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class PaymentOrderCreated private constructor(
@@ -18,7 +18,7 @@ data class PaymentOrderCreated private constructor(
     override val sellerId: String,
     override val amountValue: Long,
     override val currency: String,
-    override val timestamp: LocalDateTime
+    override val timestamp: Instant
 ) : PaymentOrderEvent() {
 
     override val eventType = EVENT_TYPE
@@ -29,7 +29,7 @@ data class PaymentOrderCreated private constructor(
     companion object {
         const val EVENT_TYPE = "payment_order_created"
 
-        fun from(order: PaymentOrder, now: LocalDateTime): PaymentOrderCreated {
+        fun from(order: PaymentOrder, now: Instant): PaymentOrderCreated {
             require(order.status == PaymentOrderStatus.INITIATED_PENDING)
             return PaymentOrderCreated(
                 paymentOrderId = order.paymentOrderId.value.toString(),
@@ -51,7 +51,7 @@ data class PaymentOrderCreated private constructor(
             @JsonProperty("sellerId") sellerId: String,
             @JsonProperty("amountValue") amount: Long,
             @JsonProperty("currency") currency: String,
-            @JsonProperty("timestamp") timestamp: LocalDateTime
+            @JsonProperty("timestamp") timestamp: Instant
         ) = PaymentOrderCreated(
             pOrderId, pubOrderId, pId, pubPId, sellerId, amount, currency, timestamp
         )

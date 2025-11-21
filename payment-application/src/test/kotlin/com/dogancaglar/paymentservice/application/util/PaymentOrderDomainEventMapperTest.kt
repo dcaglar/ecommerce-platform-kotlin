@@ -1,18 +1,21 @@
 package com.dogancaglar.paymentservice.application.util
 
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.*
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.vo.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
-import java.time.*
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 
 class PaymentOrderDomainEventMapperTest {
 
     private val fixedClock =
         Clock.fixed(Instant.parse("2024-01-01T12:00:00Z"), ZoneOffset.UTC)
 
-    private val mapper = PaymentOrderDomainEventMapper(fixedClock)
+    private val mapper = PaymentOrderDomainEventMapper()
 
     private val currency = Currency("EUR")
     private val amount = Amount.of(5000L, currency)
@@ -34,9 +37,8 @@ class PaymentOrderDomainEventMapperTest {
             paymentId = PaymentId(1L),
             buyerId = BuyerId("buyer-1"),
             orderId = OrderId("order-1"),
-            totalAmount = Amount.of(10000L, currency),
-            clock = fixedClock
-        )
+            totalAmount = Amount.of(10000L, currency)
+        ).authorize()
 
         val lines = listOf(
             PaymentLine(SellerId("seller-1"), amount)
@@ -69,7 +71,10 @@ class PaymentOrderDomainEventMapperTest {
         assertEquals("seller-1", event.sellerId)
         assertEquals(5000L, event.amountValue)
         assertEquals("EUR", event.currency)
-        assertEquals(LocalDateTime.ofInstant(fixedClock.instant(), fixedClock.zone), event.timestamp)
+        // Timestamp should be close to now (within a few seconds) since Utc.nowInstant() is used
+        val now = Utc.nowInstant()
+        assertTrue(event.timestamp.isAfter(now.minusSeconds(5)))
+        assertTrue(event.timestamp.isBefore(now.plusSeconds(5)))
     }
 
     // ---------------------------------------------------------
@@ -93,7 +98,7 @@ class PaymentOrderDomainEventMapperTest {
     @Test
     fun `toPaymentOrderSucceeded maps correctly`() {
         val order = sampleOrder()
-        val now = LocalDateTime.now(fixedClock)
+        val now = Utc.nowLocalDateTime()
         val event = mapper.toPaymentOrderFinalized(order, now, PaymentOrderStatus.CAPTURED)
 
         assertEquals("${order.paymentOrderId.value}", event.paymentOrderId)
@@ -104,7 +109,7 @@ class PaymentOrderDomainEventMapperTest {
     @Test
     fun `toPaymentOrderFinalized maps correctly for failed status`() {
         val order = sampleOrder()
-        val now = LocalDateTime.now(fixedClock)
+        val now = Utc.nowLocalDateTime()
         val event = mapper.toPaymentOrderFinalized(order, now, PaymentOrderStatus.CAPTURE_FAILED)
 
         assertEquals("10", event.paymentOrderId)

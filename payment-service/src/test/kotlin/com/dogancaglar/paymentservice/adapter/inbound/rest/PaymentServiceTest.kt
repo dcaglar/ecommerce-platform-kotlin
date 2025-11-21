@@ -19,15 +19,11 @@ import io.mockk.verify
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
 
 class PaymentServiceTest {
 
     private lateinit var authorizePaymentService: AuthorizePaymentService
     private lateinit var paymentService: PaymentService
-    private lateinit var clock: Clock
 
     private lateinit var paymentValidator: PaymentValidator
 
@@ -35,7 +31,6 @@ class PaymentServiceTest {
     fun setUp() {
         authorizePaymentService = mockk()
         paymentValidator = mockk(relaxed = true)
-        clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
         paymentService = PaymentService(authorizePaymentService, paymentValidator)
     }
 
@@ -59,7 +54,6 @@ class PaymentServiceTest {
             buyerId = BuyerId("buyer-456"),
             orderId = OrderId("order-123"),
             totalAmount = Amount.of(10000L, Currency("USD")),
-            clock = clock
         )
         
         every { authorizePaymentService.authorize(any()) } returns expectedPayment
@@ -152,7 +146,6 @@ class PaymentServiceTest {
             buyerId = BuyerId("buyer-456"),
             orderId = OrderId("order-123"),
             totalAmount = Amount.of(5000L, Currency("EUR")),
-            clock = clock
         ).authorize()
         
         every { authorizePaymentService.authorize(any()) } returns expectedPayment
@@ -189,7 +182,6 @@ class PaymentServiceTest {
             buyerId = BuyerId("buyer-456"),
             orderId = OrderId("order-123"),
             totalAmount = Amount.of(99999999L, Currency("USD")),
-            clock = clock
         )
         
         every { authorizePaymentService.authorize(any()) } returns expectedPayment

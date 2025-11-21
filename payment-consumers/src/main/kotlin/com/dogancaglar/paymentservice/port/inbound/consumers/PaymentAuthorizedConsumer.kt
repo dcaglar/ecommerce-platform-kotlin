@@ -4,7 +4,7 @@ import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.CONSUMER_G
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.common.logging.EventLogContext
-import com.dogancaglar.paymentservice.application.events.PaymentPipelineAuthorized
+import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
@@ -16,14 +16,12 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
-import java.time.Clock
 
 @Component
 class PaymentAuthorizedConsumer(
     @param:Qualifier("syncPaymentTx") private val kafkaTx: KafkaTxExecutor,
     @param:Qualifier("syncPaymentEventPublisher") private val publisher: EventPublisherPort,
-    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
-    private val clock: Clock
+    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -33,7 +31,7 @@ class PaymentAuthorizedConsumer(
         groupId = CONSUMER_GROUPS.PAYMENT_AUTHORIZED_CONSUMER
     )
     fun onCreated(
-        record: ConsumerRecord<String, EventEnvelope<PaymentPipelineAuthorized>>,
+        record: ConsumerRecord<String, EventEnvelope<PaymentAuthorized>>,
         consumer: Consumer<*, *>
     ) {
         val consumed = record.value()

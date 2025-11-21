@@ -25,11 +25,8 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
+import com.dogancaglar.common.time.Utc
 import org.junit.jupiter.api.Test
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneId
 import java.util.UUID
 
 class RecordLedgerEntriesServiceTest {
@@ -37,7 +34,6 @@ class RecordLedgerEntriesServiceTest {
     private lateinit var ledgerWritePort: LedgerEntryPort
     private lateinit var eventPublisherPort: EventPublisherPort
     private lateinit var accountDirectory: AccountDirectoryPort
-    private lateinit var clock: Clock
     private lateinit var service: RecordLedgerEntriesService
 
     @BeforeEach
@@ -45,13 +41,11 @@ class RecordLedgerEntriesServiceTest {
         ledgerWritePort = mockk()
         eventPublisherPort = mockk()
         accountDirectory = mockk()
-        clock = Clock.fixed(Instant.parse("2024-05-01T10:00:00Z"), ZoneId.of("UTC"))
 
         service = RecordLedgerEntriesService(
             ledgerWritePort = ledgerWritePort,
             eventPublisherPort = eventPublisherPort,
             accountDirectory = accountDirectory,
-            clock = clock
         )
 
         stubAccountProfiles()
@@ -249,7 +243,7 @@ class RecordLedgerEntriesServiceTest {
         amount = 10_000L,
         currency = "EUR",
         finalStatus = status,
-        timestamp = LocalDateTime.now(clock)
+        timestamp = Utc.nowInstant()
     )
 
     private fun withMockedLogContext(): Pair<String, String> {

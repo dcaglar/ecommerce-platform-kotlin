@@ -12,10 +12,10 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.inbound.AuthorizePaymentUseCase
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.ports.outbound.*
 import org.slf4j.LoggerFactory
 import java.time.Clock
-import java.time.LocalDateTime
 import java.util.*
 
 
@@ -25,9 +25,7 @@ class AuthorizePaymentService(
     private val outboxEventPort: OutboxEventRepository,
     private val idGeneratorPort: IdGeneratorPort,
     private val serializationPort: SerializationPort,
-    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
-    private val clock : Clock
-) : AuthorizePaymentUseCase {
+    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper) : AuthorizePaymentUseCase {
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -39,8 +37,7 @@ class AuthorizePaymentService(
             paymentId = paymentId,
             buyerId = cmd.buyerId,
             orderId = cmd.orderId,
-            totalAmount = cmd.totalAmount,
-            clock = clock
+            totalAmount = cmd.totalAmount
         )
 
             // 2️⃣ Persist intent (PENDING_AUTH)
@@ -55,13 +52,13 @@ class AuthorizePaymentService(
 
         // 4️⃣ Update domain aggregate based on PSP result
         val updated = when (pspStatus) {
-            PaymentStatus.AUTHORIZED -> payment.authorize(LocalDateTime.now(clock))
-            PaymentStatus.DECLINED -> payment.decline(LocalDateTime.now(clock))
+            PaymentStatus.AUTHORIZED -> payment.authorize(Utc.nowLocalDateTime())
+            PaymentStatus.DECLINED -> payment.decline(Utc.nowLocalDateTime())
             PaymentStatus.PENDING_AUTH -> payment
             else -> payment
         }
 
-        // 5️⃣ On success: persist outcome + emit Outbox<PaymentPipelineAuthorized>
+        // 5️⃣ On success: persist outcome + emit Outbox<PaymentAuthorized>
         if (updated.status == PaymentStatus.AUTHORIZED) {
             paymentRepository.updatePayment(updated)
             val paymentAuthorized = toOutboxEvent(updated,cmd.paymentLines)
@@ -99,7 +96,6 @@ class AuthorizePaymentService(
             eventType = envelope.eventType,
             aggregateId = envelope.aggregateId,
             payload = serializationPort.toJson(envelope),
-            createdAt = updated.createdAt
         )
     }
 }

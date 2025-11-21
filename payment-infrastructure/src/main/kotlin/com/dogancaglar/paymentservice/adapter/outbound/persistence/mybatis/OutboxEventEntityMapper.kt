@@ -2,6 +2,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis
 
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.OutboxEventEntity
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
+import java.time.ZoneOffset
 
 object OutboxEventEntityMapper {
 
@@ -12,8 +13,8 @@ object OutboxEventEntityMapper {
             aggregateId = entity.aggregateId,
             payload = entity.payload,
             status = entity.status,
-            createdAt = entity.createdAt,
-            updatedAt = entity.updatedAt
+            createdAt = entity.createdAt.atOffset(ZoneOffset.UTC).toLocalDateTime(),
+            updatedAt = entity.updatedAt.atOffset(ZoneOffset.UTC).toLocalDateTime()
         )
 
     fun toEntity(domain: OutboxEvent): OutboxEventEntity =
@@ -23,8 +24,8 @@ object OutboxEventEntityMapper {
             aggregateId = domain.aggregateId,
             payload = domain.payload,
             status = domain.status.name,
-            createdAt = domain.createdAt,
-            updatedAt = domain.updatedAt,
+            createdAt = domain.createdAt.toInstant(ZoneOffset.UTC),
+            updatedAt = domain.updatedAt.toInstant(ZoneOffset.UTC),
             claimedAt = null,    // infra-managed
             claimedBy = null     // infra-managed
         )

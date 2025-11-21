@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.domain.event
 
 
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -8,7 +9,7 @@ import java.time.LocalDateTime
 
 class OutboxEventTest {
 
-    private val now = LocalDateTime.now()
+    private val now = Utc.nowLocalDateTime()
     private val testOeid = 123L
     private val testEventType = "PaymentOrderCreated"
     private val testAggregateId = "paymentorder-123"
@@ -21,8 +22,7 @@ class OutboxEventTest {
             oeid = testOeid,
             eventType = testEventType,
             aggregateId = testAggregateId,
-            payload = testPayload,
-            createdAt = testCreatedAt
+            payload = testPayload
         )
 
         assertEquals(testOeid, outboxEvent.oeid)
@@ -30,7 +30,7 @@ class OutboxEventTest {
         assertEquals(testAggregateId, outboxEvent.aggregateId)
         assertEquals(testPayload, outboxEvent.payload)
         assertEquals(OutboxEvent.Status.NEW, outboxEvent.status)
-        assertEquals(testCreatedAt, outboxEvent.createdAt)
+        assertNotNull(outboxEvent.createdAt)
     }
 
     @Test
@@ -39,8 +39,7 @@ class OutboxEventTest {
             oeid = testOeid,
             eventType = testEventType,
             aggregateId = testAggregateId,
-            payload = testPayload,
-            createdAt = testCreatedAt
+            payload = testPayload
         )
         assertEquals(OutboxEvent.Status.NEW, outboxEvent.status)
         val updatedOutboxEvent = outboxEvent.markAsProcessing()
@@ -50,7 +49,7 @@ class OutboxEventTest {
         assertEquals(testEventType, outboxEvent.eventType)
         assertEquals(testAggregateId, outboxEvent.aggregateId)
         assertEquals(testPayload, outboxEvent.payload)
-        assertEquals(testCreatedAt, outboxEvent.createdAt)
+        assertNotNull(outboxEvent.createdAt)
     }
 
     @Test
@@ -59,8 +58,7 @@ class OutboxEventTest {
             oeid = testOeid,
             eventType = testEventType,
             aggregateId = testAggregateId,
-            payload = testPayload,
-            createdAt = testCreatedAt
+            payload = testPayload
         ).markAsProcessing()
 
         val updatedOutBoxEvent = outboxEvent.markAsSent()
@@ -77,8 +75,7 @@ class OutboxEventTest {
             oeid = testOeid,
             eventType = testEventType,
             aggregateId = testAggregateId,
-            payload = testPayload,
-            createdAt = testCreatedAt
+            payload = testPayload
         ).markAsSent()
 
 
@@ -95,8 +92,7 @@ class OutboxEventTest {
             oeid = testOeid,
             eventType = testEventType,
             aggregateId = testAggregateId,
-            payload = testPayload,
-            createdAt = testCreatedAt
+            payload = testPayload
         ).markAsSent()
 
 
@@ -165,8 +161,7 @@ class OutboxEventTest {
             oeid = testOeid,
             eventType = testEventType,
             aggregateId = testAggregateId,
-            payload = testPayload,
-            createdAt = testCreatedAt
+            payload = testPayload
         )
 
         assertEquals(OutboxEvent.Status.NEW, outboxEvent.status)
@@ -185,8 +180,7 @@ class OutboxEventTest {
             oeid = testOeid,
             eventType = testEventType,
             aggregateId = testAggregateId,
-            payload = largePayload,
-            createdAt = testCreatedAt
+            payload = largePayload
         )
 
         assertEquals(largePayload, outboxEvent.payload)
@@ -205,8 +199,7 @@ class OutboxEventTest {
                 oeid = testOeid,
                 eventType = eventType,
                 aggregateId = testAggregateId,
-                payload = testPayload,
-                createdAt = testCreatedAt
+                payload = testPayload
             )
 
             assertEquals(eventType, outboxEvent.eventType)
@@ -227,8 +220,7 @@ class OutboxEventTest {
                 oeid = testOeid,
                 eventType = testEventType,
                 aggregateId = aggregateId,
-                payload = testPayload,
-                createdAt = testCreatedAt
+                payload = testPayload
             )
 
             assertEquals(aggregateId, outboxEvent.aggregateId)
@@ -251,8 +243,7 @@ class OutboxEventTest {
             oeid = testOeid,
             eventType = testEventType,
             aggregateId = testAggregateId,
-            payload = jsonPayload,
-            createdAt = testCreatedAt
+            payload = jsonPayload
         )
 
         assertEquals(jsonPayload, outboxEvent.payload)
@@ -265,8 +256,7 @@ class OutboxEventTest {
             oeid = testOeid,
             eventType = testEventType,
             aggregateId = testAggregateId,
-            payload = emptyPayload,
-            createdAt = testCreatedAt
+            payload = emptyPayload
         )
 
         assertEquals(emptyPayload, outboxEvent.payload)
@@ -279,8 +269,7 @@ class OutboxEventTest {
             oeid = testOeid,
             eventType = testEventType,
             aggregateId = testAggregateId,
-            payload = nullPayload ?: "",
-            createdAt = testCreatedAt
+            payload = nullPayload ?: ""
         )
 
         assertEquals("", outboxEvent.payload)
@@ -294,8 +283,7 @@ class OutboxEventTest {
             oeid = testOeid,
             eventType = testEventType,
             aggregateId = testAggregateId,
-            payload = testPayload,
-            createdAt = testCreatedAt
+            payload = testPayload
         )
 
         val originalOeid = outboxEvent.oeid
@@ -320,8 +308,7 @@ class OutboxEventTest {
             oeid = testOeid,
             eventType = testEventType,
             aggregateId = testAggregateId,
-            payload = testPayload,
-            createdAt = testCreatedAt
+            payload = testPayload
         ).markAsSent()
 
 

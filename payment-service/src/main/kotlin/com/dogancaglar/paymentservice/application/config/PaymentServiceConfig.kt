@@ -13,7 +13,6 @@ import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import com.dogancaglar.paymentservice.ports.outbound.PspAuthGatewayPort
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import java.time.Clock
 
 @Configuration
 class PaymentServiceConfig {
@@ -21,8 +20,8 @@ class PaymentServiceConfig {
 
 
     @Bean
-    fun paymentOrderDomainEventMapper(clock: Clock): PaymentOrderDomainEventMapper =
-        PaymentOrderDomainEventMapper(clock)
+    fun paymentOrderDomainEventMapper(): PaymentOrderDomainEventMapper =
+        PaymentOrderDomainEventMapper()
 
 
     @Bean
@@ -31,7 +30,6 @@ class PaymentServiceConfig {
         paymentRepository: PaymentOutboundAdapter,
         outboxOutboundAdapter: OutboxOutboundAdapter,
         serializationPort: JacksonSerializationAdapter,
-        clock: Clock,
         paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
         pspAuthGatewayPort: PspAuthGatewayPort
     ): AuthorizePaymentService {
@@ -41,7 +39,6 @@ class PaymentServiceConfig {
             psp = pspAuthGatewayPort,
             outboxEventPort = outboxOutboundAdapter,
             serializationPort = serializationPort,
-            clock = clock,
             paymentOrderDomainEventMapper = paymentOrderDomainEventMapper
         )
     }
