@@ -174,7 +174,7 @@ class OutboxDispatcherJob(
             .constructParametricType(EventEnvelope::class.java, PaymentAuthorized::class.java)
         val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentAuthorized>
         val data = envelope.data
-        var ok : Boolean=false
+        var ok =false
         EventLogContext.with(envelope) {
             logger.info("Expanding PaymentAuthorized → PaymentOrderCreated for paymentId=${data.paymentId}")
             // Expand PaymentOrders from the authorized payload from paymentline
@@ -187,8 +187,8 @@ class OutboxDispatcherJob(
                     amount = Amount.of(line.amountValue, Currency(line.currency))
                 )
             }
-            //create outbox<paymentordercreated>
-            val outboxEvents = paymentOrders.map { toOutboxEvent(it) }
+            //create outbox<paymentordercreated> with parent being set paymentaiuthorizerd event
+            val outboxEvents = paymentOrders.map { toOutboxEvent(it,envelope.eventId) }
             paymentOrderRepository.insertAll(paymentOrders)
             // For each order, persist an OutboxEvent<PaymentOrderCreated>
             outboxEventRepository.saveAll(outboxEvents)
@@ -203,12 +203,13 @@ class OutboxDispatcherJob(
     }
 
 
-    private fun toOutboxEvent(paymentOrder: PaymentOrder): OutboxEvent {
+    private fun toOutboxEvent(paymentOrder: PaymentOrder, parentEventId: String): OutboxEvent {
         val paymentOrderCreatedEvent = paymentOrderDomainEventMapper.toPaymentOrderCreated(paymentOrder)
         val envelope = EventEnvelopeFactory.envelopeFor(
             traceId = EventLogContext.getTraceId() ?: UUID.randomUUID().toString(),
             data = paymentOrderCreatedEvent,
-            aggregateId = paymentOrderCreatedEvent.paymentOrderId
+            aggregateId = paymentOrderCreatedEvent.paymentOrderId,
+            parentEventId = parentEventId
         )
 
         return OutboxEvent.createNew(
