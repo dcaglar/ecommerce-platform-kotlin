@@ -19,12 +19,12 @@ kafka-consumer-groups.sh --bootstrap-server kafka.payment.svc.cluster.local:9092
 
 ```bash
 kafka-consumer-groups.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 \
-  --group payment-order-psp-call-executor-consumer-group --describe
+  --group payment-order-capture-executor-consumer-group --describe
 ```
 
 ```bash
 kafka-topics.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 \
-  --topic payment_order_psp_call_requested_topic --describe
+  --topic payment_order_capture_request_queue_topic --describe
 
 kafka-topics.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 \
   --topic tpc --describe
@@ -38,7 +38,7 @@ kafka-transactions.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 li
 ```bash
 kafka-console-consumer.sh \
   --bootstrap-server kafka.payment.svc.cluster.local:9092 \
-  --topic payment_order_psp_call_requested_topic.DLQ \
+  --topic payment_order_created_topic.DLQ \
   --from-beginning \
   --group dlq-debug-psp-$(date +%s) \
   --property print.headers=true \

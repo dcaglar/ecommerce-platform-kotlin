@@ -4,6 +4,8 @@ set -euo pipefail
 # --- config --------------------------------------------------------------
 PAYMENT_NS=payment
 MONITORING_NS=monitoring
+LOGGING_NS=logging
+
 
 # Set PF_INGRESS=true to force PF for ingress if you ever switch back from LoadBalancer
 PF_INGRESS=${PF_INGRESS:-false}
@@ -121,6 +123,9 @@ FORWARDS+=("$PAYMENT_NS svc/payment-db-postgresql 5432 5432")
 
 #prometheus-operated 9090 9090 $MONITORING_NS & PIDS+=($!)
 FORWARDS+=("$MONITORING_NS svc/prometheus-operated 9090 9090")
+
+#kibana-kibana 5601 5601 $LOGGING_NS & PIDS+=($!)
+FORWARDS+=("$LOGGING_NS svc/kibana-kibana  5601 5601")
 
 # Grafana
 FORWARDS+=("$MONITORING_NS svc/prometheus-stack-grafana 3000 80")
