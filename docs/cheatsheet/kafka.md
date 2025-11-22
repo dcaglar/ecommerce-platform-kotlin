@@ -48,7 +48,7 @@ kafka-console-consumer.sh \
 ```bash
 kafka-console-consumer.sh \
   --bootstrap-server kafka.payment.svc.cluster.local:9092 \
-  --topic payment_order_psp_result_updated_topic.DLQ \
+  --topic payment_order_psp_result_updated_topic \
   --from-beginning \
   --group dlq-debug-psp-result-$(date +%s) \
   --property print.headers=true \
