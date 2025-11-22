@@ -197,7 +197,7 @@ psp:
         NORMAL:
           timeouts:
             enabled: true
-sd            probability: 0       # 0% of total requests time out
+            probability: 0       # 0% of total requests time out
           latency:
             fast:
               probability: 100    # rest of 100% are fast (50–150ms)
