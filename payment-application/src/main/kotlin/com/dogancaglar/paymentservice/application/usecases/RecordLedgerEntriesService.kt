@@ -31,7 +31,7 @@ open class RecordLedgerEntriesService(
 
     override fun recordLedgerEntries(event: LedgerRecordingCommand) {
         val createdAt = Utc.nowLocalDateTime()
-        val traceId = EventLogContext.getTraceId() ?: UUID.randomUUID().toString()
+        val traceId = EventLogContext.getTraceId()
         val parentEventId = EventLogContext.getEventId()
 
         val amount = Amount.of(event.amountValue, Currency(event.currency))
@@ -96,10 +96,10 @@ open class RecordLedgerEntriesService(
         val recordedEvent = LedgerEntriesRecorded.from(event,"ledger-batch-${UUID.randomUUID()}",ledgerEntryEventDataList,Utc.toInstant(createdAt))
 
         eventPublisherPort.publishSync(
-            aggregateId = event.sellerId,
+            aggregateId = EventLogContext.getAggregateId()!!,
             data = recordedEvent,
-            parentEventId = parentEventId,
-            traceId = traceId
+            parentEventId = EventLogContext.getEventId(),
+            traceId = EventLogContext.getTraceId()
         )
     }
 

@@ -5,11 +5,11 @@ import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ID
+import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ORDER_ID
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
@@ -56,56 +56,60 @@ class PaymentOrderCaptureExecutor(
         record: ConsumerRecord<String, EventEnvelope<PaymentOrderCaptureCommand>>,
         consumer: org.apache.kafka.clients.consumer.Consumer<*, *>
     ) {
-        val env = record.value()
-        val work = env.data
-        val eventId = env.eventId
+        val envelope = record.value()
+        val eventData = envelope.data
+        val eventId = envelope.eventId
 
         val tp = TopicPartition(record.topic(), record.partition())
         val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
         val groupMeta = consumer.groupMetadata()
 
-        EventLogContext.with(env) {
-
-            // ---------------------------------------
+        EventLogContext.with(envelope) {
             // 1. DEDUPE CHECK
             // ---------------------------------------
             if (dedupe.exists(eventId)) {
+                logger.warn(
+                    "⚠️ Event is processed already  for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId} , skipping")
                 logger.debug("🔁 Redis dedupe skip PSP executor eventId={}", eventId)
                 kafkaTx.run(offsets, groupMeta) {}
                 return@with
             }
+            logger.info(
+                "🎬 Started processing   for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                        "with $PAYMENT_ID ${eventData.publicPaymentId}")
+            // ---------------------------------------
+
 
             // ---------------------------------------
             // 2. LOAD ORDER + IDENTITY CHECK
             // ---------------------------------------
             val current = paymentOrderRepository
-                .findByPaymentOrderId(PaymentOrderId(work.paymentOrderId.toLong()))
+                .findByPaymentOrderId(PaymentOrderId(eventData.paymentOrderId.toLong()))
                 .firstOrNull()
 
             if (current == null) {
-                logger.warn("⏭️ Missing PaymentOrder row for PSP call poId={} eventId={}",
-                    work.paymentOrderId, eventId
-                )
+                logger.warn(
+                    "‼️ Missing PaymentOrder row for PSP call  for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId}")
                 kafkaTx.run(offsets, groupMeta) {}
                 return@with
             }
 
             // stale attempt check
-            if (current.retryCount > work.attempt) {
+            if (current.retryCount > eventData.attempt) {
                 logger.warn(
-                    "⏭️ Stale PSP attempt dbRetryCount={} > eventRetryCount={} poId={}",
-                    current.retryCount, work.attempt, work.paymentOrderId
-                )
+                    "⚠️  Stale PSP attempt dbRetryCount ${current.retryCount} eventRetryCount ${eventData.attempt}  for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId}")
                 kafkaTx.run(offsets, groupMeta) {}
                 return@with
             }
 
-            // status check (must still be CAPTURE_REQUESTED or PENDING_CAPTURE before psp call)
+            // (must still be CAPTURE_REQUESTED or PENDING_CAPTURE before psp call)
             if (current.status != PaymentOrderStatus.CAPTURE_REQUESTED && current.status!= PaymentOrderStatus.PENDING_CAPTURE) {
                 logger.warn(
-                    "⏭️ Skip PSP: dbStatus={} expected=CAPTURE_REQUESTED or CAPTURE_PENDING poId={}",
-                    current.status, current.paymentOrderId
-                )
+                    "⚠️ Skip PSP: dbStatus=${current.status.name} expected=CAPTURE_REQUESTED or CAPTURE_PENDING   for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId}")
                 kafkaTx.run(offsets, groupMeta) {}
                 return@with
             }
@@ -125,7 +129,7 @@ class PaymentOrderCaptureExecutor(
             // ---------------------------------------
             val result = try {
                 PaymentOrderPspResultUpdated.from(
-                    work,
+                    eventData,
                     pspStatus,
                     tookMs,
                     Utc.nowInstant()
@@ -133,27 +137,19 @@ class PaymentOrderCaptureExecutor(
             } catch (ex: IllegalArgumentException) {
                 // domain invariant failed (invalid PSP status or order state)
                 logger.warn(
-                    "⏭️ Skipping PSP_RESULT_UPDATED creation: poId={} status={} reason={}",
-                    current.paymentOrderId, current.status, ex.message
-                )
+                    "‼️  Invalid PSP_RESULT_UPDATED creation   for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId}")
                 kafkaTx.run(offsets, groupMeta) {} // commit offset and skip
                 return@with
             } catch (ex: Exception) {
                 // unexpected serialization or mapping issue
                 logger.error(
-                    "❌ Unexpected error building PSP_RESULT_UPDATED for poId={} eventId={}",
-                    current.paymentOrderId, eventId, ex
-                )
+                    "🚨 Unexpected error building PSP_RESULT_UPDATED for for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId} error was : ${ex.message}")
                 kafkaTx.run(offsets, groupMeta) {}
                 return@with
             }
 
-            val outEnv = EventEnvelopeFactory.envelopeFor(
-                data = result,
-                aggregateId = work.paymentOrderId,
-                traceId = env.traceId,
-                parentEventId = env.eventId
-            )
 
             // ---------------------------------------
             // 5. TX: publish + commit + mark dedupe
@@ -161,18 +157,17 @@ class PaymentOrderCaptureExecutor(
             kafkaTx.run(offsets, groupMeta) {
 
                 publisher.publishSync(
-                    aggregateId = outEnv.aggregateId,
+                    aggregateId = envelope.aggregateId,
                     data = result,
-                    traceId = outEnv.traceId,
-                    parentEventId = outEnv.parentEventId
+                    traceId = EventLogContext.getTraceId(),
+                    parentEventId = EventLogContext.getEventId()
                 )
 
                 dedupe.markProcessed(eventId, 3600)
 
                 logger.info(
-                    "📤 PSP_RESULT_UPDATED published poId={} traceId={} status={}",
-                    work.paymentOrderId, outEnv.traceId, result
-                )
+                    "✅ Completed processing   for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId}")
             }
         }
     }

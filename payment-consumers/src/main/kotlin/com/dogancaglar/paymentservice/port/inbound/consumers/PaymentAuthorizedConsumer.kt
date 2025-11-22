@@ -4,6 +4,8 @@ import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.CONSUMER_G
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ID
+import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ORDER_ID
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
@@ -34,13 +36,13 @@ class PaymentAuthorizedConsumer(
         record: ConsumerRecord<String, EventEnvelope<PaymentAuthorized>>,
         consumer: Consumer<*, *>
     ) {
-        val consumed = record.value()
+        val envelope = record.value()
+        val eventData = envelope.data
 
         val tp = TopicPartition(record.topic(), record.partition())
         val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
-        val groupMeta =
-            consumer.groupMetadata()                        // <— real metadata (generation, member id, epoch)
-        EventLogContext.with(consumed) {
+        val groupMeta = consumer.groupMetadata()
+        EventLogContext.with(envelope) {
             /*
             if (order.status != PaymentStatus.AUTHORIZED) {
                 kafkaTx.run(offsets, groupMeta) {}
@@ -48,23 +50,15 @@ class PaymentAuthorizedConsumer(
                 return@with
             }
             */
+            logger.info(
+                "🎬 Started processing   authorization event for $PAYMENT_ID  ${eventData.publicPaymentId}")
 
+
+            kafkaTx.run(offsets, groupMeta) {}
+            logger.info(
+                "✅ Completed processing authorization payment event   for  with $PAYMENT_ID ${eventData.publicPaymentId}")
+            return@with
             //todo we will request a ledger recording here
-            /*
-
-
-            kafkaTx.run(offsets, groupMeta) {
-                publisher.publishSync(
-                    preSetEventIdFromCaller = outEnv.eventId,
-                    aggregateId = outEnv.aggregateId,
-                    eventMetaData = PaymentEventMetadataCatalog.PaymentOrderCaptureCommandMetadata,
-                    data = work,
-                    traceId = outEnv.traceId,
-                    parentEventId = outEnv.parentEventId
-                )
-                logger.debug("📤 Enqueued PSP work attempt=0 agg={} traceId={}", outEnv.aggregateId, outEnv.traceId)
-            }
-            */
 
         }
 

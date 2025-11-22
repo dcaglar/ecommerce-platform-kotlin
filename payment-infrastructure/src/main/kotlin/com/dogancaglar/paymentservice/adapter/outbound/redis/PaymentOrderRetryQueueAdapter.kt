@@ -1,15 +1,14 @@
 package com.dogancaglar.paymentservice.adapter.outbound.redis
 
-import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
-import com.dogancaglar.paymentservice.application.util.RetryItem
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.RetryItem
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
+import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -18,7 +17,6 @@ import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
-import java.util.*
 
 @Component("paymentOrderRetryQueueAdapter")
 class PaymentOrderRetryQueueAdapter(
@@ -38,7 +36,7 @@ class PaymentOrderRetryQueueAdapter(
 
     override fun scheduleRetry(
         paymentOrder: PaymentOrder,
-        backOffMillis: Long
+        backOffMillis: Long,
     ) {
         val totalStart = System.currentTimeMillis()
         try {
@@ -52,27 +50,11 @@ class PaymentOrderRetryQueueAdapter(
             val envelope = EventEnvelopeFactory.envelopeFor(
                 data = pspCallRequested,
                 aggregateId = pspCallRequested.paymentOrderId,
-                traceId = EventLogContext.getTraceId() ?: UUID.randomUUID().toString(),
+                traceId = EventLogContext.getTraceId(),
                 parentEventId = EventLogContext.getEventId()
             )
-
-            val serializationStart = System.currentTimeMillis()
             val json = objectMapper.writeValueAsString(envelope)
-            val serializationEnd = System.currentTimeMillis()
-
-            val redisStart = System.currentTimeMillis()
             paymentOrderRetryRedisCache.scheduleRetry(json, retryAt.toDouble())
-            val redisEnd = System.currentTimeMillis()
-
-            val totalEnd = System.currentTimeMillis()
-            logger.debug(
-                "TIMING: scheduleRetry | serialize: {} ms | redis: {} ms | total: {} ms | agg={} attempt={} retryAt={}",
-                (serializationEnd - serializationStart),
-                (redisEnd - redisStart),
-                (totalEnd - totalStart),
-                envelope.aggregateId,
-                retryAt
-            )
         } catch (e: Exception) {
             logger.error("❌ Exception during scheduleRetry for agg={}", paymentOrder.paymentOrderId.toPublicPaymentOrderId(), e)
             throw e

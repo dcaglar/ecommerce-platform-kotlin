@@ -71,9 +71,10 @@ open class ProcessPaymentService(
         val evt = paymentOrderDomainEventMapper.toPaymentOrderFinalized(persisted, Utc.nowLocalDateTime(),
             PaymentOrderStatus.CAPTURED)
         eventPublisher.publishSync(
-            persisted.paymentOrderId.value.toString(),
+            EventLogContext.getAggregateId()!!,
             evt,
-            EventLogContext.getTraceId()
+            EventLogContext.getTraceId(),
+            parentEventId = EventLogContext.getEventId()
         )
         logger.info("✅ Capture succeeded for {}", order.paymentOrderId)
     }
@@ -83,9 +84,10 @@ open class ProcessPaymentService(
         val evt = paymentOrderDomainEventMapper.toPaymentOrderFinalized(persisted, Utc.nowLocalDateTime(),
             PaymentOrderStatus.CAPTURE_FAILED)
         eventPublisher.publishSync(
-            persisted.paymentOrderId.value.toString(),
+            EventLogContext.getAggregateId()!!,
             evt,
-            EventLogContext.getTraceId()
+            EventLogContext.getTraceId(),
+            parentEventId = EventLogContext.getEventId()
         )
         logger.warn("❌ Capture failed for {}", order.paymentOrderId)
     }

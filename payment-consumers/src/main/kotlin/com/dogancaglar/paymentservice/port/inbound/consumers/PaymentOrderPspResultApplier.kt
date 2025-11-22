@@ -4,6 +4,8 @@ import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.CONSUMER_G
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ID
+import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ORDER_ID
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
@@ -39,48 +41,54 @@ class PaymentOrderPspResultApplier(
         record: ConsumerRecord<String, EventEnvelope<PaymentOrderPspResultUpdated>>,
         consumer: org.apache.kafka.clients.consumer.Consumer<*, *>
     ) {
-        val env = record.value()
-        val evt = env.data
-        val eventId = env.eventId
+        val envelope = record.value()
+        val eventData = envelope.data
+        val eventId = envelope.eventId
 
         val tp = TopicPartition(record.topic(), record.partition())
         val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
         val groupMeta = consumer.groupMetadata()
 
-        EventLogContext.with(env) {
-
+        EventLogContext.with(envelope) {
             if (dedupe.exists(eventId)) {
-                logger.debug("🔁 Skip duplicate PSP_RESULT_UPDATED eventId={}", eventId)
+                logger.warn(
+                    "⚠️ Event is processed already  for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId} , skipping")
                 kafkaTx.run(offsets, groupMeta) {}
                 return@with
             }
+            logger.info(
+                "🎬 Started processing   for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                        "with $PAYMENT_ID ${eventData.publicPaymentId}")
 
-            val status = runCatching { PaymentOrderStatus.valueOf(evt.pspStatus) }
+
+            val status = runCatching { PaymentOrderStatus.valueOf(eventData.pspStatus) }
                 .getOrElse {
-                    logger.warn("❌ Invalid PSP status={} for poId={}, skipping", evt.pspStatus, env.aggregateId)
+                    logger.warn("❌ Invalid PSP status={} for poId={}, skipping", eventData.pspStatus, envelope.aggregateId)
                     kafkaTx.run(offsets, groupMeta) {}
                     return@with
                 }
 
             // Capture variables for use in lambda
             val capturedStatus = status
-            val capturedEventId = eventId
-            
+
             kafkaTx.run(offsets, groupMeta) {
-                val order: PaymentOrder? = paymentOrderModificationPort.findByPaymentOrderId(PaymentOrderId(evt.paymentOrderId.toLong()))
+                val order: PaymentOrder? = paymentOrderModificationPort.findByPaymentOrderId(PaymentOrderId(eventData.paymentOrderId.toLong()))
                 if (order == null) {
-                    logger.warn("⚠️ Missing PaymentOrder row for {}", evt.paymentOrderId)
+                    logger.warn("⚠️ Missing PaymentOrder row for {}", eventData.paymentOrderId)
                     return@run
                 }
                 if (order.isTerminal()) {
                     logger.info("ℹ️ Skipping PSP result for terminal order. poId={} currentStatus={} pspStatus={} eventId={}", 
-                        order.paymentOrderId.value, order.status, capturedStatus, capturedEventId)
-                    dedupe.markProcessed(capturedEventId, 3600)
+                        order.paymentOrderId.value, order.status, capturedStatus, eventId)
+                    dedupe.markProcessed(eventId, 3600)
                     return@run  // Graceful return - no exception, no DLQ, but still commit offset and mark dedup
                 }
-                processPspResult.processPspResult(evt, order)
-                dedupe.markProcessed(capturedEventId, 3600)
-                logger.info("✅ PSP result applied status={} agg={} eventId={}", capturedStatus, env.aggregateId, capturedEventId)
+                processPspResult.processPspResult(eventData, order)
+                dedupe.markProcessed(eventId, 3600)
+                logger.info(
+                    "✅ Completed processing   for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId}")
             }
         }
     }

@@ -73,23 +73,11 @@ class AuthorizePaymentService(
     private fun toOutboxEvent(updated: Payment,paymentLines: List<PaymentLine>): OutboxEvent {
         val paymentAuthorizedEvent = paymentOrderDomainEventMapper.toPaymentAuthorized(updated,paymentLines)
         val envelope = EventEnvelopeFactory.envelopeFor(
-            traceId = EventLogContext.getTraceId() ?: UUID.randomUUID().toString(),
+            traceId = EventLogContext.getTraceId(),
             data = paymentAuthorizedEvent,
             aggregateId = updated.paymentId.value.toString()
         )
 
-        val extraLogFields = mapOf(
-            PaymentLogFields.PUBLIC_PAYMENT_ID to updated.paymentId.toPublicPaymentId()
-        )
-
-        EventLogContext.with(envelope, additionalContext = extraLogFields) {
-            logger.debug(
-                "Creating OutboxEvent for eventType={}, aggregateId={}, eventId={}",
-                envelope.eventType,
-                envelope.aggregateId,
-                envelope.eventId
-            )
-        }
 
         return OutboxEvent.createNew(
             oeid = updated.paymentId.value,

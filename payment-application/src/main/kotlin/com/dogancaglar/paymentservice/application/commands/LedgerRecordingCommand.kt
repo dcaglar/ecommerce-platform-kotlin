@@ -2,6 +2,7 @@ package com.dogancaglar.paymentservice.application.commands
 
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCommand
 import com.dogancaglar.paymentservice.application.events.PaymentOrderEvent
+import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -39,7 +40,7 @@ data class LedgerRecordingCommand private constructor(
          * Factory for domain → command mapping
          * (the ONLY valid creator in production code)
          */
-        fun from(final: PaymentOrderEvent, now: Instant): LedgerRecordingCommand =
+        fun from(final: PaymentOrderFinalized, now: Instant): LedgerRecordingCommand =
             LedgerRecordingCommand(
                 paymentOrderId = final.paymentOrderId,
                 publicPaymentOrderId = final.publicPaymentOrderId,
@@ -48,7 +49,7 @@ data class LedgerRecordingCommand private constructor(
                 sellerId = final.sellerId,
                 amountValue = final.amountValue,
                 currency = final.currency,
-                finalStatus = final.eventType,     // e.g. "payment_order_succeeded"
+                finalStatus = final.status,     // e.g. "payment_order_succeeded"
                 timestamp = now
             )
 

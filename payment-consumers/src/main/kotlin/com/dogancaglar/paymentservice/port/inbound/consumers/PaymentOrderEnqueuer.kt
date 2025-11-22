@@ -1,14 +1,14 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
-import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ID
+import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ORDER_ID
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
-import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
-import com.dogancaglar.paymentservice.domain.util.PSPCaptureStatusMapper
+import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
+
 @Component
 class PaymentOrderEnqueuer(
     @Qualifier("syncPaymentTx")
@@ -44,28 +45,35 @@ class PaymentOrderEnqueuer(
         record: ConsumerRecord<String, EventEnvelope<PaymentOrderCreated>>,
         consumer: org.apache.kafka.clients.consumer.Consumer<*, *>
     ) {
-        val env = record.value()
-        val evt = env.data
-        val eventId = env.eventId
+        val envelope = record.value()
+        val eventData = envelope.data
+        val eventId = envelope.eventId
 
         val tp = TopicPartition(record.topic(), record.partition())
         val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
         val groupMeta = consumer.groupMetadata()
 
-        EventLogContext.with(env) {
-
-            // 1. DEDUPE CHECK,if it's captured alreadyv,it already exist in dedup
+        EventLogContext.with(envelope) {
             if (dedupe.exists(eventId)) {
-                logger.debug("🔁 Redis dedupe skip eventId={}", eventId)
+                logger.warn(
+                    "⚠️ Event is processed already  for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId} , skipping")
                 kafkaTx.run(offsets, groupMeta) {}
                 return@with
             }
+            logger.info(
+                "🎬 Started processing   for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                        "with $PAYMENT_ID ${eventData.publicPaymentId}")
+            // 1. DEDUPE CHECK,if it's captured alreadyv,it already exist in dedup
+
 
             // 2. UPDATE DB → mark as CAPTURE_REQUESTED
             val updated = try {
-                modification.markAsCaptureRequested(evt.paymentOrderId.toLong())
+                modification.markAsCaptureRequested(eventData.paymentOrderId.toLong())
             } catch (ex: MissingPaymentOrderException) {
-                logger.warn("⏭️ Stale/Missing order during enqueue poId={} eventId={}", evt.paymentOrderId, eventId)
+                logger.warn(
+                    "‼️ Issue with processing   for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId} issue : ${ex.message}")
                 kafkaTx.run(offsets, groupMeta) {}
                 return@with
             }
@@ -76,44 +84,36 @@ class PaymentOrderEnqueuer(
             } catch (ex: IllegalArgumentException) {
                 // this comes from require(...) in from()
                 logger.warn(
-                    "⏭️ Skipping invalid PaymentOrderCaptureCommand creation: poId={} status={} reason={}",
-                    evt.paymentOrderId,
-                    updated.status,
-                    ex.message
-                )
+                    "‼️ Issue with processing   for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId} issue : ${ex.message}")
                 kafkaTx.run(offsets, groupMeta) {}
                 return@with
             } catch (ex: Exception) {
-                logger.error("❌ Unexpected error creating PaymentOrderCaptureCommand for poId={} eventId={}", evt.paymentOrderId, eventId, ex)
+                logger.warn(
+                    "🚨 with processing   for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId} issue : ${ex.message}")
                 kafkaTx.run(offsets, groupMeta) {}
                 return@with
             }
 
-            val outEnv = EventEnvelopeFactory.envelopeFor(
-                data = work,
-                aggregateId = work.paymentOrderId,
-                traceId = env.traceId,
-                parentEventId = env.eventId
-            )
+
 
             // 4. KAFKA TX: publish + commit offset + mark dedupe
             kafkaTx.run(offsets, groupMeta) {
 
                 publisher.publishSync(
-                    aggregateId = outEnv.aggregateId,
+                    aggregateId = envelope.aggregateId,
                     data = work,
-                    traceId = outEnv.traceId,
-                    parentEventId = outEnv.parentEventId
+                    traceId = envelope.traceId,
+                    parentEventId = envelope.eventId
                 )
 
                 // 5. Mark as processed ONLY HERE — AFTER EVERYTHING SUCCEEDS
                 dedupe.markProcessed(eventId, 3600)
 
                 logger.info(
-                    "📤 Enqueued CAPTURE_REQUESTED attempt=0 paymentOrderId={} traceId={}",
-                    work.paymentOrderId,
-                    outEnv.traceId
-                )
+                    "✅ Completed processing   for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId}")
             }
         }
     }

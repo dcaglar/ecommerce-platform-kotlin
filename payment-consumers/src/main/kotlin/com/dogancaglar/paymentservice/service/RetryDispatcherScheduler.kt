@@ -140,7 +140,9 @@ class RetryDispatcherScheduler(
         if (fail > 0) failedCounter.increment(fail.toDouble())
 
         batchSample.stop(batchTimer)
-        logger.info("RetryDispatcher: batch done ok={} fail={} polled={}", ok, fail, due.size)
+        if(ok >0 || fail >0 || due.size>0) {
+            logger.info("RetryDispatcher: batch done ok={} fail={} polled={}", ok, fail, due.size)
+        }
     }
 
     /** Requeue stale inflight items (e.g., if we crashed after popping) */

@@ -82,7 +82,6 @@ class OutboxDispatcherJob(
         try {
             val fresh = outboxEventRepository.countByStatus("NEW")
             backlog.set(fresh)
-            logger.info("Backlog gauge reset to {} ({})", fresh, reason)
         } catch (e: Exception) {
             logger.warn("Failed to reset backlog gauge ({}): {}", reason, e.message)
         }
@@ -188,7 +187,7 @@ class OutboxDispatcherJob(
                 )
             }
             //create outbox<paymentordercreated> with parent being set paymentaiuthorizerd event
-            val outboxEvents = paymentOrders.map { toOutboxEvent(it,envelope.eventId) }
+            val outboxEvents = paymentOrders.map { toOutboxEvent(it) }
             paymentOrderRepository.insertAll(paymentOrders)
             // For each order, persist an OutboxEvent<PaymentOrderCreated>
             outboxEventRepository.saveAll(outboxEvents)
@@ -203,13 +202,13 @@ class OutboxDispatcherJob(
     }
 
 
-    private fun toOutboxEvent(paymentOrder: PaymentOrder, parentEventId: String): OutboxEvent {
+    private fun toOutboxEvent(paymentOrder: PaymentOrder): OutboxEvent {
         val paymentOrderCreatedEvent = paymentOrderDomainEventMapper.toPaymentOrderCreated(paymentOrder)
         val envelope = EventEnvelopeFactory.envelopeFor(
-            traceId = EventLogContext.getTraceId() ?: UUID.randomUUID().toString(),
+            traceId = EventLogContext.getTraceId(),
             data = paymentOrderCreatedEvent,
             aggregateId = paymentOrderCreatedEvent.paymentOrderId,
-            parentEventId = parentEventId
+            parentEventId = EventLogContext.getEventId()
         )
 
         return OutboxEvent.createNew(
@@ -311,8 +310,9 @@ class OutboxDispatcherJob(
         val durationMs = System.currentTimeMillis() - start
         meterRegistry.timer(OUTBOX_DISPATCHER_DURATION, "thread", threadName)
             .record(durationMs, java.util.concurrent.TimeUnit.MILLISECONDS)
-
-        logger.info("Dispatched ok={} fail={} on {}", succeeded.size, failed.size, threadName)
+        if(succeeded.isNotEmpty() || failed.isNotEmpty()) {
+            logger.info("Dispatched ok={} fail={} on {}", succeeded.size, failed.size, threadName)
+        }
     }
 
     /** Adjust backlog but never let it go below zero. */

@@ -45,7 +45,6 @@ class PaymentEventPublisher(
 
         val record = buildRecord(eventMetaData, envelope)
 
-        EventLogContext.with(envelope) {
             try {
                 kafkaTemplate.send(record).get(timeoutSeconds, TimeUnit.SECONDS)
                 logger.debug(
@@ -59,7 +58,7 @@ class PaymentEventPublisher(
                 )
                 throw e
             }
-        }
+
 
         return envelope
     }

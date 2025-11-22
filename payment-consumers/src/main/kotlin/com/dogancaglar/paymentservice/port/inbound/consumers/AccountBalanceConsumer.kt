@@ -4,10 +4,14 @@ import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.CONSUMER_G
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.common.logging.GenericLogFields.JOURNAL_ID
+import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ID
+import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ORDER_ID
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.application.util.LedgerDomainEventMapper
 import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceUseCase
+import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
@@ -29,6 +33,7 @@ import org.springframework.stereotype.Component
 class AccountBalanceConsumer(
     @param:Qualifier("syncPaymentTx") private val kafkaTx: KafkaTxExecutor,
     private val accountBalanceService: AccountBalanceUseCase,
+    private val dedupe: EventDeduplicationPort
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     
@@ -51,24 +56,34 @@ class AccountBalanceConsumer(
                 OffsetAndMetadata(maxOffset + 1)
             }
             val groupMeta = consumer.groupMetadata()
-            // Use first event's traceId for MDC (all events in batch share partition, so likely same sellerId)
-            val firstEnvelope = records.first().value()
-            EventLogContext.with(firstEnvelope) {
+
                 // Wrap in KafkaTxExecutor for atomic offset commit
                 kafkaTx.run(offsets, groupMeta) {
-                    logger.info(
-                        "💰 Processing batch of {} ledger entry events (traceId={})",
-                        records.size,
-                        firstEnvelope.traceId
-                    )
+                    // Deduplication: Filter out already-processed events and log duplicates
+                    val newRecords = records.filter { record ->
+                        val exists = dedupe.exists(record.value().eventId)
+                        if (exists) {
+                            logger.warn(
+                                "⚠️ Event is processed already, skipping eventId=${record.value().eventId}, aggregateId=${record.value().aggregateId}"
+                            )
+                        }
+                        !exists
+                    }
+                    
                     // Extract all ledger entry domain from batch
-                    val allLedgerEntriesDomain = records
+                    val allLedgerEntriesDomain = newRecords
                         .flatMap { it.value().data.ledgerEntries }
-                        .map { LedgerDomainEventMapper.toDomain(it) }
+                        .map {
+                            logger.info(
+                                "🎬 Processing  journal ${it.journalType.name} with journal entry id ${it.journalEntryId}  ledger entry id ${it.ledgerEntryId} ")
+                            LedgerDomainEventMapper.toDomain(it) }
                     // idempotenct update Process batch with idempotency check
                     accountBalanceService.updateAccountBalancesBatch(allLedgerEntriesDomain)
+                    
+                    // Mark processed events
+                    newRecords.forEach { dedupe.markProcessed(it.value().eventId, 3600) }
                 }
-            }
+
 
     }
 }

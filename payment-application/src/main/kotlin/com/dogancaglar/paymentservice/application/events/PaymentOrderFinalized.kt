@@ -26,7 +26,7 @@ data class PaymentOrderFinalized private constructor(
     override val eventType = EVENT_TYPE
 
     override fun deterministicEventId(): String =
-        "$publicPaymentOrderId:$eventType"
+        "$publicPaymentOrderId:$eventType:$status"
 
     companion object {
         const val EVENT_TYPE = "payment_order_finalized"
