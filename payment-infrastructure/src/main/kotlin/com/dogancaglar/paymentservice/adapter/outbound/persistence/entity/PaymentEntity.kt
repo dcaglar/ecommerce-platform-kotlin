@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.outbound.persistence.entity
 
-import java.time.LocalDateTime
+import java.time.Instant
 
 data class PaymentEntity(
     val paymentId: Long,
@@ -11,6 +11,6 @@ data class PaymentEntity(
     val capturedAmountValue: Long,
     val idempotencyKey: String,
     val status: String,
-    val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime
+    val createdAt: Instant,
+    val updatedAt: Instant
 )

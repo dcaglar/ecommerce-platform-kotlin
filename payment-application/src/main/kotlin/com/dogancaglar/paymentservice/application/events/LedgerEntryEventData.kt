@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.application.events
 
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalType
-import java.time.LocalDateTime
+import java.time.Instant
 
 /**
  * Serializable DTO representing a ledger entry for event publication.
@@ -15,7 +15,7 @@ data class LedgerEntryEventData private constructor(
     val journalEntryId: String, // e.g., "AUTH:paymentorder-123"
     val journalType: JournalType,
     val journalName: String?,
-    val createdAt: LocalDateTime,
+    val createdAt: Instant,
     val postings: List<PostingEventData>
 ) {
     companion object {
@@ -35,7 +35,7 @@ data class LedgerEntryEventData private constructor(
             journalEntryId: String,
             journalType: JournalType,
             journalName: String?,
-            createdAt: LocalDateTime,
+            createdAt: Instant,
             postings: List<PostingEventData>
         ): LedgerEntryEventData {
             return LedgerEntryEventData(

@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.domain.model
 
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.vo.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -9,9 +10,7 @@ import java.time.LocalDateTime
 class PaymentOrderTest {
 
     private val paymentOrderId = PaymentOrderId(1L)
-    private val publicPaymentOrderId ="paymentorder-1"
     private val paymentId = PaymentId(10L)
-    private val publicPaymentId = "payment-10"
     private val sellerId = SellerId("seller-abc")
     private val amount = Amount.of(1000L, Currency("EUR")) // €10.00
 
@@ -46,7 +45,7 @@ class PaymentOrderTest {
                 Amount.of(-1000, Currency("EUR"))
             )
         }
-        assertTrue(ex.message!!.contains("greater than zero"))
+        assertTrue(ex.message!!.contains("Amount quantity must be greater than zero"))
     }
 
     @Test
@@ -59,7 +58,7 @@ class PaymentOrderTest {
                 amount
             )
         }
-        assertTrue(ex.message!!.contains("Seller id cant be blank"))
+        assertTrue(ex.message!!.contains("Seller ID cannot be blank"))
     }
 
     // --- ✅ State transition tests ---
@@ -159,8 +158,8 @@ class PaymentOrderTest {
             Amount.of(2000L, Currency("USD")),
             PaymentOrderStatus.CAPTURED,
             retryCount = 2,
-            createdAt = LocalDateTime.now().minusDays(1),
-            updatedAt = LocalDateTime.now()
+            createdAt = Utc.nowLocalDateTime().minusDays(1),
+            updatedAt = Utc.nowLocalDateTime()
         )
 
         assertEquals(PaymentOrderStatus.CAPTURED, persisted.status)

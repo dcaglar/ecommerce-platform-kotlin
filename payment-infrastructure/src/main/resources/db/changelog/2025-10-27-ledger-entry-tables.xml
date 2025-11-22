@@ -18,7 +18,10 @@
             <column name="name" type="VARCHAR(128)"/>
             <column name="reference_type" type="VARCHAR(64)"/>
             <column name="reference_id" type="VARCHAR(64)"/>
-            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE"
+                    defaultValueComputed="(now() AT TIME ZONE 'UTC')">
+                <constraints nullable="false"/>
+            </column>
         </createTable>
 
         <!-- ========== LEDGER ENTRIES TABLE ========== -->
@@ -29,7 +32,10 @@
             <column name="journal_id" type="VARCHAR(128)">
                 <constraints nullable="false"/>
             </column>
-            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE"
+                    defaultValueComputed="(now() AT TIME ZONE 'UTC')">
+                <constraints nullable="false"/>
+            </column>
         </createTable>
 
         <!-- ========== POSTINGS TABLE ========== -->
@@ -55,7 +61,10 @@
             <column name="currency" type="VARCHAR(3)">
                 <constraints nullable="false"/>
             </column>
-            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE"
+                    defaultValueComputed="(now() AT TIME ZONE 'UTC')">
+                <constraints nullable="false"/>
+            </column>
         </createTable>
 
         <!-- ========== RELATION & INDEXES ========== -->

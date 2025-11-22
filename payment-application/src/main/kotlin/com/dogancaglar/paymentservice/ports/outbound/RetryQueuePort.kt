@@ -8,7 +8,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 interface RetryQueuePort<T> {
     fun scheduleRetry(
         paymentOrder: PaymentOrder,
-        backOffMillis: Long,
+        backOffMillis: Long
     )
 
 

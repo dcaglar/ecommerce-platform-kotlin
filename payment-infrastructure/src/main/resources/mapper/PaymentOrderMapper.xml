@@ -12,8 +12,10 @@
         <result property="amountCurrency" column="amount_currency"/>
         <result property="status" column="status"
                 typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.PaymentOrderStatusTypeHandler"/>
-        <result property="createdAt" column="created_at"/>
-        <result property="updatedAt" column="updated_at"/>
+        <result property="createdAt" column="created_at"
+                typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.InstantTypeHandler"/>
+        <result property="updatedAt" column="updated_at"
+                typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.InstantTypeHandler"/>
         <result property="retryCount" column="retry_count"/>
     </resultMap>
 
@@ -134,13 +136,36 @@
         UPDATE payment_orders p
         SET
         status = CASE
-        WHEN p.status IN ('CAPTURED','REFUNDED') THEN p.status
+        WHEN p.status IN ('CAPTURED','CAPTURE_FAILED') THEN p.status
         ELSE
         #{status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.PaymentOrderStatusTypeHandler}
         END,
-        updated_at = GREATEST(p.updated_at, #{updatedAt}),
+        updated_at = GREATEST(p.updated_at, #{updatedAt, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.InstantTypeHandler}),
         retry_count = GREATEST(p.retry_count, #{retryCount})
         WHERE p.payment_order_id = #{paymentOrderId}
+        RETURNING
+        p.payment_order_id,
+        p.payment_id,
+        p.seller_id,
+        p.amount_value,
+        p.amount_currency,
+        p.status,
+        p.created_at,
+        p.updated_at,
+        p.retry_count
+        )
+        SELECT * FROM updated
+    </select>
+
+    <select id="updateReturningIdempotentInitialCaptureRequest"
+            resultMap="PaymentOrderResultMap">
+        WITH updated AS (
+        UPDATE payment_orders p
+        SET
+        status = 'CAPTURE_REQUESTED',
+        updated_at = GREATEST(p.updated_at, #{updateAt})
+        WHERE p.payment_order_id = #{paymentOrderId} and
+        p.status='INITIATED_PENDING' and p.retry_count=0
         RETURNING
         p.payment_order_id,
         p.payment_id,

@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.domain.model
 
+import com.dogancaglar.common.time.Utc
 import java.time.LocalDateTime
 
 
@@ -34,7 +35,7 @@ import java.time.LocalDateTime
     /** Functional immutability */
     private fun copy(
         status: Status = this.status,
-        updatedAt: LocalDateTime = LocalDateTime.now()
+        updatedAt: LocalDateTime = Utc.nowLocalDateTime()
     ): OutboxEvent = OutboxEvent(
         oeid = oeid,
         eventType = eventType,
@@ -55,17 +56,19 @@ import java.time.LocalDateTime
             oeid: Long,
             eventType: String,
             aggregateId: String,
-            payload: String,
-            createdAt: LocalDateTime = LocalDateTime.now()
-        ): OutboxEvent = OutboxEvent(
-            oeid = oeid,
-            eventType = eventType,
-            aggregateId = aggregateId,
-            payload = payload,
-            status = Status.NEW,
-            createdAt = createdAt,
-            updatedAt = createdAt
-        )
+            payload: String
+        ): OutboxEvent {
+            val now = Utc.nowLocalDateTime()
+           return  OutboxEvent(
+                oeid = oeid,
+                eventType = eventType,
+                aggregateId = aggregateId,
+                payload = payload,
+                status = Status.NEW,
+                createdAt = now,
+                updatedAt = now
+            )
+        }
 
         /** 🔹 Rehydrate from persistence row */
         fun rehydrate(

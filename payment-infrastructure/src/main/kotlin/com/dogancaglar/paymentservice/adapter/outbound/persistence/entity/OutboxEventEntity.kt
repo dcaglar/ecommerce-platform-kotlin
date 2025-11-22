@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.outbound.persistence.entity
 
-import java.time.LocalDateTime
+import java.time.Instant
 
 data class OutboxEventEntity(
     val oeid: Long,
@@ -8,9 +8,9 @@ data class OutboxEventEntity(
     val aggregateId: String,
     val payload: String,
     var status: String = "NEW",
-    val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime,
-    val claimedAt: LocalDateTime? = null,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+    val claimedAt: Instant? = null,
     val claimedBy: String? = null
 ) {
     fun markAsSent() {

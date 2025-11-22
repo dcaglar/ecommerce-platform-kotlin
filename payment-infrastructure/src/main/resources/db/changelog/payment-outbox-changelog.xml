@@ -15,9 +15,9 @@
                 aggregate_id   VARCHAR(255) NOT NULL,
                 payload        TEXT NOT NULL,
                 status         VARCHAR(50) NOT NULL,
-                created_at     TIMESTAMP NOT NULL,
-                updated_at     TIMESTAMP NOT NULL,
-                claimed_at     TIMESTAMPTZ,
+                created_at     TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC'),
+                updated_at     TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC'),
+                claimed_at     TIMESTAMP WITHOUT TIME ZONE,
                 claimed_by     VARCHAR(128),
                 PRIMARY KEY (oeid, created_at)
                 )

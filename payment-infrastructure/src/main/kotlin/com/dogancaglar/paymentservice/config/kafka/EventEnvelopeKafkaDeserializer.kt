@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.config.kafka
 
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
@@ -19,7 +19,7 @@ class EventEnvelopeKafkaDeserializer : Deserializer<EventEnvelope<*>> {
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
 
     private val topicTypeMap: Map<String, TypeReference<out EventEnvelope<*>>> =
-        EventMetadatas.all.associate { it.topic to it.typeRef }
+        PaymentEventMetadataCatalog.all.associate { it.topic to it.typeRef }
 
 
     override fun deserialize(

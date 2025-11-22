@@ -1,4 +1,6 @@
-package com.dogancaglar.port.out.web.dto
+package com.dogancaglar.paymentservice.adapter.inbound.rest.dto
+
+import com.dogancaglar.port.out.web.dto.AmountDto
 
 
 data class PaymentResponseDTO(

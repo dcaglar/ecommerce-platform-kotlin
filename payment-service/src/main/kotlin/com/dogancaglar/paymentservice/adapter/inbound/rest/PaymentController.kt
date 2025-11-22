@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
-import com.dogancaglar.port.out.web.dto.PaymentRequestDTO
-import com.dogancaglar.port.out.web.dto.PaymentResponseDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentResponseDTO
 import jakarta.validation.Valid
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -34,6 +34,21 @@ class PaymentController(
         val responseDTO = paymentService.createPayment(request)
         logger.debug("📥 Received payment request for order: ${responseDTO.orderId}, payment id is ${responseDTO.paymentId}")
         
+        // Return 201 Created with Location header (best practice for resource creation)
+        return ResponseEntity
+            .status(HttpStatus.CREATED)
+            .header("Location", "/api/v1/payments/${responseDTO.paymentId}")
+            .body(responseDTO)
+    }
+
+
+    @PostMapping("/payments/{paymentId}/captures")
+    @PreAuthorize("hasAuthority('payment:write')")
+    fun capturePayment(@Valid @RequestBody request: PaymentRequestDTO): ResponseEntity<PaymentResponseDTO> {
+        logger.debug("📥 Sending payment request for order: ${request.orderId}")
+        val responseDTO = paymentService.createPayment(request)
+        logger.debug("📥 Received payment request for order: ${responseDTO.orderId}, payment id is ${responseDTO.paymentId}")
+
         // Return 201 Created with Location header (best practice for resource creation)
         return ResponseEntity
             .status(HttpStatus.CREATED)

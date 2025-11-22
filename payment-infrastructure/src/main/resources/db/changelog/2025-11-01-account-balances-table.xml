@@ -20,10 +20,14 @@
             <column name="last_applied_entry_id" type="BIGINT" defaultValueNumeric="0">
                 <constraints nullable="false"/>
             </column>
-            <column name="last_snapshot_at" type="TIMESTAMP">
+            <column name="last_snapshot_at" type="TIMESTAMP WITHOUT TIME ZONE"
+                    defaultValueComputed="(now() AT TIME ZONE 'UTC')">
                 <constraints nullable="false"/>
             </column>
-            <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" type="TIMESTAMP WITHOUT TIME ZONE"
+                    defaultValueComputed="(now() AT TIME ZONE 'UTC')">
+                <constraints nullable="false"/>
+            </column>
         </createTable>
 
     </changeSet>

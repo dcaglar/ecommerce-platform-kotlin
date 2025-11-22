@@ -4,7 +4,7 @@ import com.dogancaglar.paymentservice.adapter.inbound.rest.mapper.AmountMapper
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountStatus
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
-import com.dogancaglar.port.out.web.dto.PaymentRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentRequestDTO
 import org.springframework.stereotype.Service
 
 @Service

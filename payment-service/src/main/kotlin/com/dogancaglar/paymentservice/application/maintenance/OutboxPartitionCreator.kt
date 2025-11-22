@@ -1,20 +1,19 @@
 package com.dogancaglar.paymentservice.application.maintenance
 
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.common.time.Utc
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.context.annotation.DependsOn
 import org.springframework.context.event.EventListener
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Component
-import java.time.Clock
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -23,7 +22,6 @@ import java.time.temporal.ChronoUnit
 @Component
 class OutboxPartitionCreator(
     @Qualifier("maintenanceJdbcTemplate") private val jdbcTemplate: JdbcTemplate,
-    private val clock: Clock,
     @Qualifier("outboxEventPartitionMaintenanceScheduler") private val taskScheduler: ThreadPoolTaskScheduler
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -40,11 +38,10 @@ class OutboxPartitionCreator(
         fixedDelayString = "\${outbox-partition.fixed-delay:PT10M}"
     )
     fun ensureCurrentAndNextScheduled() {
-        val now = LocalDateTime.now(clock)
         taskScheduler.execute {
-            val start = LocalDateTime.now(clock)
+            val start = Utc.nowLocalDateTime()
             ensureCurrentAndNext()
-            val end = LocalDateTime.now(clock)
+            val end = Utc.nowLocalDateTime()
             val durationMs = ChronoUnit.MILLIS.between(start, end)  // long
             logger.info("Partition check complete started at $start, ended at $end, duration: $durationMs ")
 
@@ -53,7 +50,7 @@ class OutboxPartitionCreator(
 
 
     fun ensureCurrentAndNext() {
-        val now = LocalDateTime.now(clock)
+        val now = Utc.nowLocalDateTime()
         val start = now.withMinute((now.minute / 30) * 30).withSecond(0).withNano(0)
         // current window
         ensurePartitionExists(start, start.plusMinutes(PARTITION_SIZE_MIN))
@@ -68,7 +65,7 @@ class OutboxPartitionCreator(
         val toStr = to.format(sqlFormatter)
 
         val mdcContext = mapOf("partitionName" to partitionName, "from" to fromStr, "to" to toStr)
-        LogContext.with(mdcContext) {
+        EventLogContext.with(mdcContext) {
             val sql = """
                 CREATE TABLE IF NOT EXISTS $partitionName
                 PARTITION OF outbox_event
@@ -93,7 +90,7 @@ class OutboxPartitionCreator(
 
     // Partition creation logic for current window
     fun ensurePartitionForNow() {
-        val now = LocalDateTime.now(clock)
+        val now = Utc.nowLocalDateTime()
         val currentPartitionStartTime = now.withMinute((now.minute / 30) * 30).withSecond(0).withNano(0)
         val currentPartitionEndTime = currentPartitionStartTime.plusMinutes(PARTITION_SIZE_MIN)
         ensurePartitionExists(currentPartitionStartTime, currentPartitionEndTime)
@@ -101,7 +98,7 @@ class OutboxPartitionCreator(
 
     // Partition creation logic for next window
     fun ensurePartitionForNext() {
-        val now = LocalDateTime.now(clock)
+        val now = Utc.nowLocalDateTime()
         val windowStart = now.withMinute((now.minute / 30) * 30).withSecond(0).withNano(0)
         val nextWindowStart = windowStart.plusMinutes(PARTITION_SIZE_MIN)
         val nextWindowEnd = nextWindowStart.plusMinutes(PARTITION_SIZE_MIN)
@@ -116,9 +113,9 @@ class OutboxPartitionCreator(
     @Scheduled(fixedDelay = 21 * 60 * 1000)
     fun pruneOldPartitionsScheduled() {
         taskScheduler.execute {
-            val start = LocalDateTime.now(clock)
+            val start = Utc.nowLocalDateTime()
             pruneOldPartitions()
-            val end = LocalDateTime.now(clock)
+            val end = Utc.nowLocalDateTime()
             val durationMs = ChronoUnit.MILLIS.between(start, end)  // long
             logger.info("Partition prune complete started at $start, ended at $end, duration: $durationMs ")
         }
@@ -129,13 +126,13 @@ class OutboxPartitionCreator(
     }
 
     fun prunePartitionsSafe() {
-        val now = LocalDateTime.now(clock)
+        val now = Utc.nowLocalDateTime()
         val currWindowStart = now.withMinute((now.minute / 30) * 30).withSecond(0).withNano(0)
         MDC.put("currWindowStart", currWindowStart.toString())
         val mdcContext = mapOf(
             "currWindowStart" to currWindowStart.toString(),
         )
-        LogContext.with(mdcContext) {
+        EventLogContext.with(mdcContext) {
             val sql = """
             DO $$
             DECLARE
@@ -184,11 +181,11 @@ class OutboxPartitionCreator(
     @Scheduled(fixedDelay = 30 * 60 * 1000, initialDelay = 15 * 60 * 1000)
     fun vacuumOldPartitionsWithNewRowsScheduled() {
         taskScheduler.execute {
-            val start = LocalDateTime.now(clock)
+            val start = Utc.nowLocalDateTime()
 
 
             vacuumOldPartitionsWithNewRows()
-            val end = LocalDateTime.now(clock)
+            val end = Utc.nowLocalDateTime()
             val durationMs = ChronoUnit.MILLIS.between(start, end)  // long
             logger.info("Partition vacuum check complete started at $start, ended at $end, duration: $durationMs ")
         }
@@ -196,7 +193,7 @@ class OutboxPartitionCreator(
 
 
     fun vacuumOldPartitionsWithNewRows() {
-        val now = LocalDateTime.now(clock)
+        val now = Utc.nowLocalDateTime()
         val partitionFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmm")
         val currWindowStart = now.withMinute((now.minute / 30) * 30).withSecond(0).withNano(0)
         val nextWindowStart = currWindowStart.plusMinutes(PARTITION_SIZE_MIN)

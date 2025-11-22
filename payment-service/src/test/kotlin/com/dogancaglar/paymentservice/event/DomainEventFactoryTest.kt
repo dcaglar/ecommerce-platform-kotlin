@@ -1,18 +1,27 @@
 package com.dogancaglar.paymentservice.event
 
-import com.dogancaglar.common.event.DomainEventEnvelopeFactory
+import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.GenericLogFields
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
-import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
+import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
+import com.dogancaglar.paymentservice.domain.model.vo.SellerId
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.slf4j.MDC
-import java.time.LocalDateTime
-import java.util.*
+import java.util.UUID
 
 class DomainEventFactoryTest {
+
+    private val mapper = PaymentOrderDomainEventMapper()
 
     @Test
     fun `should create EventEnvelope with generated eventId and traceid from mdc`() {
@@ -20,22 +29,24 @@ class DomainEventFactoryTest {
         val traceIdFromMDC = "test-traceid"
         MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
+            val now = Utc.nowLocalDateTime()
+            val paymentOrder = PaymentOrder.rehydrate(
+                paymentOrderId = PaymentOrderId(1001L),
+                paymentId = PaymentId(123L),
+                sellerId = SellerId("seller-1"),
+                amount = Amount.of(25000L, Currency("EUR")),
+                status = PaymentOrderStatus.INITIATED_PENDING,
+                retryCount = 0,
+                createdAt = now,
+                updatedAt = now
+            )
+            val event = mapper.toPaymentOrderCreated(paymentOrder)
+            
             // when
-            val envelope: EventEnvelope<PaymentOrderCreated> = DomainEventEnvelopeFactory.envelopeFor(
-                traceId = traceIdFromMDC,
-                data = PaymentOrderCreated.create(
-                    paymentOrderId = "1001",
-                    paymentId = "123",
-                    sellerId = "seller-1",
-                    amountValue = 25000L, // $250.00
-                    currency = "EUR",
-                    status = "CREATED",
-                    createdAt = LocalDateTime.now(),
-                    updatedAt = LocalDateTime.now(),
-                    retryCount = 0
-                ),
-                eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
-                aggregateId = "paymentorder-1001"
+            val envelope: EventEnvelope<PaymentOrderCreated> = EventEnvelopeFactory.envelopeFor(
+                data = event,
+                aggregateId = event.paymentOrderId,
+                traceId = traceIdFromMDC
             )
 
             // then
@@ -51,23 +62,24 @@ class DomainEventFactoryTest {
     fun `should generate new traceId when not present in MDC`() {
         // when
         assertThrows<IllegalStateException> {
-            DomainEventEnvelopeFactory.envelopeFor(
-                traceId = MDC.get(GenericLogFields.TRACE_ID) ?: throw IllegalStateException("TraceId missing"),
-                data = PaymentOrderCreated.create(
-                    paymentOrderId = "po-1",
-                    paymentId = "p-1",
-                    sellerId = "s-1",
-                    amountValue = 1000L, // $10.00
-                    currency = "EUR",
-                    status = "CREATED",
-                    createdAt = LocalDateTime.now(),
-                    updatedAt = LocalDateTime.now(),
-                    retryCount = 0
-                ),
-                eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
-                aggregateId = "paymentorder-1"
+            val now = Utc.nowLocalDateTime()
+            val paymentOrder = PaymentOrder.rehydrate(
+                paymentOrderId = PaymentOrderId(1L),
+                paymentId = PaymentId(1L),
+                sellerId = SellerId("s-1"),
+                amount = Amount.of(1000L, Currency("EUR")),
+                status = PaymentOrderStatus.INITIATED_PENDING,
+                retryCount = 0,
+                createdAt = now,
+                updatedAt = now
             )
-
+            val event = mapper.toPaymentOrderCreated(paymentOrder)
+            
+            EventEnvelopeFactory.envelopeFor(
+                data = event,
+                aggregateId = event.paymentOrderId,
+                traceId = MDC.get(GenericLogFields.TRACE_ID) ?: throw IllegalStateException("TraceId missing")
+            )
         }
     }
 
@@ -76,37 +88,39 @@ class DomainEventFactoryTest {
         val traceIdFromMDC = "test-traceid"
         MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
-            val event1 = DomainEventEnvelopeFactory.envelopeFor(
-                traceId = traceIdFromMDC,
-                data = PaymentOrderCreated.create(
-                    paymentOrderId = "1",
-                    paymentId = "2",
-                    sellerId = "s-1",
-                    amountValue = 1000L, // $10.00
-                    currency = "EUR",
-                    status = "CREATED",
-                    createdAt = LocalDateTime.now(),
-                    updatedAt = LocalDateTime.now(),
-                    retryCount = 0
-                ),
-                eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
-                aggregateId = "paymentorder-1"
+            val now = Utc.nowLocalDateTime()
+            val paymentOrder1 = PaymentOrder.rehydrate(
+                paymentOrderId = PaymentOrderId(1L),
+                paymentId = PaymentId(2L),
+                sellerId = SellerId("s-1"),
+                amount = Amount.of(1000L, Currency("EUR")),
+                status = PaymentOrderStatus.INITIATED_PENDING,
+                retryCount = 0,
+                createdAt = now,
+                updatedAt = now
             )
-            val event2 = DomainEventEnvelopeFactory.envelopeFor(
-                traceId = traceIdFromMDC,
-                data = PaymentOrderCreated.create(
-                    paymentOrderId = "3",
-                    paymentId = "2",
-                    sellerId = "s-1",
-                    amountValue = 1000L, // $10.00
-                    currency = "EUR",
-                    status = "CREATED",
-                    createdAt = LocalDateTime.now(),
-                    updatedAt = LocalDateTime.now(),
-                    retryCount = 0
-                ),
-                eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
-                aggregateId = "paymentorder-1"
+            val event1Data = mapper.toPaymentOrderCreated(paymentOrder1)
+            val event1 = EventEnvelopeFactory.envelopeFor(
+                data = event1Data,
+                aggregateId = event1Data.paymentOrderId,
+                traceId = traceIdFromMDC
+            )
+            
+            val paymentOrder2 = PaymentOrder.rehydrate(
+                paymentOrderId = PaymentOrderId(3L),
+                paymentId = PaymentId(2L),
+                sellerId = SellerId("s-1"),
+                amount = Amount.of(1000L, Currency("EUR")),
+                status = PaymentOrderStatus.INITIATED_PENDING,
+                retryCount = 0,
+                createdAt = now,
+                updatedAt = now
+            )
+            val event2Data = mapper.toPaymentOrderCreated(paymentOrder2)
+            val event2 = EventEnvelopeFactory.envelopeFor(
+                data = event2Data,
+                aggregateId = event2Data.paymentOrderId,
+                traceId = traceIdFromMDC
             )
             Assertions.assertThat(event1.traceId).isEqualTo(event2.traceId)
             Assertions.assertThat(event1.eventId).isNotEqualTo(event2.eventId)
@@ -122,28 +136,28 @@ class DomainEventFactoryTest {
         val traceIdFromMDC = "test-traceid"
         MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
-            val event = PaymentOrderCreated.create(
-                paymentOrderId = "1001",
-                paymentId = "123",
-                sellerId = "seller-1",
-                amountValue = 25000L, // $250.00
-                currency = "EUR",
-                status = "CREATED",
-                createdAt = LocalDateTime.now(),
-                updatedAt = LocalDateTime.now(),
-                retryCount = 0
+            val now = Utc.nowLocalDateTime()
+            val paymentOrder = PaymentOrder.rehydrate(
+                paymentOrderId = PaymentOrderId(1001L),
+                paymentId = PaymentId(123L),
+                sellerId = SellerId("seller-1"),
+                amount = Amount.of(25000L, Currency("EUR")),
+                status = PaymentOrderStatus.INITIATED_PENDING,
+                retryCount = 0,
+                createdAt = now,
+                updatedAt = now
             )
+            val event = mapper.toPaymentOrderCreated(paymentOrder)
 
-            val envelope = DomainEventEnvelopeFactory.envelopeFor(
-                traceId = traceIdFromMDC,
+            val envelope = EventEnvelopeFactory.envelopeFor(
                 data = event,
-                eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
-                aggregateId = event.publicPaymentOrderId
+                aggregateId = event.publicPaymentOrderId,
+                traceId = traceIdFromMDC
             )
 
             Assertions.assertThat(envelope.traceId).isNotBlank
             Assertions.assertThat(envelope.eventId).isNotNull
-            Assertions.assertThat(envelope.eventType).isEqualTo(EventMetadatas.PaymentOrderCreatedMetadata.eventType)
+            Assertions.assertThat(envelope.eventType).isEqualTo("payment_order_created")
             Assertions.assertThat(envelope.aggregateId).isEqualTo(event.publicPaymentOrderId)
             Assertions.assertThat(envelope.data).isEqualTo(event)
         } finally {
@@ -156,24 +170,24 @@ class DomainEventFactoryTest {
         val traceIdFromMDC = "test-traceid"
         MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
-            val parentId = UUID.randomUUID()
-            val event = PaymentOrderCreated.create(
-                paymentOrderId = "1001",
-                paymentId = "123",
-                sellerId = "seller-1",
-                amountValue = 25000L, // $250.00
-                currency = "EUR",
-                status = "CREATED",
-                createdAt = LocalDateTime.now(),
-                updatedAt = LocalDateTime.now(),
-                retryCount = 0
+            val parentId = UUID.randomUUID().toString()
+            val now = Utc.nowLocalDateTime()
+            val paymentOrder = PaymentOrder.rehydrate(
+                paymentOrderId = PaymentOrderId(1001L),
+                paymentId = PaymentId(123L),
+                sellerId = SellerId("seller-1"),
+                amount = Amount.of(25000L, Currency("EUR")),
+                status = PaymentOrderStatus.INITIATED_PENDING,
+                retryCount = 0,
+                createdAt = now,
+                updatedAt = now
             )
+            val event = mapper.toPaymentOrderCreated(paymentOrder)
 
-            val envelope = DomainEventEnvelopeFactory.envelopeFor(
-                traceId = traceIdFromMDC,
+            val envelope = EventEnvelopeFactory.envelopeFor(
                 data = event,
-                eventMetaData = EventMetadatas.PaymentOrderCreatedMetadata,
                 aggregateId = event.publicPaymentOrderId,
+                traceId = traceIdFromMDC,
                 parentEventId = parentId
             )
             Assertions.assertThat(envelope.parentEventId).isEqualTo(parentId)

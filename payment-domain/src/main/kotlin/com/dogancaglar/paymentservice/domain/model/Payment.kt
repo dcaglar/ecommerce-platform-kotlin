@@ -1,9 +1,9 @@
 package com.dogancaglar.paymentservice.domain.model
 
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import java.time.Clock
 import java.time.LocalDateTime
 import kotlin.collections.plus
 
@@ -22,13 +22,13 @@ class Payment private constructor(
 ) {
     // --- Domain Behavior ---
 
-    fun authorize(updatedAt: LocalDateTime= LocalDateTime.now(Clock.systemUTC())): Payment {
+    fun authorize(updatedAt: LocalDateTime= Utc.nowLocalDateTime()): Payment {
         require(status == PaymentStatus.PENDING_AUTH) { "Payment can only be authorized from PENDING_AUTH" }
         return copy(status = PaymentStatus.AUTHORIZED, updatedAt = updatedAt )
     }
 
 
-    fun decline(updatedAt: LocalDateTime= LocalDateTime.now(Clock.systemUTC())): Payment {
+    fun decline(updatedAt: LocalDateTime= Utc.nowLocalDateTime()): Payment {
         require(status == PaymentStatus.PENDING_AUTH) { "Payment can only be declined from PENDING_AUTH" }
         return copy(status = PaymentStatus.DECLINED, updatedAt = updatedAt)
     }
@@ -63,7 +63,7 @@ class Payment private constructor(
         capturedAmount: Amount = this.capturedAmount,
         status: PaymentStatus = this.status,
         paymentOrders: List<PaymentOrder> = this.paymentOrders,
-        updatedAt: LocalDateTime
+        updatedAt: LocalDateTime= Utc.nowLocalDateTime()
     ): Payment = Payment(
         paymentId = paymentId,
         buyerId = buyerId,
@@ -82,11 +82,11 @@ class Payment private constructor(
             paymentId: PaymentId,
             buyerId: BuyerId,
             orderId: OrderId,
-            totalAmount: Amount,
-            clock: Clock = Clock.systemUTC()
+            totalAmount: Amount
         ): Payment {
             require(totalAmount.isPositive()) { "Total amount must be positive" }
             val idempotencyKeyGenerated = "${buyerId.value}:${orderId.value}:${totalAmount.quantity}:${totalAmount.currency.currencyCode}"
+            val now = Utc.nowLocalDateTime()
             return Payment(
                 paymentId = paymentId,
                 buyerId = buyerId,
@@ -95,8 +95,8 @@ class Payment private constructor(
                 capturedAmount = Amount.zero(totalAmount.currency),
                 status = PaymentStatus.PENDING_AUTH,
                 idempotencyKey = idempotencyKeyGenerated,
-                createdAt = LocalDateTime.now(clock),
-                updatedAt = LocalDateTime.now(clock),
+                createdAt = now,
+                updatedAt = now,
                 paymentOrders = emptyList()
             )
 

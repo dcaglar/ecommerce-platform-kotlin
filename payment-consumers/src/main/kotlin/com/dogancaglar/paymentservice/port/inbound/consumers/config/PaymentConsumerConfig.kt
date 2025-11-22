@@ -16,15 +16,14 @@ import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPor
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import java.time.Clock
 
 @Configuration
 class PaymentConsumerConfig {
 
 
     @Bean
-    fun paymentOrderDomainEventMapper(clock: Clock): PaymentOrderDomainEventMapper =
-        PaymentOrderDomainEventMapper(clock)
+    fun paymentOrderDomainEventMapper(): PaymentOrderDomainEventMapper =
+        PaymentOrderDomainEventMapper()
 
 
     @Bean
@@ -32,14 +31,12 @@ class PaymentConsumerConfig {
         paymentOrderModificationPort: PaymentOrderModificationPort,
         @Qualifier("syncPaymentEventPublisher") syncPaymentEventPublisher: PaymentEventPublisher,
         paymentOrderRetryQueueAdapter: PaymentOrderRetryQueueAdapter,
-        clock: Clock,
         paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
     ): ProcessPaymentService {
         return ProcessPaymentService(
             paymentOrderModificationPort = paymentOrderModificationPort,
             eventPublisher = syncPaymentEventPublisher,
             retryQueuePort = paymentOrderRetryQueueAdapter,
-            clock = clock,
             paymentOrderDomainEventMapper = paymentOrderDomainEventMapper
         )
     }
@@ -47,10 +44,9 @@ class PaymentConsumerConfig {
     @Bean
     fun requestLedgerRecordingService(
         @Qualifier(
-            "syncPaymentEventPublisher") syncPaymentEventPublisher: PaymentEventPublisher,
-                                                clock: Clock): RequestLedgerRecordingService{
+            "syncPaymentEventPublisher") syncPaymentEventPublisher: PaymentEventPublisher): RequestLedgerRecordingService{
 
-        return RequestLedgerRecordingService(syncPaymentEventPublisher,clock)
+        return RequestLedgerRecordingService(syncPaymentEventPublisher)
     }
 
 
@@ -59,10 +55,9 @@ class PaymentConsumerConfig {
         ledgerEntrPort: LedgerEntryPort,
         syncPaymentEventPublisher: PaymentEventPublisher,
         @Qualifier(
-            "accountDirectoryImpl") accountDirectoryImpl: AccountDirectoryPort,
-                                                clock: Clock): RecordLedgerEntriesService{
+            "accountDirectoryImpl") accountDirectoryImpl: AccountDirectoryPort): RecordLedgerEntriesService{
 
-        return RecordLedgerEntriesService(ledgerEntrPort,syncPaymentEventPublisher,accountDirectoryImpl,clock)
+        return RecordLedgerEntriesService(ledgerEntrPort,syncPaymentEventPublisher,accountDirectoryImpl)
     }
 
 

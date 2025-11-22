@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers.base
 
+import com.dogancaglar.common.event.Event
 import com.dogancaglar.common.event.EventEnvelope
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
@@ -7,7 +8,7 @@ import org.springframework.kafka.support.Acknowledgment
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import java.util.concurrent.Future
 
-abstract class BaseBatchKafkaConsumer<T : Any> : AbstractKafkaConsumer<T>() {
+abstract class BaseBatchKafkaConsumer<T : Event> : AbstractKafkaConsumer<T>() {
     abstract fun consume(record: ConsumerRecord<String, EventEnvelope<T>>)
     open fun getExecutor(): ThreadPoolTaskExecutor? = null
 

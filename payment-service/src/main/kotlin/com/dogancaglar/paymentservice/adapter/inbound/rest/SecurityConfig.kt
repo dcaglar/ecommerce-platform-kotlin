@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
+import com.dogancaglar.common.time.Utc
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpMethod
@@ -46,7 +47,7 @@ class SecurityConfig {
                         response.contentType = "application/json"
                         response.writer.write("""
                             {
-                                "timestamp": "${java.time.Instant.now()}",
+                                "timestamp": "${Utc.nowInstant()}",
                                 "status": 401,
                                 "error": "Unauthorized",
                                 "message": "Authentication required. Please provide a valid JWT token.",
@@ -60,7 +61,7 @@ class SecurityConfig {
                         response.contentType = "application/json"
                         response.writer.write("""
                             {
-                                "timestamp": "${java.time.Instant.now()}",
+                                "timestamp": "${Utc.nowInstant()}",
                                 "status": 403,
                                 "error": "Forbidden",
                                 "message": "Access denied. You do not have the required permissions.",

@@ -1,6 +1,9 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest.mapper
 
 
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CaptureResponseDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentResponseDTO
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
 import com.dogancaglar.paymentservice.domain.commands.CreatePaymentCommand
@@ -40,11 +43,4 @@ object PaymentRequestMapper {
         )
     }
 
-    private fun toDto(order: PaymentOrder): PaymentOrderResponseDTO {
-        return PaymentOrderResponseDTO(
-            paymentOrderId = order.paymentOrderId.toPublicPaymentOrderId(),
-            sellerId = order.sellerId.value,
-            amount = AmountDto(order.amount.quantity, CurrencyEnum.valueOf(order.amount.currency.currencyCode))
-        )
-    }
 }

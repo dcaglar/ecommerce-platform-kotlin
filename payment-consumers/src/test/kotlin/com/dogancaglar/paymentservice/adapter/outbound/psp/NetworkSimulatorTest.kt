@@ -4,21 +4,16 @@ import io.mockk.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
 import org.junit.jupiter.api.Assertions.assertTrue
 
 class NetworkSimulatorTest {
 
     private lateinit var config: CaptureSimulationProperties
-    private lateinit var clock: Clock
     private lateinit var networkSimulator: CaptureNetworkSimulator
 
     @BeforeEach
     fun setUp() {
         config = mockk()
-        clock = Clock.fixed(Instant.parse("2023-01-01T10:00:00Z"), ZoneOffset.UTC)
         
         networkSimulator = CaptureNetworkSimulator(config)
     }

@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.stereotype.Component
-import java.time.Clock
 
 @Component
 class JacksonSerializationAdapter(
@@ -21,11 +20,4 @@ class JacksonSerializationAdapter(
 class JacksonConfig {
     @Bean("myObjectMapper")
     fun objectMapper(): ObjectMapper = JacksonUtil.createObjectMapper()
-}
-
-
-@Configuration
-class ClockConfig {
-    @Bean
-    fun clock(): Clock = Clock.systemUTC()
 }

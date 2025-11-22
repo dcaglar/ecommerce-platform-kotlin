@@ -1,11 +1,11 @@
 package com.dogancaglar.paymentservice.application.usecases
 
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.balance.AccountBalanceSnapshot
 import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceReadUseCase
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import org.slf4j.LoggerFactory
-import java.time.LocalDateTime
 
 class AccountBalanceReadService(
     private val cachePort: AccountBalanceCachePort,
@@ -32,8 +32,8 @@ class AccountBalanceReadService(
                 accountCode = accountCode,
                 balance = 0L,
                 lastAppliedEntryId = 0L,
-                lastSnapshotAt = LocalDateTime.now(),
-                updatedAt = LocalDateTime.now()
+                lastSnapshotAt = Utc.nowLocalDateTime(),
+                updatedAt = Utc.nowLocalDateTime()
             )
 
         if (delta != 0L) {
@@ -44,8 +44,8 @@ class AccountBalanceReadService(
             val updated = current.copy(
                 balance = newBalance,
                 lastAppliedEntryId = newWatermark,
-                lastSnapshotAt = LocalDateTime.now(),
-                updatedAt = LocalDateTime.now()
+                lastSnapshotAt = Utc.nowLocalDateTime(),
+                updatedAt = Utc.nowLocalDateTime()
             )
 
             // 4️⃣ Persist (UPSERT guarded by last_applied_entry_id)

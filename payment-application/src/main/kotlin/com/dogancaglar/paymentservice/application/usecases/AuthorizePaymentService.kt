@@ -1,9 +1,8 @@
 package com.dogancaglar.paymentservice.application.usecases
 
-import com.dogancaglar.common.event.DomainEventEnvelopeFactory
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.common.event.EventEnvelopeFactory
+import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.constants.PaymentLogFields
-import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.domain.commands.CreatePaymentCommand
@@ -13,10 +12,10 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.inbound.AuthorizePaymentUseCase
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.ports.outbound.*
 import org.slf4j.LoggerFactory
 import java.time.Clock
-import java.time.LocalDateTime
 import java.util.*
 
 
@@ -26,9 +25,7 @@ class AuthorizePaymentService(
     private val outboxEventPort: OutboxEventRepository,
     private val idGeneratorPort: IdGeneratorPort,
     private val serializationPort: SerializationPort,
-    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
-    private val clock : Clock
-) : AuthorizePaymentUseCase {
+    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper) : AuthorizePaymentUseCase {
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -40,8 +37,7 @@ class AuthorizePaymentService(
             paymentId = paymentId,
             buyerId = cmd.buyerId,
             orderId = cmd.orderId,
-            totalAmount = cmd.totalAmount,
-            clock = clock
+            totalAmount = cmd.totalAmount
         )
 
             // 2️⃣ Persist intent (PENDING_AUTH)
@@ -56,8 +52,8 @@ class AuthorizePaymentService(
 
         // 4️⃣ Update domain aggregate based on PSP result
         val updated = when (pspStatus) {
-            PaymentStatus.AUTHORIZED -> payment.authorize(LocalDateTime.now(clock))
-            PaymentStatus.DECLINED -> payment.decline(LocalDateTime.now(clock))
+            PaymentStatus.AUTHORIZED -> payment.authorize(Utc.nowLocalDateTime())
+            PaymentStatus.DECLINED -> payment.decline(Utc.nowLocalDateTime())
             PaymentStatus.PENDING_AUTH -> payment
             else -> payment
         }
@@ -76,32 +72,18 @@ class AuthorizePaymentService(
 
     private fun toOutboxEvent(updated: Payment,paymentLines: List<PaymentLine>): OutboxEvent {
         val paymentAuthorizedEvent = paymentOrderDomainEventMapper.toPaymentAuthorized(updated,paymentLines)
-        val envelope = DomainEventEnvelopeFactory.envelopeFor(
-            traceId = LogContext.getTraceId() ?: UUID.randomUUID().toString(),
+        val envelope = EventEnvelopeFactory.envelopeFor(
+            traceId = EventLogContext.getTraceId(),
             data = paymentAuthorizedEvent,
-            eventMetaData = EventMetadatas.PaymentAuthorizedMetadata,
             aggregateId = updated.paymentId.value.toString()
         )
 
-        val extraLogFields = mapOf(
-            PaymentLogFields.PUBLIC_PAYMENT_ID to updated.paymentId.toPublicPaymentId()
-        )
-
-        LogContext.with(envelope, additionalContext = extraLogFields) {
-            logger.debug(
-                "Creating OutboxEvent for eventType={}, aggregateId={}, eventId={}",
-                envelope.eventType,
-                envelope.aggregateId,
-                envelope.eventId
-            )
-        }
 
         return OutboxEvent.createNew(
             oeid = updated.paymentId.value,
             eventType = envelope.eventType,
             aggregateId = envelope.aggregateId,
             payload = serializationPort.toJson(envelope),
-            createdAt = updated.createdAt
         )
     }
 }

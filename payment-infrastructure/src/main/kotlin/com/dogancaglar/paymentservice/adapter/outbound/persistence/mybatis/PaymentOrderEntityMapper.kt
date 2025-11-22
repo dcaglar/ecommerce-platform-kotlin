@@ -7,6 +7,7 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
+import java.time.ZoneOffset
 
 object PaymentOrderEntityMapper {
 
@@ -19,8 +20,8 @@ object PaymentOrderEntityMapper {
             amountValue = order.amount.quantity,
             amountCurrency = order.amount.currency.currencyCode,
             status = order.status,
-            createdAt = order.createdAt,
-            updatedAt = order.updatedAt,
+            createdAt = order.createdAt.toInstant(ZoneOffset.UTC),
+            updatedAt = order.updatedAt.toInstant(ZoneOffset.UTC),
             retryCount = order.retryCount
         )
 
@@ -33,7 +34,11 @@ object PaymentOrderEntityMapper {
             amount = Amount.of(entity.amountValue, Currency(entity.amountCurrency)),
             status = entity.status,
             retryCount = entity.retryCount,
-            createdAt = entity.createdAt,
-            updatedAt = entity.updatedAt
+            createdAt = entity.createdAt.atOffset(ZoneOffset.UTC).toLocalDateTime(),
+            updatedAt = entity.updatedAt.atOffset(ZoneOffset.UTC).toLocalDateTime()
         )
+    /*
+    createdAt = entity.createdAt.atOffset(ZoneOffset.UTC).toLocalDateTime(),
+            updatedAt = entity.updatedAt.atOffset(ZoneOffset.UTC).toLocalDateTime()
+     */
 }

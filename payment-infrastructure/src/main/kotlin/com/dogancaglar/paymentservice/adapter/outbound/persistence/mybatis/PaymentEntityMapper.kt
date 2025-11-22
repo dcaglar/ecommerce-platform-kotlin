@@ -8,6 +8,7 @@ import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import java.time.ZoneOffset
 
 
 object PaymentEntityMapper {
@@ -21,8 +22,8 @@ object PaymentEntityMapper {
             currency = payment.totalAmount.currency.currencyCode,
             status = payment.status.name,
             idempotencyKey = payment.idempotencyKey,
-            createdAt = payment.createdAt,
-            updatedAt = payment.updatedAt
+            createdAt = payment.createdAt.toInstant(ZoneOffset.UTC),
+            updatedAt = payment.updatedAt.toInstant(ZoneOffset.UTC),
         )
 
     fun toDomain(entity: PaymentEntity): Payment {
@@ -33,7 +34,7 @@ object PaymentEntityMapper {
         } else {
             Amount.of(entity.capturedAmountValue, currency)
         }
-        return Payment.Companion.rehydrate(
+        return Payment.rehydrate(
             paymentId = PaymentId(entity.paymentId),
             buyerId = BuyerId(entity.buyerId),
             orderId = OrderId(entity.orderId),
@@ -41,8 +42,8 @@ object PaymentEntityMapper {
             capturedAmount = captured,
             status = PaymentStatus.valueOf(entity.status),
             idempotencyKey = entity.idempotencyKey,
-            createdAt = entity.createdAt,
-            updatedAt = entity.updatedAt
+            createdAt = entity.createdAt.atOffset(ZoneOffset.UTC).toLocalDateTime(),
+            updatedAt = entity.updatedAt.atOffset(ZoneOffset.UTC).toLocalDateTime()
         )
     }
 }

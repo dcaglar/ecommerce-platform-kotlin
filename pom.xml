@@ -47,6 +47,7 @@ It declares that this module is:
         <mybatis.version>3.0.3</mybatis.version>
         <logstash.version>7.4</logstash.version>
         <spring-boot.version>3.0.3</spring-boot.version>
+        <caffeine.versione>3.1.8</caffeine.versione>
         <!-- Build plugins -->
         <kotlin.maven.plugin.version>${kotlin.version}</kotlin.maven.plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -67,14 +68,6 @@ It declares that this module is:
             <!-- Spring Boot BOM (already managed by parent, no need to re-import) -->
             <!-- Spring Kafka -->
             <!-- PostgreSQL -->
-
-            <dependency>
-                <groupId>io.github.resilience4j</groupId>
-                <artifactId>resilience4j-bom</artifactId>
-                <version>2.3.0</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
             <dependency>
                 <groupId>com.dogancaglar</groupId>
                 <artifactId>common</artifactId>
@@ -100,6 +93,11 @@ It declares that this module is:
                 <groupId>com.dogancaglar</groupId>
                 <artifactId>common-test</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.ben-manes.caffeine</groupId>
+                <artifactId>caffeine</artifactId>
+                <version>${caffeine.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.postgresql</groupId>

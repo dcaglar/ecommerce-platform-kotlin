@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.outbound.persistence.entity
 
-import java.time.LocalDateTime
+import java.time.Instant
 
 /**
  * Entity representing a ledger entry in the database.
@@ -9,5 +9,5 @@ import java.time.LocalDateTime
 data class LedgerEntryEntity internal constructor(
     var id: Long? = null, // Auto-generated BIGSERIAL, populated by MyBatis after insert
     val journalId: String, // Foreign key to journal_entries.id
-    val createdAt: LocalDateTime
+    val createdAt: Instant
 )

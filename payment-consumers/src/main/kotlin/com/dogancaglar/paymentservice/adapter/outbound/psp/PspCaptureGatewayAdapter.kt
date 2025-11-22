@@ -2,6 +2,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.psp
 
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.util.PSPCaptureStatusMapper
 import com.dogancaglar.paymentservice.ports.outbound.PspCaptureGatewayPort
 import io.micrometer.core.instrument.MeterRegistry

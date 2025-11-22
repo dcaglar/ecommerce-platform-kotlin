@@ -12,20 +12,17 @@ import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalType
 import com.dogancaglar.paymentservice.domain.model.ledger.LedgerEntry
 import com.dogancaglar.paymentservice.domain.model.ledger.Posting
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.util.LedgerEntryFactory
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
-import java.time.Clock
 import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneOffset
 import kotlin.test.assertEquals
 
 class LedgerDomainEventMapperTest {
 
     private val fixedInstant = Instant.parse("2025-11-07T16:20:00Z")
-    private val clock = Clock.fixed(fixedInstant, ZoneOffset.UTC)
-    private val ledgerEntryFactory = LedgerEntryFactory(clock)
+    private val ledgerEntryFactory = LedgerEntryFactory()
 
     private fun sampleLedgerEntry(): LedgerEntry {
         val merchantAccount = Account.Companion.mock(AccountType.MERCHANT_PAYABLE, "SELLER-333", "EUR")
@@ -44,7 +41,7 @@ class LedgerDomainEventMapperTest {
         return ledgerEntryFactory.fromPersistence(
             ledgerEntryId = 1234L,
             journalEntry = journal,
-            createdAt = LocalDateTime.ofInstant(fixedInstant, ZoneOffset.UTC)
+            createdAt = fixedInstant
         )
     }
 
@@ -69,7 +66,7 @@ class LedgerDomainEventMapperTest {
             journalEntryId = "journal-9876",
             journalType = JournalType.CAPTURE,
             journalName = "capture",
-            createdAt = LocalDateTime.ofInstant(fixedInstant.plusSeconds(2400), ZoneOffset.UTC),
+            createdAt = fixedInstant.plusSeconds(2400),
             postings = listOf(debitEvent, creditEvent)
         )
     }
@@ -83,7 +80,7 @@ class LedgerDomainEventMapperTest {
         Assertions.assertEquals(ledgerEntry.ledgerEntryId, eventData.ledgerEntryId)
         Assertions.assertEquals(ledgerEntry.journalEntry.id, eventData.journalEntryId)
         Assertions.assertEquals(ledgerEntry.journalEntry.txType, eventData.journalType)
-        Assertions.assertEquals(ledgerEntry.createdAt, eventData.createdAt)
+        Assertions.assertEquals(Utc.toInstant(ledgerEntry.createdAt), eventData.createdAt)
 
         val postingEvent = eventData.postings.first()
         val postingDomain = ledgerEntry.journalEntry.postings.first()
@@ -123,7 +120,7 @@ class LedgerDomainEventMapperTest {
         assertEquals(eventData.ledgerEntryId, domain.ledgerEntryId)
         assertEquals(eventData.journalEntryId, domain.journalEntry.id)
         assertEquals(eventData.journalType, domain.journalEntry.txType)
-        assertEquals(eventData.createdAt, domain.createdAt)
+        assertEquals(Utc.fromInstant(eventData.createdAt), domain.createdAt)
 
         val postings = domain.journalEntry.postings
         Assertions.assertEquals(2, postings.size)

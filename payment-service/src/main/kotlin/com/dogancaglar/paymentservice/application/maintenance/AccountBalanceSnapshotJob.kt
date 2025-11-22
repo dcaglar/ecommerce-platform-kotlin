@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
-import java.time.LocalDateTime
+import com.dogancaglar.common.time.Utc
 import java.time.Duration
 
 @Service
@@ -33,7 +33,7 @@ class AccountBalanceSnapshotJob(
                 if (delta == 0L) return@forEach
 
                 val current = snapshotPort.getSnapshot(accountCode)
-                    ?: AccountBalanceSnapshot(accountCode, 0L, 0L, LocalDateTime.now(), LocalDateTime.now())
+                    ?: AccountBalanceSnapshot(accountCode, 0L, 0L, Utc.nowLocalDateTime(), Utc.nowLocalDateTime())
 
                 val newBalance = current.balance + delta
                 val newWatermark = maxOf(current.lastAppliedEntryId, upToEntryId)
@@ -41,8 +41,8 @@ class AccountBalanceSnapshotJob(
                 val updated = current.copy(
                     balance = newBalance,
                     lastAppliedEntryId = newWatermark,
-                    lastSnapshotAt = LocalDateTime.now(),
-                    updatedAt = LocalDateTime.now()
+                    lastSnapshotAt = Utc.nowLocalDateTime(),
+                    updatedAt = Utc.nowLocalDateTime()
                 )
 
                 snapshotPort.saveSnapshot(updated)
