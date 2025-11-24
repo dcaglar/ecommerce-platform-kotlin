@@ -28,9 +28,9 @@ service:
   port: 8080
 
 autoscaling:
-  enabled: false
+  enabled: true
   minReplicas: 3
-  maxReplicas: 3
+  maxReplicas: 5
   metrics:
     - type: External
       external:

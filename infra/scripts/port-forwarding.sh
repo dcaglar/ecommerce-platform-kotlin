@@ -124,14 +124,20 @@ FORWARDS+=("$PAYMENT_NS svc/payment-db-postgresql 5432 5432")
 #prometheus-operated 9090 9090 $MONITORING_NS & PIDS+=($!)
 FORWARDS+=("$MONITORING_NS svc/prometheus-operated 9090 9090")
 
-#kibana-kibana 5601 5601 $LOGGING_NS & PIDS+=($!)
-FORWARDS+=("$LOGGING_NS svc/kibana-kibana  5601 5601")
 
 # Grafana
 FORWARDS+=("$MONITORING_NS svc/prometheus-stack-grafana 3000 80")
 
+
 #paymetn-service management
 FORWARDS+=("$PAYMENT_NS svc/payment-service 9000 9000")
+
+# Elasticsearch
+FORWARDS+=("$LOGGING_NS svc/elasticsearch-master 9200 9200")
+
+# Kibana
+FORWARDS+=("$LOGGING_NS svc/kibana-kibana 5601 5601")
+
 
 # Pre-free all local ports and start PF loops
 for spec in "${FORWARDS[@]}"; do
@@ -154,6 +160,8 @@ echo "   - Keycloak    → http://127.0.0.1:8080"
 echo "   - Postgres    → 127.0.0.1:5432"
 echo "   - Grafana     → http://127.0.0.1:3000"
 echo "   - Promotheus     → http://127.0.0.1:9090"
+echo "   - Elasticsearch → https://127.0.0.1:9200 (user: elastic, password: fUNIuW1Kdl3qFUyh%)"
+echo "   - Kibana      → http://127.0.0.1:5601"
 if [[ "$PF_INGRESS" != "true" ]]; then
   echo "   - Ingress     → via LoadBalancer (ensure 'minikube tunnel' is running)"
 fi
