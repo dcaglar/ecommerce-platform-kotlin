@@ -114,7 +114,7 @@ class PspCaptureGatewayAdapter(
         val roll = Random.nextInt(100)
         val result = when {
             roll < active.response.successful -> "CAPTURE_SUCCESS"
-            roll < active.response.successful + active.response.retryable -> "TRANSIENT_NETWORK_ERROR"
+            roll < active.response.successful + active.response.retryable -> "PENDING_CAPTURE"
             roll < active.response.successful + active.response.retryable + active.response.nonRetryable -> "CAPTURE_DECLINED_FINAL"
             else -> PaymentOrderStatus.PENDING_CAPTURE
         }

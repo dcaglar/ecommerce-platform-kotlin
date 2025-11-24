@@ -179,13 +179,12 @@ curl -i -X POST "$BASE_URL/api/v1/payments" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
   -d '{
-    "orderId": "ORDER-20240508-XYZ",
-    "buyerId": "BUYER-123",
-    "totalAmount": { "quantity": 19949, "currency": "EUR" },
+    "orderId": "ORDER-1755",
+    "buyerId": "BUYER-1755",
+    "totalAmount": { "quantity": 3510, "currency": "EUR" },
     "paymentOrders": [
-      { "sellerId": "SELLER-111", "amount": { "quantity": 4999, "currency": "EUR" }},
-      { "sellerId": "SELLER-222", "amount": { "quantity": 2950, "currency": "EUR" }},
-      { "sellerId": "SELLER-333", "amount": { "quantity": 12000, "currency": "EUR" }}
+      { "sellerId": "SELLER-111", "amount": { "quantity": 1755, "currency": "EUR" }},
+      { "sellerId": "SELLER-222", "amount": { "quantity":1755, "currency": "EUR" }}
     ]
   }'
 ```

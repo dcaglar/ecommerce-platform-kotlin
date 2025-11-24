@@ -212,9 +212,8 @@ psp:
               minMs: 300
               maxMs: 600
           response:
-            successful: 90
-            retryable: 0
-            statusCheck: 0
+            successful: 50
+            retryable: 40
             nonRetryable: 10
         PEAK:
           timeouts:

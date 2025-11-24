@@ -17,6 +17,7 @@ object PSPCaptureStatusMapper {
 
         // Transient (retryable) errors
         "TRANSIENT_NETWORK_ERROR",
+            "PENDING_CAPTURE",
         "TIMEOUT_EXCEEDED_1S_TRANSIENT" -> PaymentOrderStatus.PENDING_CAPTURE // will be retried
 
 
