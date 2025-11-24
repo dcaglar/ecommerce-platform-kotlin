@@ -55,7 +55,7 @@ autoscaling:
           periodSeconds: 60
 
 serviceMonitor:
-  enabled: false
+  enabled: true
   labels:
     release: prometheus-stack  # must match Prometheus' serviceMonitorSelector
   path: /actuator/prometheus
