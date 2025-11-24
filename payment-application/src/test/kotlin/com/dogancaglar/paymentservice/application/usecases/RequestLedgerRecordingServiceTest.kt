@@ -82,7 +82,7 @@ class RequestLedgerRecordingServiceTest {
         // then - verify publishSync called with exact parameters and correct status
         val now = Utc.nowInstant()
         verify(exactly = 1) {
-            eventPublisherPort.publishSync(
+            eventPublisherPort.publishSync<LedgerRecordingCommand>(
                 aggregateId = event.sellerId,
                 data = match { cmd ->
                     cmd is LedgerRecordingCommand &&
@@ -91,14 +91,15 @@ class RequestLedgerRecordingServiceTest {
                     cmd.sellerId == event.sellerId &&
                     cmd.amountValue == event.amountValue &&
                     cmd.currency == event.currency &&
-                    cmd.finalStatus == event.eventType &&
+                    cmd.finalStatus == event.status &&
                     cmd.timestamp.isAfter(now.minusSeconds(5)) &&
                     cmd.timestamp.isBefore(now.plusSeconds(5))
                 },
-                parentEventId = expectedEventId,
-                traceId = expectedTraceId
+                traceId = expectedTraceId,
+                parentEventId = expectedEventId
             )
         }
+        unmockkObject(EventLogContext)
     }
 
     @Test
@@ -123,11 +124,11 @@ class RequestLedgerRecordingServiceTest {
         // then - verify publishSync called with exact parameters and FAILED_FINAL status
         val now = Utc.nowInstant()
         verify(exactly = 1) {
-            eventPublisherPort.publishSync(
+            eventPublisherPort.publishSync<LedgerRecordingCommand>(
                 aggregateId = failedEvent.sellerId,
                 data = match { cmd ->
                     cmd is LedgerRecordingCommand &&
-                    cmd.finalStatus == failedEvent.eventType &&
+                    cmd.finalStatus == failedEvent.status &&
                     cmd.paymentOrderId == failedEvent.paymentOrderId &&
                     cmd.paymentId == failedEvent.paymentId &&
                     cmd.sellerId == failedEvent.sellerId &&
@@ -136,10 +137,11 @@ class RequestLedgerRecordingServiceTest {
                     cmd.timestamp.isAfter(now.minusSeconds(5)) &&
                     cmd.timestamp.isBefore(now.plusSeconds(5))
                 },
-                parentEventId = expectedEventId,
-                traceId = expectedTraceId
+                traceId = expectedTraceId,
+                parentEventId = expectedEventId
             )
         }
+        unmockkObject(EventLogContext)
     }
     @Test
     fun `should handle exception in publishSync and propagate it for PaymentOrderSucceeded`() {
@@ -147,12 +149,16 @@ class RequestLedgerRecordingServiceTest {
         val event = createPaymentOrderSucceeded()
         val capturedCommand = slot<LedgerRecordingCommand>()
         
+        mockkObject(EventLogContext)
+        every { EventLogContext.getEventId() } returns null
+        every { EventLogContext.getTraceId() } returns "test-trace"
+        
         every {
-            eventPublisherPort.publishSync(
+            eventPublisherPort.publishSync<LedgerRecordingCommand>(
                 aggregateId = any(),
                 data = capture(capturedCommand),
-                parentEventId = any(),
-                traceId = any()
+                traceId = any(),
+                parentEventId = any()
             )
         } throws RuntimeException("Kafka publish error")
 
@@ -164,7 +170,8 @@ class RequestLedgerRecordingServiceTest {
         // then - verify publishSync was attempted with correct data before exception
         assertNotNull(capturedCommand.captured)
         assertEquals(event.paymentOrderId, capturedCommand.captured.paymentOrderId)
-        assertEquals(event.eventType, capturedCommand.captured.finalStatus)
+        assertEquals(event.status, capturedCommand.captured.finalStatus)
+        unmockkObject(EventLogContext)
     }
 
     // Note: The requestLedgerRecording method only accepts PaymentOrderFinalized,

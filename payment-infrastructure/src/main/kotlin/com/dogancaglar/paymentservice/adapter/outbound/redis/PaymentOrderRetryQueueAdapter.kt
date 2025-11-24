@@ -72,20 +72,8 @@ class PaymentOrderRetryQueueAdapter(
 
     /** New: pop to inflight and return [RetryItem]s. */
     override fun pollDueRetriesToInflight(maxBatchSize: Long): List<RetryItem> {
-        val raws: List<ByteArray> = paymentOrderRetryRedisCache.popDueToInflight(maxBatchSize)
-        if (raws.isEmpty()) return emptyList()
-        val items = mutableListOf<RetryItem>()
-        for (raw in raws) {
-            try {
-                val env: EventEnvelope<PaymentOrderCaptureCommand> =
-                    objectMapper.readValue(raw, object : TypeReference<EventEnvelope<PaymentOrderCaptureCommand>>() {})
-                items += RetryItem(env, raw)
-            } catch (e: Exception) {
-                // If we cannot deserialize, drop from inflight to avoid poison loops
-                paymentOrderRetryRedisCache.removeFromInflight(raw)
-            }
-        }
-        return items
+        // Use the new deserialized method - deserialization happens in cache layer (like Kafka)
+        return paymentOrderRetryRedisCache.popDueToInflightDeserialized(maxBatchSize)
     }
 
 

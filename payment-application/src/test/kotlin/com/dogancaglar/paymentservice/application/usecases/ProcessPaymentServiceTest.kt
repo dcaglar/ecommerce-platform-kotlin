@@ -44,6 +44,8 @@ class ProcessPaymentServiceTest {
         mockkObject(EventLogContext)
         every { EventLogContext.getEventId() } returns null
         every { EventLogContext.getTraceId() } returns "test-trace-id"
+        // Mock aggregateId - in real usage this comes from EventLogContext.with(envelope)
+        every { EventLogContext.getAggregateId() } returns null
 
         service = ProcessPaymentService(
             eventPublisher = eventPublisher,
@@ -70,11 +72,13 @@ class ProcessPaymentServiceTest {
             now = now,
             status = PaymentOrderStatus.CAPTURED
         )
+        val aggregateId = persisted.paymentOrderId.value.toString()
+        every { EventLogContext.getAggregateId() } returns aggregateId
         every { paymentOrderModificationPort.markAsCaptured(order) } returns persisted
         every { paymentOrderDomainEventMapper.toPaymentOrderFinalized(persisted, any(), PaymentOrderStatus.CAPTURED) } returns succeededEvent
         every {
             eventPublisher.publishSync(
-                aggregateId = persisted.paymentOrderId.value.toString(),
+                aggregateId = aggregateId,
                 data = succeededEvent,
                 parentEventId = any(),
                 traceId = any()
@@ -107,12 +111,13 @@ class ProcessPaymentServiceTest {
             now = now,
             status = PaymentOrderStatus.CAPTURE_FAILED
         )
-
+        val aggregateId = persisted.paymentOrderId.value.toString()
+        every { EventLogContext.getAggregateId() } returns aggregateId
         every { paymentOrderModificationPort.markAsCaptureFailed(order) } returns persisted
         every { paymentOrderDomainEventMapper.toPaymentOrderFinalized(persisted, any(), PaymentOrderStatus.CAPTURE_FAILED) } returns failedEvent
         every {
             eventPublisher.publishSync(
-                aggregateId = persisted.paymentOrderId.value.toString(),
+                aggregateId = aggregateId,
                 data = failedEvent,
                 parentEventId = any(),
                 traceId = any()

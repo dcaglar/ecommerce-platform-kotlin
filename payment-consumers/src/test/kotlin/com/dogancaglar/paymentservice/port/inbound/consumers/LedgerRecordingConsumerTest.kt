@@ -1,44 +1,49 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.logging.EventLogContext
-import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
+import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
+import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
+import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.paymentservice.ports.inbound.RecordLedgerEntriesUseCase
-import io.mockk.*
+import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.verify
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import com.dogancaglar.common.time.Utc
-import com.dogancaglar.common.id.PublicIdFactory
-import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
-import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.Currency
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 
 class LedgerRecordingConsumerTest {
 
     private lateinit var kafkaTxExecutor: KafkaTxExecutor
     private lateinit var recordLedgerEntriesUseCase: RecordLedgerEntriesUseCase
     private lateinit var consumer: LedgerRecordingConsumer
+    private lateinit var eventDeduplicationPort: EventDeduplicationPort
 
     @BeforeEach
     fun setUp() {
         kafkaTxExecutor = mockk()
         recordLedgerEntriesUseCase = mockk()
+        eventDeduplicationPort = mockk()
         
         this.consumer = LedgerRecordingConsumer(
             kafkaTx = kafkaTxExecutor,
-            recordLedgerEntriesUseCase = recordLedgerEntriesUseCase
+            recordLedgerEntriesUseCase = recordLedgerEntriesUseCase,
+            dedupe=eventDeduplicationPort
         )
     }
 
@@ -94,6 +99,8 @@ class LedgerRecordingConsumerTest {
             lambda.invoke()
         }
         every { recordLedgerEntriesUseCase.recordLedgerEntries(any()) } returns Unit
+        every { eventDeduplicationPort.exists(any()) } returns false
+        every { eventDeduplicationPort.markProcessed(any(),any()) } returns Unit
 
         // When
         val kafkaConsumer = mockk<Consumer<*, *>>()
@@ -110,7 +117,7 @@ class LedgerRecordingConsumerTest {
                     cmd.sellerId == SellerId("seller-789").value &&
                     cmd.amountValue == 10000L &&
                     cmd.currency == "EUR" &&
-                    cmd.finalStatus == "payment_order_finalized" &&
+                    cmd.finalStatus == PaymentOrderStatus.CAPTURED.name &&
                     cmd.publicPaymentOrderId == finalizedEvent.publicPaymentOrderId
                 }
             )
@@ -183,7 +190,8 @@ class LedgerRecordingConsumerTest {
             lambda.invoke()
         }
         every { recordLedgerEntriesUseCase.recordLedgerEntries(any()) } returns Unit
-
+        every { eventDeduplicationPort.exists(any()) } returns false
+        every { eventDeduplicationPort.markProcessed(any(),any()) } returns Unit
         // When
         val kafkaConsumer = mockk<Consumer<*, *>>()
         every { kafkaConsumer.groupMetadata() } returns mockk()
@@ -194,7 +202,7 @@ class LedgerRecordingConsumerTest {
             recordLedgerEntriesUseCase.recordLedgerEntries(
                 event = match { cmd ->
                     cmd is LedgerRecordingCommand &&
-                    cmd.finalStatus == "payment_order_finalized" &&
+                    cmd.finalStatus == PaymentOrderStatus.CAPTURE_FAILED.name &&
                     cmd.publicPaymentOrderId == finalizedEvent.publicPaymentOrderId &&
                     cmd.amountValue == 5000L &&
                     cmd.currency == "USD"
@@ -266,7 +274,8 @@ class LedgerRecordingConsumerTest {
             lambda.invoke()
         }
         every { recordLedgerEntriesUseCase.recordLedgerEntries(any()) } throws RuntimeException("Database error")
-
+        every { eventDeduplicationPort.exists(any()) } returns false
+        every { eventDeduplicationPort.markProcessed(any(),any()) } returns Unit
         // When/Then - verify exception is propagated
         val kafkaConsumer = mockk<Consumer<*, *>>()
         every { kafkaConsumer.groupMetadata() } returns mockk()

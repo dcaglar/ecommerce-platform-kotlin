@@ -1,7 +1,12 @@
 package com.dogancaglar.paymentservice.adapter.outbound.redis
 
+import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.RetryItem
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
@@ -36,7 +41,7 @@ import org.testcontainers.containers.GenericContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
-import com.dogancaglar.common.time.Utc
+import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
@@ -44,38 +49,37 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
- * Integration tests for PaymentOrderRetryQueueAdapter with real Redis (Testcontainers).
+ * Integration tests for Payment Order Retry Queue (Adapter + Cache) with real Redis.
  * 
- * These tests validate:
+ * Tests the full stack:
+ * - PaymentOrderRetryQueueAdapter (business logic, serialization)
+ * - PaymentOrderRetryRedisCache (Redis operations, deserialization)
+ * - Real Redis via Testcontainers
+ * 
+ * Validates:
  * - End-to-end retry scheduling and polling
- * - Real serialization/deserialization
- * - Inflight management with real Redis
- * - Concurrent polling behaviorcle
+ * - Real serialization/deserialization round-trip
+ * - Raw Redis ByteArray deserialization
+ * - Inflight queue management
+ * - Atomic operations (no duplicates)
+ * - Concurrent access patterns
  * - Poison message handling
+ * - Retry counter operations
  * 
  * Tagged as @integration for selective execution.
  */
 @Tag("integration")
-@SpringBootTest(classes = [PaymentOrderRetryQueueAdapterIntegrationTest.TestConfig::class])
+@SpringBootTest(classes = [PaymentOrderRetryIntegrationTest.TestConfig::class])
 @Testcontainers
-class PaymentOrderRetryQueueAdapterIntegrationTest {
+class PaymentOrderRetryIntegrationTest {
 
     @Configuration
-    @Import(RedisAutoConfiguration::class, PaymentOrderRetryRedisCache::class)
+    @Import(RedisAutoConfiguration::class, PaymentOrderRetryRedisCache::class, com.dogancaglar.paymentservice.adapter.outbound.serialization.JacksonConfig::class)
     class TestConfig {
-        @Bean
-        fun objectMapper(): ObjectMapper {
-            return ObjectMapper().apply {
-                registerModule(JavaTimeModule())
-                registerKotlinModule()
-                disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            }
-        }
-
         @Bean
         fun paymentOrderRetryQueueAdapter(
             cache: PaymentOrderRetryRedisCache,
-            objectMapper: ObjectMapper
+            @org.springframework.beans.factory.annotation.Qualifier("myObjectMapper") objectMapper: ObjectMapper
         ): PaymentOrderRetryQueueAdapter {
             return PaymentOrderRetryQueueAdapter(
                 cache,
@@ -109,6 +113,11 @@ class PaymentOrderRetryQueueAdapterIntegrationTest {
 
     @Autowired
     private lateinit var redisTemplate: StringRedisTemplate
+
+    private val objectMapper = ObjectMapper()
+        .registerModule(JavaTimeModule())
+        .registerKotlinModule()
+        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
 
     @BeforeEach
     fun setUp() {
@@ -148,39 +157,38 @@ class PaymentOrderRetryQueueAdapterIntegrationTest {
     @Test
     fun `should schedule and poll retry with real Redis`() {
         // Given
-        val paymentOrder = createTestPaymentOrder(id = 123L, retryCount = 1, status = PaymentOrderStatus.CAPTURE_REQUESTED)
-        val backOffMillis = 100L // Short delay for testing
+        val paymentOrder = createTestPaymentOrder(id = 123L, retryCount = 1)
+        val backOffMillis = 100L
 
         // When - schedule retry
         adapter.scheduleRetry(paymentOrder, backOffMillis)
-        
-        // Verify item was scheduled
         assertEquals(1L, cache.zsetSize(), "Item should be in queue after scheduling")
 
-        // Wait for retry to become due
-        Thread.sleep(150)
+        Thread.sleep(150) // Wait for retry to become due
 
         // Then - poll should return the scheduled item
         val polled = adapter.pollDueRetriesToInflight(10)
-        assertEquals(1, polled.size, "Should poll 1 item after delay")
+        assertEquals(1, polled.size)
         
         val retryItem = polled[0]
         assertEquals("123", retryItem.envelope.data.paymentOrderId)
         assertEquals(1, retryItem.envelope.data.attempt)
+        assertEquals("payment_order_capture_requested", retryItem.envelope.eventType)
     }
 
     @Test
-    fun `pollDueRetriesToInflight should not return future retries`() {
+    fun `should not return future retries`() {
         // Given
         val paymentOrder = createTestPaymentOrder()
         val backOffMillis = 10_000L // 10 seconds in future
 
-        // When - schedule future retry
+        // When
         adapter.scheduleRetry(paymentOrder, backOffMillis)
 
         // Then - immediate poll should return nothing
         val polled = adapter.pollDueRetriesToInflight(10)
         assertTrue(polled.isEmpty())
+        assertEquals(1L, cache.zsetSize(), "Future item should remain in queue")
     }
 
     @Test
@@ -189,15 +197,72 @@ class PaymentOrderRetryQueueAdapterIntegrationTest {
         val paymentOrder1 = createTestPaymentOrder(id = 100L, retryCount = 1)
         val paymentOrder2 = createTestPaymentOrder(id = 100L, retryCount = 2)
         
-        // When - schedule two retries for same order
+        // When
         adapter.scheduleRetry(paymentOrder1, 100L)
         adapter.scheduleRetry(paymentOrder2, 100L)
-
         Thread.sleep(150)
 
-        // Then - both should be polled
+        // Then
         val polled = adapter.pollDueRetriesToInflight(10)
         assertEquals(2, polled.size)
+        assertEquals(1, polled[0].envelope.data.attempt)
+        assertEquals(2, polled[1].envelope.data.attempt)
+    }
+
+    // ==================== Serialization/Deserialization Round-Trip ====================
+
+    @Test
+    fun `should correctly deserialize raw Redis ByteArray response`() {
+        // Given - store via adapter (full serialization)
+        val paymentOrder = createTestPaymentOrder(id = 999L, retryCount = 1)
+        adapter.scheduleRetry(paymentOrder, 100L)
+        Thread.sleep(150)
+
+        // When - retrieve from Redis (gets raw ByteArray) and deserialize
+        val polled = adapter.pollDueRetriesToInflight(10)
+
+        // Then - verify round-trip
+        assertEquals(1, polled.size)
+        val retryItem = polled[0]
+        
+        // Verify deserialized EventEnvelope
+        assertEquals("999", retryItem.envelope.data.paymentOrderId)
+        assertEquals("payment_order_capture_requested", retryItem.envelope.eventType)
+        assertEquals(1, retryItem.envelope.data.attempt)
+        
+        // Verify raw ByteArray can be converted back to JSON
+        val deserializedJsonString = String(retryItem.raw, StandardCharsets.UTF_8)
+        assertTrue(deserializedJsonString.contains("\"paymentOrderId\":\"999\""))
+        
+        // Verify we can re-serialize the envelope
+        val reSerializedJson = objectMapper.writeValueAsString(retryItem.envelope)
+        val reSerializedNode = objectMapper.readTree(reSerializedJson)
+        assertEquals("999", reSerializedNode["data"]["paymentOrderId"].asText())
+    }
+
+    @Test
+    fun `should preserve event envelope structure through Redis roundtrip`() {
+        // Given
+        val paymentOrder = createTestPaymentOrder(id = 789L, retryCount = 3)
+
+        // When
+        adapter.scheduleRetry(paymentOrder, 100L)
+        Thread.sleep(150)
+        val polled = adapter.pollDueRetriesToInflight(10)
+
+        // Then - verify envelope structure
+        val env = polled[0].envelope
+        assertNotNull(env.eventId)
+        assertEquals("payment_order_capture_requested", env.eventType)
+        assertEquals("789", env.aggregateId)
+        assertNotNull(env.traceId)
+        assertNotNull(env.timestamp)
+
+        // Verify data
+        val data = env.data
+        assertEquals("789", data.paymentOrderId)
+        assertEquals(PaymentOrderId(789L).toPublicPaymentOrderId(), data.publicPaymentOrderId)
+        assertEquals(3, data.attempt)
     }
 
     // ==================== Inflight Management ====================
@@ -251,10 +316,10 @@ class PaymentOrderRetryQueueAdapterIntegrationTest {
         // Wait to make inflight items stale
         Thread.sleep(100)
 
-        // When - reclaim items older than 50ms
+        // When
         adapter.reclaimInflight(olderThanMs = 50)
 
-        // Then - should be back in queue
+        // Then
         assertEquals(0L, cache.inflightSize())
         assertEquals(1L, cache.zsetSize())
 
@@ -283,7 +348,7 @@ class PaymentOrderRetryQueueAdapterIntegrationTest {
         assertEquals(0, adapter.getRetryCount(paymentOrderId))
     }
 
-    // ==================== Concurrency ====================
+    // ==================== Atomicity and Concurrency ====================
 
     @Test
     fun `concurrent polling should not duplicate items - ATOMICITY TEST`() {
@@ -319,7 +384,7 @@ class PaymentOrderRetryQueueAdapterIntegrationTest {
         executor.shutdown()
 
         // Then - all items polled exactly once (no duplicates)
-        assertEquals(count, allPolled.size)
+        assertEquals(count, allPolled.size, "Should poll exactly $count items with no duplicates")
         assertEquals(0L, cache.zsetSize())
         assertEquals(count.toLong(), cache.inflightSize())
     }
@@ -361,23 +426,20 @@ class PaymentOrderRetryQueueAdapterIntegrationTest {
         // Then - verify consistency
         val totalInSystem = cache.zsetSize() + cache.inflightSize()
         assertEquals(scheduleCount.toLong(), totalInSystem)
-        
-        // All polled items should be unique
-        assertEquals(polled.size, polled.size) // No duplicates
     }
 
     // ==================== Error Handling ====================
 
     @Test
     fun `should handle poison messages gracefully in real Redis`() {
-        // Given - manually inject invalid JSON into Redis
+        // Given - schedule valid order
         val validOrder = createTestPaymentOrder(id = 100L)
         adapter.scheduleRetry(validOrder, 100L)
 
-        // Inject poison message directly into Redis
+        // Inject poison message directly into Redis (simulating corruption)
         val poisonJson = "{ invalid json }"
         val now = System.currentTimeMillis().toDouble()
-        redisTemplate.opsForZSet().add("payment_retry_queue", poisonJson, now - 1000)
+        redisTemplate.opsForZSet().add("payment_order_retry_queue", poisonJson, now - 1000)
 
         Thread.sleep(150)
 
@@ -390,35 +452,6 @@ class PaymentOrderRetryQueueAdapterIntegrationTest {
         
         // Verify inflight size (poison message was removed)
         assertEquals(1L, cache.inflightSize())
-    }
-
-    @Test
-    fun `should preserve event envelope structure through Redis roundtrip`() {
-        // Given
-        val paymentOrder = createTestPaymentOrder(id = 789L, retryCount = 3)
-
-        // When
-        adapter.scheduleRetry(paymentOrder, 100L)
-        Thread.sleep(150)
-        val polled = adapter.pollDueRetriesToInflight(10)
-
-        // Then - verify envelope structure
-        val env = polled[0].envelope
-        assertNotNull(env.eventId)
-        assertEquals("payment_order_capture_requested", env.eventType)
-        assertEquals("789", env.aggregateId)
-        assertNotNull(env.traceId)
-        assertNotNull(env.timestamp)
-
-        // Verify data
-        val data = env.data
-
-        assertEquals("789", data.paymentOrderId)
-
-        val expectedPublicPaymentOrderId = PaymentOrderId(789L).toPublicPaymentOrderId()
-        assertEquals(expectedPublicPaymentOrderId, data.publicPaymentOrderId)
-
-        assertEquals(3, data.attempt)
     }
 }
 

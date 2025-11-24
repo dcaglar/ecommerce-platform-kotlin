@@ -7,6 +7,7 @@ import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.OutboxEventType
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
@@ -100,7 +101,7 @@ class OutboxDispatcherJobTest {
         )
         
         every { outboxEventRepository.findBatchForDispatch(10, any<String>()) } returns outboxEvents
-        every { eventPublisherPort.publishBatchAtomically<Event>(any(), any()) } returns true
+        every { eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(any(), any()) } returns true
         every { outboxEventRepository.updateAll(any()) } returns Unit
 
         // When
@@ -108,7 +109,11 @@ class OutboxDispatcherJobTest {
 
         // Then
         verify { outboxEventRepository.findBatchForDispatch(10, any<String>()) }
-        verify { eventPublisherPort.publishBatchAtomically<Event>(any(), any()) }
+        // Verify publishBatchAtomically was called (once per event, so 2 times total)
+        // Note: Each event is processed separately, so publishBatchAtomically is called once per event
+        verify(atLeast = 1) { 
+            eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(any(), any())
+        }
         verify { outboxEventRepository.updateAll(any()) }
     }
 
@@ -122,7 +127,7 @@ class OutboxDispatcherJobTest {
 
         // Then
         verify { outboxEventRepository.findBatchForDispatch(10, any<String>()) }
-        verify(exactly = 0) { eventPublisherPort.publishBatchAtomically<Event>(any(), any()) }
+        verify(exactly = 0) { eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(any(), any()) }
     }
 
     @Test
@@ -134,7 +139,7 @@ class OutboxDispatcherJobTest {
         )
         
         every { outboxEventRepository.findBatchForDispatch(10, any<String>()) } returns outboxEvents
-        every { eventPublisherPort.publishBatchAtomically<Event>(any(), any()) } returns false
+        every { eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(any(), any()) } returns false
         every { outboxEventRepository.unclaimSpecific(any<String>(), any<List<Long>>()) } returns 2
 
         // When
@@ -142,7 +147,7 @@ class OutboxDispatcherJobTest {
 
         // Then
         verify { outboxEventRepository.findBatchForDispatch(10, any<String>()) }
-        verify { eventPublisherPort.publishBatchAtomically<Event>(any(), any()) }
+        verify { eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(any(), any()) }
         verify { outboxEventRepository.unclaimSpecific(any<String>(), listOf(1L, 2L)) }
         verify(exactly = 0) { outboxEventRepository.updateAll(any()) }
     }
@@ -168,7 +173,7 @@ class OutboxDispatcherJobTest {
         )
         
         every { outboxEventRepository.findBatchForDispatch(10, any<String>()) } returns outboxEvents
-        every { eventPublisherPort.publishBatchAtomically<Event>(any(), any()) } throws RuntimeException("Publish failed")
+        every { eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(any(), any()) } throws RuntimeException("Publish failed")
         every { outboxEventRepository.unclaimSpecific(any<String>(), any<List<Long>>()) } returns 2
 
         // When
@@ -179,10 +184,12 @@ class OutboxDispatcherJobTest {
         verify { outboxEventRepository.unclaimSpecific(any<String>(), listOf(1L, 2L)) }
     }
 
+
     private fun createOutboxEvent(oeid: Long, payload: String): OutboxEvent {
+        // Persist with the same enum label OutboxEventType expects ("PAYMENT_ORDER_CREATED")
         return OutboxEvent.createNew(
             oeid = oeid,
-            eventType = "payment_order_created",
+            eventType = OutboxEventType.PAYMENT_ORDER_CREATED.name,
             aggregateId = "test-aggregate",
             payload = payload,
         )

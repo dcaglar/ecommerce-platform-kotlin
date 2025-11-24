@@ -24,6 +24,7 @@ import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 
 class LedgerRecordingRequestDispatcherTest {
 
@@ -31,16 +32,20 @@ class LedgerRecordingRequestDispatcherTest {
     private lateinit var eventPublisherPort: EventPublisherPort
     private lateinit var requestLedgerRecordingUseCase: RequestLedgerRecordingUseCase
     private lateinit var dispatcher: LedgerRecordingRequestDispatcher
+    private lateinit var eventDeduplicationPort: EventDeduplicationPort
+
 
     @BeforeEach
     fun setUp() {
         kafkaTxExecutor = mockk()
         eventPublisherPort = mockk()
         requestLedgerRecordingUseCase = mockk()
+        eventDeduplicationPort = mockk()
         
         dispatcher = LedgerRecordingRequestDispatcher(
             kafkaTx = kafkaTxExecutor,
-            requestLedgerRecordingUseCase = requestLedgerRecordingUseCase
+            requestLedgerRecordingUseCase = requestLedgerRecordingUseCase,
+            eventDeduplicationPort
         )
     }
 
@@ -95,6 +100,8 @@ class LedgerRecordingRequestDispatcherTest {
             lambda.invoke()
         }
         every { requestLedgerRecordingUseCase.requestLedgerRecording(any()) } returns Unit
+        every { eventDeduplicationPort.exists(any()) } returns false
+        every { eventDeduplicationPort.markProcessed(any(), any()) } returns Unit
 
         // When
         val consumer = mockk<Consumer<*, *>>()
@@ -174,6 +181,8 @@ class LedgerRecordingRequestDispatcherTest {
             lambda.invoke()
         }
         every { requestLedgerRecordingUseCase.requestLedgerRecording(any()) } returns Unit
+        every { eventDeduplicationPort.exists(any()) } returns false
+        every { eventDeduplicationPort.markProcessed(any(), any()) } returns Unit
 
         // When
         val consumer = mockk<Consumer<*, *>>()
@@ -250,6 +259,8 @@ class LedgerRecordingRequestDispatcherTest {
             lambda.invoke()
         }
         every { requestLedgerRecordingUseCase.requestLedgerRecording(any()) } throws RuntimeException("Use case failed")
+        every { eventDeduplicationPort.exists(any()) } returns false
+        every { eventDeduplicationPort.markProcessed(any(), any()) } returns Unit
 
         // When/Then - verify exception is propagated
         val consumer = mockk<Consumer<*, *>>()

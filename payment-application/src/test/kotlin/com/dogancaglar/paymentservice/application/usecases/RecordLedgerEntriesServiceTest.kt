@@ -59,7 +59,7 @@ class RecordLedgerEntriesServiceTest {
     @Test
     fun `recordLedgerEntries emits LedgerEntriesRecorded for AUTHORIZED status`() {
         val command = sampleCommand(PaymentStatus.AUTHORIZED.name)
-        val (eventId, traceId) = withMockedLogContext()
+        val (eventId, traceId, aggregateId) = withMockedLogContext(command.sellerId)
 
         val persistedEntriesSlot = slot<List<LedgerEntry>>()
         every { ledgerWritePort.postLedgerEntriesAtomic(capture(persistedEntriesSlot)) } answers {
@@ -72,7 +72,7 @@ class RecordLedgerEntriesServiceTest {
         val recordedEventSlot = slot<LedgerEntriesRecorded>()
         every {
             eventPublisherPort.publishSync(
-                aggregateId = command.sellerId,
+                aggregateId = aggregateId!!,
                 data = capture(recordedEventSlot),
                 parentEventId = eventId.toString(),
                 traceId = traceId
@@ -111,7 +111,7 @@ class RecordLedgerEntriesServiceTest {
     @Test
     fun `recordLedgerEntries emits capture journal for CAPTURED status`() {
         val command = sampleCommand("CAPTURED")
-        val (eventId, traceId) = withMockedLogContext()
+        val (eventId, traceId, aggregateId) = withMockedLogContext(command.sellerId)
 
         val persistedEntriesSlot = slot<List<LedgerEntry>>()
         every { ledgerWritePort.postLedgerEntriesAtomic(capture(persistedEntriesSlot)) } answers {
@@ -124,7 +124,7 @@ class RecordLedgerEntriesServiceTest {
         val recordedEventSlot = slot<LedgerEntriesRecorded>()
         every {
             eventPublisherPort.publishSync(
-                aggregateId = command.sellerId,
+                aggregateId = aggregateId!!,
                 data = capture(recordedEventSlot),
                 parentEventId = eventId.toString(),
                 traceId = traceId
@@ -156,7 +156,7 @@ class RecordLedgerEntriesServiceTest {
         verify(exactly = 1) { ledgerWritePort.postLedgerEntriesAtomic(any()) }
         verify(exactly = 1) {
             eventPublisherPort.publishSync<LedgerEntriesRecorded>(
-                aggregateId = command.sellerId,
+                aggregateId = aggregateId!!,
                 data = any(),
                 traceId = traceId,
                 parentEventId = eventId.toString()
@@ -199,7 +199,7 @@ class RecordLedgerEntriesServiceTest {
     @Test
     fun `recordLedgerEntries propagates publish failure after persisting`() {
         val command = sampleCommand(PaymentStatus.AUTHORIZED.name)
-        val (eventId, traceId) = withMockedLogContext()
+        val (eventId, traceId, aggregateId) = withMockedLogContext(command.sellerId)
 
         val persistedEntriesSlot = slot<List<LedgerEntry>>()
         every { ledgerWritePort.postLedgerEntriesAtomic(capture(persistedEntriesSlot)) } answers {
@@ -210,7 +210,7 @@ class RecordLedgerEntriesServiceTest {
         }
         every {
             eventPublisherPort.publishSync(
-                aggregateId = command.sellerId,
+                aggregateId = aggregateId!!,
                 data = any(),
                 parentEventId = eventId.toString(),
                 traceId = traceId
@@ -226,7 +226,7 @@ class RecordLedgerEntriesServiceTest {
         verify(exactly = 1) { ledgerWritePort.postLedgerEntriesAtomic(any()) }
         verify(exactly = 1) {
             eventPublisherPort.publishSync<LedgerEntriesRecorded>(
-                aggregateId = command.sellerId,
+                aggregateId = aggregateId!!,
                 data = any(),
                 traceId = traceId,
                 parentEventId = eventId.toString()
@@ -246,13 +246,15 @@ class RecordLedgerEntriesServiceTest {
         timestamp = Utc.nowInstant()
     )
 
-    private fun withMockedLogContext(): Pair<String, String> {
+    private fun withMockedLogContext(aggregateId: String? = null): Triple<String, String, String?> {
         val expectedEventId = UUID.randomUUID().toString()
         val expectedTraceId = "trace-${expectedEventId.take(8)}"
+        val expectedAggregateId = aggregateId
         mockkObject(EventLogContext)
         every { EventLogContext.getEventId() } returns expectedEventId
         every { EventLogContext.getTraceId() } returns expectedTraceId
-        return expectedEventId to expectedTraceId
+        every { EventLogContext.getAggregateId() } returns expectedAggregateId
+        return Triple(expectedEventId, expectedTraceId, expectedAggregateId)
     }
 
     private fun stubAccountProfiles() {
