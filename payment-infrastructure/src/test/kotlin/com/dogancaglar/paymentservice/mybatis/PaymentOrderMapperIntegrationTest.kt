@@ -36,6 +36,25 @@ import java.time.Instant
 @MapperScan("com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis")
 class PaymentOrderMapperIntegrationTest {
 
+    /**
+     * Normalizes Instant to microsecond precision to match PostgreSQL's TIMESTAMP precision.
+     * PostgreSQL stores timestamps with microsecond precision (6 decimal places),
+     * but Java Instant can have nanosecond precision (9 decimal places).
+     */
+    private fun Instant.normalizeToMicroseconds(): Instant {
+        return this.truncatedTo(java.time.temporal.ChronoUnit.MICROS)
+    }
+
+    /**
+     * Normalizes PaymentOrderEntity timestamps to microsecond precision for comparison.
+     */
+    private fun PaymentOrderEntity.normalizeTimestamps(): PaymentOrderEntity {
+        return this.copy(
+            createdAt = this.createdAt.normalizeToMicroseconds(),
+            updatedAt = this.updatedAt.normalizeToMicroseconds()
+        )
+    }
+
     companion object {
         @Container
         @JvmStatic
@@ -120,7 +139,8 @@ class PaymentOrderMapperIntegrationTest {
 
         val byId = paymentOrderMapper.findByPaymentOrderId(201L)
         assertEquals(1, byId.size)
-        assertEquals(entity, byId.first())
+        // Normalize timestamps to microsecond precision for comparison (PostgreSQL precision)
+        assertEquals(entity.normalizeTimestamps(), byId.first().normalizeTimestamps())
 
         val byPayment = paymentOrderMapper.findByPaymentId(1001L)
         assertEquals(1, byPayment.size)
@@ -269,7 +289,8 @@ class PaymentOrderMapperIntegrationTest {
         assertEquals(0, updated.retryCount)
         // The GREATEST function should return futureTime since it's greater than baseTime
         // With InstantTypeHandler, TIMESTAMP WITHOUT TIME ZONE is always interpreted as UTC
-        assertEquals(futureTime, updated.updatedAt)
+        // Normalize to microsecond precision for comparison (PostgreSQL precision)
+        assertEquals(futureTime.normalizeToMicroseconds(), updated.updatedAt.normalizeToMicroseconds())
         
         // Test 2: Returns null when status is not INITIATED_PENDING
         val nonEligibleStatus = paymentOrderEntity(
@@ -328,7 +349,8 @@ class PaymentOrderMapperIntegrationTest {
         assertEquals(PaymentOrderStatus.CAPTURE_REQUESTED, updated2!!.status)
         // updated_at should be the greater of the two (existing: baseTime+2h, provided: baseTime+30m)
         // With InstantTypeHandler, TIMESTAMP WITHOUT TIME ZONE is always interpreted as UTC
-        assertEquals(baseTimePlus2h, updated2.updatedAt)
+        // Normalize to microsecond precision for comparison (PostgreSQL precision)
+        assertEquals(baseTimePlus2h.normalizeToMicroseconds(), updated2.updatedAt.normalizeToMicroseconds())
         
         // Test 5: Does not update when status is CAPTURE_FAILED
         val captureFailed = paymentOrderEntity(
@@ -346,7 +368,8 @@ class PaymentOrderMapperIntegrationTest {
         
         val stillCaptureFailed = paymentOrderMapper.findByPaymentOrderId(605L).first()
         assertEquals(PaymentOrderStatus.CAPTURE_FAILED, stillCaptureFailed.status)
-        assertEquals(baseTime, stillCaptureFailed.updatedAt) // updated_at should remain unchanged
+        // Normalize to microsecond precision for comparison (PostgreSQL precision)
+        assertEquals(baseTime.normalizeToMicroseconds(), stillCaptureFailed.updatedAt.normalizeToMicroseconds()) // updated_at should remain unchanged
         
         // Test 6: Does not update when status is CAPTURED
         val captured = paymentOrderEntity(
@@ -364,7 +387,8 @@ class PaymentOrderMapperIntegrationTest {
         
         val stillCaptured = paymentOrderMapper.findByPaymentOrderId(606L).first()
         assertEquals(PaymentOrderStatus.CAPTURED, stillCaptured.status)
-        assertEquals(baseTime, stillCaptured.updatedAt) // updated_at should remain unchanged
+        // Normalize to microsecond precision for comparison (PostgreSQL precision)
+        assertEquals(baseTime.normalizeToMicroseconds(), stillCaptured.updatedAt.normalizeToMicroseconds()) // updated_at should remain unchanged
         
         // Test 7: Does not update when status is PENDING_CAPTURE
         val pendingCapture = paymentOrderEntity(
@@ -382,7 +406,8 @@ class PaymentOrderMapperIntegrationTest {
         
         val stillPendingCapture = paymentOrderMapper.findByPaymentOrderId(607L).first()
         assertEquals(PaymentOrderStatus.PENDING_CAPTURE, stillPendingCapture.status)
-        assertEquals(baseTime, stillPendingCapture.updatedAt) // updated_at should remain unchanged
+        // Normalize to microsecond precision for comparison (PostgreSQL precision)
+        assertEquals(baseTime.normalizeToMicroseconds(), stillPendingCapture.updatedAt.normalizeToMicroseconds()) // updated_at should remain unchanged
     }
 }
 

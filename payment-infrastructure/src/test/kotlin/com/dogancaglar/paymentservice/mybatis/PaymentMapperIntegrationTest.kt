@@ -32,6 +32,25 @@ import java.time.Instant
 @MapperScan("com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis")
 class PaymentMapperIntegrationTest {
 
+    /**
+     * Normalizes Instant to microsecond precision to match PostgreSQL's TIMESTAMP precision.
+     * PostgreSQL stores timestamps with microsecond precision (6 decimal places),
+     * but Java Instant can have nanosecond precision (9 decimal places).
+     */
+    private fun Instant.normalizeToMicroseconds(): Instant {
+        return this.truncatedTo(java.time.temporal.ChronoUnit.MICROS)
+    }
+
+    /**
+     * Normalizes PaymentEntity timestamps to microsecond precision for comparison.
+     */
+    private fun PaymentEntity.normalizeTimestamps(): PaymentEntity {
+        return this.copy(
+            createdAt = this.createdAt.normalizeToMicroseconds(),
+            updatedAt = this.updatedAt.normalizeToMicroseconds()
+        )
+    }
+
     companion object {
         @Container
         @JvmStatic
@@ -99,7 +118,8 @@ class PaymentMapperIntegrationTest {
         assertEquals(1, inserted)
 
         val fetched = paymentMapper.findById(101L)
-        assertEquals(entity, fetched)
+        // Normalize timestamps to microsecond precision for comparison (PostgreSQL precision)
+        assertEquals(entity.normalizeTimestamps(), fetched?.normalizeTimestamps())
 
         assertEquals(101L, paymentMapper.getMaxPaymentId())
 
@@ -113,7 +133,8 @@ class PaymentMapperIntegrationTest {
         assertEquals(1, updatedCount)
 
         val refetched = paymentMapper.findById(101L)
-        assertEquals(updatedEntity, refetched)
+        // Normalize timestamps to microsecond precision for comparison (PostgreSQL precision)
+        assertEquals(updatedEntity.normalizeTimestamps(), refetched?.normalizeTimestamps())
 
         val deleted = paymentMapper.deleteById(101L)
         assertEquals(1, deleted)

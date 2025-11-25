@@ -50,6 +50,34 @@ CREATE TABLE payment_orders (
     retry_count INTEGER NOT NULL DEFAULT 0
 );
 
+-- Constraints matching changelog
+ALTER TABLE payment_orders
+    ADD CONSTRAINT chk_payment_orders_status_valid
+    CHECK (status IN (
+        'INITIATED_PENDING',
+        'CAPTURE_REQUESTED',
+        'CAPTURE_FAILED',
+        'CAPTURED',
+        'REFUND_REQUESTED',
+        'REFUND_FAILED',
+        'REFUNDED',
+        'PENDING_CAPTURE',
+        'TIMEOUT_EXCEEDED_1S_TRANSIENT',
+        'PSP_UNAVAILABLE_TRANSIENT'
+    ));
+
+ALTER TABLE payment_orders
+    ADD CONSTRAINT chk_payment_orders_currency_3
+    CHECK (amount_currency ~ '^[A-Z]{3}$');
+
+ALTER TABLE payment_orders
+    ADD CONSTRAINT chk_payment_orders_amount_positive
+    CHECK (amount_value > 0);
+
+-- Indexes matching changelog
+CREATE INDEX IF NOT EXISTS idx_payment_orders_payment_id ON payment_orders (payment_id);
+CREATE INDEX IF NOT EXISTS idx_payment_orders_seller_id ON payment_orders (seller_id);
+
 -- ========== JOURNAL ENTRIES TABLE ==========
 DROP TABLE IF EXISTS postings;
 DROP TABLE IF EXISTS ledger_entries;
