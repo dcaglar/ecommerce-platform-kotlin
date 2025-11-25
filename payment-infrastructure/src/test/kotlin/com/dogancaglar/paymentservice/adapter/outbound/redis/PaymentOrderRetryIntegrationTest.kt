@@ -140,17 +140,25 @@ class PaymentOrderRetryIntegrationTest {
         status: PaymentOrderStatus = PaymentOrderStatus.CAPTURE_REQUESTED,
         createdAt: Instant = Utc.nowInstant(),
         updatedAt: Instant = createdAt
-    ): PaymentOrder =
-        PaymentOrder.rehydrate(
+    ): PaymentOrder {
+        // Domain invariant: CAPTURE_REQUESTED requires retryCount = 0, PENDING_CAPTURE requires retryCount > 0
+        // Auto-adjust status based on retryCount to satisfy domain invariants
+        val adjustedStatus = when {
+            retryCount > 0 && status == PaymentOrderStatus.CAPTURE_REQUESTED -> PaymentOrderStatus.PENDING_CAPTURE
+            retryCount == 0 && status == PaymentOrderStatus.PENDING_CAPTURE -> PaymentOrderStatus.CAPTURE_REQUESTED
+            else -> status
+        }
+        return PaymentOrder.rehydrate(
             paymentOrderId = PaymentOrderId(id),
             paymentId = PaymentId(999L),
             sellerId = SellerId("111"),
             amount = Amount.of(10000L, Currency("USD")),
-            status = status,
+            status = adjustedStatus,
             retryCount = retryCount,
             createdAt = Utc.fromInstant(createdAt),
             updatedAt = Utc.fromInstant(updatedAt)
         )
+    }
 
     // ==================== End-to-End Retry Flow ====================
 

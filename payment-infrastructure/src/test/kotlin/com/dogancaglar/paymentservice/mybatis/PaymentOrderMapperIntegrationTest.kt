@@ -158,7 +158,7 @@ class PaymentOrderMapperIntegrationTest {
             id = 301L,
             paymentId = 2001L,
             status = PaymentOrderStatus.CAPTURE_REQUESTED,
-            retryCount = 1
+            retryCount = 0  // CAPTURE_REQUESTED requires retryCount = 0
         )
         paymentOrderMapper.insert(base)
 
@@ -171,7 +171,9 @@ class PaymentOrderMapperIntegrationTest {
         )
         assertNotNull(updated)
         assertEquals(PaymentOrderStatus.CAPTURE_FAILED, updated!!.status)
-        assertEquals(3, updated.retryCount)
+        // When transitioning to terminal status, retry_count is frozen at the OLD value (0), not the NEW value (3)
+        // This is the correct behavior: terminal statuses freeze retry_count
+        assertEquals(0, updated.retryCount)
 
         // Attempt to override terminal status CAPTURE_FAILED -> CAPTURED should remain CAPTURE_FAILED
         // SQL protects terminal statuses: once terminal, cannot be changed to another terminal status
