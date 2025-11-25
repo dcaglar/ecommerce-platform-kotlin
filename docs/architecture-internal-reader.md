@@ -5,7 +5,7 @@ architecture, idempotent workflows, and cloud-native patterns.Also
 - It is not intended
   as a commercial product but as an educational and reference for fur projects
 
-*Last updated: **2025‑01‑14** – maintained by **Doğan Çağlar***
+*Last updated: **2025‑11‑25** – maintained by **Doğan Çağlar***
 
 ---
 
@@ -13,17 +13,17 @@ architecture, idempotent workflows, and cloud-native patterns.Also
 
 1. [Purpose & Audience](#1--purposeaudience-)
 2. [Functional Requirements](#2--functional-requirements)
-   
+
    2.1 [System Context](#21-system-context)
 
    2.2 [Core Entities](#22-core-entities)
-   
+
    2.3 [PAyment Bounded Context-Integration Diagram](#23-paymentboundedcontext-integration-diagram-this-diagram-shows-external-integration--boundaries)
-   
+
    2.4 [PAyment Bounded Context-Domain Design](#24-payment-bounded-context-domain-modelthis-diagram-shows-internal-domain-aggregates-value-objects-and-events)
 
    2.5 [Aggregate Boundaries & Consistency(This diagram shows aggregate boundaries, consistency guarantees, and transaction scopes.](#25-aggregate-boundaries--consistencythis-diagram-shows-aggregate-boundaries-consistency-guarantees-and-transaction-scopes)
-   
+
    2.6 [API Summary](#26-api-summary)
 
    2.7 [Data Flow](#27-data-flow-summary)
@@ -75,7 +75,7 @@ architecture, idempotent workflows, and cloud-native patterns.Also
 15. [Changelog](#15--changelog)
 
 ---
-## 1 · Purpose/Audience 
+## 1 · Purpose/Audience
 
 From this platform’s point of view, all business flows are expressed as combinations of:
 
@@ -767,13 +767,13 @@ flowchart LR
 > **Current Architecture (Jan‑2025):** `payment-consumers` contains six specialized consumers organized into **three independent flows**:
 > - **PSP Flow** (3 consumers):
     >   - **PaymentOrderEnqueuer** *(reads `payment_order_created_topic` and enqueues PSP call tasks)*
->   - **PaymentOrderPspCallExecutor** *(invokes PSP **capture** endpoint and publishes results)*
+    >   - **PaymentOrderPspCallExecutor** *(invokes PSP **capture** endpoint and publishes results)*
 >   - **PaymentOrderPspResultApplier** *(applies PSP results and manages retries)*
 > - **Status Check Flow** (1 consumer):
     >   - **ScheduledPaymentStatusCheckExecutor** *(handles async status check requests)*
 > - **Ledger Flow** (2 consumers):
     >   - **LedgerRecordingRequestDispatcher** *(routes finalized payments to ledger queue)*
->   - **LedgerRecordingConsumer** *(creates double-entry journal entries)*
+    >   - **LedgerRecordingConsumer** *(creates double-entry journal entries)*
 >
 > **Independent Scaling & Flow Isolation**: Each flow uses separate Kafka topics and consumer groups:
 > - **PSP Flow**: Consumer groups `payment-order-*-consumer-group` (concurrency=8), topics `payment_order_*_topic` (48 partitions)
@@ -2125,7 +2125,7 @@ verify(exactly = 1) {
 **Anti-Pattern (Self-Reinforcing)**:
 ```kotlin
 // ❌ WRONG: Same criteria in both stub and verify - test will always pass
-every { 
+every {
     eventPublisherPort.publishSync(
         eventMetaData = EventMetadatas.MyEventMetadata,
         aggregateId = event.id,
