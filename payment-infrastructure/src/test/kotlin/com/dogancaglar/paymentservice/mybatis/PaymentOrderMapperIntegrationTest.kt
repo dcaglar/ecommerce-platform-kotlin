@@ -124,8 +124,8 @@ class PaymentOrderMapperIntegrationTest {
         amountValue = 10_00,
         amountCurrency = "USD",
         status = status,
-        createdAt = createdAt,
-        updatedAt = updatedAt,
+        createdAt = createdAt.normalizeToMicroseconds(),
+        updatedAt = updatedAt.normalizeToMicroseconds(),
         retryCount = retryCount
     )
 

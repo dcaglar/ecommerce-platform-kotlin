@@ -84,8 +84,9 @@ class PaymentMapperIntegrationTest {
     @Autowired
     lateinit var paymentMapper: PaymentMapper
 
-    private fun sampleEntity(id: Long = 101L, key: String = "key-$id") =
-        PaymentEntity(
+    private fun sampleEntity(id: Long = 101L, key: String = "key-$id"): PaymentEntity {
+        val now = Utc.nowInstant().normalizeToMicroseconds()
+        return PaymentEntity(
             paymentId = id,
             buyerId = "buyer-$id",
             orderId = "order-$id",
@@ -94,13 +95,14 @@ class PaymentMapperIntegrationTest {
             idempotencyKey = key,
             currency = "USD",
             status = "PENDING_AUTH",
-            createdAt = Utc.nowInstant(),
-            updatedAt = Utc.nowInstant()
+            createdAt = now,
+            updatedAt = now
         )
+    }
 
     @Test
     fun `insert find update and delete payment`() {
-        val createdAt = Utc.nowInstant()
+        val createdAt = Utc.nowInstant().normalizeToMicroseconds()
         val entity = PaymentEntity(
             paymentId = 101L,
             buyerId = "buyer-1",
