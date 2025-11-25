@@ -116,9 +116,9 @@ class PspCaptureGatewayAdapter(
             roll < active.response.successful -> "CAPTURE_SUCCESS"
             roll < active.response.successful + active.response.retryable -> "PENDING_CAPTURE"
             roll < active.response.successful + active.response.retryable + active.response.nonRetryable -> "CAPTURE_DECLINED_FINAL"
-            else -> PaymentOrderStatus.PENDING_CAPTURE
+            else -> PaymentOrderStatus.PENDING_CAPTURE.name
         }
-        return CapturePspResponse(result.toString())
+        return CapturePspResponse(result)
     }
 
 }

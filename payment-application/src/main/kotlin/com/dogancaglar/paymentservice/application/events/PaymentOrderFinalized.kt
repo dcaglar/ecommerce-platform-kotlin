@@ -33,7 +33,7 @@ data class PaymentOrderFinalized private constructor(
 
         fun from(order: PaymentOrder, now: Instant,status: PaymentOrderStatus) : PaymentOrderFinalized{
             require(status.isTerminalPspResponse()){
-                "PaymentOrderFinalized can only be created termnial psp responses, but was ${order.status}"
+                "PaymentOrderFinalized can only be created from termnial psp responses, but was ${status}"
             }
             return PaymentOrderFinalized(
                 paymentOrderId = order.paymentOrderId.value.toString(),

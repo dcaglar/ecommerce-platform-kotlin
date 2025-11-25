@@ -132,16 +132,51 @@
     <select id="updateReturningIdempotent"
             parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentOrderEntity"
             resultMap="PaymentOrderResultMap">
+
         WITH updated AS (
         UPDATE payment_orders p
         SET
+        -- 🔒 1. STATUS: terminal is sticky, others can move forward
         status = CASE
-        WHEN p.status IN ('CAPTURED','CAPTURE_FAILED') THEN p.status
-        ELSE
-        #{status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.PaymentOrderStatusTypeHandler}
+        -- once terminal, always terminal: ignore any later status
+        WHEN p.status IN ('CAPTURED', 'CAPTURE_FAILED')
+        THEN p.status
+
+        -- INITIATED_PENDING → only allow CAPTURE_REQUESTED (first PSP call)
+        WHEN p.status = 'INITIATED_PENDING'
+        AND #{status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.PaymentOrderStatusTypeHandler}
+        = 'CAPTURE_REQUESTED'
+        THEN #{status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.PaymentOrderStatusTypeHandler}
+
+        -- CAPTURE_REQUESTED / PENDING_CAPTURE → can go to PENDING_CAPTURE, CAPTURED, CAPTURE_FAILED
+        WHEN p.status IN ('CAPTURE_REQUESTED', 'PENDING_CAPTURE')
+        AND #{status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.PaymentOrderStatusTypeHandler}
+        IN ('PENDING_CAPTURE', 'CAPTURED', 'CAPTURE_FAILED')
+        THEN #{status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.PaymentOrderStatusTypeHandler}
+
+        -- any other combination = ignore (no downgrade / weird jump)
+        ELSE p.status
         END,
-        updated_at = GREATEST(p.updated_at, #{updatedAt, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.InstantTypeHandler}),
-        retry_count = GREATEST(p.retry_count, #{retryCount})
+
+        -- 🔁 2. RETRY_COUNT: monotonic, and frozen once terminal (FIXED: check both old and new status)
+        retry_count = CASE
+        -- Freeze if CURRENT status is already terminal (idempotency protection)
+        WHEN p.status IN ('CAPTURED', 'CAPTURE_FAILED')
+        THEN p.retry_count
+        -- Freeze if NEW status is terminal (correct logic for transitions to terminal)
+        WHEN #{status, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.PaymentOrderStatusTypeHandler}
+        IN ('CAPTURED', 'CAPTURE_FAILED')
+        THEN p.retry_count
+        -- Otherwise, monotonic increase
+        ELSE GREATEST(p.retry_count, #{retryCount})
+        END,
+
+        -- 🕒 3. UPDATED_AT: always take the max
+        updated_at = GREATEST(
+        p.updated_at,
+        #{updatedAt, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.InstantTypeHandler}
+        )
+
         WHERE p.payment_order_id = #{paymentOrderId}
         RETURNING
         p.payment_order_id,

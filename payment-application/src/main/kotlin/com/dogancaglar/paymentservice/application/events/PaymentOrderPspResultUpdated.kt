@@ -7,7 +7,6 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.Instant
-import java.time.LocalDateTime
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -20,6 +19,7 @@ data class PaymentOrderPspResultUpdated private constructor(
     override val amountValue: Long,
     override val currency: String,
     val pspStatus: String,
+    val attempt: Int,
     val latencyMs: Long,
     override val timestamp: Instant
 ) : PaymentOrderEvent() {
@@ -27,7 +27,7 @@ data class PaymentOrderPspResultUpdated private constructor(
     override val eventType = EVENT_TYPE
 
     override fun deterministicEventId(): String =
-        "$publicPaymentOrderId:$eventType:$pspStatus"
+        "$publicPaymentOrderId:$eventType:$pspStatus:$attempt"
 
     companion object {
         const val EVENT_TYPE = "payment_order_psp_result_updated"
@@ -52,6 +52,7 @@ data class PaymentOrderPspResultUpdated private constructor(
                 amountValue = cmd.amountValue,
                 currency = cmd.currency,
                 pspStatus = pspStatus.name,
+                attempt = cmd.attempt,
                 latencyMs = latencyMs,
                 timestamp = now
             )
@@ -67,10 +68,11 @@ data class PaymentOrderPspResultUpdated private constructor(
             @JsonProperty("amountValue") amount: Long,
             @JsonProperty("currency") currency: String,
             @JsonProperty("pspStatus") pspStatus: String,
+            @JsonProperty("attempt") attempt: Int,
             @JsonProperty("latencyMs") latencyMs: Long,
             @JsonProperty("timestamp") timestamp: Instant
         ) = PaymentOrderPspResultUpdated(
-            pOrderId, pubOrderId, pId, pubPId, sellerId, amount, currency, pspStatus, latencyMs, timestamp
+            pOrderId, pubOrderId, pId, pubPId, sellerId, amount, currency, pspStatus, attempt ,latencyMs, timestamp
         )
     }
 }

@@ -12,7 +12,7 @@ import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
-import com.dogancaglar.paymentservice.service.MissingPaymentOrderException
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.MissingPaymentOrderException
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
@@ -69,7 +69,7 @@ class PaymentOrderEnqueuer(
 
             // 2. UPDATE DB → mark as CAPTURE_REQUESTED
             val updated = try {
-                modification.markAsCaptureRequested(eventData.paymentOrderId.toLong())
+                modification.updateReturningIdempotentInitialCaptureRequest(eventData.paymentOrderId.toLong())
             } catch (ex: MissingPaymentOrderException) {
                 logger.warn(
                     "‼️ Issue with processing   for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +

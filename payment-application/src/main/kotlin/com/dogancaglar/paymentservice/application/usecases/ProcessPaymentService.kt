@@ -59,7 +59,13 @@ open class ProcessPaymentService(
             handleFailed(order)
             return
         }
-        val persisted = paymentOrderModificationPort.markAsCapturePending(order)
+        // Use atomic method to transition to PENDING_CAPTURE and increment retry count
+        // This avoids domain invariant violations:
+        // - CAPTURE_REQUESTED requires retryCount == 0
+        // - PENDING_CAPTURE requires retryCount > 0
+        // We can't do these operations separately without violating invariants
+        val draft = order.markCapturePendingAndIncrementRetry()
+        val persisted = paymentOrderModificationPort.updateReturningIdempotent(draft)
         val nextAttempt = persisted.retryCount
         val backoffMs = computeEqualJitterBackoff(nextAttempt)
         logRetrySchedule(persisted, nextAttempt, System.currentTimeMillis() + backoffMs)
@@ -67,7 +73,8 @@ open class ProcessPaymentService(
     }
 
     private fun handleCaptured(order: PaymentOrder) {
-        val persisted = paymentOrderModificationPort.markAsCaptured(order)
+        val draft = order.markAsCaptured()
+        val persisted = paymentOrderModificationPort.updateReturningIdempotent(draft)
         val evt = paymentOrderDomainEventMapper.toPaymentOrderFinalized(persisted, Utc.nowLocalDateTime(),
             PaymentOrderStatus.CAPTURED)
         eventPublisher.publishSync(
@@ -80,7 +87,8 @@ open class ProcessPaymentService(
     }
 
     private fun handleFailed(order: PaymentOrder) {
-        val persisted = paymentOrderModificationPort.markAsCaptureFailed(order)
+        val draft = order.markCaptureDeclined()
+        val persisted = paymentOrderModificationPort.updateReturningIdempotent(draft)
         val evt = paymentOrderDomainEventMapper.toPaymentOrderFinalized(persisted, Utc.nowLocalDateTime(),
             PaymentOrderStatus.CAPTURE_FAILED)
         eventPublisher.publishSync(

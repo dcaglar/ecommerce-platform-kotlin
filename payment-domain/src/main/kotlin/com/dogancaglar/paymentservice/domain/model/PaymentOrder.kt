@@ -20,6 +20,65 @@ class PaymentOrder private constructor(
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime
 ) {
+    
+    init {
+        // Constructor validation - enforces domain invariants
+        // This is the gatekeeper that ensures all PaymentOrder instances are valid
+        require(amount.isPositive()) {
+            "Payment order amount must be positive. " +
+                    "Received amount: ${amount.quantity} ${amount.currency.currencyCode}. " +
+                    "PaymentOrderId: ${paymentOrderId.value}"
+        }
+        require(sellerId.value.isNotBlank()) {
+            "Seller ID cannot be blank. " +
+                    "PaymentOrderId: ${paymentOrderId.value}"
+        }
+        require(retryCount >= 0) {
+            "Retry count cannot be negative. " +
+                    "Received retryCount: $retryCount. " +
+                    "PaymentOrderId: ${paymentOrderId.value}"
+        }
+        require(!updatedAt.isBefore(createdAt)) {
+            "UpdatedAt cannot be before createdAt. " +
+                    "CreatedAt: $createdAt, UpdatedAt: $updatedAt. " +
+                    "PaymentOrderId: ${paymentOrderId.value}"
+        }
+        
+        // Enforce retry count constraints based on status
+        when (status) {
+            PaymentOrderStatus.CAPTURE_REQUESTED -> {
+                require(retryCount == 0) {
+                    "Status '${status.name}' must have retryCount = 0. " +
+                            "Received retryCount: $retryCount. " +
+                            "PaymentOrderId: ${paymentOrderId.value}"
+                }
+            }
+            PaymentOrderStatus.PENDING_CAPTURE -> {
+                require(retryCount > 0) {
+                    "PENDING_CAPTURE status must have retryCount > 0 (this is a retry state). " +
+                            "Received retryCount: $retryCount. " +
+                            "PaymentOrderId: ${paymentOrderId.value}"
+                }
+            }
+            PaymentOrderStatus.CAPTURED,
+            PaymentOrderStatus.CAPTURE_FAILED -> {
+                // Terminal statuses can have any non-negative retry count
+                require(retryCount >= 0) {
+                    "Terminal status must have retryCount >= 0. " +
+                            "Status: ${status.name}, retryCount: $retryCount. " +
+                            "PaymentOrderId: ${paymentOrderId.value}"
+                }
+            }
+            else -> {
+                // Other statuses - allow any non-negative retry count
+                require(retryCount >= 0) {
+                    "Retry count must be non-negative for status ${status.name}. " +
+                            "Received retryCount: $retryCount. " +
+                            "PaymentOrderId: ${paymentOrderId.value}"
+                }
+            }
+        }
+    }
 
     // ============================================================================
     // Status Transition Methods
@@ -68,36 +127,21 @@ class PaymentOrder private constructor(
         }
         return copy(status = PaymentOrderStatus.CAPTURE_FAILED)
     }
-
-    /**
-     * Transitions the payment order to PENDING_CAPTURE status.
-     * Used for retryable transient failures.
-     */
-    fun markCapturePending(): PaymentOrder {
+    fun markCapturePendingAndIncrementRetry(): PaymentOrder {
         require(status in ALLOWED_STATUSES_FOR_PENDING_CAPTURE) {
-            "Invalid transtion Cannot mark as pending capture from status '${status.name}'. " +
+            "Invalid transition Cannot mark as pending capture from status '${status.name}'. " +
                     "Allowed statuses: ${ALLOWED_STATUSES_FOR_PENDING_CAPTURE.joinToString { it.name }}. " +
                     "PaymentOrderId: ${paymentOrderId.value}"
         }
-        return copy(status = PaymentOrderStatus.PENDING_CAPTURE)
-    }
-
-    // ============================================================================
-    // Retry Management
-    // ============================================================================
-
-    /**
-     * Increments the retry count for this payment order.
-     * Only allowed for non-terminal statuses.
-     */
-    fun incrementRetry(): PaymentOrder {
         require(!isTerminal()) {
             "Cannot increment retry count for terminal order. " +
                     "Current status: ${status.name}. " +
                     "Terminal statuses: ${TERMINAL_STATUSES.joinToString { it.name }}. " +
                     "PaymentOrderId: ${paymentOrderId.value}"
         }
-        return copy(retryCount = retryCount + 1)
+        // Atomically set both status and retryCount in a single copy() call
+        // This avoids intermediate invalid states
+        return copy(status = PaymentOrderStatus.PENDING_CAPTURE, retryCount = retryCount + 1)
     }
 
     // ============================================================================
@@ -172,7 +216,7 @@ class PaymentOrder private constructor(
 
         /**
          * Creates a new payment order with INITIATED_PENDING status.
-         * Validates that the amount is positive and seller ID is not blank.
+         * Validation is performed by the constructor's init block.
          */
         fun createNew(
             paymentOrderId: PaymentOrderId,
@@ -180,15 +224,6 @@ class PaymentOrder private constructor(
             sellerId: SellerId,
             amount: Amount
         ): PaymentOrder {
-            require(amount.isPositive()) {
-                "Payment order amount must be positive. " +
-                        "Received amount: ${amount.quantity} ${amount.currency.currencyCode}. " +
-                        "PaymentOrderId: ${paymentOrderId.value}"
-            }
-            require(sellerId.value.isNotBlank()) {
-                "Seller ID cannot be blank. " +
-                        "PaymentOrderId: ${paymentOrderId.value}"
-            }
             val now = Utc.nowLocalDateTime()
             return PaymentOrder(
                 paymentOrderId = paymentOrderId,
@@ -205,6 +240,15 @@ class PaymentOrder private constructor(
         /**
          * Rehydrates a payment order from persistence.
          * Used when loading existing payment orders from the database.
+         * 
+         * No validation is performed here because:
+         * - PaymentOrderEntity can only be created from valid PaymentOrder instances (via toEntity())
+         * - PaymentOrder instances are only created via createNew() or valid transition methods
+         * - Therefore, entities loaded from the database are guaranteed to be valid
+         * 
+         * Note: The constructor's init block will still run and validate, but since entities
+         * are created from validated domain objects, this validation should always pass.
+         * This follows the same pattern as JournalEntry.fromPersistence().
          */
         fun rehydrate(
             paymentOrderId: PaymentOrderId,

@@ -80,15 +80,18 @@ class PaymentOrderRetryRedisCacheTest {
     }
 
     // Helper to create a valid EventEnvelope for testing
-    private fun createTestEventEnvelope(paymentOrderId: String = "123", traceId: String = "trace-123"): EventEnvelope<PaymentOrderCaptureCommand> {
+    private fun createTestEventEnvelope(paymentOrderId: String = "123", traceId: String = "trace-123", retryCount: Int = 1): EventEnvelope<PaymentOrderCaptureCommand> {
         val now = Utc.nowInstant()
+        // When retryCount > 0, status must be PENDING_CAPTURE (retryable status)
+        // When retryCount = 0, status must be CAPTURE_REQUESTED
+        val status = if (retryCount > 0) PaymentOrderStatus.PENDING_CAPTURE else PaymentOrderStatus.CAPTURE_REQUESTED
         val paymentOrder = PaymentOrder.rehydrate(
             paymentOrderId = PaymentOrderId(paymentOrderId.toLong()),
             paymentId = PaymentId(999L),
             sellerId = SellerId("111"),
             amount = Amount.of(10000L, Currency("USD")),
-            status = PaymentOrderStatus.CAPTURE_REQUESTED,
-            retryCount = 1,
+            status = status,
+            retryCount = retryCount,
             createdAt = Utc.fromInstant(now),
             updatedAt = Utc.fromInstant(now)
         )

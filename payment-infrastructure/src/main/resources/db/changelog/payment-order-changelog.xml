@@ -62,7 +62,10 @@
             'CAPTURED',
             'REFUND_REQUESTED',
             'REFUND_FAILED',
-            'REFUNDED'
+            'REFUNDED',
+            'PENDING_CAPTURE',
+            'TIMEOUT_EXCEEDED_1S_TRANSIENT',
+            'PSP_UNAVAILABLE_TRANSIENT'
             ));
         </sql>
 

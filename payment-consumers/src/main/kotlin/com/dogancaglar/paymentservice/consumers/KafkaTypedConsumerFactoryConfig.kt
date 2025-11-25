@@ -135,7 +135,7 @@ class KafkaTypedConsumerFactoryConfig(
                 org.apache.kafka.clients.consumer.CommitFailedException::class.java,
             )
             addNotRetryableExceptions(
-                com.dogancaglar.paymentservice.service.MissingPaymentOrderException::class.java,
+                com.dogancaglar.paymentservice.adapter.outbound.persistence.MissingPaymentOrderException::class.java,
                 java.lang.IllegalArgumentException::class.java,
                 java.lang.NullPointerException::class.java,
                 java.lang.ClassCastException::class.java,

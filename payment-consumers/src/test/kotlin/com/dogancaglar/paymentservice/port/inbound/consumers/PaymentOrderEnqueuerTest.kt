@@ -78,7 +78,7 @@ class PaymentOrderEnqueuerTest {
         val updatedOrder = paymentOrder.markCaptureRequested()
         every { dedupe.exists(any()) } returns false
         every { dedupe.markProcessed(any(), any()) } just Runs
-        every { modification.markAsCaptureRequested(paymentOrderId.value) } returns updatedOrder
+        every { modification.updateReturningIdempotentInitialCaptureRequest(paymentOrderId.value) } returns updatedOrder
         // The mapper is a real object, so we can use it directly
         val captureCommand = paymentOrderDomainEventMapper.toPaymentOrderCaptureCommand(updatedOrder, 0)
         
@@ -189,7 +189,7 @@ class PaymentOrderEnqueuerTest {
         // The test simulates a scenario where markAsCaptureRequested throws MissingPaymentOrderException
         // (e.g., order was already processed or doesn't exist)
         every { dedupe.exists(any()) } returns false
-        every { modification.markAsCaptureRequested(paymentOrderId.value) } throws com.dogancaglar.paymentservice.service.MissingPaymentOrderException(paymentOrderId.value)
+        every { modification.updateReturningIdempotentInitialCaptureRequest(paymentOrderId.value) } throws com.dogancaglar.paymentservice.adapter.outbound.persistence.MissingPaymentOrderException(paymentOrderId.value)
         
         val envelope = EventEnvelopeFactory.envelopeFor(
             data = paymentOrderCreated,
