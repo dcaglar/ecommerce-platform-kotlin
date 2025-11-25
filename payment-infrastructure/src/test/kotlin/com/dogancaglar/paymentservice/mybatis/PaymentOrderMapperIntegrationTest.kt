@@ -267,7 +267,7 @@ class PaymentOrderMapperIntegrationTest {
     @Test
     fun `updateReturningIdempotentInitialCaptureRequest updates only INITIATED_PENDING with retry_count=0`() {
         upsertPayment(5001L)
-        val baseTime = Utc.nowInstant()
+        val baseTime = Utc.nowInstant().normalizeToMicroseconds()
         
         // Test 1: Successfully updates when status is INITIATED_PENDING and retry_count=0
         val eligible = paymentOrderEntity(
