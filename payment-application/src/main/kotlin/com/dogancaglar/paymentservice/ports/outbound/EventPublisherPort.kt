@@ -1,29 +1,30 @@
 package com.dogancaglar.paymentservice.ports.outbound
 
+import com.dogancaglar.common.event.Event
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.event.EventMetadata
 import java.time.Duration
-import java.util.*
+
 
 interface EventPublisherPort {
 
-    fun <T> publishBatchAtomically(
-        envelopes: List<EventEnvelope<*>>,
-        eventMetaData: EventMetadata<T>,
-        timeout: Duration = Duration.ofSeconds(30)
-    ): Boolean
     /**
-     * Publishes an event synchronously (blocking until confirmation).
+     * Publish a single event synchronously.
+     * @return The produced EventEnvelope<T>
      */
-    fun <T> publishSync(
-        preSetEventIdFromCaller: UUID? = null,
+    fun <T : Event> publishSync(
         aggregateId: String,
-        eventMetaData: EventMetadata<T>,
         data: T,
-        traceId: String? = null,
-        parentEventId: UUID? = null,
+        traceId: String,
+        parentEventId: String? = null,
         timeoutSeconds: Long = 5
     ): EventEnvelope<T>
 
+    /**
+     * Publish a batch inside one Kafka transaction (exactly-once).
+     */
+    fun <T : Event> publishBatchAtomically(
+        envelopes: List<EventEnvelope<T>>,
+        timeout: Duration = Duration.ofSeconds(30)
+    ): Boolean
 }
 

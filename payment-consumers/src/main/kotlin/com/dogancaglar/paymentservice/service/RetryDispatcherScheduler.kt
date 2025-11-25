@@ -4,7 +4,7 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.PaymentEventPublisher
 import com.dogancaglar.paymentservice.adapter.outbound.redis.PaymentOrderRetryQueueAdapter
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
-import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
 import io.micrometer.core.instrument.*
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
@@ -31,7 +31,7 @@ class RetryDispatcherScheduler(
     private val running = java.util.concurrent.atomic.AtomicBoolean(false)
 
     // Static tag for your topic (so dashboards can filter/group)
-    private val topicTag = Tag.of("topic", EventMetadatas.PaymentOrderCaptureCommandMetadata.topic)
+    private val topicTag = Tag.of("topic", PaymentEventMetadataCatalog.PaymentOrderCaptureCommandMetadata.topic)
 
     private val processedCounter = Counter.builder("redis_retry_events_total")
         .description("Total retry events successfully re-published")
@@ -112,7 +112,6 @@ class RetryDispatcherScheduler(
                 // Send the whole chunk atomically (one Kafka transaction)
                 val txOk = publisher.publishBatchAtomically(
                     envelopes = envs,
-                    eventMetaData = EventMetadatas.PaymentOrderCaptureCommandMetadata,
                     timeout = java.time.Duration.ofSeconds(30)
                 )
 
@@ -141,7 +140,9 @@ class RetryDispatcherScheduler(
         if (fail > 0) failedCounter.increment(fail.toDouble())
 
         batchSample.stop(batchTimer)
-        logger.info("RetryDispatcher: batch done ok={} fail={} polled={}", ok, fail, due.size)
+        if(ok >0 || fail >0 || due.size>0) {
+            logger.info("RetryDispatcher: batch done ok={} fail={} polled={}", ok, fail, due.size)
+        }
     }
 
     /** Requeue stale inflight items (e.g., if we crashed after popping) */

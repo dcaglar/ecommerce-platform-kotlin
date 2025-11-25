@@ -11,8 +11,10 @@
         <id property="accountCode" column="account_code"/>
         <result property="balance" column="balance"/>
         <result property="lastAppliedEntryId" column="last_applied_entry_id"/>
-        <result property="lastSnapshotAt" column="last_snapshot_at"/>
-        <result property="updatedAt" column="updated_at"/>
+        <result property="lastSnapshotAt" column="last_snapshot_at"
+                typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.InstantTypeHandler"/>
+        <result property="updatedAt" column="updated_at"
+                typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.InstantTypeHandler"/>
     </resultMap>
 
 

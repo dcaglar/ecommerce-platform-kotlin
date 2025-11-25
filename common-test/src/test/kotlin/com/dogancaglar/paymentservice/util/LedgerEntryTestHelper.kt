@@ -1,10 +1,10 @@
 package com.dogancaglar.paymentservice.util
 
 
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.ledger.*
-import java.time.LocalDateTime
 
 /**
  * Domain-consistent factory for creating valid LedgerEntry test data.
@@ -36,7 +36,7 @@ object LedgerEntryTestHelper {
             authReceivable = authReceivable,
             authLiability = authLiability
         ).first()
-        return LedgerEntry.create(ledgerEntryId, journal, LocalDateTime.now())
+        return LedgerEntry.create(ledgerEntryId, journal, Utc.nowLocalDateTime())
     }
 
     /**
@@ -61,7 +61,7 @@ object LedgerEntryTestHelper {
             merchantAccount = merchantAccount,
             pspReceivable = pspReceivable
         ).first()
-        return LedgerEntry.create(ledgerEntryId, journal, LocalDateTime.now())
+        return LedgerEntry.create(ledgerEntryId, journal, Utc.nowLocalDateTime())
     }
 
     /**

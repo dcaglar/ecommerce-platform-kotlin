@@ -37,11 +37,12 @@
                 <constraints nullable="false"/>
             </column>
 
-            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+            <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE"
+                    defaultValueComputed="(now() AT TIME ZONE 'UTC')">
                 <constraints nullable="false"/>
             </column>
-
-            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+            <column name="updated_at" type="TIMESTAMP WITHOUT TIME ZONE"
+                    defaultValueComputed="(now() AT TIME ZONE 'UTC')">
                 <constraints nullable="false"/>
             </column>
 
@@ -61,7 +62,10 @@
             'CAPTURED',
             'REFUND_REQUESTED',
             'REFUND_FAILED',
-            'REFUNDED'
+            'REFUNDED',
+            'PENDING_CAPTURE',
+            'TIMEOUT_EXCEEDED_1S_TRANSIENT',
+            'PSP_UNAVAILABLE_TRANSIENT'
             ));
         </sql>
 

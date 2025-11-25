@@ -16,10 +16,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.servlet.NoHandlerFoundException
 import org.springframework.web.servlet.resource.NoResourceFoundException
 import org.springframework.transaction.TransactionTimedOutException
-import io.github.resilience4j.bulkhead.BulkheadFullException
 import org.postgresql.util.PSQLException
 import org.postgresql.util.PSQLState
-import java.time.Instant
+import com.dogancaglar.common.time.Utc
 import java.util.concurrent.CompletionException
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeoutException
@@ -39,7 +38,7 @@ class PaymentControllerWebExceptionHandler {
             .joinToString(" -> ") { "${it::class.simpleName}:${trunc(it.message)}" }
 
     data class ErrorResponse(
-        val timestamp: String = Instant.now().toString(),
+        val timestamp: String = Utc.nowInstant().toString(),
         val status: Int,
         val error: String,
         val message: String?,
@@ -84,12 +83,6 @@ class PaymentControllerWebExceptionHandler {
         return respond(HttpStatus.GATEWAY_TIMEOUT, request, "Timed out while processing the request")
     }
 
-    @ExceptionHandler(BulkheadFullException::class)
-    fun handleBulkheadFull(ex: BulkheadFullException, request: HttpServletRequest): ResponseEntity<ErrorResponse> {
-        logger.warn("Bulkhead full at {}: {}", request.requestURI, causeSummary(ex))
-        val headers = HttpHeaders().apply { add(HttpHeaders.RETRY_AFTER, "1") }
-        return ResponseEntity(body(HttpStatus.TOO_MANY_REQUESTS, "Too many concurrent requests", request), headers, HttpStatus.TOO_MANY_REQUESTS)
-    }
 
     @ExceptionHandler(PSQLException::class)
     fun handlePSQL(ex: PSQLException, request: HttpServletRequest): ResponseEntity<ErrorResponse> {
@@ -183,27 +176,6 @@ class PaymentControllerWebExceptionHandler {
         )
     }
 
-    // -------- Wrapped async exceptions --------
-    @ExceptionHandler(ExecutionException::class, CompletionException::class)
-    fun handleWrapped(ex: Throwable, request: HttpServletRequest): ResponseEntity<ErrorResponse> {
-        val root = deepestCause(ex)
-        return when (root) {
-            is TimeoutException -> {
-                logger.warn("Wrapped timeout at {}: {}", request.requestURI, causeSummary(root))
-                respond(HttpStatus.GATEWAY_TIMEOUT, request, "Timed out while processing the request")
-            }
-            is BulkheadFullException -> {
-                logger.warn("Wrapped bulkhead-full at {}: {}", request.requestURI, causeSummary(root))
-                val headers = HttpHeaders().apply { add(HttpHeaders.RETRY_AFTER, "1") }
-                ResponseEntity(body(HttpStatus.TOO_MANY_REQUESTS, "Too many concurrent requests", request), headers, HttpStatus.TOO_MANY_REQUESTS)
-            }
-            is PSQLException -> handlePSQL(root, request)
-            else -> {
-                logger.error("Wrapped error at {}: {}", request.requestURI, causeSummary(root))
-                respond(HttpStatus.SERVICE_UNAVAILABLE, request, trunc(root.message))
-            }
-        }
-    }
 
     // -------- Generic fallback (no stack) --------
     @ExceptionHandler(Exception::class)

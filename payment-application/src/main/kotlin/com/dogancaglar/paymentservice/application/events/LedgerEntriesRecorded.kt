@@ -1,69 +1,88 @@
 package com.dogancaglar.paymentservice.application.events
 
-import java.time.LocalDateTime
+import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
+import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.annotation.JsonProperty
+import java.time.Instant
 
-/**
- * Domain event published when ledger entries have been recorded.
- * 
- * This event is only created through the factory method to ensure invariants are maintained.
- */
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class LedgerEntriesRecorded private constructor(
-    override val ledgerBatchId: String,
-    override val paymentOrderId: String,
-    override val sellerId: String,
-    override val currency: String,
-    override val status: String,
-    override val recordedAt: LocalDateTime,
-    val entryCount: Int,
-    val ledgerEntries: List<LedgerEntryEventData> = emptyList(),
-    override val traceId: String? = null,
-    override val parentEventId: String? = null
-) : LedgerEvent {
-    
+    @JsonProperty("paymentOrderId") override val paymentOrderId: String,
+    @JsonProperty("publicPaymentOrderId") override val publicPaymentOrderId: String,
+    @JsonProperty("paymentId") override val paymentId: String,
+    @JsonProperty("publicPaymentId") override val publicPaymentId: String,
+    @JsonProperty("sellerId") override val sellerId: String,
+    @JsonProperty("amountValue") override val amountValue: Long,
+    @JsonProperty("currency") override val currency: String,
+
+    @JsonProperty("ledgerBatchId") val ledgerBatchId: String,
+    @JsonProperty("ledgerEntries") val ledgerEntries: List<LedgerEntryEventData>,
+
+    @JsonProperty("timestamp") override val timestamp: Instant
+) : PaymentOrderEvent() {
+
+    override val eventType: String = EVENT_TYPE
+
+    /**
+     * Deterministic ID uses *ledgerBatchId*.
+     * Why?
+     * - A batch is the true atomic ledger mutation.
+     * - Replays / retries produce the same batchId → idempotency safe.
+     */
+    override fun deterministicEventId(): String =
+        "$ledgerBatchId:$eventType"
+
     companion object {
+        const val EVENT_TYPE = "ledger_entries_recorded"
+
         /**
-         * Factory method to create LedgerEntriesRecorded event.
-         * 
-         * Ensures entryCount matches the actual size of ledgerEntries list.
-         * 
-         * @param ledgerBatchId Batch ID for this ledger recording batch
-         * @param paymentOrderId Internal payment order ID
-         * @param publicPaymentOrderId Public payment order ID
-         * @param sellerId Seller/merchant ID
-         * @param currency Currency code
-         * @param status Payment status
-         * @param recordedAt Timestamp when ledger entries were recorded
-         * @param ledgerEntries List of ledger entry event data
-         * @param traceId Optional trace ID for distributed tracing
-         * @param parentEventId Optional parent event ID
-         * @return LedgerEntriesRecorded event with validated entryCount
+         * Factory for use by RecordLedgerEntriesService.
          */
-        fun create(
-            ledgerBatchId: String,
-            paymentOrderId: String,
-            sellerId: String,
-            currency: String,
-            status: String,
-            recordedAt: LocalDateTime,
-            ledgerEntries: List<LedgerEntryEventData>,
-            traceId: String? = null,
-            parentEventId: String? = null
-        ): LedgerEntriesRecorded {
-            // Validate that entryCount matches actual size
-            val entryCount = ledgerEntries.size
-            
-            return LedgerEntriesRecorded(
-                ledgerBatchId = ledgerBatchId,
-                paymentOrderId = paymentOrderId,
-                sellerId = sellerId,
-                currency = currency,
-                status = status,
-                recordedAt = recordedAt,
-                entryCount = entryCount,
-                ledgerEntries = ledgerEntries,
-                traceId = traceId,
-                parentEventId = parentEventId
-            )
-        }
+        fun from(
+            cmd: LedgerRecordingCommand,
+            batchId: String,
+            entries: List<LedgerEntryEventData>,
+            now: Instant
+        ) = LedgerEntriesRecorded(
+            paymentOrderId = cmd.paymentOrderId,
+            publicPaymentOrderId = cmd.publicPaymentOrderId,
+            paymentId = cmd.paymentId,
+            publicPaymentId = cmd.publicPaymentId,
+            sellerId = cmd.sellerId,
+            amountValue = cmd.amountValue,
+            currency = cmd.currency,
+            ledgerBatchId = batchId,
+            ledgerEntries = entries,
+            timestamp = now
+        )
+
+        /**
+         * Jackson-only constructor (required for Kafka consumers).
+         */
+        @JsonCreator
+        internal fun fromJson(
+            @JsonProperty("paymentOrderId") pOrderId: String,
+            @JsonProperty("publicPaymentOrderId") pubOrderId: String,
+            @JsonProperty("paymentId") pId: String,
+            @JsonProperty("publicPaymentId") pubPId: String,
+            @JsonProperty("sellerId") sellerId: String,
+            @JsonProperty("amountValue") amountValue: Long,
+            @JsonProperty("currency") currency: String,
+            @JsonProperty("ledgerBatchId") batchId: String,
+            @JsonProperty("ledgerEntries") ledgerEntries: List<LedgerEntryEventData>,
+            @JsonProperty("timestamp") timestamp: Instant
+        ) = LedgerEntriesRecorded(
+            pOrderId,
+            pubOrderId,
+            pId,
+            pubPId,
+            sellerId,
+            amountValue,
+            currency,
+            batchId,
+            ledgerEntries,
+            timestamp
+        )
     }
 }

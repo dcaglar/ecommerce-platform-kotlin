@@ -1,11 +1,10 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
-import com.dogancaglar.port.out.web.dto.PaymentRequestDTO
-import com.dogancaglar.port.out.web.dto.PaymentResponseDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentResponseDTO
 import com.dogancaglar.port.out.web.dto.AmountDto
 import com.dogancaglar.port.out.web.dto.CurrencyEnum
-import com.dogancaglar.port.out.web.dto.PaymentOrderRequestDTO
-import com.dogancaglar.port.out.web.dto.PaymentOrderResponseDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentOrderRequestDTO
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -13,7 +12,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.springframework.http.HttpStatus
-import org.springframework.http.ResponseEntity
 
 class PaymentControllerTest {
 

@@ -1,15 +1,14 @@
 package com.dogancaglar.paymentservice.adapter.outbound.redis
 
-import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.common.event.EventEnvelopeFactory
+import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
-import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
-import com.dogancaglar.paymentservice.application.util.RetryItem
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.RetryItem
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
+import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -18,7 +17,6 @@ import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
-import java.util.*
 
 @Component("paymentOrderRetryQueueAdapter")
 class PaymentOrderRetryQueueAdapter(
@@ -38,7 +36,7 @@ class PaymentOrderRetryQueueAdapter(
 
     override fun scheduleRetry(
         paymentOrder: PaymentOrder,
-        backOffMillis: Long
+        backOffMillis: Long,
     ) {
         val totalStart = System.currentTimeMillis()
         try {
@@ -49,32 +47,14 @@ class PaymentOrderRetryQueueAdapter(
                 order = paymentOrder,
                 attempt = paymentOrder.retryCount
             )
-            val envelope = DomainEventEnvelopeFactory.envelopeFor(
+            val envelope = EventEnvelopeFactory.envelopeFor(
                 data = pspCallRequested,
-                eventMetaData = EventMetadatas.PaymentOrderCaptureCommandMetadata,
                 aggregateId = pspCallRequested.paymentOrderId,
-                traceId = LogContext.getTraceId() ?: UUID.randomUUID().toString(),
-                parentEventId = LogContext.getEventId()
+                traceId = EventLogContext.getTraceId(),
+                parentEventId = EventLogContext.getEventId()
             )
-
-            val serializationStart = System.currentTimeMillis()
             val json = objectMapper.writeValueAsString(envelope)
-            val serializationEnd = System.currentTimeMillis()
-
-            val redisStart = System.currentTimeMillis()
             paymentOrderRetryRedisCache.scheduleRetry(json, retryAt.toDouble())
-            val redisEnd = System.currentTimeMillis()
-
-            val totalEnd = System.currentTimeMillis()
-            logger.debug(
-                "TIMING: scheduleRetry | serialize: {} ms | redis: {} ms | total: {} ms | agg={} attempt={} retryAt={}",
-                (serializationEnd - serializationStart),
-                (redisEnd - redisStart),
-                (totalEnd - totalStart),
-                envelope.aggregateId,
-                pspCallRequested.retryCount,
-                retryAt
-            )
         } catch (e: Exception) {
             logger.error("❌ Exception during scheduleRetry for agg={}", paymentOrder.paymentOrderId.toPublicPaymentOrderId(), e)
             throw e
@@ -92,20 +72,8 @@ class PaymentOrderRetryQueueAdapter(
 
     /** New: pop to inflight and return [RetryItem]s. */
     override fun pollDueRetriesToInflight(maxBatchSize: Long): List<RetryItem> {
-        val raws: List<ByteArray> = paymentOrderRetryRedisCache.popDueToInflight(maxBatchSize)
-        if (raws.isEmpty()) return emptyList()
-        val items = mutableListOf<RetryItem>()
-        for (raw in raws) {
-            try {
-                val env: EventEnvelope<PaymentOrderCaptureCommand> =
-                    objectMapper.readValue(raw, object : TypeReference<EventEnvelope<PaymentOrderCaptureCommand>>() {})
-                items += RetryItem(env, raw)
-            } catch (e: Exception) {
-                // If we cannot deserialize, drop from inflight to avoid poison loops
-                paymentOrderRetryRedisCache.removeFromInflight(raw)
-            }
-        }
-        return items
+        // Use the new deserialized method - deserialization happens in cache layer (like Kafka)
+        return paymentOrderRetryRedisCache.popDueToInflightDeserialized(maxBatchSize)
     }
 
 

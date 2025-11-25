@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.outbound.persistence.entity
 
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import java.time.LocalDateTime
+import java.time.Instant
 
 data class PaymentOrderEntity(
     val paymentOrderId: Long,
@@ -10,7 +10,7 @@ data class PaymentOrderEntity(
     val amountValue: Long,
     val amountCurrency: String,
     val status: PaymentOrderStatus,
-    val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime,
+    val createdAt: Instant,
+    val updatedAt: Instant,
     val retryCount: Int,
 )

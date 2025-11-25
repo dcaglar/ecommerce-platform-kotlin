@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentOrderEntity
 import org.apache.ibatis.annotations.Mapper
 import org.apache.ibatis.annotations.Param
+import java.time.LocalDateTime
 
 @Mapper
 interface PaymentOrderMapper {
@@ -31,6 +32,9 @@ interface PaymentOrderMapper {
     fun insert(paymentOrder: PaymentOrderEntity): Int
 
     fun updateReturningIdempotent(paymentOrder: PaymentOrderEntity): PaymentOrderEntity?
+
+    fun updateReturningIdempotentInitialCaptureRequest(paymentOrderId: Long,updateAt: LocalDateTime): PaymentOrderEntity?
+
 
     fun deleteAll(): Int
     fun countAll(): Int

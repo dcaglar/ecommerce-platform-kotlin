@@ -2,76 +2,58 @@ package com.dogancaglar.paymentservice.application.events
 
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
+import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
-import java.time.LocalDateTime
+import java.time.Instant
 
-/**
- * Domain event published when a payment order is created.
- * 
- * This event is only created through the factory method to ensure invariants are maintained.
- * The @JsonCreator annotation allows Jackson to deserialize from JSON (e.g., Kafka messages).
- */
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class PaymentOrderCreated private @JsonCreator constructor(
-    @JsonProperty("paymentOrderId") override val paymentOrderId: String,
-    @JsonProperty("publicPaymentOrderId") override val publicPaymentOrderId: String,
-    @JsonProperty("paymentId") override val paymentId: String,
-    @JsonProperty("publicPaymentId") override val publicPaymentId: String,
-    @JsonProperty("sellerId") override val sellerId: String,
-    @JsonProperty("amountValue") override val amountValue: Long,
-    @JsonProperty("currency") override val currency: String,
-    @JsonProperty("status") override val status: String,
-    @JsonProperty("createdAt") override val createdAt: LocalDateTime = LocalDateTime.now(),
-    @JsonProperty("updatedAt") override val updatedAt: LocalDateTime = LocalDateTime.now(),
-    @JsonProperty("retryCount") override val retryCount: Int = 0,
-) : PaymentOrderEvent {
-    
+data class PaymentOrderCreated private constructor(
+    override val paymentOrderId: String,
+    override val publicPaymentOrderId: String,
+    override val paymentId: String,
+    override val publicPaymentId: String,
+    override val sellerId: String,
+    override val amountValue: Long,
+    override val currency: String,
+    override val timestamp: Instant
+) : PaymentOrderEvent() {
+
+    override val eventType = EVENT_TYPE
+
+    override fun deterministicEventId(): String =
+        "$publicPaymentOrderId:$eventType"
+
     companion object {
-        /**
-         * Factory method to create PaymentOrderCreated event.
-         * 
-         * @param paymentOrderId Internal payment order ID
-         * @param publicPaymentOrderId Public payment order ID
-         * @param paymentId Internal payment ID
-         * @param publicPaymentId Public payment ID
-         * @param sellerId Seller/merchant ID
-         * @param amountValue Amount in minor currency units
-         * @param currency Currency code
-         * @param status Payment order status
-         * @param createdAt Timestamp when payment order was created
-         * @param updatedAt Timestamp when payment order was last updated
-         * @param retryCount Number of retry attempts (default: 0)
-         * @param retryReason Reason for retry (optional)
-         * @param lastErrorMessage Last error message (optional)
-         * @return PaymentOrderCreated event instance
-         */
-        fun create(
-            paymentOrderId: String,
-            paymentId: String,
-            sellerId: String,
-            amountValue: Long,
-            currency: String,
-            status: String,
-            createdAt: LocalDateTime = LocalDateTime.now(),
-            updatedAt: LocalDateTime = LocalDateTime.now(),
-            retryCount: Int = 0
-        ): PaymentOrderCreated {
+        const val EVENT_TYPE = "payment_order_created"
+
+        fun from(order: PaymentOrder, now: Instant): PaymentOrderCreated {
+            require(order.status == PaymentOrderStatus.INITIATED_PENDING)
             return PaymentOrderCreated(
-                paymentOrderId = paymentOrderId,
-                publicPaymentOrderId = PaymentOrderId(paymentOrderId.toLong()).toPublicPaymentOrderId(),
-                paymentId = paymentId,
-                publicPaymentId = PaymentId(paymentId.toLong()).toPublicPaymentId(),
-                sellerId = sellerId,
-                amountValue = amountValue,
-                currency = currency,
-                status = status,
-                createdAt = createdAt,
-                updatedAt = updatedAt,
+                paymentOrderId = order.paymentOrderId.value.toString(),
+                publicPaymentOrderId = order.paymentOrderId.toPublicPaymentOrderId(),
+                paymentId = order.paymentId.value.toString(),
+                publicPaymentId = order.paymentId.toPublicPaymentId(),
+                sellerId = order.sellerId.value,
+                amountValue = order.amount.quantity,
+                currency = order.amount.currency.currencyCode,
+                timestamp = now
             )
         }
+        @JsonCreator
+        internal fun fromJson(
+            @JsonProperty("paymentOrderId") pOrderId: String,
+            @JsonProperty("publicPaymentOrderId") pubOrderId: String,
+            @JsonProperty("paymentId") pId: String,
+            @JsonProperty("publicPaymentId") pubPId: String,
+            @JsonProperty("sellerId") sellerId: String,
+            @JsonProperty("amountValue") amount: Long,
+            @JsonProperty("currency") currency: String,
+            @JsonProperty("timestamp") timestamp: Instant
+        ) = PaymentOrderCreated(
+            pOrderId, pubOrderId, pId, pubPId, sellerId, amount, currency, timestamp
+        )
     }
 }

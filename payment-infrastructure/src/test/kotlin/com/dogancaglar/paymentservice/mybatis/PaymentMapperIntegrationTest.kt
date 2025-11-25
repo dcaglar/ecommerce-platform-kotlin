@@ -20,7 +20,8 @@ import org.springframework.test.context.TestPropertySource
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
-import java.time.LocalDateTime
+import com.dogancaglar.common.time.Utc
+import java.time.Instant
 
 @Tag("integration")
 @MybatisTest
@@ -30,6 +31,25 @@ import java.time.LocalDateTime
 @TestPropertySource(properties = ["spring.liquibase.enabled=false"])
 @MapperScan("com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis")
 class PaymentMapperIntegrationTest {
+
+    /**
+     * Normalizes Instant to microsecond precision to match PostgreSQL's TIMESTAMP precision.
+     * PostgreSQL stores timestamps with microsecond precision (6 decimal places),
+     * but Java Instant can have nanosecond precision (9 decimal places).
+     */
+    private fun Instant.normalizeToMicroseconds(): Instant {
+        return this.truncatedTo(java.time.temporal.ChronoUnit.MICROS)
+    }
+
+    /**
+     * Normalizes PaymentEntity timestamps to microsecond precision for comparison.
+     */
+    private fun PaymentEntity.normalizeTimestamps(): PaymentEntity {
+        return this.copy(
+            createdAt = this.createdAt.normalizeToMicroseconds(),
+            updatedAt = this.updatedAt.normalizeToMicroseconds()
+        )
+    }
 
     companion object {
         @Container
@@ -64,8 +84,9 @@ class PaymentMapperIntegrationTest {
     @Autowired
     lateinit var paymentMapper: PaymentMapper
 
-    private fun sampleEntity(id: Long = 101L, key: String = "key-$id") =
-        PaymentEntity(
+    private fun sampleEntity(id: Long = 101L, key: String = "key-$id"): PaymentEntity {
+        val now = Utc.nowInstant().normalizeToMicroseconds()
+        return PaymentEntity(
             paymentId = id,
             buyerId = "buyer-$id",
             orderId = "order-$id",
@@ -74,13 +95,14 @@ class PaymentMapperIntegrationTest {
             idempotencyKey = key,
             currency = "USD",
             status = "PENDING_AUTH",
-            createdAt = LocalDateTime.now().withNano(0),
-            updatedAt = LocalDateTime.now().withNano(0)
+            createdAt = now,
+            updatedAt = now
         )
+    }
 
     @Test
     fun `insert find update and delete payment`() {
-        val createdAt = LocalDateTime.now().withNano(0)
+        val createdAt = Utc.nowInstant().normalizeToMicroseconds()
         val entity = PaymentEntity(
             paymentId = 101L,
             buyerId = "buyer-1",
@@ -98,11 +120,12 @@ class PaymentMapperIntegrationTest {
         assertEquals(1, inserted)
 
         val fetched = paymentMapper.findById(101L)
-        assertEquals(entity, fetched)
+        // Normalize timestamps to microsecond precision for comparison (PostgreSQL precision)
+        assertEquals(entity.normalizeTimestamps(), fetched?.normalizeTimestamps())
 
         assertEquals(101L, paymentMapper.getMaxPaymentId())
 
-        val updatedAt = createdAt.plusMinutes(5)
+        val updatedAt = createdAt.plusSeconds(300) // 5 minutes
         val updatedEntity = entity.copy(
             capturedAmountValue = 5_000,
             status = "CAPTURED_PARTIALLY",
@@ -112,7 +135,8 @@ class PaymentMapperIntegrationTest {
         assertEquals(1, updatedCount)
 
         val refetched = paymentMapper.findById(101L)
-        assertEquals(updatedEntity, refetched)
+        // Normalize timestamps to microsecond precision for comparison (PostgreSQL precision)
+        assertEquals(updatedEntity.normalizeTimestamps(), refetched?.normalizeTimestamps())
 
         val deleted = paymentMapper.deleteById(101L)
         assertEquals(1, deleted)

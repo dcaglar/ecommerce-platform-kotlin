@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.domain.model
 
+import com.dogancaglar.common.time.Utc
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.math.BigDecimal
@@ -15,8 +16,8 @@ data class ScheduledPaymentOrderStatusRequest constructor(
     @JsonProperty("amountValue") val amountValue: BigDecimal,
     @JsonProperty("currency") val currency: String,
     @JsonProperty("status") val status: String,
-    @JsonProperty("createdAt") val createdAt: LocalDateTime = LocalDateTime.now(),
-    @JsonProperty("updatedAt") val updatedAt: LocalDateTime = LocalDateTime.now(),
+    @JsonProperty("createdAt") val createdAt: LocalDateTime = Utc.nowLocalDateTime(),
+    @JsonProperty("updatedAt") val updatedAt: LocalDateTime = Utc.nowLocalDateTime(),
     @JsonProperty("retryCount") val retryCount: Int,
     @JsonProperty("retryReason") val retryReason: String? = null,
     @JsonProperty("lastErrorMessage") val lastErrorMesage: String? = null

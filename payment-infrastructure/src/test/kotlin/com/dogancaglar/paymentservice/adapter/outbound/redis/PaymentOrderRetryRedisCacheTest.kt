@@ -11,6 +11,24 @@ import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.ValueOperations
 import org.springframework.data.redis.core.ZSetOperations
 import org.springframework.data.redis.connection.zset.Tuple
+import org.springframework.data.redis.core.RedisCallback
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.common.event.EventEnvelopeFactory
+import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.application.util.RetryItem
+import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
+import com.dogancaglar.paymentservice.domain.model.vo.SellerId
+import com.fasterxml.jackson.core.type.TypeReference
 
 /**
  * Unit tests for PaymentOrderRetryRedisCache using MockK.
@@ -21,6 +39,35 @@ import org.springframework.data.redis.connection.zset.Tuple
  * - Inflight queue management
  * - Reclaim logic
  * - Atomic operations
+ * 
+ * **Serialization/Deserialization Flow:**
+ * 
+ * **Storage (Serialization):**
+ * 1. PaymentOrderRetryQueueAdapter.scheduleRetry():
+ *    - PaymentOrder → EventEnvelope<PaymentOrderCaptureCommand>
+ *    - EventEnvelope → JSON String: objectMapper.writeValueAsString(envelope)
+ *    - JSON String → Redis ZSet: paymentOrderRetryRedisCache.scheduleRetry(json, retryAt)
+ *    - Redis stores JSON string (internally as UTF-8 ByteArray)
+ * 
+ * **Retrieval & Deserialization (Cache Layer - Like Kafka):**
+ * 2. PaymentOrderRetryRedisCache.popDueToInflightDeserialized():
+ *    - Redis ZSet → List<RetryItem> (deserialized EventEnvelope + raw bytes)
+ *    - Uses low-level Redis connection (zSetCommands().zPopMin())
+ *    - Deserializes each ByteArray → EventEnvelope (like Kafka EventEnvelopeKafkaDeserializer)
+ *    - Returns List<RetryItem> containing:
+ *      - Deserialized EventEnvelope<PaymentOrderCaptureCommand> (for business logic)
+ *      - Raw ByteArray (for removeFromInflight() which needs exact byte match)
+ *    - Handles poison messages by removing them from inflight
+ * 
+ * **Adapter Layer (Simplified):**
+ * 3. PaymentOrderRetryQueueAdapter.pollDueRetriesToInflight():
+ *    - Simply calls cache.popDueToInflightDeserialized()
+ *    - No deserialization needed - already done in cache layer (like Kafka consumers)
+ * 
+ * **Removal:**
+ * 4. removeFromInflight(): Uses raw ByteArray to remove from inflight set
+ *    - Must match exact bytes stored in Redis (no re-serialization)
+ *    - This is why RetryItem keeps both envelope AND raw bytes
  */
 class PaymentOrderRetryRedisCacheTest {
     
@@ -32,12 +79,38 @@ class PaymentOrderRetryRedisCacheTest {
         }
     }
 
+    // Helper to create a valid EventEnvelope for testing
+    private fun createTestEventEnvelope(paymentOrderId: String = "123", traceId: String = "trace-123", retryCount: Int = 1): EventEnvelope<PaymentOrderCaptureCommand> {
+        val now = Utc.nowInstant()
+        // When retryCount > 0, status must be PENDING_CAPTURE (retryable status)
+        // When retryCount = 0, status must be CAPTURE_REQUESTED
+        val status = if (retryCount > 0) PaymentOrderStatus.PENDING_CAPTURE else PaymentOrderStatus.CAPTURE_REQUESTED
+        val paymentOrder = PaymentOrder.rehydrate(
+            paymentOrderId = PaymentOrderId(paymentOrderId.toLong()),
+            paymentId = PaymentId(999L),
+            sellerId = SellerId("111"),
+            amount = Amount.of(10000L, Currency("USD")),
+            status = status,
+            retryCount = retryCount,
+            createdAt = Utc.fromInstant(now),
+            updatedAt = Utc.fromInstant(now)
+        )
+        val captureCommand = PaymentOrderCaptureCommand.from(paymentOrder, now, attempt = 1)
+        return EventEnvelopeFactory.envelopeFor(
+            data = captureCommand,
+            aggregateId = captureCommand.paymentOrderId,
+            traceId = traceId,
+            parentEventId = null
+        )
+    }
+
     private lateinit var redisTemplate: StringRedisTemplate
     private lateinit var valueOperations: ValueOperations<String, String>
     private lateinit var zSetOperations: ZSetOperations<String, String>
     private lateinit var connectionFactory: RedisConnectionFactory
     private lateinit var connection: RedisConnection
     private lateinit var zSetCommands: RedisZSetCommands
+    private lateinit var objectMapper: ObjectMapper
     private lateinit var cache: PaymentOrderRetryRedisCache
 
     @BeforeEach
@@ -48,6 +121,12 @@ class PaymentOrderRetryRedisCacheTest {
         connectionFactory = mockk(relaxed = true)
         connection = mockk(relaxed = true)
         zSetCommands = mockk(relaxed = true)
+        
+        // Create ObjectMapper for deserialization (like in production)
+        objectMapper = ObjectMapper()
+            .registerModule(JavaTimeModule())
+            .registerKotlinModule()
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
 
         every { redisTemplate.opsForValue() } returns valueOperations
         every { redisTemplate.opsForZSet() } returns zSetOperations
@@ -55,7 +134,7 @@ class PaymentOrderRetryRedisCacheTest {
         every { connectionFactory.connection } returns connection
         every { connection.zSetCommands() } returns zSetCommands
 
-        cache = PaymentOrderRetryRedisCache(redisTemplate)
+        cache = PaymentOrderRetryRedisCache(redisTemplate, objectMapper)
     }
 
     // ==================== Retry Counter Tests ====================
@@ -191,13 +270,17 @@ class PaymentOrderRetryRedisCacheTest {
     // ==================== Inflight Tests ====================
 
     @Test
-    fun `popDueToInflight should return empty list when no items to pop`() {
+    fun `popDueToInflightDeserialized should return empty list when no items to pop`() {
         // Given
         val queueBytes = "payment_order_retry_queue".toByteArray()
         every { zSetCommands.zPopMin(queueBytes, 1000) } returns emptySet()
+        every { redisTemplate.execute<List<ByteArray>>(any<RedisCallback<List<ByteArray>>>()) } answers {
+            val callback = firstArg<RedisCallback<List<ByteArray>>>()
+            callback.doInRedis(connection)
+        }
 
         // When
-        val result = cache.popDueToInflight(1000)
+        val result = cache.popDueToInflightDeserialized(1000)
 
         // Then
         assertTrue(result.isEmpty())
@@ -205,45 +288,63 @@ class PaymentOrderRetryRedisCacheTest {
     }
 
     @Test
-    fun `popDueToInflight should move due items to inflight`() {
+    fun `popDueToInflightDeserialized should move due items to inflight and deserialize`() {
         // Given
         val now = System.currentTimeMillis().toDouble()
         val dueScore = now - 1000 // Past
-        val jsonBytes = """{"eventId":"evt-due"}""".toByteArray()
+        // Create a valid EventEnvelope JSON (as it would be stored in Redis)
+        val envelope = createTestEventEnvelope("123", "trace-123")
+        val jsonBytes = objectMapper.writeValueAsBytes(envelope)
         
         val tuple = createMockedTuple(jsonBytes, dueScore)
         
         every { zSetCommands.zPopMin("payment_order_retry_queue".toByteArray(), 1000) } returns setOf(tuple)
         every { zSetCommands.zAdd("payment_order_retry_inflight".toByteArray(), any<Double>(), jsonBytes) } returns true
+        every { redisTemplate.execute<List<ByteArray>>(any<RedisCallback<List<ByteArray>>>()) } answers {
+            val callback = firstArg<RedisCallback<List<ByteArray>>>()
+            callback.doInRedis(connection)
+        }
 
         // When
-        val result = cache.popDueToInflight(1000)
+        val result = cache.popDueToInflightDeserialized(1000)
 
         // Then
         assertEquals(1, result.size)
-        assertArrayEquals(jsonBytes, result[0])
+        val retryItem = result[0]
+        // Verify deserialized envelope
+        assertEquals(envelope.eventId, retryItem.envelope.eventId)
+        assertEquals("123", retryItem.envelope.data.paymentOrderId)
+        // Verify raw bytes are preserved
+        assertArrayEquals(jsonBytes, retryItem.raw)
         verify(exactly = 1) { 
             zSetCommands.zAdd("payment_order_retry_inflight".toByteArray(), any(), jsonBytes) 
         }
     }
 
     @Test
-    fun `popDueToInflight should requeue not-due items`() {
+    fun `popDueToInflightDeserialized should requeue not-due items`() {
         // Given
         val now = System.currentTimeMillis().toDouble()
         val futureScore = now + 10000 // Future
-        val jsonBytes = """{"eventId":"evt-future"}""".toByteArray()
+        // Create a valid EventEnvelope JSON
+        val envelope = createTestEventEnvelope("123", "trace-123")
+        val jsonBytes = objectMapper.writeValueAsBytes(envelope)
         
         val tuple = createMockedTuple(jsonBytes, futureScore)
         
         every { zSetCommands.zPopMin("payment_order_retry_queue".toByteArray(), 1000) } returns setOf(tuple)
         every { zSetCommands.zAdd("payment_order_retry_queue".toByteArray(), futureScore, jsonBytes) } returns true
+        every { redisTemplate.execute<List<ByteArray>>(any<RedisCallback<List<ByteArray>>>()) } answers {
+            val callback = firstArg<RedisCallback<List<ByteArray>>>()
+            callback.doInRedis(connection)
+        }
 
         // When
-        val result = cache.popDueToInflight(1000)
+        val result = cache.popDueToInflightDeserialized(1000)
 
         // Then
         assertTrue(result.isEmpty(), "Not-due items should not be returned")
+        // Verify the JSON bytes are preserved when requeued
         verify(exactly = 1) { 
             zSetCommands.zAdd("payment_order_retry_queue".toByteArray(), futureScore, jsonBytes) 
         }
@@ -253,25 +354,37 @@ class PaymentOrderRetryRedisCacheTest {
     }
 
     @Test
-    fun `popDueToInflight should handle mixed due and not-due items`() {
+    fun `popDueToInflightDeserialized should handle mixed due and not-due items`() {
         // Given
         val now = System.currentTimeMillis().toDouble()
         
-        val dueBytes = """{"eventId":"due"}""".toByteArray()
+        // Create valid EventEnvelope JSONs
+        val dueEnvelope = createTestEventEnvelope("123", "trace-due")
+        val dueBytes = objectMapper.writeValueAsBytes(dueEnvelope)
         val dueTuple = createMockedTuple(dueBytes, now - 1000)
         
-        val futureBytes = """{"eventId":"future"}""".toByteArray()
+        val futureEnvelope = createTestEventEnvelope("789", "trace-future")
+        val futureBytes = objectMapper.writeValueAsBytes(futureEnvelope)
         val futureTuple = createMockedTuple(futureBytes, now + 10000)
         
         every { zSetCommands.zPopMin("payment_order_retry_queue".toByteArray(), 1000) } returns setOf(dueTuple, futureTuple)
         every { zSetCommands.zAdd(any(), any<Double>(), any()) } returns true
+        every { redisTemplate.execute<List<ByteArray>>(any<RedisCallback<List<ByteArray>>>()) } answers {
+            val callback = firstArg<RedisCallback<List<ByteArray>>>()
+            callback.doInRedis(connection)
+        }
 
         // When
-        val result = cache.popDueToInflight(1000)
+        val result = cache.popDueToInflightDeserialized(1000)
 
         // Then
         assertEquals(1, result.size)
-        assertArrayEquals(dueBytes, result[0])
+        val retryItem = result[0]
+        // Verify deserialized envelope
+        assertEquals(dueEnvelope.eventId, retryItem.envelope.eventId)
+        assertEquals("123", retryItem.envelope.data.paymentOrderId)
+        // Verify raw bytes
+        assertArrayEquals(dueBytes, retryItem.raw)
         
         // Verify due item moved to inflight
         verify(exactly = 1) { 
@@ -289,6 +402,10 @@ class PaymentOrderRetryRedisCacheTest {
         // Given
         val raw = """{"eventId":"evt-123"}""".toByteArray()
         every { zSetCommands.zRem("payment_order_retry_inflight".toByteArray(), raw) } returns 1L
+        every { redisTemplate.execute<Long>(any<RedisCallback<Long>>()) } answers {
+            val callback = firstArg<RedisCallback<Long>>()
+            callback.doInRedis(connection)
+        }
 
         // When
         cache.removeFromInflight(raw)
@@ -301,6 +418,10 @@ class PaymentOrderRetryRedisCacheTest {
     fun `inflightSize should return number of inflight items`() {
         // Given
         every { zSetCommands.zCard("payment_order_retry_inflight".toByteArray()) } returns 5L
+        every { redisTemplate.execute<Long>(any<RedisCallback<Long>>()) } answers {
+            val callback = firstArg<RedisCallback<Long>>()
+            callback.doInRedis(connection)
+        }
 
         // When
         val size = cache.inflightSize()
@@ -314,6 +435,10 @@ class PaymentOrderRetryRedisCacheTest {
     fun `inflightSize should return 0 when zCard returns null`() {
         // Given
         every { zSetCommands.zCard("payment_order_retry_inflight".toByteArray()) } returns null
+        every { redisTemplate.execute<Long>(any<RedisCallback<Long>>()) } answers {
+            val callback = firstArg<RedisCallback<Long>>()
+            callback.doInRedis(connection)
+        }
 
         // When
         val size = cache.inflightSize()
@@ -336,6 +461,10 @@ class PaymentOrderRetryRedisCacheTest {
         
         every { zSetCommands.zAdd(any(), any<Double>(), any()) } returns true
         every { zSetCommands.zRem(any(), any()) } returns 1L
+        every { redisTemplate.execute<Unit>(any<RedisCallback<Unit>>()) } answers {
+            val callback = firstArg<RedisCallback<Unit>>()
+            callback.doInRedis(connection)
+        }
 
         // When
         cache.reclaimInflight(olderThanMs)
@@ -361,6 +490,10 @@ class PaymentOrderRetryRedisCacheTest {
         every { 
             zSetCommands.zRangeByScore("payment_order_retry_inflight".toByteArray(), 0.0, cutoff) 
         } returns null
+        every { redisTemplate.execute<Unit>(any<RedisCallback<Unit>>()) } answers {
+            val callback = firstArg<RedisCallback<Unit>>()
+            callback.doInRedis(connection)
+        }
 
         // When
         cache.reclaimInflight(olderThanMs)
@@ -384,6 +517,10 @@ class PaymentOrderRetryRedisCacheTest {
         
         every { zSetCommands.zAdd(any(), any<Double>(), any()) } returns true
         every { zSetCommands.zRem(any(), any()) } returns 1L
+        every { redisTemplate.execute<Unit>(any<RedisCallback<Unit>>()) } answers {
+            val callback = firstArg<RedisCallback<Unit>>()
+            callback.doInRedis(connection)
+        }
 
         // When
         cache.reclaimInflight(olderThanMs)
@@ -408,6 +545,10 @@ class PaymentOrderRetryRedisCacheTest {
         every { 
             zSetCommands.zRangeByScore("payment_order_retry_inflight".toByteArray(), 0.0, any()) 
         } returns mutableSetOf()
+        every { redisTemplate.execute<Unit>(any<RedisCallback<Unit>>()) } answers {
+            val callback = firstArg<RedisCallback<Unit>>()
+            callback.doInRedis(connection)
+        }
 
         // When
         cache.reclaimInflight(customOlderThanMs)

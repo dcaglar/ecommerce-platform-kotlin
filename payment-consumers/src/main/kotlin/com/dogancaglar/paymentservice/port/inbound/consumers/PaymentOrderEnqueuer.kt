@@ -1,16 +1,18 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.paymentservice.application.metadata.CONSUMER_GROUPS
-import com.dogancaglar.common.event.DomainEventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.application.metadata.Topics
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ID
+import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ORDER_ID
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
+import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
-import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
-import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
+import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
+import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.MissingPaymentOrderException
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
@@ -21,10 +23,17 @@ import org.springframework.stereotype.Component
 
 @Component
 class PaymentOrderEnqueuer(
-    @param:Qualifier("syncPaymentTx") private val kafkaTx: KafkaTxExecutor,
-    @param:Qualifier("syncPaymentEventPublisher") private val publisher: EventPublisherPort,
-    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
+    @Qualifier("syncPaymentTx")
+    private val kafkaTx: KafkaTxExecutor,
+
+    @Qualifier("syncPaymentEventPublisher")
+    private val publisher: EventPublisherPort,
+
+    private val dedupe: EventDeduplicationPort,
+    private val modification: PaymentOrderModificationPort,
+    private val mapper: PaymentOrderDomainEventMapper
 ) {
+
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @KafkaListener(
@@ -36,41 +45,75 @@ class PaymentOrderEnqueuer(
         record: ConsumerRecord<String, EventEnvelope<PaymentOrderCreated>>,
         consumer: org.apache.kafka.clients.consumer.Consumer<*, *>
     ) {
-        val consumed = record.value()
-        val created = consumed.data
-        val order = paymentOrderDomainEventMapper.fromEvent(created)
+        val envelope = record.value()
+        val eventData = envelope.data
+        val eventId = envelope.eventId
 
         val tp = TopicPartition(record.topic(), record.partition())
         val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
-        val groupMeta =
-            consumer.groupMetadata()                        // <— real metadata (generation, member id, epoch)
-        LogContext.with(consumed) {
-            if (order.status != PaymentOrderStatus.INITIATED_PENDING) {
+        val groupMeta = consumer.groupMetadata()
+
+        EventLogContext.with(envelope) {
+            if (dedupe.exists(eventId)) {
+                logger.warn(
+                    "⚠️ Event is processed already  for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId} , skipping")
                 kafkaTx.run(offsets, groupMeta) {}
-                logger.warn("⏩ Skip enqueue (status={}) agg={}", order.status, consumed.aggregateId)
+                return@with
+            }
+            logger.info(
+                "🎬 Started processing   for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                        "with $PAYMENT_ID ${eventData.publicPaymentId}")
+            // 1. DEDUPE CHECK,if it's captured alreadyv,it already exist in dedup
+
+
+            // 2. UPDATE DB → mark as CAPTURE_REQUESTED
+            val updated = try {
+                modification.updateReturningIdempotentInitialCaptureRequest(eventData.paymentOrderId.toLong())
+            } catch (ex: MissingPaymentOrderException) {
+                logger.warn(
+                    "‼️ Issue with processing   for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId} issue : ${ex.message}")
+                kafkaTx.run(offsets, groupMeta) {}
                 return@with
             }
 
-            val work = paymentOrderDomainEventMapper.toPaymentOrderCaptureCommand(order, attempt = 0)
-            val outEnv = DomainEventEnvelopeFactory.envelopeFor(
-                data = work,
-                eventMetaData = EventMetadatas.PaymentOrderCaptureCommandMetadata,
-                aggregateId = work.paymentOrderId, // Kafka key = paymentOrderId
-                traceId = consumed.traceId,
-                parentEventId = consumed.eventId
-            )
+            // 3. Build new event
+            val work = try {
+                mapper.toPaymentOrderCaptureCommand(updated, attempt = 0)
+            } catch (ex: IllegalArgumentException) {
+                // this comes from require(...) in from()
+                logger.warn(
+                    "‼️ Issue with processing   for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId} issue : ${ex.message}")
+                kafkaTx.run(offsets, groupMeta) {}
+                return@with
+            } catch (ex: Exception) {
+                logger.warn(
+                    "🚨 with processing   for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId} issue : ${ex.message}")
+                kafkaTx.run(offsets, groupMeta) {}
+                return@with
+            }
 
+
+
+            // 4. KAFKA TX: publish + commit offset + mark dedupe
             kafkaTx.run(offsets, groupMeta) {
+
                 publisher.publishSync(
-                    preSetEventIdFromCaller = outEnv.eventId,
-                    aggregateId = outEnv.aggregateId,
-                    eventMetaData = EventMetadatas
-                        .PaymentOrderCaptureCommandMetadata,
+                    aggregateId = envelope.aggregateId,
                     data = work,
-                    traceId = outEnv.traceId,
-                    parentEventId = outEnv.parentEventId
+                    traceId = envelope.traceId,
+                    parentEventId = envelope.eventId
                 )
-                logger.debug("📤 Enqueued PSP work attempt=0 agg={} traceId={}", outEnv.aggregateId, outEnv.traceId)
+
+                // 5. Mark as processed ONLY HERE — AFTER EVERYTHING SUCCEEDS
+                dedupe.markProcessed(eventId, 3600)
+
+                logger.info(
+                    "✅ Completed processing   for $PAYMENT_ORDER_ID  ${eventData.publicPaymentOrderId} " +
+                            "with $PAYMENT_ID ${eventData.publicPaymentId}")
             }
         }
     }

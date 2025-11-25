@@ -5,11 +5,11 @@ import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.balance.AccountBalanceSnapshot
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.util.LedgerEntryTestHelper
 import io.mockk.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -150,8 +150,8 @@ class AccountBalanceServiceTest {
                 accountCode = it,
                 balance = 0L,
                 lastAppliedEntryId = 20L,
-                lastSnapshotAt = LocalDateTime.now(),
-                updatedAt = LocalDateTime.now()
+                lastSnapshotAt = Utc.nowLocalDateTime(),
+                updatedAt = Utc.nowLocalDateTime()
             )
         }
         every { snapshotPort.findByAccountCodes(accountCodes = accountCodes) } returns existingSnapshots
@@ -286,11 +286,11 @@ class AccountBalanceServiceTest {
             when {
                 code.contains(SELLER_A) -> AccountBalanceSnapshot(
                     accountCode = code, balance = 0L, lastAppliedEntryId = 35L,
-                    lastSnapshotAt = LocalDateTime.now(), updatedAt = LocalDateTime.now()
+                    lastSnapshotAt = Utc.nowLocalDateTime(), updatedAt = Utc.nowLocalDateTime()
                 )
                 else -> AccountBalanceSnapshot(
                     accountCode = code, balance = 0L, lastAppliedEntryId = 0L,
-                    lastSnapshotAt = LocalDateTime.now(), updatedAt = LocalDateTime.now()
+                    lastSnapshotAt = Utc.nowLocalDateTime(), updatedAt = Utc.nowLocalDateTime()
                 )
             }
         }

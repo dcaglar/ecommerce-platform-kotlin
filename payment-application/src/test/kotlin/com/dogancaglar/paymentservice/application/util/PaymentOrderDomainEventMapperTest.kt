@@ -1,19 +1,21 @@
 package com.dogancaglar.paymentservice.application.util
 
-import com.dogancaglar.common.id.PublicIdCodec
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.*
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.vo.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
-import java.time.*
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 
 class PaymentOrderDomainEventMapperTest {
 
     private val fixedClock =
         Clock.fixed(Instant.parse("2024-01-01T12:00:00Z"), ZoneOffset.UTC)
 
-    private val mapper = PaymentOrderDomainEventMapper(fixedClock)
+    private val mapper = PaymentOrderDomainEventMapper()
 
     private val currency = Currency("EUR")
     private val amount = Amount.of(5000L, currency)
@@ -35,9 +37,8 @@ class PaymentOrderDomainEventMapperTest {
             paymentId = PaymentId(1L),
             buyerId = BuyerId("buyer-1"),
             orderId = OrderId("order-1"),
-            totalAmount = Amount.of(10000L, currency),
-            clock = fixedClock
-        )
+            totalAmount = Amount.of(10000L, currency)
+        ).authorize()
 
         val lines = listOf(
             PaymentLine(SellerId("seller-1"), amount)
@@ -70,9 +71,10 @@ class PaymentOrderDomainEventMapperTest {
         assertEquals("seller-1", event.sellerId)
         assertEquals(5000L, event.amountValue)
         assertEquals("EUR", event.currency)
-        assertEquals(order.status.name, event.status)
-        assertEquals(order.retryCount, event.retryCount)
-        assertEquals(LocalDateTime.ofInstant(fixedClock.instant(), fixedClock.zone), event.createdAt)
+        // Timestamp should be close to now (within a few seconds) since Utc.nowInstant() is used
+        val now = Utc.nowInstant()
+        assertTrue(event.timestamp.isAfter(now.minusSeconds(5)))
+        assertTrue(event.timestamp.isBefore(now.plusSeconds(5)))
     }
 
     // ---------------------------------------------------------
@@ -80,11 +82,12 @@ class PaymentOrderDomainEventMapperTest {
     // ---------------------------------------------------------
     @Test
     fun `toPaymentOrderCaptureCommand maps retry count`() {
-        val order = sampleOrder()
+        // PaymentOrderCaptureCommand requires order to be in CAPTURE_REQUESTED or PENDING_CAPTURE status
+        val order = sampleOrder().markCaptureRequested()
 
         val event = mapper.toPaymentOrderCaptureCommand(order, attempt = 3)
 
-        assertEquals(3, event.retryCount)
+        assertEquals(3, event.attempt)
         assertEquals(order.paymentOrderId.value.toString(), event.paymentOrderId)
         assertEquals(order.paymentOrderId.toPublicPaymentOrderId(), event.publicPaymentOrderId)
     }
@@ -95,54 +98,32 @@ class PaymentOrderDomainEventMapperTest {
     @Test
     fun `toPaymentOrderSucceeded maps correctly`() {
         val order = sampleOrder()
-        val event = mapper.toPaymentOrderSucceeded(order)
+        val now = Utc.nowLocalDateTime()
+        val event = mapper.toPaymentOrderFinalized(order, now, PaymentOrderStatus.CAPTURED)
 
         assertEquals("${order.paymentOrderId.value}", event.paymentOrderId)
         assertEquals(order.paymentOrderId.toPublicPaymentOrderId(), event.publicPaymentOrderId)
-        assertEquals(order.status.name, event.status)
+        assertEquals("CAPTURED", event.status)
     }
 
     @Test
-    fun `toPaymentOrderFailed maps correctly`() {
+    fun `toPaymentOrderFinalized maps correctly for failed status`() {
         val order = sampleOrder()
-        val event = mapper.toPaymentOrderFailed(order)
+        val now = Utc.nowLocalDateTime()
+        val event = mapper.toPaymentOrderFinalized(order, now, PaymentOrderStatus.CAPTURE_FAILED)
 
         assertEquals("10", event.paymentOrderId)
         assertEquals(order.paymentId.toPublicPaymentId(), event.publicPaymentId)
         assertEquals(order.paymentOrderId.toPublicPaymentOrderId(), event.publicPaymentOrderId)
-        assertEquals(order.status.name, event.status)
+        assertEquals("CAPTURE_FAILED", event.status)
     }
 
     // ---------------------------------------------------------
     // 5. FROM EVENT (rehydration)
     // ---------------------------------------------------------
-    @Test
-    fun `fromEvent reconstructs domain PaymentOrder`() {
-        val order = sampleOrder()
-        val event = mapper.toPaymentOrderCreated(order)
-
-        val rebuilt = mapper.fromEvent(event)
-
-        assertEquals(order.paymentOrderId, rebuilt.paymentOrderId)
-        assertEquals(order.paymentId, rebuilt.paymentId)
-        assertEquals(order.sellerId, rebuilt.sellerId)
-        assertEquals(order.amount, rebuilt.amount)
-        assertEquals(order.status, rebuilt.status)
-        assertEquals(order.retryCount, rebuilt.retryCount)
-    }
 
     // ---------------------------------------------------------
     // 6. COPY WITH STATUS
     // ---------------------------------------------------------
-    @Test
-    fun `copyWithStatus changes only status`() {
-        val order = sampleOrder()
-        val event = mapper.toPaymentOrderCreated(order)
 
-        val updated = mapper.copyWithStatus(event, "CAPTURED")
-
-        assertEquals("CAPTURED", updated.status)
-        assertEquals(event.paymentOrderId, updated.paymentOrderId)
-        assertEquals(event.amountValue, updated.amountValue)
-    }
 }

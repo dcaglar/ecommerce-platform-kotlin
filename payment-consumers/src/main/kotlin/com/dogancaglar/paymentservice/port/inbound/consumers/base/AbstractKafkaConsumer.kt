@@ -1,11 +1,12 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers.base
 
+import com.dogancaglar.common.event.Event
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.common.logging.EventLogContext
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 
-abstract class AbstractKafkaConsumer<T : Any> {
+abstract class AbstractKafkaConsumer<T : Event> {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     abstract fun filter(envelope: EventEnvelope<T>): Boolean
@@ -25,6 +26,6 @@ abstract class AbstractKafkaConsumer<T : Any> {
         block: () -> Unit
     ) {
         logger.info("Setting log context for event: ${envelope.eventType}, traceId: ${envelope.traceId}, eventId: ${envelope.eventId}")
-        LogContext.with(envelope, additionalContext, block)
+        EventLogContext.with(envelope, additionalContext, block)
     }
 }

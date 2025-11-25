@@ -197,7 +197,7 @@ psp:
         NORMAL:
           timeouts:
             enabled: true
-            probability: 20       # 2% of total requests time out
+            probability: 0       # 0% of total requests time out
           latency:
             fast:
               probability: 100    # rest of 100% are fast (50–150ms)
@@ -212,9 +212,8 @@ psp:
               minMs: 300
               maxMs: 600
           response:
-            successful: 70
-            retryable: 20
-            statusCheck: 0
+            successful: 50
+            retryable: 40
             nonRetryable: 10
         PEAK:
           timeouts:

@@ -2,14 +2,11 @@ package com.dogancaglar.paymentservice.adapter.inbound.rest
 
 import com.dogancaglar.paymentservice.adapter.inbound.rest.mapper.PaymentRequestMapper
 import com.dogancaglar.paymentservice.application.validator.PaymentValidator
-import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.ports.inbound.AuthorizePaymentUseCase
-import com.dogancaglar.paymentservice.ports.outbound.PspAuthGatewayPort
-import com.dogancaglar.port.out.web.dto.PaymentRequestDTO
-import com.dogancaglar.port.out.web.dto.PaymentResponseDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentResponseDTO
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 
 @Service
 class PaymentService(

@@ -6,9 +6,9 @@ CREATE TABLE outbox_event (
   aggregate_id VARCHAR(255) NOT NULL,
   payload     TEXT         NOT NULL,
   status      VARCHAR(50)  NOT NULL,
-  created_at  TIMESTAMP    NOT NULL,
-  updated_at  TIMESTAMP    NOT NULL,
-  claimed_at  TIMESTAMP NULL,
+  created_at  TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
+  updated_at  TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
+  claimed_at  TIMESTAMP WITHOUT TIME ZONE NULL,
   claimed_by  VARCHAR(128) NULL,
   PRIMARY KEY (oeid, created_at)
 );
@@ -33,10 +33,9 @@ CREATE TABLE payments (
     captured_amount_value BIGINT NOT NULL DEFAULT 0,
     currency CHAR(3) NOT NULL,
     status VARCHAR(50) NOT NULL,
-    created_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
     CONSTRAINT uq_payment_idempotency_key UNIQUE(idempotency_key)
-
 );
 
 CREATE TABLE payment_orders (
@@ -46,10 +45,38 @@ CREATE TABLE payment_orders (
     amount_value BIGINT NOT NULL,
     amount_currency CHAR(3) NOT NULL,
     status VARCHAR(50) NOT NULL,
-    created_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
     retry_count INTEGER NOT NULL DEFAULT 0
 );
+
+-- Constraints matching changelog
+ALTER TABLE payment_orders
+    ADD CONSTRAINT chk_payment_orders_status_valid
+    CHECK (status IN (
+        'INITIATED_PENDING',
+        'CAPTURE_REQUESTED',
+        'CAPTURE_FAILED',
+        'CAPTURED',
+        'REFUND_REQUESTED',
+        'REFUND_FAILED',
+        'REFUNDED',
+        'PENDING_CAPTURE',
+        'TIMEOUT_EXCEEDED_1S_TRANSIENT',
+        'PSP_UNAVAILABLE_TRANSIENT'
+    ));
+
+ALTER TABLE payment_orders
+    ADD CONSTRAINT chk_payment_orders_currency_3
+    CHECK (amount_currency ~ '^[A-Z]{3}$');
+
+ALTER TABLE payment_orders
+    ADD CONSTRAINT chk_payment_orders_amount_positive
+    CHECK (amount_value > 0);
+
+-- Indexes matching changelog
+CREATE INDEX IF NOT EXISTS idx_payment_orders_payment_id ON payment_orders (payment_id);
+CREATE INDEX IF NOT EXISTS idx_payment_orders_seller_id ON payment_orders (seller_id);
 
 -- ========== JOURNAL ENTRIES TABLE ==========
 DROP TABLE IF EXISTS postings;
@@ -62,14 +89,14 @@ CREATE TABLE journal_entries (
 	name VARCHAR(128),
 	reference_type VARCHAR(64),
 	reference_id VARCHAR(64),
-	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC')
 );
 
 -- ========== LEDGER ENTRIES TABLE ==========
 CREATE TABLE ledger_entries (
 	id BIGSERIAL PRIMARY KEY,
 	journal_id VARCHAR(128) NOT NULL,
-	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
 	CONSTRAINT fk_ledger_entries_journal FOREIGN KEY (journal_id) REFERENCES journal_entries(id) ON DELETE CASCADE
 );
 
@@ -82,7 +109,7 @@ CREATE TABLE postings (
 	amount BIGINT NOT NULL,
 	direction VARCHAR(8) NOT NULL,
 	currency VARCHAR(3) NOT NULL,
-	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
 	CONSTRAINT fk_postings_journal FOREIGN KEY (journal_id) REFERENCES journal_entries(id) ON DELETE CASCADE,
 	CONSTRAINT uq_postings_journal_account UNIQUE (journal_id, account_code)
 );
@@ -98,8 +125,8 @@ CREATE TABLE account_balances (
     account_code VARCHAR(128) PRIMARY KEY,
     balance BIGINT NOT NULL,
     last_applied_entry_id BIGINT NOT NULL DEFAULT 0,
-    last_snapshot_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    last_snapshot_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC')
 );
 
 -- ========== ACCOUNT DIRECTORY TABLE ==========
@@ -113,8 +140,8 @@ CREATE TABLE account_directory (
     category VARCHAR(32),
     country VARCHAR(2),
     status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC')
 );
 
 CREATE INDEX IF NOT EXISTS idx_account_directory_entity ON account_directory (entity_id);

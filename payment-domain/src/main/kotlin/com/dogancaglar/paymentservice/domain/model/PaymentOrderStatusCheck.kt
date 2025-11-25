@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.domain.model
 
+import com.dogancaglar.common.time.Utc
 import java.time.LocalDateTime
 
 class PaymentOrderStatusCheck private constructor(
@@ -8,8 +9,8 @@ class PaymentOrderStatusCheck private constructor(
     val scheduledAt: LocalDateTime,
     val attempt: Int = 1,
     val status: Status = Status.SCHEDULED,
-    val createdAt: LocalDateTime = LocalDateTime.now(),
-    val updatedAt: LocalDateTime = LocalDateTime.now(),
+    val createdAt: LocalDateTime = Utc.nowLocalDateTime(),
+    val updatedAt: LocalDateTime = Utc.nowLocalDateTime(),
 ) {
 
     enum class Status { SCHEDULED, PROCESSED }
@@ -44,8 +45,8 @@ class PaymentOrderStatusCheck private constructor(
                 scheduledAt = scheduledAt,
                 attempt = 1,
                 status = Status.SCHEDULED,
-                createdAt = LocalDateTime.now(),
-                updatedAt = LocalDateTime.now()
+                createdAt = Utc.nowLocalDateTime(),
+                updatedAt = Utc.nowLocalDateTime()
             )
 
         fun reconstructFromPersistence(

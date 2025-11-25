@@ -1,88 +1,77 @@
 package com.dogancaglar.paymentservice.application.usecases
 
-import com.dogancaglar.common.logging.LogContext
+import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.application.events.PaymentOrderEvent
-import com.dogancaglar.paymentservice.application.events.PaymentOrderFailed
-import com.dogancaglar.paymentservice.application.events.PaymentOrderSucceeded
-import com.dogancaglar.paymentservice.application.metadata.EventMetadatas
+import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import io.mockk.*
+import com.dogancaglar.common.time.Utc
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class RequestLedgerRecordingServiceTest {
 
     private lateinit var eventPublisherPort: EventPublisherPort
-    private lateinit var clock: Clock
     private lateinit var service: RequestLedgerRecordingService
 
     @BeforeEach
     fun setup() {
         eventPublisherPort = mockk(relaxed = true)
-        clock = Clock.fixed(Instant.parse("2025-01-01T10:00:00Z"), ZoneOffset.UTC)
-        service = RequestLedgerRecordingService(eventPublisherPort, clock)
+        service = RequestLedgerRecordingService(eventPublisherPort)
     }
 
-    // Helper method to create PaymentOrderSucceeded with SUCCESSFUL_FINAL status
+    // Helper method to create PaymentOrderFinalized with SUCCESSFUL_FINAL status
     private fun createPaymentOrderSucceeded(
         paymentOrderId: String = "123",
         paymentId: String = "456",
         sellerId: String = "seller-789",
         amountValue: Long = 10000L,
-        currency: String = "EUR",
-        retryCount: Int = 0
-    ): PaymentOrderSucceeded = PaymentOrderSucceeded.create(
-        paymentOrderId = paymentOrderId,
-        paymentId = paymentId,
+        currency: String = "EUR"
+    ): PaymentOrderFinalized = PaymentOrderFinalized.fromJson(
+        pOrderId = paymentOrderId,
+        pubOrderId = "paymentorder-$paymentOrderId",
+        pId = paymentId,
+        pubPId = "payment-$paymentId",
         sellerId = sellerId,
-        amountValue = amountValue,
-        currency = currency,
         status = "SUCCESSFUL_FINAL",
-        createdAt = LocalDateTime.now(clock),
-        updatedAt = LocalDateTime.now(clock),
-        retryCount = retryCount
+        amount = amountValue,
+        currency = currency,
+        timestamp = Utc.nowInstant()
     )
 
-    // Helper method to create PaymentOrderFailed with FAILED_FINAL status
+    // Helper method to create PaymentOrderFinalized with FAILED_FINAL status
     private fun createPaymentOrderFailed(
         paymentOrderId: String = "999",
         paymentId: String = "999",
         sellerId: String = "seller-789",
         amountValue: Long = 5000L,
-        currency: String = "EUR",
-        retryCount: Int = 0,
-        retryReason: String? = null,
-        lastErrorMessage: String? = null
-    ): PaymentOrderFailed = PaymentOrderFailed.create(
-        paymentOrderId = paymentOrderId,
-        paymentId = paymentId,
+        currency: String = "EUR"
+    ): PaymentOrderFinalized = PaymentOrderFinalized.fromJson(
+        pOrderId = paymentOrderId,
+        pubOrderId = "paymentorder-$paymentOrderId",
+        pId = paymentId,
+        pubPId = "payment-$paymentId",
         sellerId = sellerId,
-        amountValue = amountValue,
-        currency = currency,
         status = "FAILED_FINAL",
-        createdAt = LocalDateTime.now(clock),
-        updatedAt = LocalDateTime.now(clock),
-        retryCount = retryCount
+        amount = amountValue,
+        currency = currency,
+        timestamp = Utc.nowInstant()
     )
     @Test
     fun `should publish LedgerRecordingCommand for PaymentOrderSucceeded with SUCCESSFUL_FINAL status`() {
-        // given - PaymentOrderSucceeded with SUCCESSFUL_FINAL status
+        // given - PaymentOrderFinalized with SUCCESSFUL_FINAL status
         val event = createPaymentOrderSucceeded()
-        val expectedEventId = java.util.UUID.fromString("11111111-1111-1111-1111-111111111111")
+        val expectedEventId = "11111111-1111-1111-1111-111111111111"
         val expectedTraceId = "trace-111"
         
-        // Mock LogContext to control traceId and parentEventId
-        mockkObject(LogContext)
-        every { LogContext.getEventId() } returns expectedEventId
-        every { LogContext.getTraceId() } returns expectedTraceId
+        // Mock EventLogContext to control traceId and parentEventId
+        mockkObject(EventLogContext)
+        every { EventLogContext.getEventId() } returns expectedEventId
+        every { EventLogContext.getTraceId() } returns expectedTraceId
         
         // Setup mocks to accept calls
         every { eventPublisherPort.publishSync<LedgerRecordingCommand>(any(), any(), any(), any(), any()) } returns mockk()
@@ -91,9 +80,9 @@ class RequestLedgerRecordingServiceTest {
         service.requestLedgerRecording(event)
 
         // then - verify publishSync called with exact parameters and correct status
+        val now = Utc.nowInstant()
         verify(exactly = 1) {
-            eventPublisherPort.publishSync(
-                eventMetaData = EventMetadatas.LedgerRecordingCommandMetadata,
+            eventPublisherPort.publishSync<LedgerRecordingCommand>(
                 aggregateId = event.sellerId,
                 data = match { cmd ->
                     cmd is LedgerRecordingCommand &&
@@ -102,13 +91,15 @@ class RequestLedgerRecordingServiceTest {
                     cmd.sellerId == event.sellerId &&
                     cmd.amountValue == event.amountValue &&
                     cmd.currency == event.currency &&
-                    cmd.status == "SUCCESSFUL_FINAL" &&
-                    cmd.createdAt == LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
+                    cmd.finalStatus == event.status &&
+                    cmd.timestamp.isAfter(now.minusSeconds(5)) &&
+                    cmd.timestamp.isBefore(now.plusSeconds(5))
                 },
-                parentEventId = expectedEventId,
-                traceId = expectedTraceId
+                traceId = expectedTraceId,
+                parentEventId = expectedEventId
             )
         }
+        unmockkObject(EventLogContext)
     }
 
     @Test
@@ -116,13 +107,13 @@ class RequestLedgerRecordingServiceTest {
         // given - PaymentOrderFailed with FAILED_FINAL status
         val failedEvent = createPaymentOrderFailed()
 
-        val expectedEventId = java.util.UUID.fromString("22222222-2222-2222-2222-222222222222")
+        val expectedEventId = "22222222-2222-2222-2222-222222222222"
         val expectedTraceId = "trace-222"
         
-        // Mock LogContext to control traceId and parentEventId
-        mockkObject(LogContext)
-        every { LogContext.getEventId() } returns expectedEventId
-        every { LogContext.getTraceId() } returns expectedTraceId
+        // Mock EventLogContext to control traceId and parentEventId
+        mockkObject(EventLogContext)
+        every { EventLogContext.getEventId() } returns expectedEventId
+        every { EventLogContext.getTraceId() } returns expectedTraceId
         
         // Setup mocks to accept calls
         every { eventPublisherPort.publishSync<LedgerRecordingCommand>(any(), any(), any(), any(), any()) } returns mockk()
@@ -131,38 +122,43 @@ class RequestLedgerRecordingServiceTest {
         service.requestLedgerRecording(failedEvent)
 
         // then - verify publishSync called with exact parameters and FAILED_FINAL status
+        val now = Utc.nowInstant()
         verify(exactly = 1) {
-            eventPublisherPort.publishSync(
-                eventMetaData = EventMetadatas.LedgerRecordingCommandMetadata,
+            eventPublisherPort.publishSync<LedgerRecordingCommand>(
                 aggregateId = failedEvent.sellerId,
                 data = match { cmd ->
                     cmd is LedgerRecordingCommand &&
-                    cmd.status == "FAILED_FINAL" &&
+                    cmd.finalStatus == failedEvent.status &&
                     cmd.paymentOrderId == failedEvent.paymentOrderId &&
                     cmd.paymentId == failedEvent.paymentId &&
                     cmd.sellerId == failedEvent.sellerId &&
                     cmd.amountValue == failedEvent.amountValue &&
                     cmd.currency == failedEvent.currency &&
-                    cmd.createdAt == LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
+                    cmd.timestamp.isAfter(now.minusSeconds(5)) &&
+                    cmd.timestamp.isBefore(now.plusSeconds(5))
                 },
-                parentEventId = expectedEventId,
-                traceId = expectedTraceId
+                traceId = expectedTraceId,
+                parentEventId = expectedEventId
             )
         }
+        unmockkObject(EventLogContext)
     }
     @Test
     fun `should handle exception in publishSync and propagate it for PaymentOrderSucceeded`() {
-        // given - PaymentOrderSucceeded event
+        // given - PaymentOrderFinalized event
         val event = createPaymentOrderSucceeded()
         val capturedCommand = slot<LedgerRecordingCommand>()
         
+        mockkObject(EventLogContext)
+        every { EventLogContext.getEventId() } returns null
+        every { EventLogContext.getTraceId() } returns "test-trace"
+        
         every {
-            eventPublisherPort.publishSync(
-                eventMetaData = any(),
+            eventPublisherPort.publishSync<LedgerRecordingCommand>(
                 aggregateId = any(),
                 data = capture(capturedCommand),
-                parentEventId = any(),
-                traceId = any()
+                traceId = any(),
+                parentEventId = any()
             )
         } throws RuntimeException("Kafka publish error")
 
@@ -174,70 +170,11 @@ class RequestLedgerRecordingServiceTest {
         // then - verify publishSync was attempted with correct data before exception
         assertNotNull(capturedCommand.captured)
         assertEquals(event.paymentOrderId, capturedCommand.captured.paymentOrderId)
-        assertEquals("SUCCESSFUL_FINAL", capturedCommand.captured.status)
+        assertEquals(event.status, capturedCommand.captured.finalStatus)
+        unmockkObject(EventLogContext)
     }
 
-    @Test
-    fun `should skip publishing for PaymentOrderSucceeded type with invalid status`() {
-        // given - Event that looks like PaymentOrderSucceeded but has wrong status (PENDING_STATUS_CHECK_LATER)
-        val eventWithInvalidStatus = object : PaymentOrderEvent {
-            override val paymentOrderId = "po-invalid-success"
-            override val publicPaymentOrderId = "paymentorder-invalid-success"
-            override val paymentId = "p-invalid-success"
-            override val publicPaymentId = "payment-invalid-success"
-            override val sellerId = "seller-invalid"
-            override val amountValue = 15000L
-            override val currency = "USD"
-            override val status = "PENDING_STATUS_CHECK_LATER"  // Invalid status for succeeded event
-            override val createdAt = LocalDateTime.now(clock)
-            override val updatedAt = LocalDateTime.now(clock)
-            override val retryCount = 0
-        }
-        
-        // when - service processes the event
-        service.requestLedgerRecording(eventWithInvalidStatus)
-
-        // then - verify publishSync was NOT called because status is not final
-        verify(exactly = 0) {
-            eventPublisherPort.publishSync<LedgerRecordingCommand>(
-                eventMetaData = any(),
-                aggregateId = any(),
-                data = any(),
-                parentEventId = any(),
-                traceId = any()
-            )
-        }
-    }
-
-    @Test
-    fun `should skip publishing for PaymentOrderFailed type with invalid status`() {
-        // given - Event that looks like PaymentOrderFailed but has wrong status (FAILED_TRANSIENT_ERROR)
-        val eventWithInvalidStatus = object : PaymentOrderEvent {
-            override val paymentOrderId = "po-invalid-failed"
-            override val publicPaymentOrderId = "paymentorder-invalid-failed"
-            override val paymentId = "p-invalid-failed"
-            override val publicPaymentId = "payment-invalid-failed"
-            override val sellerId = "seller-invalid"
-            override val amountValue = 7000L
-            override val currency = "GBP"
-            override val status = "FAILED_TRANSIENT_ERROR"  // Invalid status (not FAILED_FINAL)
-            override val createdAt = LocalDateTime.now(clock)
-            override val updatedAt = LocalDateTime.now(clock)
-            override val retryCount = 0
-        }
-        
-        // when - service processes the event
-        service.requestLedgerRecording(eventWithInvalidStatus)
-
-        // then - verify publishSync was NOT called because status is not final
-        verify(exactly = 0) {
-            eventPublisherPort.publishSync<LedgerRecordingCommand>(
-                eventMetaData = any(),
-                aggregateId = any(),
-                data = any(),
-                parentEventId = any(),
-                traceId = any()
-            )
-        }
-    }
+    // Note: The requestLedgerRecording method only accepts PaymentOrderFinalized,
+    // so we cannot test with non-finalized events at compile time.
+    // The type system ensures only finalized events can trigger ledger recording.
 }
