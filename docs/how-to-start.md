@@ -164,7 +164,12 @@ infra/scripts/deploy-observability-stack.sh
 ```
 
 4) Send test payment request
-- Use the saved token to call the API. Prefer the dynamic example to avoid hardcoded IPs.
+
+You can test payment creation in two ways:
+
+### Option A: Using curl (Command Line)
+
+Use the saved token to call the API. Prefer the dynamic example to avoid hardcoded IPs.
 
 - Dynamic (reads host and base URL from infra/endpoints.json):
 ```bash
@@ -206,6 +211,78 @@ curl -i -X POST http://127.0.0.1/api/v1/payments \
     ]
   }'
 ```
+
+### Option B: Using Checkout Demo Page (Interactive UI)
+
+A developer-friendly web interface for testing payment creation without managing tokens manually.
+
+**Prerequisites:**
+- Node.js 18+ installed
+- Steps 1-9 completed (infrastructure, Keycloak provisioning)
+
+**Setup:**
+
+1. Install dependencies:
+```bash
+cd checkout-demo
+npm install
+```
+
+2. Generate environment configuration:
+```bash
+# Make sure you've run step 9 (provision-keycloak.sh) first
+npm run setup-env
+```
+
+This automatically:
+- Reads client secret from `keycloak/output/secrets.txt`
+- Reads API endpoints from `infra/endpoints.json`
+- Creates `.env` file with all configuration
+
+3. Start the demo:
+```bash
+npm run dev
+```
+
+This starts both:
+- Frontend server at `http://localhost:3000` (Vite)
+- Backend proxy server at `http://localhost:3001` (simulates order-service/checkout-service)
+
+The app will automatically open at `http://localhost:3000`
+
+**Usage:**
+
+1. Fill the payment form:
+   - Order ID (e.g., `ORDER-TEST-001`)
+   - Buyer ID (e.g., `BUYER-123`)
+   - Total amount (in smallest currency unit, e.g., cents)
+   - Select currency
+   - Add one or more payment orders with seller IDs and amounts
+
+2. Click "Send Payment Request"
+
+3. View the response and equivalent curl command
+
+The backend proxy automatically handles token acquisition and payment-service calls - no manual token management needed!
+
+**Architecture:**
+
+The checkout demo uses a production-like flow:
+- **Frontend** (React) → calls **Backend Proxy** (Node.js/Express)
+- **Backend Proxy** → gets token from Keycloak (server-to-server)
+- **Backend Proxy** → calls payment-service with token (server-to-server)
+- **Frontend** ← receives payment response
+
+> 💡 **Note**: The backend proxy simulates a production backend (order-service/checkout-service) and needs CORS enabled because the browser calls it directly (browser → proxy is cross-origin).
+
+**Troubleshooting:**
+
+- **"Client secret not found"**: Run `npm run setup-env` after provisioning Keycloak
+- **"Cannot reach Keycloak"**: Ensure Keycloak port-forwarding is active: `kubectl port-forward -n payment svc/keycloak 8080:8080`
+- **Payment request errors**: Check proxy console for detailed error messages (it logs token and payment-service call errors)
+- **Network errors**: Verify payment service is running and `infra/endpoints.json` is correct
+
+For more details, see `checkout-demo/README.md`.
 
 ## 5️⃣ Query Balance Endpoints
 
