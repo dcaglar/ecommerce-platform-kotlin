@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.IdempotencyKeyMapper">
+
+    <resultMap id="IdempotencyResultMap"
+               type="com.dogancaglar.paymentservice.ports.outbound.IdempotencyRecord">
+        <id     property="idempotencyKey" column="idempotency_key"/>
+        <result property="requestHash"    column="request_hash"/>
+        <result property="paymentId"      column="payment_id"/>
+        <result property="responsePayload" column="response_payload"/>
+        <result property="status"         column="status"
+                typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.IdempotencyStatusTypeHandler"/>
+        <result property="createdAt"      column="created_at"
+                typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.InstantTypeHandler"/>
+    </resultMap>
+
+    <insert id="insertPending"
+            parameterType="com.dogancaglar.paymentservice.ports.outbound.IdempotencyRecord">
+        INSERT INTO idempotency_keys (
+        idempotency_key, request_hash, status
+        ) VALUES (
+        #{idempotencyKey},
+        #{requestHash},
+        'PENDING'
+        )
+        ON CONFLICT (idempotency_key) DO NOTHING
+    </insert>
+
+    <select id="findByKey"
+            parameterType="string"
+            resultMap="IdempotencyResultMap">
+        SELECT idempotency_key,
+        request_hash,
+        payment_id,
+        response_payload,
+        status,
+        created_at
+        FROM idempotency_keys
+        WHERE idempotency_key = #{id}
+    </select>
+
+    <update id="updatePaymentId" parameterType="map">
+        UPDATE idempotency_keys
+        SET payment_id = #{paymentId}
+        WHERE idempotency_key = #{key}
+    </update>
+
+    <update id="updateResponsePayload" parameterType="map">
+        UPDATE idempotency_keys
+        SET response_payload = CAST(#{payload} AS jsonb),
+        status = 'COMPLETED'
+        WHERE idempotency_key = #{key}
+    </update>
+
+</mapper>

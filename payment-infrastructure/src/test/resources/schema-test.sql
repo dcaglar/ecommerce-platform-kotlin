@@ -145,3 +145,21 @@ CREATE TABLE account_directory (
 );
 
 CREATE INDEX IF NOT EXISTS idx_account_directory_entity ON account_directory (entity_id);
+
+-- ========== IDEMPOTENCY KEYS TABLE ==========
+DROP TABLE IF EXISTS idempotency_keys;
+
+CREATE TABLE idempotency_keys (
+    idempotency_key VARCHAR(255) PRIMARY KEY,
+    payment_id BIGINT NULL,
+    request_hash VARCHAR(128) NULL,
+    response_payload JSONB NULL,
+    status VARCHAR(20) NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
+    CONSTRAINT fk_idempotency_keys_payment FOREIGN KEY (payment_id) REFERENCES payments(payment_id),
+    CONSTRAINT chk_idem_req_status CHECK (status IN ('PENDING', 'COMPLETED'))
+);
+
+-- Indexes for idempotency_keys table
+CREATE INDEX IF NOT EXISTS idx_idempotency_request_hash ON idempotency_keys (request_hash);
+CREATE INDEX IF NOT EXISTS idx_idempotency_payment_id ON idempotency_keys (payment_id);
