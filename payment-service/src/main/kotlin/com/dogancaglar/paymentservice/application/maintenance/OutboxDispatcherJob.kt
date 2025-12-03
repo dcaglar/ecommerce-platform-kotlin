@@ -277,7 +277,7 @@ class OutboxDispatcherJob(
     }
 
     fun dispatchBatchWorker() {
-        val start = System.currentTimeMillis()
+        val start = Utc.nowInstant()
         val threadName = Thread.currentThread().name
         val workerId = "$appInstanceId:$threadName"
 
@@ -307,7 +307,7 @@ class OutboxDispatcherJob(
                 .increment(failed.size.toDouble())
         }
 
-        val durationMs = System.currentTimeMillis() - start
+        val durationMs = java.time.Duration.between(start, Utc.nowInstant()).toMillis()
         meterRegistry.timer(OUTBOX_DISPATCHER_DURATION, "thread", threadName)
             .record(durationMs, java.util.concurrent.TimeUnit.MILLISECONDS)
         if(succeeded.isNotEmpty() || failed.isNotEmpty()) {

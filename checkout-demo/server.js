@@ -16,6 +16,7 @@ import { fileURLToPath } from 'url';
 import http from 'http';
 import https from 'https';
 import { URL } from 'url';
+import { randomUUID } from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -318,12 +319,18 @@ app.post('/api/checkout/process-payment', async (req, res) => {
       });
     }
 
-    // Step 2: Call payment-service with token (server-to-server)
+    // Step 2: Generate idempotency key for this request
+    // In production, this would be provided by the client, but for demo we generate it
+    const idempotencyKey = randomUUID();
+    console.log(`   [${requestId}] 🔑 Generated idempotency key: ${idempotencyKey}`);
+
+    // Step 3: Call payment-service with token (server-to-server)
     // Access via ingress: base URL + Host header (matches how-to-start.md)
-    console.log(`   [${requestId}] 💳 Step 2: Calling payment-service...`);
+    console.log(`   [${requestId}] 💳 Step 3: Calling payment-service...`);
     const paymentUrl = `${PAYMENT_API_BASE_URL}/api/v1/payments`;
     console.log(`   [${requestId}]    URL: ${paymentUrl}`);
     console.log(`   [${requestId}]    Host header: ${PAYMENT_API_HOST_HEADER}`);
+    console.log(`   [${requestId}]    Idempotency-Key: ${idempotencyKey}`);
     console.log(`   [${requestId}]    Request payload:`, JSON.stringify(paymentData, null, 2));
     
     const paymentStartTime = Date.now();
@@ -334,6 +341,7 @@ app.post('/api/checkout/process-payment', async (req, res) => {
       console.log(`   [${requestId}]      Method: POST`);
       console.log(`   [${requestId}]      URL: ${paymentUrl}`);
       console.log(`   [${requestId}]      Host header: ${PAYMENT_API_HOST_HEADER}`);
+      console.log(`   [${requestId}]      Idempotency-Key: ${idempotencyKey}`);
       console.log(`   [${requestId}]      Token length: ${token.length} chars`);
       
       // Use custom httpRequestWithHost to properly set Host header for ingress routing
@@ -343,6 +351,7 @@ app.post('/api/checkout/process-payment', async (req, res) => {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
+          'Idempotency-Key': idempotencyKey,
         },
         hostHeader: PAYMENT_API_HOST_HEADER, // Custom Host header for ingress routing
         body: JSON.stringify(paymentData),
@@ -407,7 +416,7 @@ app.post('/api/checkout/process-payment', async (req, res) => {
     console.log(`   [${requestId}] ✅ Payment created successfully`);
     console.log(`   [${requestId}]    Response:`, JSON.stringify(paymentResponseData, null, 2));
 
-    // Step 3: Return payment response to frontend (with metadata for curl generation)
+    // Step 4: Return payment response to frontend (with metadata for curl generation)
     console.log(`   [${requestId}] 📤 Returning response to frontend`);
     const response = {
       success: true,
@@ -415,6 +424,7 @@ app.post('/api/checkout/process-payment', async (req, res) => {
       // Include metadata for curl command generation
       _meta: {
         token: token,
+        idempotencyKey: idempotencyKey,
         usedApiUrl: paymentUrl,
         usedHostHeader: PAYMENT_API_HOST_HEADER
       }

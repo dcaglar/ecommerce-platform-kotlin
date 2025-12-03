@@ -9,13 +9,16 @@ import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api/v1")
 class PaymentController(
-    private val paymentService: PaymentService
+    private val paymentService: PaymentService,
+    private val idempotencyService: IdempotencyService
+
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -29,14 +32,29 @@ class PaymentController(
      */
     @PostMapping("/payments")
     @PreAuthorize("hasAuthority('payment:write')")
-    fun createPayment(@Valid @RequestBody request: PaymentRequestDTO): ResponseEntity<PaymentResponseDTO> {
-        logger.debug("📥 Sending payment request for order: ${request.orderId}")
-        val responseDTO = paymentService.createPayment(request)
-        logger.debug("📥 Received payment request for order: ${responseDTO.orderId}, payment id is ${responseDTO.paymentId}")
+    fun createPayment(
+        @RequestHeader("Idempotency-Key") idempotencyKey: String?,
+        @Valid @RequestBody request: PaymentRequestDTO): ResponseEntity<PaymentResponseDTO> {
+        logger.info("📥 Sending payment request for order: ${request.orderId} with idempodencykey: $idempotencyKey")
+        require(!idempotencyKey.isNullOrBlank()) {
+            "Idempotency-Key header is required"
+        }
+
+        val result = idempotencyService.run(idempotencyKey, request) {
+            paymentService.createPayment(request)
+        }
+
+        val status = when (result.status) {
+            IdempotencyExecutionStatus.CREATED -> HttpStatus.CREATED   // 201 first time
+            IdempotencyExecutionStatus.REPLAYED -> HttpStatus.OK       // 200 on retry
+        }
+        val responseDTO = result.response as PaymentResponseDTO
+
+        logger.info("📥 Received payment request for order: ${responseDTO.orderId}, payment id is ${responseDTO.paymentId}")
         
         // Return 201 Created with Location header (best practice for resource creation)
         return ResponseEntity
-            .status(HttpStatus.CREATED)
+            .status(status)
             .header("Location", "/api/v1/payments/${responseDTO.paymentId}")
             .body(responseDTO)
     }

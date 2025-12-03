@@ -93,7 +93,7 @@ class PaymentOrderMapperIntegrationTest {
 
     private fun upsertPayment(paymentId: Long) {
         val now = Utc.nowInstant()
-        paymentMapper.insertIgnore(
+        paymentMapper.insert(
             PaymentEntity(
                 paymentId = paymentId,
                 buyerId = "buyer-$paymentId",
@@ -102,8 +102,6 @@ class PaymentOrderMapperIntegrationTest {
                 capturedAmountValue = 0,
                 currency = "USD",
                 status = "PENDING_AUTH",
-
-                idempotencyKey = "12345",
                 createdAt = now,
                 updatedAt = now
             )

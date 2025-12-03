@@ -15,7 +15,6 @@ class Payment private constructor(
     val totalAmount: Amount,
     val capturedAmount: Amount,
     val status: PaymentStatus,
-    val idempotencyKey: String,            // <-- internal business idempotency
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime,
     val paymentOrders: List<PaymentOrder>
@@ -71,7 +70,6 @@ class Payment private constructor(
         totalAmount = totalAmount,
         capturedAmount = capturedAmount,
         status = status,
-        idempotencyKey = idempotencyKey,
         createdAt = createdAt,
         updatedAt = updatedAt,
         paymentOrders = paymentOrders
@@ -85,7 +83,6 @@ class Payment private constructor(
             totalAmount: Amount
         ): Payment {
             require(totalAmount.isPositive()) { "Total amount must be positive" }
-            val idempotencyKeyGenerated = "${buyerId.value}:${orderId.value}:${totalAmount.quantity}:${totalAmount.currency.currencyCode}"
             val now = Utc.nowLocalDateTime()
             return Payment(
                 paymentId = paymentId,
@@ -94,7 +91,6 @@ class Payment private constructor(
                 totalAmount = totalAmount,
                 capturedAmount = Amount.zero(totalAmount.currency),
                 status = PaymentStatus.PENDING_AUTH,
-                idempotencyKey = idempotencyKeyGenerated,
                 createdAt = now,
                 updatedAt = now,
                 paymentOrders = emptyList()
@@ -109,7 +105,6 @@ class Payment private constructor(
             totalAmount: Amount,
             capturedAmount: Amount,
             status: PaymentStatus,
-            idempotencyKey: String,
             createdAt: LocalDateTime,
             updatedAt: LocalDateTime
         ): Payment = Payment(
@@ -119,7 +114,6 @@ class Payment private constructor(
             totalAmount,
             capturedAmount,
             status,
-            idempotencyKey,
             createdAt,
             updatedAt,
             emptyList()

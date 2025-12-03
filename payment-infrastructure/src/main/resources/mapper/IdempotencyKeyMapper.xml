@@ -17,17 +17,19 @@
                 typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.InstantTypeHandler"/>
     </resultMap>
 
-    <insert id="insertPending"
+    <select id="insertPending"
             parameterType="com.dogancaglar.paymentservice.ports.outbound.IdempotencyRecord">
         INSERT INTO idempotency_keys (
-        idempotency_key, request_hash, status
+        idempotency_key, request_hash, status,created_at
         ) VALUES (
         #{idempotencyKey},
         #{requestHash},
-        'PENDING'
+        'PENDING',
+        #{createdAt}
         )
         ON CONFLICT (idempotency_key) DO NOTHING
-    </insert>
+        RETURNING idempotency_key
+    </select>
 
     <select id="findByKey"
             parameterType="string"
@@ -39,7 +41,7 @@
         status,
         created_at
         FROM idempotency_keys
-        WHERE idempotency_key = #{id}
+        WHERE idempotency_key = #{key}
     </select>
 
     <update id="updatePaymentId" parameterType="map">
@@ -54,5 +56,12 @@
         status = 'COMPLETED'
         WHERE idempotency_key = #{key}
     </update>
+
+    <delete id="deletePending" parameterType="string">
+        DELETE FROM idempotency_keys
+        WHERE idempotency_key = #{key}
+        AND status = 'PENDING'
+        AND response_payload IS NULL
+    </delete>
 
 </mapper>

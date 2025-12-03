@@ -9,17 +9,19 @@ import org.apache.ibatis.annotations.Param
 interface IdempotencyKeyMapper {
 
     /** Returns number of inserted rows (1 for first request, 0 for duplicate) */
-    fun insertPending(record: IdempotencyRecord): Int
+    fun insertPending(record: IdempotencyRecord): String?
 
-    fun findByKey(@Param("id") key: String): IdempotencyRecord?
+    fun findByKey(key: String): IdempotencyRecord?
 
     fun updatePaymentId(
-        @Param("key") key: String,
-        @Param("paymentId") paymentId: Long
+        key: String,
+        paymentId: Long
     ): Int
 
     fun updateResponsePayload(
-        @Param("key") key: String,
-        @Param("payload") payload: String
+        key: String,
+        payload: String
     ): Int
+
+    fun deletePending(key: String): Int
 }

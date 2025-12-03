@@ -4,4 +4,5 @@ interface IdempotencyStorePort {
     fun findByKey(key: String): IdempotencyRecord?
     fun updatePaymentId(key: String, paymentId: Long)
     fun updateResponsePayload(key: String, payload: String)
+    fun deletePending(key: String)
 }

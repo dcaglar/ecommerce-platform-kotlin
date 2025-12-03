@@ -22,8 +22,10 @@
         SELECT COALESCE(MAX(payment_id), 0) FROM payments
     </select>
 
-    <insert id="insertIgnore"
-            parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentEntity">
+
+    <insert id="insert"
+            parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentEntity"
+            >
         INSERT INTO payments (
         payment_id,
         buyer_id,
@@ -32,7 +34,6 @@
         captured_amount_value,
         currency,
         status,
-        idempotency_key,
         created_at,
         updated_at
         ) VALUES (
@@ -43,28 +44,10 @@
         #{capturedAmountValue},
         #{currency},
         #{status},
-        #{idempotencyKey},
         #{createdAt},
         #{updatedAt}
         )
-        ON CONFLICT (idempotency_key) DO NOTHING;
     </insert>
-
-    <select id="findByIdempotencyKey" parameterType="string"
-            resultMap="PaymentResultMap">
-        SELECT payment_id,
-               buyer_id,
-               order_id,
-               total_amount_value,
-               currency,
-               captured_amount_value,
-               idempotency_key,
-               status,
-               created_at,
-               updated_at
-        FROM payments
-        WHERE idempotency_key = #{idempotencyKey}
-    </select>
 
     <select id="findById" resultMap="PaymentResultMap">
         SELECT payment_id,
@@ -73,7 +56,6 @@
                total_amount_value,
                currency,
                captured_amount_value,
-               idempotency_key,
                status,
                created_at,
                updated_at

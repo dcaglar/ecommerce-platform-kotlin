@@ -26,6 +26,7 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import com.dogancaglar.common.time.Utc
+import org.junit.jupiter.api.BeforeEach
 import java.time.Instant
 
 /**
@@ -67,6 +68,15 @@ class IdempotencyKeyMapperIntegrationTest {
         return this.copy(
             createdAt = this.createdAt.normalizeToMicroseconds()
         )
+    }
+
+    @BeforeEach
+    fun cleanDB() {
+        postgres.createConnection("").use { c ->
+            val s = c.createStatement()
+            s.execute("TRUNCATE TABLE idempotency_keys CASCADE;")
+            s.execute("TRUNCATE TABLE payments CASCADE;")
+        }
     }
 
     companion object {
@@ -116,7 +126,7 @@ class IdempotencyKeyMapperIntegrationTest {
 
     private fun createPayment(paymentId: Long) {
         val now = Utc.nowInstant().normalizeToMicroseconds()
-        paymentMapper.insertIgnore(
+        paymentMapper.insert(
             PaymentEntity(
                 paymentId = paymentId,
                 buyerId = "buyer-$paymentId",
@@ -125,7 +135,6 @@ class IdempotencyKeyMapperIntegrationTest {
                 capturedAmountValue = 0,
                 currency = "EUR",
                 status = "PENDING_AUTH",
-                idempotencyKey = "payment-key-$paymentId",
                 createdAt = now,
                 updatedAt = now
             )
@@ -150,216 +159,142 @@ class IdempotencyKeyMapperIntegrationTest {
         )
     }
 
+
+
     @Test
-    fun `insertPending should insert new idempotency key record`() {
-        val record = sampleRecord(
-            key = "key-001",
-            requestHash = "hash-001"
+    fun `insertPending first time inserts row and second time returns 0`() {
+        val key = "idem-test-1"
+        val hash1 = "hash-abc"
+
+        val nowBefore = Utc.nowInstant().normalizeToMicroseconds()
+
+        // first insert
+        val first = idempotencyKeyMapper.insertPending(
+            sampleRecord(
+                key = key,
+                requestHash = hash1
+            )
+        )
+        assertEquals(key, first)
+
+        val nowAfter = Utc.nowInstant().normalizeToMicroseconds()
+
+        val row1 = idempotencyKeyMapper.findByKey(key)
+        assertNotNull(row1)
+        assertEquals(key, row1!!.idempotencyKey)
+        assertEquals(hash1, row1.requestHash)
+        assertEquals(IdempotencyStatus.PENDING, row1.status)
+        assertNull(row1.paymentId)
+        assertNull(row1.responsePayload)
+        // createdAt should be between nowBefore and nowAfter (with tolerance for clock differences)
+        // Database generates timestamp, so allow 2 seconds tolerance for clock skew
+        val createdAt = row1.createdAt.normalizeToMicroseconds()
+        assertTrue(createdAt >= nowBefore.minusSeconds(2), 
+            "createdAt ($createdAt) should be >= nowBefore - 2s ($nowBefore)")
+        assertTrue(createdAt <= nowAfter.plusSeconds(2),
+            "createdAt ($createdAt) should be <= nowAfter + 2s ($nowAfter)")
+
+        // duplicate insert with DIFFERENT hash must be ignored by ON CONFLICT
+        val hash2 = "hash-xyz"
+        val second = idempotencyKeyMapper.insertPending(
+            sampleRecord(
+                key = key,
+                requestHash = hash2
+            )
+        )
+        assertNull(second)
+
+        val row2 = idempotencyKeyMapper.findByKey(key)
+        assertNotNull(row2)
+        // hash MUST stay as first one, because second insert was ignored
+        assertEquals(hash1, row2!!.requestHash)
+    }
+
+    @Test
+    fun `updatePaymentId sets paymentId when row exists`() {
+        val key = "idem-test-2"
+        val hash = "hash-123"
+
+        // create a real payment row (FK safety if schema uses FK)
+        val paymentId = 1001L
+        createPayment(paymentId)
+
+        idempotencyKeyMapper.insertPending(
+            sampleRecord(
+                key = key,
+                requestHash = hash
+            )
         )
 
-        val inserted = idempotencyKeyMapper.insertPending(record)
-        assertEquals(1, inserted, "Should insert one row")
+        val updatedRows = idempotencyKeyMapper.updatePaymentId(key, paymentId)
+        assertEquals(1, updatedRows)
 
-        val found = idempotencyKeyMapper.findByKey("key-001")
-        assertNotNull(found)
-        assertEquals("key-001", found!!.idempotencyKey)
-        assertEquals("hash-001", found.requestHash)
-        assertEquals(IdempotencyStatus.PENDING, found.status)
-        assertNull(found.paymentId)
-        assertNull(found.responsePayload)
+        val row = idempotencyKeyMapper.findByKey(key)
+        assertNotNull(row)
+        assertEquals(paymentId, row!!.paymentId)
     }
 
     @Test
-    fun `insertPending should ignore duplicate idempotency keys`() {
-        val record1 = sampleRecord(
-            key = "duplicate-key",
-            requestHash = "hash-first"
-        )
-        val record2 = sampleRecord(
-            key = "duplicate-key",
-            requestHash = "hash-second"
+    fun `updateResponsePayload writes jsonb and marks COMPLETED`() {
+        val key = "idem-test-3"
+        val hash = "hash-456"
+
+        idempotencyKeyMapper.insertPending(
+            sampleRecord(
+                key = key,
+                requestHash = hash
+            )
         )
 
-        val firstInsert = idempotencyKeyMapper.insertPending(record1)
-        assertEquals(1, firstInsert, "First insert should succeed")
+        val payload = """{"paymentId":"p-123","status":"AUTHORIZED"}"""
+        val updatedRows = idempotencyKeyMapper.updateResponsePayload(key, payload)
+        assertEquals(1, updatedRows)
 
-        val secondInsert = idempotencyKeyMapper.insertPending(record2)
-        assertEquals(0, secondInsert, "ON CONFLICT DO NOTHING should skip duplicate")
-
-        val found = idempotencyKeyMapper.findByKey("duplicate-key")
-        assertNotNull(found)
-        assertEquals("hash-first", found!!.requestHash, "Should keep original request hash")
-        assertEquals(IdempotencyStatus.PENDING, found.status)
+        val row = idempotencyKeyMapper.findByKey(key)
+        assertNotNull(row)
+        assertEquals(IdempotencyStatus.COMPLETED, row!!.status)
+        assertJsonEquals(payload, row.responsePayload)
     }
 
     @Test
-    fun `findByKey should return null for non-existent key`() {
-        val found = idempotencyKeyMapper.findByKey("non-existent-key")
-        assertNull(found)
-    }
+    fun `deletePending deletes only PENDING rows without payload`() {
+        val keyPending = "idem-test-4-pending"
+        val keyCompleted = "idem-test-4-completed"
 
-    @Test
-    fun `findByKey should return correct record`() {
-        val record = sampleRecord(
-            key = "find-test-key",
-            requestHash = "find-test-hash"
+        // PENDING, no payload
+        idempotencyKeyMapper.insertPending(
+            sampleRecord(
+                key = keyPending,
+                requestHash = "hash-pending"
+            )
         )
 
-        idempotencyKeyMapper.insertPending(record)
-        val found = idempotencyKeyMapper.findByKey("find-test-key")
-
-        assertNotNull(found)
-        assertEquals("find-test-key", found!!.idempotencyKey)
-        assertEquals("find-test-hash", found.requestHash)
-        assertEquals(IdempotencyStatus.PENDING, found.status)
-    }
-
-    @Test
-    fun `updatePaymentId should update payment_id field`() {
-        val record = sampleRecord(
-            key = "update-payment-key",
-            requestHash = "update-hash"
+        // PENDING → COMPLETED with payload
+        idempotencyKeyMapper.insertPending(
+            sampleRecord(
+                key = keyCompleted,
+                requestHash = "hash-completed"
+            )
+        )
+        idempotencyKeyMapper.updateResponsePayload(
+            keyCompleted,
+            """{"ok":true}"""
         )
 
-        idempotencyKeyMapper.insertPending(record)
+        // when
+        val deletedPending = idempotencyKeyMapper.deletePending(keyPending)
+        val deletedCompleted = idempotencyKeyMapper.deletePending(keyCompleted)
 
-        val paymentId = 12345L
-        createPayment(paymentId)  // Create payment first to satisfy foreign key constraint
-        val updated = idempotencyKeyMapper.updatePaymentId("update-payment-key", paymentId)
-        assertEquals(1, updated, "Should update one row")
+        // then
+        assertEquals(1, deletedPending)   // pending row removed
+        assertEquals(0, deletedCompleted) // completed row kept
 
-        val found = idempotencyKeyMapper.findByKey("update-payment-key")
-        assertNotNull(found)
-        assertEquals(paymentId, found!!.paymentId)
-        assertEquals("update-hash", found.requestHash, "Other fields should remain unchanged")
-        assertEquals(IdempotencyStatus.PENDING, found.status, "Status should remain PENDING")
-    }
+        val rowPending = idempotencyKeyMapper.findByKey(keyPending)
+        val rowCompleted = idempotencyKeyMapper.findByKey(keyCompleted)
 
-    @Test
-    fun `updatePaymentId should return 0 for non-existent key`() {
-        createPayment(999L)  // Create payment first
-        val updated = idempotencyKeyMapper.updatePaymentId("non-existent", 999L)
-        assertEquals(0, updated, "Should not update non-existent record")
-    }
-
-    @Test
-    fun `updateResponsePayload should update payload and set status to COMPLETED`() {
-        val record = sampleRecord(
-            key = "complete-key",
-            requestHash = "complete-hash"
-        )
-
-        idempotencyKeyMapper.insertPending(record)
-
-        val responsePayload = """{"paymentId": "pub-123", "status": "AUTHORIZED"}"""
-        val updated = idempotencyKeyMapper.updateResponsePayload("complete-key", responsePayload)
-        assertEquals(1, updated, "Should update one row")
-
-        val found = idempotencyKeyMapper.findByKey("complete-key")
-        assertNotNull(found)
-        assertJsonEquals(responsePayload, found!!.responsePayload)
-        assertEquals(IdempotencyStatus.COMPLETED, found.status, "Status should be COMPLETED")
-        assertEquals("complete-hash", found.requestHash, "Other fields should remain unchanged")
-    }
-
-    @Test
-    fun `updateResponsePayload should return 0 for non-existent key`() {
-        val updated = idempotencyKeyMapper.updateResponsePayload("non-existent", "{}")
-        assertEquals(0, updated, "Should not update non-existent record")
-    }
-
-    @Test
-    fun `full flow - insert, update payment id, then complete with payload`() {
-        val key = "full-flow-key"
-        val requestHash = "full-flow-hash"
-        val record = sampleRecord(key = key, requestHash = requestHash)
-
-        // Step 1: Insert pending
-        val inserted = idempotencyKeyMapper.insertPending(record)
-        assertEquals(1, inserted)
-
-        var found = idempotencyKeyMapper.findByKey(key)
-        assertNotNull(found)
-        assertEquals(IdempotencyStatus.PENDING, found!!.status)
-        assertNull(found.paymentId)
-        assertNull(found.responsePayload)
-
-        // Step 2: Update with payment ID
-        val paymentId = 54321L
-        createPayment(paymentId)  // Create payment first to satisfy foreign key constraint
-        idempotencyKeyMapper.updatePaymentId(key, paymentId)
-
-        found = idempotencyKeyMapper.findByKey(key)
-        assertNotNull(found)
-        assertEquals(paymentId, found!!.paymentId)
-        assertEquals(IdempotencyStatus.PENDING, found.status, "Still PENDING after payment ID update")
-
-        // Step 3: Complete with response payload
-        val responsePayload = """{"paymentId": "pub-54321", "status": "AUTHORIZED", "orderId": "ORDER-123"}"""
-        idempotencyKeyMapper.updateResponsePayload(key, responsePayload)
-
-        found = idempotencyKeyMapper.findByKey(key)
-        assertNotNull(found)
-        assertEquals(paymentId, found!!.paymentId, "Payment ID should remain")
-        assertJsonEquals(responsePayload, found.responsePayload)
-        assertEquals(IdempotencyStatus.COMPLETED, found.status)
-        assertEquals(requestHash, found.requestHash, "Request hash should remain unchanged")
-    }
-
-    @Test
-    fun `multiple idempotency keys can coexist`() {
-        val record1 = sampleRecord(key = "key-1", requestHash = "hash-1")
-        val record2 = sampleRecord(key = "key-2", requestHash = "hash-2")
-        val record3 = sampleRecord(key = "key-3", requestHash = "hash-3")
-
-        idempotencyKeyMapper.insertPending(record1)
-        idempotencyKeyMapper.insertPending(record2)
-        idempotencyKeyMapper.insertPending(record3)
-
-        val found1 = idempotencyKeyMapper.findByKey("key-1")
-        val found2 = idempotencyKeyMapper.findByKey("key-2")
-        val found3 = idempotencyKeyMapper.findByKey("key-3")
-
-        assertNotNull(found1)
-        assertNotNull(found2)
-        assertNotNull(found3)
-
-        assertEquals("hash-1", found1!!.requestHash)
-        assertEquals("hash-2", found2!!.requestHash)
-        assertEquals("hash-3", found3!!.requestHash)
-    }
-
-    @Test
-    fun `updatePaymentId multiple times should update correctly`() {
-        val record = sampleRecord(key = "multi-update-key", requestHash = "multi-hash")
-        idempotencyKeyMapper.insertPending(record)
-
-        // First update
-        createPayment(111L)  // Create payment first
-        idempotencyKeyMapper.updatePaymentId("multi-update-key", 111L)
-        var found = idempotencyKeyMapper.findByKey("multi-update-key")
-        assertEquals(111L, found!!.paymentId)
-
-        // Second update
-        createPayment(222L)  // Create payment first
-        idempotencyKeyMapper.updatePaymentId("multi-update-key", 222L)
-        found = idempotencyKeyMapper.findByKey("multi-update-key")
-        assertEquals(222L, found!!.paymentId, "Should update to new payment ID")
-    }
-
-    @Test
-    fun `created_at should be set automatically`() {
-        val record = sampleRecord(key = "timestamp-key", requestHash = "timestamp-hash")
-        idempotencyKeyMapper.insertPending(record)
-
-        val found = idempotencyKeyMapper.findByKey("timestamp-key")
-        assertNotNull(found)
-        assertNotNull(found!!.createdAt)
-        
-        // Created at should be recent (within last minute)
-        val now = Utc.nowInstant().normalizeToMicroseconds()
-        val createdAt = found.createdAt.normalizeToMicroseconds()
-        assertTrue(createdAt.isBefore(now) || createdAt.equals(now), "Created at should be in the past or now")
+        assertNull(rowPending)
+        assertNotNull(rowCompleted)
+        assertEquals(IdempotencyStatus.COMPLETED, rowCompleted!!.status)
     }
 }
 

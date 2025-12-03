@@ -175,14 +175,17 @@ Use the saved token to call the API. Prefer the dynamic example to avoid hardcod
 ```bash
 BASE_URL=$(jq -r .base_url infra/endpoints.json)
 HOST=$(jq -r .host_header infra/endpoints.json)
+IDEMPOTENCY_KEY="idem-$(date +%s)-$RANDOM"
 
 echo "Using BASE_URL=$BASE_URL"
 echo "Using Host header=$HOST"
+echo "Using Idempotency-Key=$IDEMPOTENCY_KEY"
 
 curl -i -X POST "$BASE_URL/api/v1/payments" \
   -H "Host: $HOST" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
+  -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -d '{
     "orderId": "ORDER-1755",
     "buyerId": "BUYER-1755",
@@ -194,12 +197,17 @@ curl -i -X POST "$BASE_URL/api/v1/payments" \
   }'
 ```
 
+> **Note on Idempotency-Key**: The header is required for all payment creation requests. Use the same key for retries of the same payment request to ensure idempotent behavior. Generate a unique UUID for each new payment request.
+
 - Static example (replace host/IP if different):
 ```bash
+IDEMPOTENCY_KEY="idem-$(date +%s)-$RANDOM"
+
 curl -i -X POST http://127.0.0.1/api/v1/payments \
   -H "Host: payment.192.168.49.2.nip.io" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
+  -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -d '{
     "orderId": "ORDER-20240508-XYZ",
     "buyerId": "BUYER-123",

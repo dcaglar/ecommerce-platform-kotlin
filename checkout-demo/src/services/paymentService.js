@@ -79,7 +79,8 @@ export function generateCurlCommand(paymentData, metadata = null) {
   if (metadata && metadata.token) {
     const url = metadata.usedApiUrl || import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1';
     const host = metadata.usedHostHeader || import.meta.env.VITE_API_HOST_HEADER || 'payment.192.168.49.2.nip.io';
-    return `curl -i -X POST "${url}/api/v1/payments" \\\n  -H "Host: ${host}" \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer ${metadata.token}" \\\n  -d '${escapedJson}'`;
+    const idempotencyKey = metadata.idempotencyKey || 'YOUR-IDEMPOTENCY-KEY';
+    return `curl -i -X POST "${url}/api/v1/payments" \\\n  -H "Host: ${host}" \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer ${metadata.token}" \\\n  -H "Idempotency-Key: ${idempotencyKey}" \\\n  -d '${escapedJson}'`;
   }
   
   // Otherwise, show proxy endpoint curl (simpler, production-like)

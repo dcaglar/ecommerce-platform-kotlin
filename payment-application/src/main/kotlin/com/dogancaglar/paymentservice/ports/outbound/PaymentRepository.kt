@@ -5,8 +5,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 
 
 interface PaymentRepository {
-    fun saveIdempotent(payment: Payment): Payment
-     fun findByIdempotencyKey(key: String): Payment?
+    fun save(payment: Payment): Payment
      fun getMaxPaymentId(): PaymentId
     fun updatePayment(payment: Payment)
 

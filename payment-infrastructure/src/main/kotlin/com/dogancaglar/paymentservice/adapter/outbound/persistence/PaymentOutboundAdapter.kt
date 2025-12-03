@@ -14,15 +14,9 @@ class PaymentOutboundAdapter(
 
 
 
-    override fun saveIdempotent(payment: Payment): Payment {
-        paymentMapper.insertIgnore(PaymentEntityMapper.toEntity(payment))
-        // ✅ Always read back the persisted version (new or existing)
-        return paymentMapper.findByIdempotencyKey(payment.idempotencyKey)!!
-            .let { PaymentEntityMapper.toDomain(it) }
-    }
-
-    override fun findByIdempotencyKey(key: String): Payment? {
-        return paymentMapper.findByIdempotencyKey(key)?.let { PaymentEntityMapper.toDomain(it) }
+    override fun save(payment: Payment): Payment {
+        paymentMapper.insert(PaymentEntityMapper.toEntity(payment))
+        return payment
     }
 
 

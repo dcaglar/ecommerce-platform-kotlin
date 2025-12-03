@@ -41,7 +41,7 @@ open class ProcessPaymentService(
     }
 
     override fun processPspResult(event: PaymentOrderPspResultUpdated, order: PaymentOrder) {
-        val start = System.currentTimeMillis()
+        val start = Utc.nowInstant()
         val pspStatus = PaymentOrderStatus.valueOf(event.pspStatus)
         when {
             PSPCaptureStatusMapper.requiresRetry(pspStatus) -> handleRetry(order)
@@ -50,7 +50,8 @@ open class ProcessPaymentService(
             else -> logger.warn("⚠️ Unhandled PSP status={} for {}", pspStatus, order.paymentOrderId)
         }
 
-        logger.info("⏱ processPspResult total={}ms poId={}", System.currentTimeMillis() - start, order.paymentOrderId)
+        val duration = java.time.Duration.between(start, Utc.nowInstant()).toMillis()
+        logger.info("⏱ processPspResult total={}ms poId={}", duration, order.paymentOrderId)
     }
 
     private fun handleRetry(order: PaymentOrder) {
@@ -68,7 +69,8 @@ open class ProcessPaymentService(
         val persisted = paymentOrderModificationPort.updateReturningIdempotent(draft)
         val nextAttempt = persisted.retryCount
         val backoffMs = computeEqualJitterBackoff(nextAttempt)
-        logRetrySchedule(persisted, nextAttempt, System.currentTimeMillis() + backoffMs)
+        val scheduledAt = Utc.nowInstant().plusMillis(backoffMs).toEpochMilli()
+        logRetrySchedule(persisted, nextAttempt, scheduledAt)
         retryQueuePort.scheduleRetry(persisted, backoffMs)
     }
 

@@ -26,7 +26,6 @@ DROP TABLE IF EXISTS payments;
 
 CREATE TABLE payments (
     payment_id BIGINT PRIMARY KEY,
-    idempotency_key VARCHAR(128) NOT NULL,
     buyer_id VARCHAR(255) NOT NULL,
     order_id VARCHAR(255) NOT NULL,
     total_amount_value BIGINT NOT NULL,
@@ -34,8 +33,7 @@ CREATE TABLE payments (
     currency CHAR(3) NOT NULL,
     status VARCHAR(50) NOT NULL,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
-    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
-    CONSTRAINT uq_payment_idempotency_key UNIQUE(idempotency_key)
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC')
 );
 
 CREATE TABLE payment_orders (

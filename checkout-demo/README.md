@@ -6,6 +6,7 @@ A developer-facing internal demo page for testing payment creation requests with
 
 - ✅ Interactive form to build payment requests with multiple sellers
 - ✅ Automatic JWT token generation and payment processing via backend proxy
+- ✅ Automatic Idempotency-Key generation (UUID) for each request
 - ✅ Real-time validation and total calculation
 - ✅ Send POST requests to `/api/v1/payments`
 - ✅ Display JSON response and equivalent curl command
@@ -87,11 +88,12 @@ A developer-facing internal demo page for testing payment creation requests with
    - Send request to backend proxy
    - Backend proxy automatically:
      - Gets JWT token from Keycloak (server-to-server)
-     - Calls payment-service with the token (server-to-server)
+     - Generates a unique Idempotency-Key (UUID) for this request
+     - Calls payment-service with the token and idempotency key (server-to-server)
      - Returns the payment result
-   - Display the response and equivalent curl command
+   - Display the response and equivalent curl command (including the idempotency key)
    
-   **Note**: Everything is handled automatically - just fill the form and submit!
+   **Note**: Everything is handled automatically - just fill the form and submit! The idempotency key is automatically generated. You can use the same key from the curl command for retries to test idempotent behavior.
 
 ## Example Request
 

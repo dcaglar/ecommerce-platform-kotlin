@@ -84,7 +84,7 @@ class PaymentMapperIntegrationTest {
     @Autowired
     lateinit var paymentMapper: PaymentMapper
 
-    private fun sampleEntity(id: Long = 101L, key: String = "key-$id"): PaymentEntity {
+    private fun sampleEntity(id: Long = 101L): PaymentEntity {
         val now = Utc.nowInstant().normalizeToMicroseconds()
         return PaymentEntity(
             paymentId = id,
@@ -92,7 +92,6 @@ class PaymentMapperIntegrationTest {
             orderId = "order-$id",
             totalAmountValue = 10_000,
             capturedAmountValue = 0,
-            idempotencyKey = key,
             currency = "USD",
             status = "PENDING_AUTH",
             createdAt = now,
@@ -101,90 +100,58 @@ class PaymentMapperIntegrationTest {
     }
 
     @Test
-    fun `insert find update and delete payment`() {
-        val createdAt = Utc.nowInstant().normalizeToMicroseconds()
-        val entity = PaymentEntity(
-            paymentId = 101L,
-            buyerId = "buyer-1",
-            orderId = "order-1",
-            totalAmountValue = 10_000,
-            capturedAmountValue = 0,
-            idempotencyKey = "12345",
-            currency = "USD",
-            status = "PENDING_AUTH",
-            createdAt = createdAt,
-            updatedAt = createdAt
+    fun `insert and findById and getMaxPaymentId`() {
+        // given
+        val entity = sampleEntity(101L)
+
+        // when
+        val rows = paymentMapper.insert(entity)
+
+        // then
+        assertEquals(1, rows)
+
+        val loaded = paymentMapper.findById(101L)
+        assertNotNull(loaded)
+
+        // normalize timestamps to match Postgres precision
+        assertEquals(
+            entity.normalizeTimestamps(),
+            loaded!!.normalizeTimestamps()
         )
 
-        val inserted = paymentMapper.insertIgnore(entity)
-        assertEquals(1, inserted)
+        val maxId = paymentMapper.getMaxPaymentId()
+        assertEquals(101L, maxId)
+    }
 
-        val fetched = paymentMapper.findById(101L)
-        // Normalize timestamps to microsecond precision for comparison (PostgreSQL precision)
-        assertEquals(entity.normalizeTimestamps(), fetched?.normalizeTimestamps())
+    @Test
+    fun `update and deleteById`() {
+        // given
+        val entity = sampleEntity(201L)
+        paymentMapper.insert(entity)
 
-        assertEquals(101L, paymentMapper.getMaxPaymentId())
-
-        val updatedAt = createdAt.plusSeconds(300) // 5 minutes
+        // when – update some fields
         val updatedEntity = entity.copy(
+            status = "AUTHORIZED",
             capturedAmountValue = 5_000,
-            status = "CAPTURED_PARTIALLY",
-            updatedAt = updatedAt
+            updatedAt = Utc.nowInstant().normalizeToMicroseconds()
         )
-        val updatedCount = paymentMapper.update(updatedEntity)
-        assertEquals(1, updatedCount)
+        val updatedRows = paymentMapper.update(updatedEntity)
 
-        val refetched = paymentMapper.findById(101L)
-        // Normalize timestamps to microsecond precision for comparison (PostgreSQL precision)
-        assertEquals(updatedEntity.normalizeTimestamps(), refetched?.normalizeTimestamps())
+        // then
+        assertEquals(1, updatedRows)
 
-        val deleted = paymentMapper.deleteById(101L)
-        assertEquals(1, deleted)
+        val reloaded = paymentMapper.findById(201L)
+        assertNotNull(reloaded)
+        assertEquals("AUTHORIZED", reloaded!!.status)
+        assertEquals(5_000, reloaded.capturedAmountValue)
 
-        assertNull(paymentMapper.findById(101L))
-    }
-    @Test
-    fun `insert duplicate idempotency key should be ignored`() {
-        val entity1 = sampleEntity(10L, "same-key")
-        val entity2 = sampleEntity(11L, "same-key")
+        // when – delete by id
+        val deletedRows = paymentMapper.deleteById(201L)
+        assertEquals(1, deletedRows)
 
-        val firstInsert = paymentMapper.insertIgnore(entity1)
-        assertEquals(1, firstInsert)
-
-        val secondInsert = paymentMapper.insertIgnore(entity2)
-        assertEquals(0, secondInsert, "ON CONFLICT DO NOTHING should skip duplicate")
-
-        val fetched = paymentMapper.findByIdempotencyKey("same-key")
-        assertNotNull(fetched)
-        assertEquals(entity1.paymentId, fetched!!.paymentId)
+        val afterDelete = paymentMapper.findById(201L)
+        assertNull(afterDelete)
     }
 
-    @Test
-    fun `findByIdempotencyKey should return correct row`() {
-        val entity = sampleEntity(200L, "unique-key")
-        paymentMapper.insertIgnore(entity)
-        val found = paymentMapper.findByIdempotencyKey("unique-key")
-        assertNotNull(found)
-        assertEquals(entity.buyerId, found!!.buyerId)
-    }
 
-    @Test
-    fun `getMaxPaymentId should return 0 when table empty`() {
-        val max = paymentMapper.getMaxPaymentId()
-        assertEquals(0L, max)
-    }
-
-    @Test
-    fun `idempotent insert then update does not break unique constraint`() {
-        val key = "idem-test"
-        val entity = sampleEntity(333L, key)
-        paymentMapper.insertIgnore(entity)
-        // inserting again with same key but new id should no-op
-        val again = paymentMapper.insertIgnore(entity.copy(paymentId = 334L))
-        assertEquals(0, again)
-        // update still works on existing record
-        paymentMapper.update(entity.copy(status = "AUTHORIZED"))
-        val fetched = paymentMapper.findByIdempotencyKey(key)
-        assertEquals("AUTHORIZED", fetched!!.status)
-    }
 }

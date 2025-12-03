@@ -1,6 +1,7 @@
 // payment-application/src/main/kotlin/.../ports/outbound/IdempotencyStorePort.kt
 package com.dogancaglar.paymentservice.ports.outbound
 
+import com.dogancaglar.common.time.Utc
 import java.time.Instant
 
 data class IdempotencyRecord(
@@ -9,7 +10,7 @@ data class IdempotencyRecord(
     val paymentId: Long? = null,
     val responsePayload: String? = null,
     val status: IdempotencyStatus = IdempotencyStatus.PENDING,
-    val createdAt: Instant = Instant.now()
+    val createdAt: Instant = Utc.nowInstant()
 )
 
 enum class IdempotencyStatus {
