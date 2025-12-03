@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.outbound.psp
 
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.util.PSPAuthorizationStatusMapper
@@ -48,7 +49,7 @@ class PspAuthorizationGatewayAdapter(
                 val t0 = System.nanoTime()
                 try {
                     //use your unique paymetid as idempotency key.
-                    doAuth(order.idempotencyKey)
+                    doAuth(order.paymentId.toPublicPaymentId())
                 } finally {
                     pspExecDuration.record(System.nanoTime() - t0, TimeUnit.NANOSECONDS)
                 }

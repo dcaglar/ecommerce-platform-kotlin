@@ -14,11 +14,6 @@
             <column name="payment_id" type="BIGINT">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
-
-            <column name="idempotency_key" type="VARCHAR(128)">
-                <constraints nullable="false"/>
-            </column>
-
             <column name="buyer_id" type="VARCHAR(255)">
                 <constraints nullable="false"/>
             </column>
@@ -54,11 +49,6 @@
             </column>
 
         </createTable>
-
-        <addUniqueConstraint
-                tableName="payments"
-                columnNames="idempotency_key"
-                constraintName="uq_journal_idempotency_key"/>
 
         <!-- 2️⃣ Constraints via SQL (Liquibase-safe for all 4.x versions) -->
         <sql>

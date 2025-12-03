@@ -26,7 +26,6 @@ DROP TABLE IF EXISTS payments;
 
 CREATE TABLE payments (
     payment_id BIGINT PRIMARY KEY,
-    idempotency_key VARCHAR(128) NOT NULL,
     buyer_id VARCHAR(255) NOT NULL,
     order_id VARCHAR(255) NOT NULL,
     total_amount_value BIGINT NOT NULL,
@@ -34,8 +33,7 @@ CREATE TABLE payments (
     currency CHAR(3) NOT NULL,
     status VARCHAR(50) NOT NULL,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
-    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
-    CONSTRAINT uq_payment_idempotency_key UNIQUE(idempotency_key)
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC')
 );
 
 CREATE TABLE payment_orders (
@@ -145,3 +143,21 @@ CREATE TABLE account_directory (
 );
 
 CREATE INDEX IF NOT EXISTS idx_account_directory_entity ON account_directory (entity_id);
+
+-- ========== IDEMPOTENCY KEYS TABLE ==========
+DROP TABLE IF EXISTS idempotency_keys;
+
+CREATE TABLE idempotency_keys (
+    idempotency_key VARCHAR(255) PRIMARY KEY,
+    payment_id BIGINT NULL,
+    request_hash VARCHAR(128) NULL,
+    response_payload JSONB NULL,
+    status VARCHAR(20) NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
+    CONSTRAINT fk_idempotency_keys_payment FOREIGN KEY (payment_id) REFERENCES payments(payment_id),
+    CONSTRAINT chk_idem_req_status CHECK (status IN ('PENDING', 'COMPLETED'))
+);
+
+-- Indexes for idempotency_keys table
+CREATE INDEX IF NOT EXISTS idx_idempotency_request_hash ON idempotency_keys (request_hash);
+CREATE INDEX IF NOT EXISTS idx_idempotency_payment_id ON idempotency_keys (payment_id);

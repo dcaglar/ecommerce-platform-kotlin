@@ -112,6 +112,10 @@ class PaymentControllerWebExceptionHandler {
 
     // -------- Validation / routing --------
 
+    @ExceptionHandler(IdempotencyConflictException::class)
+    fun handleNoResourceFound(ex: IdempotencyConflictException, request: HttpServletRequest)
+            = respond<ErrorResponse>(HttpStatus.CONFLICT, request, trunc(ex.localizedMessage))
+
     @ExceptionHandler(NoResourceFoundException::class)
     fun handleNoResourceFound(ex: NoResourceFoundException, request: HttpServletRequest)
             = respond<ErrorResponse>(HttpStatus.NOT_FOUND, request, trunc(ex.localizedMessage))
