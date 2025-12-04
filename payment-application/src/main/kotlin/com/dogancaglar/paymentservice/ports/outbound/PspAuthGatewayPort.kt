@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.ports.outbound
 
 import com.dogancaglar.paymentservice.domain.model.Payment
+import com.dogancaglar.paymentservice.domain.model.PaymentMethod
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
@@ -10,5 +11,5 @@ import com.dogancaglar.paymentservice.domain.model.PaymentStatus
  * Implementations can be real or simulated.
  */
 interface PspAuthGatewayPort {
-    fun authorize(order: Payment): PaymentStatus
+    fun authorize(idempotencyKey:String,payment: Payment,token: PaymentMethod): PaymentStatus
 }

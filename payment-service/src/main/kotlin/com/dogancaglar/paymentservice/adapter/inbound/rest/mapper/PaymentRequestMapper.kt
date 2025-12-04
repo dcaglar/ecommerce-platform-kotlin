@@ -2,8 +2,9 @@ package com.dogancaglar.paymentservice.adapter.inbound.rest.mapper
 
 
 import com.dogancaglar.common.id.PublicIdFactory
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.AuthorizePaymentRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.AuthorizationRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentMethodDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentResponseDTO
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.domain.commands.AuthorizePaymentCommand
@@ -11,6 +12,7 @@ import com.dogancaglar.paymentservice.domain.commands.CreatePaymentCommand
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.Payment
+import com.dogancaglar.paymentservice.domain.model.PaymentMethod
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
@@ -19,7 +21,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import java.time.format.DateTimeFormatter
 
 object PaymentRequestMapper {
-    fun toCommand(dto: CreatePaymentRequestDTO): CreatePaymentCommand =
+    fun toCreatePaymentCommand(dto: CreatePaymentRequestDTO): CreatePaymentCommand =
         CreatePaymentCommand(
             orderId = OrderId(dto.orderId),
             buyerId = BuyerId(dto.buyerId),
@@ -32,14 +34,17 @@ object PaymentRequestMapper {
             }
         )
 
-
-    fun toCommand(dto: AuthorizePaymentRequestDTO): AuthorizePaymentCommand =
+    fun toAuthorizePaymentCommand(publicPaymentId:String,dto: AuthorizationRequestDTO): AuthorizePaymentCommand =
         AuthorizePaymentCommand(
-            paymentId = PaymentId(PublicIdFactory.toInternalId(dto.paymentId)
-        ))
+            paymentId = PaymentId(PublicIdFactory.toInternalId(publicPaymentId)),
+            paymentMethod = toPaymentMethod(dto.paymentMethod)
+        )
 
 
-    fun toResponse(domain: Payment): PaymentResponseDTO {
+
+
+
+    fun toPaymentResponseDto(domain: Payment): PaymentResponseDTO {
         return PaymentResponseDTO(
             paymentId = domain.paymentId.toPublicPaymentId(),
             status = domain.status.name,
@@ -49,5 +54,16 @@ object PaymentRequestMapper {
             createdAt = domain.createdAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
         )
     }
+
+    fun toPaymentMethod(dto: PaymentMethodDTO): PaymentMethod =
+        when (dto) {
+            is PaymentMethodDTO.CardToken ->
+                PaymentMethod.CardToken(
+                    token = dto.token,
+                    cvc = dto.cvc
+                )
+        }
+
+
 
 }

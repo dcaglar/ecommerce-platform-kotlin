@@ -20,11 +20,11 @@ class Payment private constructor(
     // AUTHORIZATION FLOW
     // ------------------------
 
-    fun startAuthorization(now: LocalDateTime = Utc.nowLocalDateTime()): Payment {
+    fun startAuthorization(now: LocalDateTime? = Utc.nowLocalDateTime()): Payment {
         require(status == PaymentStatus.CREATED) {
             "Can only start authorization from CREATED"
         }
-        return copy(status = PaymentStatus.PENDING_AUTH, updatedAt = now)
+        return copy(status = PaymentStatus.PENDING_AUTH, updatedAt = now!!)
     }
 
     fun authorize(now: LocalDateTime = Utc.nowLocalDateTime()): Payment {

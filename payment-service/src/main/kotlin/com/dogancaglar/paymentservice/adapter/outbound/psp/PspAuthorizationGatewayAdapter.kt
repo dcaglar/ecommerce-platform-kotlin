@@ -2,6 +2,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.psp
 
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.domain.model.Payment
+import com.dogancaglar.paymentservice.domain.model.PaymentMethod
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.util.PSPAuthorizationStatusMapper
 import com.dogancaglar.paymentservice.ports.outbound.PspAuthGatewayPort
@@ -36,7 +37,7 @@ class PspAuthorizationGatewayAdapter(
             ?: throw IllegalStateException("No scenario config for ${config.scenario}")
 
     /** Public API: caller is a Kafka listener thread. Keep it clean. */
-    override fun authorize(order: Payment): PaymentStatus {
+    override fun authorize(idempotencyKey: String, order: Payment, token: PaymentMethod): PaymentStatus {
         var causeLabel = "EXCEPTION"
         var future: Future<PaymentStatus>? = null
         val enqueuedAt = System.nanoTime()

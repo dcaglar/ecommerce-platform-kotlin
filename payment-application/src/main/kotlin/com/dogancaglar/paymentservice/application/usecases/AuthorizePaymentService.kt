@@ -28,10 +28,14 @@ class AuthorizePaymentService(
         val payment = paymentRepository.findById(cmd.paymentId)
             ?: error("Payment ${cmd.paymentId.value} not found")
 
-        val updated = when (psp.authorize(payment)) {
-            PaymentStatus.AUTHORIZED -> payment.authorize()
-            PaymentStatus.DECLINED   -> payment.decline()
-            else                     -> payment
+        val updated =
+            when (psp.authorize(
+                idempotencyKey = payment.paymentId.value.toString(),
+                payment=payment,
+                token=cmd.paymentMethod)) {
+                                            PaymentStatus.AUTHORIZED -> payment.authorize()
+                                            PaymentStatus.DECLINED   -> payment.decline()
+                                            else                     -> payment
         }
 
         paymentRepository.updatePayment(updated)

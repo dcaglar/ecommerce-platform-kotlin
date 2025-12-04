@@ -33,16 +33,18 @@ class PaymentOrderDomainEventMapperTest {
     // ---------------------------------------------------------
     @Test
     fun `toPaymentAuthorized maps payment and lines correctly`() {
+        val lines = listOf(
+            PaymentLine(SellerId("seller-1"), amount)
+        )
         val payment = Payment.createNew(
             paymentId = PaymentId(1L),
             buyerId = BuyerId("buyer-1"),
             orderId = OrderId("order-1"),
-            totalAmount = Amount.of(10000L, currency)
-        ).authorize()
+            totalAmount = Amount.of(10000L, currency),
+            paymentLines = lines
+        ).startAuthorization().authorize()
 
-        val lines = listOf(
-            PaymentLine(SellerId("seller-1"), amount)
-        )
+
 
         val event = mapper.toPaymentAuthorized(payment, lines)
 

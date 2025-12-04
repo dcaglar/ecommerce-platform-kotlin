@@ -36,7 +36,7 @@ class PaymentRequestMapperTest {
         )
 
         // When
-        val command = PaymentRequestMapper.toCommand(dto)
+        val command = PaymentRequestMapper.toCreatePaymentCommand(dto)
 
         // Then
         assertEquals(OrderId("order-123"), command.orderId)
@@ -67,7 +67,7 @@ class PaymentRequestMapperTest {
         )
 
         // When
-        val command = PaymentRequestMapper.toCommand(dto)
+        val command = PaymentRequestMapper.toCreatePaymentCommand(dto)
 
         // Then
         assertEquals(OrderId("order-123"), command.orderId)
@@ -102,7 +102,7 @@ class PaymentRequestMapperTest {
 
         val payment = basePayment.addPaymentOrder(paymentOrder)
 
-        val response = PaymentRequestMapper.toResponse(payment)
+        val response = PaymentRequestMapper.toPaymentResponseDto(payment)
 
         assertEquals(payment.paymentId.toPublicPaymentId(), response.paymentId)
         assertEquals("PENDING_AUTH", response.status)
@@ -122,7 +122,7 @@ class PaymentRequestMapperTest {
             totalAmount = Amount.of(5000L, Currency("EUR")),
         ).authorize()
 
-        val response = PaymentRequestMapper.toResponse(payment)
+        val response = PaymentRequestMapper.toPaymentResponseDto(payment)
 
         assertEquals(payment.paymentId.toPublicPaymentId(), response.paymentId)
         assertEquals("AUTHORIZED", response.status)
@@ -146,7 +146,7 @@ class PaymentRequestMapperTest {
         )
 
         // When
-        val command = PaymentRequestMapper.toCommand(dto)
+        val command = PaymentRequestMapper.toCreatePaymentCommand(dto)
 
         // Then
         assertEquals(Amount.of(99999999L, Currency("USD")), command.totalAmount)
@@ -169,7 +169,7 @@ class PaymentRequestMapperTest {
         )
 
         // When
-        val command = PaymentRequestMapper.toCommand(dto)
+        val command = PaymentRequestMapper.toCreatePaymentCommand(dto)
 
         // Then
         assertEquals(Amount.of(10000L, Currency("GBP")), command.totalAmount)

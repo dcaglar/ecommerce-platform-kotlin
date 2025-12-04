@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.AuthorizationRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentResponseDTO
 import jakarta.validation.Valid
@@ -63,13 +64,14 @@ class PaymentController(
     /**
      * STEP 2 — Authorize Existing Payment
      */
-    @PostMapping("/{paymentId}/authorize")
+    @PostMapping("/payments/{paymentId}/authorize")
     @PreAuthorize("hasAuthority('payment:write')")
     fun authorizePayment(
-        @PathVariable paymentId: String
+        @PathVariable("paymentId") publicPaymentId: String,
+        @Valid @RequestBody request: AuthorizationRequestDTO
     ): ResponseEntity<PaymentResponseDTO> {
 
-        val dto = paymentService.authorizePayment(paymentId)
+        val dto = paymentService.authorizePayment(publicPaymentId,request)
 
         return ResponseEntity
             .status(HttpStatus.OK)
