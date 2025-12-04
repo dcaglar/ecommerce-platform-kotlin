@@ -25,6 +25,12 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
+import com.dogancaglar.paymentservice.domain.model.vo.SellerId
+import com.dogancaglar.paymentservice.serialization.JacksonUtil
+import com.fasterxml.jackson.databind.ObjectMapper
 import java.time.Instant
 
 @Tag("integration")
@@ -91,8 +97,16 @@ class PaymentOrderMapperIntegrationTest {
     @Autowired
     lateinit var paymentOrderMapper: PaymentOrderMapper
 
+    private val objectMapper: ObjectMapper = JacksonUtil.createObjectMapper()
+
     private fun upsertPayment(paymentId: Long) {
         val now = Utc.nowInstant()
+        val paymentLines = listOf(
+            PaymentLine(
+                sellerId = SellerId("seller-1"),
+                amount = Amount.of(50_00, Currency("USD"))
+            )
+        )
         paymentMapper.insert(
             PaymentEntity(
                 paymentId = paymentId,
@@ -103,7 +117,8 @@ class PaymentOrderMapperIntegrationTest {
                 currency = "USD",
                 status = "PENDING_AUTH",
                 createdAt = now,
-                updatedAt = now
+                updatedAt = now,
+                paymentLinesJson = objectMapper.writeValueAsString(paymentLines)
             )
         )
     }

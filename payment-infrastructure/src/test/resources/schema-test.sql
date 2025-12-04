@@ -32,8 +32,22 @@ CREATE TABLE payments (
     captured_amount_value BIGINT NOT NULL DEFAULT 0,
     currency CHAR(3) NOT NULL,
     status VARCHAR(50) NOT NULL,
+    payment_lines JSONB,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
-    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC')
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
+    CONSTRAINT chk_payments_status_valid CHECK (status IN (
+        'CREATED',
+        'PENDING_AUTH',
+        'AUTHORIZED',
+        'DECLINED',
+        'PARTIALLY_CAPTURED',
+        'CAPTURED'
+    )),
+    CONSTRAINT chk_payments_currency_3 CHECK (currency ~ '^[A-Z]{3}$'),
+    CONSTRAINT chk_payments_captured_le_total CHECK (
+        captured_amount_value >= 0 AND
+        captured_amount_value <= total_amount_value
+    )
 );
 
 CREATE TABLE payment_orders (

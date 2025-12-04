@@ -6,6 +6,7 @@ import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentOutbou
 import com.dogancaglar.paymentservice.adapter.outbound.serialization.JacksonSerializationAdapter
 import com.dogancaglar.paymentservice.application.usecases.AccountBalanceReadService
 import com.dogancaglar.paymentservice.application.usecases.AuthorizePaymentService
+import com.dogancaglar.paymentservice.application.usecases.CreatePaymentService
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceReadUseCase
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
@@ -25,8 +26,7 @@ class PaymentServiceConfig {
 
 
     @Bean
-    fun createAuthorizePaymentService(
-        idGeneratorPort: SnowflakeIdGeneratorAdapter,
+    fun authorizePaymentService(
         paymentRepository: PaymentOutboundAdapter,
         outboxOutboundAdapter: OutboxOutboundAdapter,
         serializationPort: JacksonSerializationAdapter,
@@ -34,13 +34,20 @@ class PaymentServiceConfig {
         pspAuthGatewayPort: PspAuthGatewayPort
     ): AuthorizePaymentService {
         return AuthorizePaymentService(
-            idGeneratorPort = idGeneratorPort,
             paymentRepository = paymentRepository,
             psp = pspAuthGatewayPort,
             outboxEventPort = outboxOutboundAdapter,
             serializationPort = serializationPort,
             paymentOrderDomainEventMapper = paymentOrderDomainEventMapper
         )
+    }
+
+    @Bean
+    fun createPaymentService(
+        idGeneratorPort: SnowflakeIdGeneratorAdapter,
+        paymentRepository: PaymentOutboundAdapter
+        ): CreatePaymentService{
+        return CreatePaymentService(paymentRepository,idGeneratorPort)
     }
 
     @Bean

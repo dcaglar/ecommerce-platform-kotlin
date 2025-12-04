@@ -26,6 +26,11 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
+import com.dogancaglar.paymentservice.domain.model.vo.SellerId
+import com.dogancaglar.paymentservice.serialization.JacksonUtil
 import org.junit.jupiter.api.BeforeEach
 import java.time.Instant
 
@@ -115,7 +120,7 @@ class IdempotencyKeyMapperIntegrationTest {
     @Autowired
     lateinit var paymentMapper: PaymentMapper
 
-    private val objectMapper = ObjectMapper()
+    private val objectMapper = JacksonUtil.createObjectMapper()
 
     private fun assertJsonEquals(expectedJson: String, actualJson: String?) {
         assertNotNull(actualJson, "JSON should not be null")
@@ -126,6 +131,12 @@ class IdempotencyKeyMapperIntegrationTest {
 
     private fun createPayment(paymentId: Long) {
         val now = Utc.nowInstant().normalizeToMicroseconds()
+        val paymentLines = listOf(
+            PaymentLine(
+                sellerId = SellerId("seller-1"),
+                amount = Amount.of(10_000, Currency("EUR"))
+            )
+        )
         paymentMapper.insert(
             PaymentEntity(
                 paymentId = paymentId,
@@ -136,7 +147,8 @@ class IdempotencyKeyMapperIntegrationTest {
                 currency = "EUR",
                 status = "PENDING_AUTH",
                 createdAt = now,
-                updatedAt = now
+                updatedAt = now,
+                paymentLinesJson = objectMapper.writeValueAsString(paymentLines)
             )
         )
     }

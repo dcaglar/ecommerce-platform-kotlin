@@ -1,8 +1,8 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
-import com.dogancaglar.paymentservice.application.usecases.AuthorizePaymentService
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.application.validator.PaymentValidator
+import com.dogancaglar.paymentservice.ports.inbound.CreatePaymentUseCase
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentRequestDTO
 import com.dogancaglar.port.out.web.dto.AmountDto
 import com.dogancaglar.port.out.web.dto.CurrencyEnum
@@ -13,6 +13,8 @@ import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
+import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -22,16 +24,15 @@ import org.junit.jupiter.api.Assertions.*
 
 class PaymentServiceTest {
 
-    private lateinit var authorizePaymentService: AuthorizePaymentService
+    private lateinit var createPaymentUseCase: CreatePaymentUseCase
     private lateinit var paymentService: PaymentService
-
     private lateinit var paymentValidator: PaymentValidator
 
     @BeforeEach
     fun setUp() {
-        authorizePaymentService = mockk()
+        createPaymentUseCase = mockk()
         paymentValidator = mockk(relaxed = true)
-        paymentService = PaymentService(authorizePaymentService, paymentValidator)
+        paymentService = PaymentService(mockk(), createPaymentUseCase, paymentValidator)
     }
 
     @Test
@@ -54,9 +55,15 @@ class PaymentServiceTest {
             buyerId = BuyerId("buyer-456"),
             orderId = OrderId("order-123"),
             totalAmount = Amount.of(10000L, Currency("USD")),
+            paymentLines = listOf(
+                PaymentLine(
+                    sellerId = SellerId("seller-789"),
+                    amount = Amount.of(10000L, Currency("USD"))
+                )
+            )
         )
         
-        every { authorizePaymentService.authorize(any()) } returns expectedPayment
+        every { createPaymentUseCase.create(any()) } returns expectedPayment
 
         // When
         val result = paymentService.createPayment(request)
@@ -65,11 +72,11 @@ class PaymentServiceTest {
         assertNotNull(result)
         assertEquals(expectedPayment.paymentId.toPublicPaymentId(), result.paymentId)
         assertEquals("order-123", result.orderId)
-        assertEquals("PENDING_AUTH", result.status)
+        assertEquals("CREATED", result.status)
         assertEquals(10000L, result.totalAmount.quantity)
         assertEquals(CurrencyEnum.USD, result.totalAmount.currency)
         
-        verify { authorizePaymentService.authorize(any()) }
+        verify { createPaymentUseCase.create(any()) }
     }
 
     @Test
@@ -88,7 +95,7 @@ class PaymentServiceTest {
         )
         
         val exception = RuntimeException("Use case failed")
-        every { authorizePaymentService.authorize(any()) } throws exception
+        every { createPaymentUseCase.create(any()) } throws exception
 
         // When & Then
         val thrownException = assertThrows(RuntimeException::class.java) {
@@ -96,7 +103,7 @@ class PaymentServiceTest {
         }
         
         assertEquals("Use case failed", thrownException.message)
-        verify { authorizePaymentService.authorize(any()) }
+        verify { createPaymentUseCase.create(any()) }
     }
 
     @Test
@@ -115,7 +122,7 @@ class PaymentServiceTest {
         )
         
         val validationException = IllegalArgumentException("Invalid payment data")
-        every { authorizePaymentService.authorize(any()) } throws validationException
+        every { createPaymentUseCase.create(any()) } throws validationException
 
         // When & Then
         val thrownException = assertThrows(IllegalArgumentException::class.java) {
@@ -123,7 +130,7 @@ class PaymentServiceTest {
         }
         
         assertEquals("Invalid payment data", thrownException.message)
-        verify { authorizePaymentService.authorize(any()) }
+        verify { createPaymentUseCase.create(any()) }
     }
 
     @Test
@@ -146,9 +153,17 @@ class PaymentServiceTest {
             buyerId = BuyerId("buyer-456"),
             orderId = OrderId("order-123"),
             totalAmount = Amount.of(5000L, Currency("EUR")),
-        ).authorize()
+            paymentLines = listOf(
+                PaymentLine(
+                    sellerId = SellerId("seller-789"),
+                    amount = Amount.of(5000L, Currency("EUR"))
+                )
+            )
+        )
+            .startAuthorization()
+            .authorize()
         
-        every { authorizePaymentService.authorize(any()) } returns expectedPayment
+        every { createPaymentUseCase.create(any()) } returns expectedPayment
 
         // When
         val result = paymentService.createPayment(request)
@@ -159,7 +174,7 @@ class PaymentServiceTest {
         assertEquals(5000L, result.totalAmount.quantity)
         assertEquals(CurrencyEnum.EUR, result.totalAmount.currency)
         
-        verify { authorizePaymentService.authorize(any()) }
+        verify { createPaymentUseCase.create(any()) }
     }
 
     @Test
@@ -182,9 +197,15 @@ class PaymentServiceTest {
             buyerId = BuyerId("buyer-456"),
             orderId = OrderId("order-123"),
             totalAmount = Amount.of(99999999L, Currency("USD")),
+            paymentLines = listOf(
+                PaymentLine(
+                    sellerId = SellerId("seller-789"),
+                    amount = Amount.of(99999999L, Currency("USD"))
+                )
+            )
         )
         
-        every { authorizePaymentService.authorize(any()) } returns expectedPayment
+        every { createPaymentUseCase.create(any()) } returns expectedPayment
 
         // When
         val result = paymentService.createPayment(request)
@@ -193,6 +214,6 @@ class PaymentServiceTest {
         assertEquals(expectedPayment.paymentId.toPublicPaymentId(), result.paymentId)
         assertEquals(99999999L, result.totalAmount.quantity)
         
-        verify { authorizePaymentService.authorize(any()) }
+        verify { createPaymentUseCase.create(any()) }
     }
 }

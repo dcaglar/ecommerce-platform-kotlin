@@ -6,12 +6,10 @@ import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.Payment
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.port.out.web.dto.*
 import org.junit.jupiter.api.Test
@@ -82,30 +80,23 @@ class PaymentRequestMapperTest {
 
     @Test
     fun `should map Payment to PaymentResponseDTO correctly`() {
-        val basePayment = Payment.createNew(
+        val payment = Payment.createNew(
             paymentId = PaymentId(123L),
             buyerId = BuyerId("buyer-456"),
             orderId = OrderId("order-123"),
             totalAmount = Amount.of(10000L, Currency("USD")),
+            paymentLines = listOf(
+                PaymentLine(
+                    sellerId = SellerId("seller-789"),
+                    amount = Amount.of(10000L, Currency("USD"))
+                )
+            )
         )
-
-        val paymentOrder = PaymentOrder.rehydrate(
-            paymentOrderId = PaymentOrderId(1L),
-            paymentId = PaymentId(123L),
-            sellerId = SellerId("seller-789"),
-            amount = Amount.of(10000L, Currency("USD")),
-            status = PaymentOrderStatus.INITIATED_PENDING,
-            retryCount = 0,
-            createdAt = basePayment.createdAt,
-            updatedAt = basePayment.createdAt
-        )
-
-        val payment = basePayment.addPaymentOrder(paymentOrder)
 
         val response = PaymentRequestMapper.toPaymentResponseDto(payment)
 
         assertEquals(payment.paymentId.toPublicPaymentId(), response.paymentId)
-        assertEquals("PENDING_AUTH", response.status)
+        assertEquals("CREATED", response.status)
         assertEquals("buyer-456", response.buyerId)
         assertEquals("order-123", response.orderId)
         assertEquals(10000L, response.totalAmount.quantity)
@@ -120,7 +111,15 @@ class PaymentRequestMapperTest {
             buyerId = BuyerId("buyer-789"),
             orderId = OrderId("order-456"),
             totalAmount = Amount.of(5000L, Currency("EUR")),
-        ).authorize()
+            paymentLines = listOf(
+                PaymentLine(
+                    sellerId = SellerId("seller-1"),
+                    amount = Amount.of(5000L, Currency("EUR"))
+                )
+            )
+        )
+            .startAuthorization()
+            .authorize()
 
         val response = PaymentRequestMapper.toPaymentResponseDto(payment)
 

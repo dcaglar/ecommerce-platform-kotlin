@@ -56,10 +56,11 @@
             ALTER TABLE payments
             ADD CONSTRAINT chk_payments_status_valid
             CHECK (status IN (
+            'CREATED',
             'PENDING_AUTH',
             'AUTHORIZED',
             'DECLINED',
-            'CAPTURED_PARTIALLY',
+            'PARTIALLY_CAPTURED',
             'CAPTURED'
             ));
         </sql>

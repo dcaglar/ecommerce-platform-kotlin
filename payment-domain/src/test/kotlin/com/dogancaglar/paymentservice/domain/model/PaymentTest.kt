@@ -52,7 +52,7 @@ class PaymentTest {
     // --- ✅ Authorization Flow ---
 
     @Test
-    fun `should transition from CREATED to PENDING_AUTH`() {
+    fun `should transition from  CREATED to PENDING_AUTH`() {
         val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount, paymentLines)
         val pending = payment.startAuthorization()
 
