@@ -11,5 +11,6 @@ data class PaymentEntity(
     val capturedAmountValue: Long,
     val status: String,
     val createdAt: Instant,
-    val updatedAt: Instant
+    val updatedAt: Instant,
+    val paymentLinesJson: String    // ← NEW JSON column
 )

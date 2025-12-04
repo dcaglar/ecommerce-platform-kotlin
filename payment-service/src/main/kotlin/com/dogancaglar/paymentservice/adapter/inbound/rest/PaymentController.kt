@@ -1,12 +1,13 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentResponseDTO
 import jakarta.validation.Valid
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
@@ -34,7 +35,7 @@ class PaymentController(
     @PreAuthorize("hasAuthority('payment:write')")
     fun createPayment(
         @RequestHeader("Idempotency-Key") idempotencyKey: String?,
-        @Valid @RequestBody request: PaymentRequestDTO): ResponseEntity<PaymentResponseDTO> {
+        @Valid @RequestBody request: CreatePaymentRequestDTO): ResponseEntity<PaymentResponseDTO> {
         logger.info("📥 Sending payment request for order: ${request.orderId} with idempodencykey: $idempotencyKey")
         require(!idempotencyKey.isNullOrBlank()) {
             "Idempotency-Key header is required"
@@ -59,10 +60,26 @@ class PaymentController(
             .body(responseDTO)
     }
 
+    /**
+     * STEP 2 — Authorize Existing Payment
+     */
+    @PostMapping("/{paymentId}/authorize")
+    @PreAuthorize("hasAuthority('payment:write')")
+    fun authorizePayment(
+        @PathVariable paymentId: String
+    ): ResponseEntity<PaymentResponseDTO> {
+
+        val dto = paymentService.authorizePayment(paymentId)
+
+        return ResponseEntity
+            .status(HttpStatus.OK)
+            .body(dto)
+    }
+
 
     @PostMapping("/payments/{paymentId}/captures")
     @PreAuthorize("hasAuthority('payment:write')")
-    fun capturePayment(@Valid @RequestBody request: PaymentRequestDTO): ResponseEntity<PaymentResponseDTO> {
+    fun capturePayment(@Valid @RequestBody request: CreatePaymentRequestDTO): ResponseEntity<PaymentResponseDTO> {
         logger.debug("📥 Sending payment request for order: ${request.orderId}")
         val responseDTO = paymentService.createPayment(request)
         logger.debug("📥 Received payment request for order: ${responseDTO.orderId}, payment id is ${responseDTO.paymentId}")

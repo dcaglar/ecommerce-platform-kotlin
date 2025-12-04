@@ -1,12 +1,8 @@
 package com.dogancaglar.paymentservice.domain.model
 
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
-import com.dogancaglar.paymentservice.domain.model.vo.OrderId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.vo.*
 import java.time.LocalDateTime
-import kotlin.collections.plus
-
 
 class Payment private constructor(
     val paymentId: PaymentId,
@@ -17,52 +13,65 @@ class Payment private constructor(
     val status: PaymentStatus,
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime,
-    val paymentOrders: List<PaymentOrder>
+    val paymentLines: List<PaymentLine>    // ← stored as JSONB in Persistence
 ) {
-    // --- Domain Behavior ---
 
-    fun authorize(updatedAt: LocalDateTime= Utc.nowLocalDateTime()): Payment {
-        require(status == PaymentStatus.PENDING_AUTH) { "Payment can only be authorized from PENDING_AUTH" }
-        return copy(status = PaymentStatus.AUTHORIZED, updatedAt = updatedAt )
+    // ------------------------
+    // AUTHORIZATION FLOW
+    // ------------------------
+
+    fun startAuthorization(now: LocalDateTime = Utc.nowLocalDateTime()): Payment {
+        require(status == PaymentStatus.CREATED) {
+            "Can only start authorization from CREATED"
+        }
+        return copy(status = PaymentStatus.PENDING_AUTH, updatedAt = now)
+    }
+
+    fun authorize(now: LocalDateTime = Utc.nowLocalDateTime()): Payment {
+        require(status == PaymentStatus.PENDING_AUTH) {
+            "Payment can only be authorized from PENDING_AUTH"
+        }
+        return copy(status = PaymentStatus.AUTHORIZED, updatedAt = now)
+    }
+
+    fun decline(now: LocalDateTime = Utc.nowLocalDateTime()): Payment {
+        require(status == PaymentStatus.PENDING_AUTH) {
+            "Payment can only be declined from PENDING_AUTH"
+        }
+        return copy(status = PaymentStatus.DECLINED, updatedAt = now)
     }
 
 
-    fun decline(updatedAt: LocalDateTime= Utc.nowLocalDateTime()): Payment {
-        require(status == PaymentStatus.PENDING_AUTH) { "Payment can only be declined from PENDING_AUTH" }
-        return copy(status = PaymentStatus.DECLINED, updatedAt = updatedAt)
-    }
-
+    // ------------------------
+    // CAPTURE FLOW
+    // ------------------------
 
     fun addCapturedAmount(amount: Amount): Payment {
-        val newCaptured = this.capturedAmount + amount
+        val newCaptured = capturedAmount + amount
         require(newCaptured <= totalAmount) { "Captured amount cannot exceed total" }
 
         val newStatus = when {
             newCaptured == totalAmount -> PaymentStatus.CAPTURED
-            newCaptured < totalAmount -> PaymentStatus.CAPTURED_PARTIALLY
+            newCaptured < totalAmount -> PaymentStatus.PARTIALLY_CAPTURED
             else -> status
         }
 
-        return copy(capturedAmount = newCaptured, status = newStatus,updatedAt=updatedAt)
-    }
-
-    fun addPaymentOrder(paymentOrder: PaymentOrder): Payment {
-        require(paymentOrder.paymentId == paymentId) {
-            "PaymentOrder must reference the same Payment"
-        }
-        require(paymentOrder.amount.currency == totalAmount.currency) {
-            "Currency mismatch between Payment and PaymentOrder"
-        }
-        return copy(paymentOrders = paymentOrders + paymentOrder, updatedAt = updatedAt)
+        return copy(
+            capturedAmount = newCaptured,
+            status = newStatus
+        )
     }
 
 
-    // --- Internal copy (immutability) ---
-    private fun  copy(
-        capturedAmount: Amount = this.capturedAmount,
+    // ------------------------
+    // COPY METHOD
+    // ------------------------
+
+    private fun copy(
         status: PaymentStatus = this.status,
-        paymentOrders: List<PaymentOrder> = this.paymentOrders,
-        updatedAt: LocalDateTime= Utc.nowLocalDateTime()
+        capturedAmount: Amount = this.capturedAmount,
+        updatedAt: LocalDateTime = Utc.nowLocalDateTime(),
+        paymentLines: List<PaymentLine> = this.paymentLines
     ): Payment = Payment(
         paymentId = paymentId,
         buyerId = buyerId,
@@ -72,30 +81,39 @@ class Payment private constructor(
         status = status,
         createdAt = createdAt,
         updatedAt = updatedAt,
-        paymentOrders = paymentOrders
+        paymentLines = paymentLines
     )
 
+
+    // ------------------------
+    // FACTORY METHODS
+    // ------------------------
+
     companion object {
+
         fun createNew(
             paymentId: PaymentId,
             buyerId: BuyerId,
             orderId: OrderId,
-            totalAmount: Amount
+            totalAmount: Amount,
+            paymentLines: List<PaymentLine>
         ): Payment {
+            require(paymentLines.isNotEmpty()) { "Payment must have at least one payment line" }
             require(totalAmount.isPositive()) { "Total amount must be positive" }
+
             val now = Utc.nowLocalDateTime()
+
             return Payment(
                 paymentId = paymentId,
                 buyerId = buyerId,
                 orderId = orderId,
                 totalAmount = totalAmount,
                 capturedAmount = Amount.zero(totalAmount.currency),
-                status = PaymentStatus.PENDING_AUTH,
+                status = PaymentStatus.CREATED,    // ← Important change!
                 createdAt = now,
                 updatedAt = now,
-                paymentOrders = emptyList()
+                paymentLines = paymentLines
             )
-
         }
 
         fun rehydrate(
@@ -106,7 +124,8 @@ class Payment private constructor(
             capturedAmount: Amount,
             status: PaymentStatus,
             createdAt: LocalDateTime,
-            updatedAt: LocalDateTime
+            updatedAt: LocalDateTime,
+            paymentLines: List<PaymentLine>
         ): Payment = Payment(
             paymentId,
             buyerId,
@@ -116,8 +135,7 @@ class Payment private constructor(
             status,
             createdAt,
             updatedAt,
-            emptyList()
+            paymentLines
         )
     }
-
 }

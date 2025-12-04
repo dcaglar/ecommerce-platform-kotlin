@@ -3,10 +3,10 @@ package com.dogancaglar.paymentservice.adapter.inbound.rest
 import com.dogancaglar.paymentservice.application.usecases.AuthorizePaymentService
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.application.validator.PaymentValidator
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentRequestDTO
 import com.dogancaglar.port.out.web.dto.AmountDto
 import com.dogancaglar.port.out.web.dto.CurrencyEnum
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentOrderRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentLineDTO
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
@@ -37,12 +37,12 @@ class PaymentServiceTest {
     @Test
     fun `should create payment successfully`() {
         // Given
-        val request = PaymentRequestDTO(
+        val request = CreatePaymentRequestDTO(
             orderId = "order-123",
             buyerId = "buyer-456",
             totalAmount = AmountDto(10000L, CurrencyEnum.USD),
             paymentOrders = listOf(
-                PaymentOrderRequestDTO(
+                PaymentLineDTO(
                     sellerId = "seller-789",
                     amount = AmountDto(10000L, CurrencyEnum.USD)
                 )
@@ -75,12 +75,12 @@ class PaymentServiceTest {
     @Test
     fun `should handle use case exception and rethrow`() {
         // Given
-        val request = PaymentRequestDTO(
+        val request = CreatePaymentRequestDTO(
             orderId = "order-123",
             buyerId = "buyer-456",
             totalAmount = AmountDto(10000L, CurrencyEnum.USD),
             paymentOrders = listOf(
-                PaymentOrderRequestDTO(
+                PaymentLineDTO(
                     sellerId = "seller-789",
                     amount = AmountDto(10000L, CurrencyEnum.USD)
                 )
@@ -102,12 +102,12 @@ class PaymentServiceTest {
     @Test
     fun `should handle validation exception`() {
         // Given
-        val request = PaymentRequestDTO(
+        val request = CreatePaymentRequestDTO(
             orderId = "order-123",
             buyerId = "buyer-456",
             totalAmount = AmountDto(10000L, CurrencyEnum.USD),
             paymentOrders = listOf(
-                PaymentOrderRequestDTO(
+                PaymentLineDTO(
                     sellerId = "seller-789",
                     amount = AmountDto(10000L, CurrencyEnum.USD)
                 )
@@ -129,12 +129,12 @@ class PaymentServiceTest {
     @Test
     fun `should handle different payment statuses`() {
         // Given
-        val request = PaymentRequestDTO(
+        val request = CreatePaymentRequestDTO(
             orderId = "order-123",
             buyerId = "buyer-456",
             totalAmount = AmountDto(5000L, CurrencyEnum.EUR),
             paymentOrders = listOf(
-                PaymentOrderRequestDTO(
+                PaymentLineDTO(
                     sellerId = "seller-789",
                     amount = AmountDto(5000L, CurrencyEnum.EUR)
                 )
@@ -165,12 +165,12 @@ class PaymentServiceTest {
     @Test
     fun `should handle large amounts correctly`() {
         // Given
-        val request = PaymentRequestDTO(
+        val request = CreatePaymentRequestDTO(
             orderId = "order-123",
             buyerId = "buyer-456",
             totalAmount = AmountDto(99999999L, CurrencyEnum.USD),
             paymentOrders = listOf(
-                PaymentOrderRequestDTO(
+                PaymentLineDTO(
                     sellerId = "seller-789",
                     amount = AmountDto(99999999L, CurrencyEnum.USD)
                 )

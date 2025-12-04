@@ -1,8 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest.mapper
 
-import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentOrderRequestDTO
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentLineDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentRequestDTO
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
@@ -24,12 +23,12 @@ class PaymentRequestMapperTest {
     @Test
     fun `should map PaymentRequestDTO to CreatePaymentCommand correctly`() {
         // Given
-        val dto = PaymentRequestDTO(
+        val dto = CreatePaymentRequestDTO(
             orderId = "order-123",
             buyerId = "buyer-456",
             totalAmount = AmountDto(10000L, CurrencyEnum.USD),
             paymentOrders = listOf(
-                PaymentOrderRequestDTO(
+                PaymentLineDTO(
                     sellerId = "seller-789",
                     amount = AmountDto(10000L, CurrencyEnum.USD)
                 )
@@ -51,16 +50,16 @@ class PaymentRequestMapperTest {
     @Test
     fun `should map PaymentRequestDTO with multiple payment orders correctly`() {
         // Given
-        val dto = PaymentRequestDTO(
+        val dto = CreatePaymentRequestDTO(
             orderId = "order-123",
             buyerId = "buyer-456",
             totalAmount = AmountDto(20000L, CurrencyEnum.EUR),
             paymentOrders = listOf(
-                PaymentOrderRequestDTO(
+                PaymentLineDTO(
                     sellerId = "seller-789",
                     amount = AmountDto(15000L, CurrencyEnum.EUR)
                 ),
-                PaymentOrderRequestDTO(
+                PaymentLineDTO(
                     sellerId = "seller-101",
                     amount = AmountDto(5000L, CurrencyEnum.EUR)
                 )
@@ -134,12 +133,12 @@ class PaymentRequestMapperTest {
     @Test
     fun `should handle large amounts correctly`() {
         // Given
-        val dto = PaymentRequestDTO(
+        val dto = CreatePaymentRequestDTO(
             orderId = "order-123",
             buyerId = "buyer-456",
             totalAmount = AmountDto(99999999L, CurrencyEnum.USD),
             paymentOrders = listOf(
-                PaymentOrderRequestDTO(
+                PaymentLineDTO(
                     sellerId = "seller-789",
                     amount = AmountDto(99999999L, CurrencyEnum.USD)
                 )
@@ -157,12 +156,12 @@ class PaymentRequestMapperTest {
     @Test
     fun `should handle different currencies correctly`() {
         // Given
-        val dto = PaymentRequestDTO(
+        val dto = CreatePaymentRequestDTO(
             orderId = "order-123",
             buyerId = "buyer-456",
             totalAmount = AmountDto(10000L, CurrencyEnum.GBP),
             paymentOrders = listOf(
-                PaymentOrderRequestDTO(
+                PaymentLineDTO(
                     sellerId = "seller-789",
                     amount = AmountDto(10000L, CurrencyEnum.GBP)
                 )

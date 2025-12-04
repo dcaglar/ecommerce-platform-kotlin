@@ -38,6 +38,7 @@
             <column name="status" type="VARCHAR(50)">
                 <constraints nullable="false"/>
             </column>
+            <column name="payment_lines" type="jsonb"/>
             <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE"
                     defaultValueComputed="(now() AT TIME ZONE 'UTC')">
                 <constraints nullable="false"/>

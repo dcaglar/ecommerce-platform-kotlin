@@ -1,10 +1,10 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentResponseDTO
 import com.dogancaglar.port.out.web.dto.AmountDto
 import com.dogancaglar.port.out.web.dto.CurrencyEnum
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentOrderRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentLineDTO
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -26,12 +26,12 @@ class PaymentControllerTest {
         paymentController = PaymentController(paymentService, idempotencyService)
     }
 
-    private fun createSampleRequest() = PaymentRequestDTO(
+    private fun createSampleRequest() = CreatePaymentRequestDTO(
         orderId = "order-123",
         buyerId = "buyer-456",
         totalAmount = AmountDto(10000L, CurrencyEnum.USD),
         paymentOrders = listOf(
-            PaymentOrderRequestDTO(
+            PaymentLineDTO(
                 sellerId = "seller-789",
                 amount = AmountDto(10000L, CurrencyEnum.USD)
             )

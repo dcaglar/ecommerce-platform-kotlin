@@ -1,11 +1,8 @@
 // payment-service/src/main/kotlin/.../idempotency/IdempotencyService.kt
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
-import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentResponseDTO
 import com.dogancaglar.paymentservice.idempotency.CanonicalJsonHasher
-import com.dogancaglar.paymentservice.ports.outbound.IdempotencyStatus
 import com.dogancaglar.paymentservice.ports.outbound.IdempotencyStorePort
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory

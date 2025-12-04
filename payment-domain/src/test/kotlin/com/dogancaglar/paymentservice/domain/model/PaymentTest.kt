@@ -1,6 +1,5 @@
 package com.dogancaglar.paymentservice.domain.model
 
-import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.vo.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -86,7 +85,7 @@ class PaymentTest {
         val partial = payment.addCapturedAmount(Amount.of(4000L, currency)) // €40.00 captured
 
         assertEquals(Amount.of(4000L, currency), partial.capturedAmount)
-        assertEquals(PaymentStatus.CAPTURED_PARTIALLY, partial.status)
+        assertEquals(PaymentStatus.PARTIALLY_CAPTURED, partial.status)
     }
 
     @Test

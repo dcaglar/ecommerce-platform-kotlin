@@ -1,25 +1,25 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest.mapper
 
 
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CaptureResponseDTO
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentRequestDTO
+import com.dogancaglar.common.id.PublicIdFactory
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.AuthorizePaymentRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentResponseDTO
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
-import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
+import com.dogancaglar.paymentservice.domain.commands.AuthorizePaymentCommand
 import com.dogancaglar.paymentservice.domain.commands.CreatePaymentCommand
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.Payment
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
-import com.dogancaglar.port.out.web.dto.*
 import java.time.format.DateTimeFormatter
 
 object PaymentRequestMapper {
-    fun toCommand(dto: PaymentRequestDTO): CreatePaymentCommand =
+    fun toCommand(dto: CreatePaymentRequestDTO): CreatePaymentCommand =
         CreatePaymentCommand(
             orderId = OrderId(dto.orderId),
             buyerId = BuyerId(dto.buyerId),
@@ -31,6 +31,13 @@ object PaymentRequestMapper {
                 )
             }
         )
+
+
+    fun toCommand(dto: AuthorizePaymentRequestDTO): AuthorizePaymentCommand =
+        AuthorizePaymentCommand(
+            paymentId = PaymentId(PublicIdFactory.toInternalId(dto.paymentId)
+        ))
+
 
     fun toResponse(domain: Payment): PaymentResponseDTO {
         return PaymentResponseDTO(
