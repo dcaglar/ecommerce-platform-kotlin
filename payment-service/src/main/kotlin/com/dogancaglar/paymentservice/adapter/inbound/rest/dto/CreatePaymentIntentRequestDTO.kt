@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotEmpty
 import jakarta.validation.constraints.NotNull
 
-data class CreatePaymentRequestDTO(
+data class CreatePaymentIntentRequestDTO(
     @field:NotBlank
     val buyerId: String,
     @field:NotNull
@@ -16,5 +16,5 @@ data class CreatePaymentRequestDTO(
     val orderId: String,
     @field:NotEmpty
     @field:Valid
-    val paymentOrders: List<PaymentLineDTO>
+    val paymentOrders: List<PaymentOrderLineDTO>
 )

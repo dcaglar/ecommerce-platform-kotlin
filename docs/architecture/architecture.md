@@ -146,7 +146,7 @@ These are the fundamental nouns of out Merchant-of-Record payment platform.
 
 ---
 
-## **1. Payment**
+## **1. PaymentIntent**
 
 Represents the **entire shopper transaction**.
 
@@ -243,6 +243,6 @@ Derived from applied LedgerEntries.
 Used for reporting, analytics, payouts, and consistency validation.
 
 
-
+mentCo
 
 

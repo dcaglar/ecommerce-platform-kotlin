@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="2025-12-06-create-payment-intents" author="dogancaglar">
+
+        <!-- 1️⃣ Create table -->
+        <createTable tableName="payment-intents">
+
+            <column name="payment_intent_id" type="BIGINT">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="buyer_id" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="order_id" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="total_amount_value" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+
+
+            <column name="currency" type="CHAR(3)">
+                <constraints nullable="false"/>
+            </column>
+
+
+            <column name="status" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="payment_order_lines" type="jsonb"/>
+            <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE"
+                    defaultValueComputed="(now() AT TIME ZONE 'UTC')">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="updated_at" type="TIMESTAMP WITHOUT TIME ZONE"
+                    defaultValueComputed="(now() AT TIME ZONE 'UTC')">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- 2️⃣ Constraints via SQL (Liquibase-safe for all 4.x versions) -->
+        <sql>
+            ALTER TABLE payment_intents
+            ADD CONSTRAINT chk_payment_intent_status_valid
+            CHECK (status IN (
+            'CREATED',
+            'PENDING_AUTH',
+            'AUTHORIZED',
+            'DECLINED',
+            'CANCELLED'
+            ));
+        </sql>
+
+        <sql>
+            ALTER TABLE payment_intents
+            ADD CONSTRAINT chk_payment_intent_currency_3
+            CHECK (currency ~ '^[A-Z]{3}$');
+        </sql>
+
+        <sql>
+            ALTER TABLE payment_intents
+            ADD CONSTRAINT chk_payment_intent_total_amount_value_le_total
+            CHECK (
+            total_amount_value &gt;= 0 AND
+            total_amount_value &lt;= total_amount_value
+            );
+        </sql>
+
+
+        <!-- 4️⃣ Rollback -->
+        <rollback>
+            <dropTable tableName="payment_intents"/>
+        </rollback>
+
+    </changeSet>
+
+</databaseChangeLog>

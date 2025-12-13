@@ -9,7 +9,8 @@ import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Component
@@ -23,15 +24,17 @@ class PaymentEntityMapper(
     fun toEntity(p: Payment): PaymentEntity =
         PaymentEntity(
             paymentId = p.paymentId.value,
+            paymentIntentId = p.paymentIntentId.value,
             buyerId = p.buyerId.value,
             orderId = p.orderId.value,
             totalAmountValue = p.totalAmount.quantity,
             currency = p.totalAmount.currency.currencyCode,
             capturedAmountValue = p.capturedAmount.quantity,
+            refundedAmountValue = p.refundedAmount.quantity,
             status = p.status.name,
             createdAt = p.createdAt.toInstant(ZoneOffset.UTC),
             updatedAt = p.updatedAt.toInstant(ZoneOffset.UTC),
-            paymentLinesJson = objectMapper.writeValueAsString(p.paymentLines)
+            paymentLinesJson = objectMapper.writeValueAsString(p.paymentOrderLines)
         )
 
     fun toDomain(entity: PaymentEntity): Payment {
@@ -42,19 +45,26 @@ class PaymentEntityMapper(
         } else {
             Amount.of(entity.capturedAmountValue, currency)
         }
-        val lines: List<PaymentLine> =
-            objectMapper.readValue(entity.paymentLinesJson, object : TypeReference<List<PaymentLine>>() {})
+        val refunded = if (entity.refundedAmountValue == 0L) {
+            Amount.zero(currency)
+        } else {
+            Amount.of(entity.refundedAmountValue, currency)
+        }
+        val lines: List<PaymentOrderLine> =
+            objectMapper.readValue(entity.paymentLinesJson, object : TypeReference<List<PaymentOrderLine>>() {})
 
         return Payment.rehydrate(
             paymentId = PaymentId(entity.paymentId),
+            paymentIntentId = PaymentIntentId(entity.paymentIntentId),
             buyerId = BuyerId(entity.buyerId),
             orderId = OrderId(entity.orderId),
             totalAmount = total,
             capturedAmount =captured,
+            refundedAmount = refunded,
             status = PaymentStatus.valueOf(entity.status),
             createdAt = Utc.fromInstant(entity.createdAt),
             updatedAt = Utc.fromInstant(entity.updatedAt),
-            paymentLines = lines
+            paymentOrderLines = lines
         )
     }
 }

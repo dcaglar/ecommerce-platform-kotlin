@@ -24,6 +24,14 @@ class SnowflakeIdGeneratorAdapter(
     private val numCoordShards = props.numCoordShards
     private val numSellerShards = props.numSellerShards
 
+    override fun nextPaymentIntentId(buyerId: BuyerId, orderId: OrderId): Long {
+        val shard = strategies.coordShard(buyerId.value, orderId.value)
+        require(shard in 0..31) {
+            "coordShard must be in 0..31 for Snowflake nodeId; was $shard (numCoordShards=$numCoordShards)"
+        }
+        return core.nextId(shard) // nodeId == coordShard
+    }
+
     override fun nextPaymentId(buyerId: BuyerId, orderId: OrderId): Long {
         val shard = strategies.coordShard(buyerId.value, orderId.value)
         require(shard in 0..31) {

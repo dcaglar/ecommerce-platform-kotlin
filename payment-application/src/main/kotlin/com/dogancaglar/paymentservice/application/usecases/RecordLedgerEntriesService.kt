@@ -7,7 +7,6 @@ import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
-import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.ledger.Account
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
@@ -18,7 +17,6 @@ import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
 import org.slf4j.LoggerFactory
-import java.time.Clock
 import java.util.UUID
 
 open class RecordLedgerEntriesService(
@@ -49,14 +47,6 @@ open class RecordLedgerEntriesService(
         )
 
         val journalEntries: List<JournalEntry> = when (event.finalStatus.uppercase()) {
-            PaymentStatus.AUTHORIZED.name ->
-                    JournalEntry.authHold(
-                        journalIdentifier = event.paymentId,
-                        authorizedAmount = amount,
-                        authReceivable = authReceivable,
-                        authLiability = authLiability
-            )
-
             PaymentOrderStatus.CAPTURED.name ->
                 JournalEntry.capture(journalIdentifier = event.paymentOrderId,
                     capturedAmount = amount,

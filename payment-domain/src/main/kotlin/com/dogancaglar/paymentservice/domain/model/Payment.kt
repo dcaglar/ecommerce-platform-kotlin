@@ -1,89 +1,192 @@
 package com.dogancaglar.paymentservice.domain.model
 
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.domain.model.vo.*
+import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
+import com.dogancaglar.paymentservice.domain.model.vo.OrderId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
 import java.time.LocalDateTime
 
+/**
+ * Payment
+ *
+ * Represents the financial transaction created AFTER a PaymentIntent is authorized.
+ * Tracks captures and refunds at an aggregate level across all PaymentOrders.
+ *
+ * Lifecycle (at Payment level):
+ *  NOT_CAPTURED -> PARTIALLY_CAPTURED -> CAPTURED
+ *  CAPTURED/PARTIALLY_CAPTURED -> PARTIALLY_REFUNDED -> REFUNDED
+ */
 class Payment private constructor(
     val paymentId: PaymentId,
+    val paymentIntentId: PaymentIntentId,
     val buyerId: BuyerId,
     val orderId: OrderId,
     val totalAmount: Amount,
     val capturedAmount: Amount,
+    val refundedAmount: Amount,
     val status: PaymentStatus,
+    val paymentOrderLines: List<PaymentOrderLine>,
     val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime,
-    val paymentLines: List<PaymentLine>    // ← stored as JSONB in Persistence
+    val updatedAt: LocalDateTime
 ) {
 
-    // ------------------------
-    // AUTHORIZATION FLOW
-    // ------------------------
-
-    fun startAuthorization(now: LocalDateTime? = Utc.nowLocalDateTime()): Payment {
-        require(status == PaymentStatus.CREATED) {
-            "Can only start authorization from CREATED"
+    init {
+        require(totalAmount.isPositive()) { "Total amount must be positive" }
+        require(capturedAmount >= Amount.zero(totalAmount.currency)) {
+            "Captured amount cannot be negative"
         }
-        return copy(status = PaymentStatus.PENDING_AUTH, updatedAt = now!!)
+        require(refundedAmount >= Amount.zero(totalAmount.currency)) {
+            "Refunded amount cannot be negative"
+        }
+        require(capturedAmount <= totalAmount) {
+            "Captured amount cannot exceed total amount"
+        }
+        require(refundedAmount <= capturedAmount) {
+            "Refunded amount cannot exceed captured amount"
+        }
+
+        // Currency consistency
+        require(capturedAmount.currency == totalAmount.currency) {
+            "Captured amount currency must match total amount"
+        }
+        require(refundedAmount.currency == totalAmount.currency) {
+            "Refunded amount currency must match total amount"
+        }
+
+        // PaymentLines invariants (same as PaymentIntent)
+        require(paymentOrderLines.isNotEmpty()) { "Payment must have at least one payment line" }
+        val lineCurrencies = paymentOrderLines.map { it.amount.currency }.distinct()
+        require(lineCurrencies.size == 1 && lineCurrencies.first() == totalAmount.currency) {
+            "All payment lines must use the same currency as total amount"
+        }
+        val sum = paymentOrderLines.sumOf { it.amount.quantity }
+        require(sum == totalAmount.quantity) {
+            "Total amount (${totalAmount.quantity}) must equal sum of payment lines ($sum)"
+        }
     }
 
-    fun authorize(now: LocalDateTime = Utc.nowLocalDateTime()): Payment {
-        require(status == PaymentStatus.PENDING_AUTH) {
-            "Payment can only be authorized from PENDING_AUTH"
-        }
-        return copy(status = PaymentStatus.AUTHORIZED, updatedAt = now)
-    }
-
-    fun decline(now: LocalDateTime = Utc.nowLocalDateTime()): Payment {
-        require(status == PaymentStatus.PENDING_AUTH) {
-            "Payment can only be declined from PENDING_AUTH"
-        }
-        return copy(status = PaymentStatus.DECLINED, updatedAt = now)
-    }
-
-
     // ------------------------
-    // CAPTURE FLOW
+    // CAPTURE LOGIC
     // ------------------------
 
-    fun addCapturedAmount(amount: Amount): Payment {
-        val newCaptured = capturedAmount + amount
-        require(newCaptured <= totalAmount) { "Captured amount cannot exceed total" }
+    /**
+     * Apply a successful capture (sum of one or more PaymentOrders).
+     * Updates capturedAmount and PaymentStatus.
+     */
+    fun applyCapture(
+        captureAmount: Amount,
+        now: LocalDateTime = Utc.nowLocalDateTime()
+    ): Payment {
+        require(captureAmount.isPositive()) { "Capture amount must be positive" }
+        require(captureAmount.currency == totalAmount.currency) {
+            "Capture amount currency must match total amount"
+        }
+        require(status in setOf(
+            PaymentStatus.NOT_CAPTURED,
+            PaymentStatus.PARTIALLY_CAPTURED
+        )) {
+            "Can only capture from NOT_CAPTURED or PARTIALLY_CAPTURED (current=$status)"
+        }
+
+        val newCaptured = capturedAmount + captureAmount
+        require(newCaptured <= totalAmount) { "Captured amount cannot exceed total amount" }
 
         val newStatus = when {
-            newCaptured == totalAmount -> PaymentStatus.CAPTURED
-            newCaptured < totalAmount -> PaymentStatus.PARTIALLY_CAPTURED
-            else -> status
+            newCaptured == Amount.zero(totalAmount.currency) -> PaymentStatus.NOT_CAPTURED
+            newCaptured < totalAmount                        -> PaymentStatus.PARTIALLY_CAPTURED
+            newCaptured == totalAmount                       -> PaymentStatus.CAPTURED
+            else                                             -> status
         }
 
         return copy(
             capturedAmount = newCaptured,
-            status = newStatus
+            status = newStatus,
+            updatedAt = now
+        )
+    }
+
+    fun voidAuthorization(now: LocalDateTime = Utc.nowLocalDateTime()): Payment {
+        require(status == PaymentStatus.NOT_CAPTURED) {
+            "Can only void when NOT_CAPTURED (current=$status)"
+        }
+
+        return copy(
+            status = PaymentStatus.VOIDED,
+            updatedAt = now
         )
     }
 
 
     // ------------------------
-    // COPY METHOD
+    // REFUND LOGIC
+    // ------------------------
+
+    /**
+     * Apply a refund (sum of one or more PaymentOrder refunds).
+     * Updates refundedAmount and PaymentStatus.
+     */
+    fun applyRefund(
+        refundAmount: Amount,
+        now: LocalDateTime = Utc.nowLocalDateTime()
+    ): Payment {
+        require(refundAmount.isPositive()) { "Refund amount must be positive" }
+        require(refundAmount.currency == totalAmount.currency) {
+            "Refund amount currency must match total amount"
+        }
+        require(capturedAmount > Amount.zero(totalAmount.currency)) {
+            "Cannot refund a payment with zero captured amount"
+        }
+        require(status in setOf(
+            PaymentStatus.PARTIALLY_CAPTURED,
+            PaymentStatus.CAPTURED,
+            PaymentStatus.PARTIALLY_REFUNDED
+        )) {
+            "Can only refund from CAPTURED / PARTIALLY_CAPTURED / PARTIALLY_REFUNDED (current=$status)"
+        }
+
+        val newRefunded = refundedAmount + refundAmount
+        require(newRefunded <= capturedAmount) {
+            "Refunded amount ($newRefunded) cannot exceed captured amount ($capturedAmount)"
+        }
+
+        val newStatus = when {
+            newRefunded == Amount.zero(totalAmount.currency) -> status // should not happen with positive refund
+            newRefunded < capturedAmount                     -> PaymentStatus.PARTIALLY_REFUNDED
+            newRefunded == capturedAmount                    -> PaymentStatus.REFUNDED
+            else                                             -> status
+        }
+
+        return copy(
+            refundedAmount = newRefunded,
+            status = newStatus,
+            updatedAt = now
+        )
+    }
+
+    // ------------------------
+    // INTERNAL COPY
     // ------------------------
 
     private fun copy(
-        status: PaymentStatus = this.status,
         capturedAmount: Amount = this.capturedAmount,
-        updatedAt: LocalDateTime = Utc.nowLocalDateTime(),
-        paymentLines: List<PaymentLine> = this.paymentLines
+        refundedAmount: Amount = this.refundedAmount,
+        status: PaymentStatus = this.status,
+        updatedAt: LocalDateTime = Utc.nowLocalDateTime()
     ): Payment = Payment(
         paymentId = paymentId,
+        paymentIntentId = paymentIntentId,
         buyerId = buyerId,
         orderId = orderId,
         totalAmount = totalAmount,
         capturedAmount = capturedAmount,
+        refundedAmount = refundedAmount,
         status = status,
+        paymentOrderLines = paymentOrderLines,
         createdAt = createdAt,
-        updatedAt = updatedAt,
-        paymentLines = paymentLines
+        updatedAt = updatedAt
     )
-
 
     // ------------------------
     // FACTORY METHODS
@@ -91,51 +194,60 @@ class Payment private constructor(
 
     companion object {
 
-        fun createNew(
+        /**
+         * Create a Payment AFTER a PaymentIntent has been AUTHORIZED.
+         * Typically called from the application layer when handling PaymentIntentAuthorized.
+         */
+        fun fromAuthorizedIntent(
             paymentId: PaymentId,
-            buyerId: BuyerId,
-            orderId: OrderId,
-            totalAmount: Amount,
-            paymentLines: List<PaymentLine>
+            intent: PaymentIntent
         ): Payment {
-            require(paymentLines.isNotEmpty()) { "Payment must have at least one payment line" }
-            require(totalAmount.isPositive()) { "Total amount must be positive" }
+            require(intent.status == PaymentIntentStatus.AUTHORIZED) {
+                "Cannot create Payment from non-AUTHORIZED PaymentIntent (current=${intent.status})"
+            }
 
+            val zero = Amount.zero(intent.totalAmount.currency)
             val now = Utc.nowLocalDateTime()
-
+            
             return Payment(
                 paymentId = paymentId,
-                buyerId = buyerId,
-                orderId = orderId,
-                totalAmount = totalAmount,
-                capturedAmount = Amount.zero(totalAmount.currency),
-                status = PaymentStatus.CREATED,    // ← Important change!
+                paymentIntentId = intent.paymentIntentId,
+                buyerId = intent.buyerId,
+                orderId = intent.orderId,
+                totalAmount = intent.totalAmount,
+                capturedAmount = zero,
+                refundedAmount = zero,
+                status = PaymentStatus.NOT_CAPTURED,
+                paymentOrderLines = intent.paymentOrderLines,
                 createdAt = now,
-                updatedAt = now,
-                paymentLines = paymentLines
+                updatedAt = now
             )
         }
 
         fun rehydrate(
             paymentId: PaymentId,
+            paymentIntentId: PaymentIntentId,
             buyerId: BuyerId,
             orderId: OrderId,
             totalAmount: Amount,
             capturedAmount: Amount,
+            refundedAmount: Amount,
             status: PaymentStatus,
+            paymentOrderLines: List<PaymentOrderLine>,
             createdAt: LocalDateTime,
-            updatedAt: LocalDateTime,
-            paymentLines: List<PaymentLine>
+            updatedAt: LocalDateTime
         ): Payment = Payment(
-            paymentId,
-            buyerId,
-            orderId,
-            totalAmount,
-            capturedAmount,
-            status,
-            createdAt,
-            updatedAt,
-            paymentLines
+            paymentId = paymentId,
+            paymentIntentId = paymentIntentId,
+            buyerId = buyerId,
+            orderId = orderId,
+            totalAmount = totalAmount,
+            capturedAmount = capturedAmount,
+            refundedAmount = refundedAmount,
+            status = status,
+            paymentOrderLines = paymentOrderLines,
+            createdAt = createdAt,
+            updatedAt = updatedAt
         )
     }
 }

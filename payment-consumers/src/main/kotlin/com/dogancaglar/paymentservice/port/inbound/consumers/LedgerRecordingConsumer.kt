@@ -28,7 +28,7 @@ class LedgerRecordingConsumer(
 
     @KafkaListener(
         topics = [Topics.LEDGER_RECORD_REQUEST_QUEUE],
-        containerFactory = "${Topics.LEDGER_RECORD_REQUEST_QUEUE}-factory",
+        containerFactory = "${Topics.LEDGER_RECORD_REQUEST_QUEUE}factory",
         groupId = CONSUMER_GROUPS.LEDGER_RECORDING_CONSUMER
     )
     fun onLedgerRequested(

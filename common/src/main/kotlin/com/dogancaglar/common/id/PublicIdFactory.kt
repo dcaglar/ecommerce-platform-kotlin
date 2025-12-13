@@ -5,6 +5,9 @@ object PublicIdFactory {
     fun publicPaymentId(paymentId: Long): String =
         "pay_${PublicIdCodec.encode(paymentId)}"
 
+    fun publicPaymentIntentId(paymentIntentId: Long): String =
+        "pi_${PublicIdCodec.encode(paymentIntentId)}"
+
     fun publicPaymentOrderId(orderId: Long): String =
         "po_${PublicIdCodec.encode(orderId)}"
 

@@ -7,10 +7,10 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.common.logging.GenericLogFields
 import com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaSerializer
-import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
+import com.dogancaglar.paymentservice.application.commands.PaymentOrderLedgerRecordingCommand
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
-import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
+import com.dogancaglar.paymentservice.application.events.PaymentAuthorizedIntent
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
@@ -201,14 +201,14 @@ class KafkaTypedConsumerFactoryConfig(
         }
 
 
-    @Bean("${Topics.PAYMENT_AUTHORIZED}-factory")
+    @Bean("${Topics.PAYMENT_INTENT_AUTHORIZED}-factory")
     fun paymentAuthorizedFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
         customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler
-    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentAuthorized>> {
-        val cfg = cfgFor(PaymentEventMetadataCatalog.PaymentAuthorizedMetadata.topic, "${Topics.PAYMENT_AUTHORIZED}-factory")
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentAuthorizedIntent>> {
+        val cfg = cfgFor(PaymentEventMetadataCatalog.PaymentIntentAuthorizedMetadata.topic, "${Topics.PAYMENT_INTENT_AUTHORIZED}-factory")
         return createFactory(
             clientId = cfg.id,
             concurrency = cfg.concurrency,
@@ -216,7 +216,7 @@ class KafkaTypedConsumerFactoryConfig(
             consumerFactory = customFactory,
             errorHandler = errorHandler,
             ackMode = ContainerProperties.AckMode.MANUAL,
-            expectedEventType = PaymentEventMetadataCatalog.PaymentAuthorizedMetadata.eventType,
+            expectedEventType = PaymentEventMetadataCatalog.PaymentIntentAuthorizedMetadata.eventType,
             batchMode = false
         )
     }
@@ -294,7 +294,7 @@ class KafkaTypedConsumerFactoryConfig(
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
         customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler
-    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<LedgerRecordingCommand>> {
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderLedgerRecordingCommand>> {
         val cfg = cfgFor(
             Topics.LEDGER_RECORD_REQUEST_QUEUE,
             "${Topics.LEDGER_RECORD_REQUEST_QUEUE}-factory"

@@ -7,11 +7,11 @@ app:
 
   kafka: # Kafka configuration for dynamic consumers
     dynamic-consumers:
-      - id: payment-order-authorized-processor
+      - id: payment-authorized-processor
         topic: payment_authorized_topic
         group-id: payment-authorized-processor-consumer-group
         class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentAuthorizedConsumer
-        concurrency: 8
+        concurrency: 2
       - id: payment-order-enqueuer
         topic: payment_order_created_topic
         group-id: payment-order-enqueuer-consumer-group

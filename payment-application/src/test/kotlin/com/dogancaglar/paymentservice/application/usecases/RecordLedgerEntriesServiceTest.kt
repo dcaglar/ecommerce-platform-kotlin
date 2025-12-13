@@ -1,10 +1,8 @@
 package com.dogancaglar.paymentservice.application.usecases
 
 import com.dogancaglar.common.logging.EventLogContext
-import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
 import com.dogancaglar.paymentservice.domain.model.Currency
-import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountCategory
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountProfile
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountStatus
@@ -26,6 +24,8 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
+import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
@@ -55,10 +55,10 @@ class RecordLedgerEntriesServiceTest {
     fun tearDown() {
         clearAllMocks()
     }
-
+/* move this to recordledgerauthentrueservicetest
     @Test
     fun `recordLedgerEntries emits LedgerEntriesRecorded for AUTHORIZED status`() {
-        val command = sampleCommand(PaymentStatus.AUTHORIZED.name)
+        val command = sampleCommand(PaymentIntentStatus.AUTHORIZED.name)
         val (eventId, traceId, aggregateId) = withMockedLogContext(command.sellerId)
 
         val persistedEntriesSlot = slot<List<LedgerEntry>>()
@@ -107,7 +107,7 @@ class RecordLedgerEntriesServiceTest {
         }
         unmockkObject(EventLogContext)
     }
-
+*/
     @Test
     fun `recordLedgerEntries emits capture journal for CAPTURED status`() {
         val command = sampleCommand("CAPTURED")
@@ -180,13 +180,14 @@ class RecordLedgerEntriesServiceTest {
         unmockkObject(EventLogContext)
     }
 
+    /* move this also record ledger authoriztion entires
     @Test
     fun `recordLedgerEntries returns when persistence yields no entries`() {
         mockkObject(EventLogContext)
         every { EventLogContext.getTraceId() } returns "test-trace"
         every { EventLogContext.getEventId() } returns null
         
-        val command = sampleCommand(PaymentStatus.AUTHORIZED.name)
+        val command = sampleCommand(PaymentIntentStatus.AUTHORIZED.name)
         every { ledgerWritePort.postLedgerEntriesAtomic(any()) } returns emptyList()
 
         service.recordLedgerEntries(command)
@@ -195,10 +196,13 @@ class RecordLedgerEntriesServiceTest {
         verify { eventPublisherPort wasNot Called }
         unmockkObject(EventLogContext)
     }
+    */
 
+
+    /*
     @Test
     fun `recordLedgerEntries propagates publish failure after persisting`() {
-        val command = sampleCommand(PaymentStatus.AUTHORIZED.name)
+        val command = sampleCommand(PaymentIntentStatus.AUTHORIZED.name)
         val (eventId, traceId, aggregateId) = withMockedLogContext(command.sellerId)
 
         val persistedEntriesSlot = slot<List<LedgerEntry>>()
@@ -233,7 +237,7 @@ class RecordLedgerEntriesServiceTest {
             )
         }
     }
-
+*/
     private fun sampleCommand(status: String) = LedgerRecordingCommand.fromJson(
         pOrderId = "po-123",
         pubOrderId = "paymentorder-po-123",

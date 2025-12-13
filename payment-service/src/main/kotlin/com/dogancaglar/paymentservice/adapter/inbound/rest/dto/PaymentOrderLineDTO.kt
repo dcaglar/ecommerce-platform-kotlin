@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 
 
-data class PaymentLineDTO(
+data class PaymentOrderLineDTO(
     @field:NotBlank
     val sellerId: String,
     @field:NotNull

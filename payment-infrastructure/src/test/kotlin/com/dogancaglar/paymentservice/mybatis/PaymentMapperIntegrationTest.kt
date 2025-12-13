@@ -23,7 +23,7 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.paymentservice.serialization.JacksonUtil
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -94,23 +94,25 @@ class PaymentMapperIntegrationTest {
 
     private fun sampleEntity(id: Long = 101L): PaymentEntity {
         val now = Utc.nowInstant().normalizeToMicroseconds()
-        val paymentLines = listOf(
-            PaymentLine(
+        val paymentOrderLines = listOf(
+            PaymentOrderLine(
                 sellerId = SellerId("seller-1"),
                 amount = Amount.of(10_000, Currency("USD"))
             )
         )
         return PaymentEntity(
             paymentId = id,
+            paymentIntentId = id,
             buyerId = "buyer-$id",
             orderId = "order-$id",
             totalAmountValue = 10_000,
             capturedAmountValue = 0,
+            refundedAmountValue = 0,
             currency = "USD",
             status = "PENDING_AUTH",
             createdAt = now,
             updatedAt = now,
-            paymentLinesJson = objectMapper.writeValueAsString(paymentLines)
+            paymentLinesJson = objectMapper.writeValueAsString(paymentOrderLines)
         )
     }
 

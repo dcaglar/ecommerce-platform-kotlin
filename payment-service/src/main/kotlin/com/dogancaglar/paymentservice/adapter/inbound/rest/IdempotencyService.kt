@@ -1,7 +1,7 @@
 // payment-service/src/main/kotlin/.../idempotency/IdempotencyService.kt
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentResponseDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentResponseDTO
 import com.dogancaglar.paymentservice.idempotency.CanonicalJsonHasher
 import com.dogancaglar.paymentservice.ports.outbound.IdempotencyStorePort
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -23,8 +23,8 @@ class IdempotencyService(
     fun run(
         key: String,
         requestBody: Any,
-        block: () -> PaymentResponseDTO
-    ): IdempotencyResult<PaymentResponseDTO> {
+        block: () -> CreatePaymentIntentResponseDTO
+    ): IdempotencyResult<CreatePaymentIntentResponseDTO> {
 
         val hash = canonicalJsonHasher.hashBody(requestBody)
 
@@ -75,7 +75,7 @@ class IdempotencyService(
 
         val responseObj = objectMapper.readValue(
             finalRecord.responsePayload,
-            PaymentResponseDTO::class.java
+            CreatePaymentIntentResponseDTO::class.java
         )
 
         return IdempotencyResult(

@@ -6,9 +6,14 @@ import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ID
 import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ORDER_ID
+import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.application.commands.LedgerRecordingAuthorizationCommand
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
+import com.dogancaglar.paymentservice.application.events.PaymentIntentAuthorized
+import com.dogancaglar.paymentservice.application.usecases.RecordAuthorizationLedgerEntriesService
 import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -22,8 +27,8 @@ import org.springframework.stereotype.Component
 @Component
 class PaymentAuthorizedConsumer(
     @param:Qualifier("syncPaymentTx") private val kafkaTx: KafkaTxExecutor,
-    @param:Qualifier("syncPaymentEventPublisher") private val publisher: EventPublisherPort,
-    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
+    private val dedupe: EventDeduplicationPort,
+    private val recordAuthorizationLedgerEntriesService: RecordAuthorizationLedgerEntriesService
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -43,23 +48,34 @@ class PaymentAuthorizedConsumer(
         val offsets = mapOf(tp to OffsetAndMetadata(record.offset() + 1))
         val groupMeta = consumer.groupMetadata()
         EventLogContext.with(envelope) {
-            /*
-            if (order.status != PaymentStatus.AUTHORIZED) {
+            if (dedupe.exists(envelope.eventId)) {
+                logger.warn(
+                    "⚠️ Event is processed already  for $PAYMENT_ID  ${eventData.publicPaymentId} " +
+                          " , skipping")
                 kafkaTx.run(offsets, groupMeta) {}
-                logger.warn("⏩ Skip authorized consumer (status={}) agg={}", order.status, consumed.aggregateId)
                 return@with
             }
-            */
             logger.info(
                 "🎬 Started processing   authorization event for $PAYMENT_ID  ${eventData.publicPaymentId}")
-
-
-            kafkaTx.run(offsets, groupMeta) {}
+            try {
+                kafkaTx.run(offsets, groupMeta) {
+                    logger.info(
+                        "🧾 Recording ledger authorization entries for paymentId=${eventData.publicPaymentId} traceid:${envelope.traceId}",
+                    )
+                    recordAuthorizationLedgerEntriesService.recordAuthorization(LedgerRecordingAuthorizationCommand.from(eventData,Utc.nowInstant()))
+                    dedupe.markProcessed(envelope.eventId, 3600)
+                    logger.info(
+                        "✅ Ledger recording authorization  complete and event published for paymenId=${eventData.paymentId}"
+                    )
+                }
+            } catch (e: Exception) {
+                logger.error(
+                    "❌ Failed to record authorization ledger entries for paymentId=${eventData.paymentId} traceId=${envelope.traceId}"
+                )
+                throw e // Re-throw to let Spring Kafka error handler process it
+            }
             logger.info(
-                "✅ Completed processing authorization payment event   for  with $PAYMENT_ID ${eventData.publicPaymentId}")
-            return@with
-            //todo we will request a ledger recording here
-
+                "🎬 Completed processing   authorization event for $PAYMENT_ID  ${eventData.publicPaymentId}")
         }
 
     }

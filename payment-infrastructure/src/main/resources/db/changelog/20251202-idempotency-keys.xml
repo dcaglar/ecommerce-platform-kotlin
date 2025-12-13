@@ -15,10 +15,10 @@
                 <constraints primaryKey="true" nullable="false"/>
             </column>
 
-            <column name="payment_id" type="BIGINT">
-                <constraints nullable="true" foreignKeyName="fk_payment_orders_payment"
-                             referencedTableName="payments"
-                             referencedColumnNames="payment_id"/>
+            <column name="payment_intent_id" type="BIGINT">
+                <constraints nullable="true" foreignKeyName="fk_payment_intent"
+                             referencedTableName="payment_intents"
+                             referencedColumnNames="payment_intent_id"/>
             </column>
             <column name="request_hash" type="VARCHAR(128)">
                 <constraints  nullable="true"/>

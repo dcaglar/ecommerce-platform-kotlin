@@ -1,25 +1,26 @@
 package com.dogancaglar.paymentservice.domain.util
 
-import com.dogancaglar.paymentservice.domain.model.PaymentStatus
+import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
+
 
 /**
- * Maps PSP authorization responses to internal PaymentStatus values.
+ * Maps PSP authorization responses to internal PaymentIntentStatus values.
  * Used only in the synchronous authorization (web/API) flow.
  */
 object PSPAuthorizationStatusMapper {
 
-    fun fromPspAuthCode(code: String): PaymentStatus = when (code.uppercase()) {
+    fun fromPspAuthCode(code: String): PaymentIntentStatus = when (code.uppercase()) {
         // Typical PSP authorization outcomes
-        "AUTHORIZED", "SUCCESS" -> PaymentStatus.AUTHORIZED
-        "DECLINED", "INSUFFICIENT_FUNDS", "CARD_EXPIRED" -> PaymentStatus.DECLINED
-        else -> PaymentStatus.DECLINED // default defensive fallback
+        "AUTHORIZED", "SUCCESS" -> PaymentIntentStatus.AUTHORIZED
+        "DECLINED", "INSUFFICIENT_FUNDS", "CARD_EXPIRED" -> PaymentIntentStatus.DECLINED
+        else -> PaymentIntentStatus.DECLINED // default defensive fallback
     }
 
     fun isAuthorized(code: String): Boolean {
-        return fromPspAuthCode(code) == PaymentStatus.AUTHORIZED
+        return fromPspAuthCode(code) == PaymentIntentStatus.AUTHORIZED
     }
 
     fun isDeclined(code: String): Boolean {
-        return fromPspAuthCode(code) == PaymentStatus.DECLINED
+        return fromPspAuthCode(code) == PaymentIntentStatus.DECLINED
     }
 }

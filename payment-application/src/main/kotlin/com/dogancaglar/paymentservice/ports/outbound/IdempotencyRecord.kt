@@ -7,7 +7,7 @@ import java.time.Instant
 data class IdempotencyRecord(
     val idempotencyKey: String,
     val requestHash: String,
-    val paymentId: Long? = null,
+    val paymentIntentId: Long? = null,
     val responsePayload: String? = null,
     val status: IdempotencyStatus = IdempotencyStatus.PENDING,
     val createdAt: Instant = Utc.nowInstant()

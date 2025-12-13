@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest.mapper
 
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentLineDTO
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentOrderLineDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentRequestDTO
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
@@ -9,7 +9,7 @@ import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.port.out.web.dto.*
 import org.junit.jupiter.api.Test
@@ -21,12 +21,12 @@ class PaymentRequestMapperTest {
     @Test
     fun `should map PaymentRequestDTO to CreatePaymentCommand correctly`() {
         // Given
-        val dto = CreatePaymentRequestDTO(
+        val dto = CreatePaymentIntentRequestDTO(
             orderId = "order-123",
             buyerId = "buyer-456",
             totalAmount = AmountDto(10000L, CurrencyEnum.USD),
             paymentOrders = listOf(
-                PaymentLineDTO(
+                PaymentOrderLineDTO(
                     sellerId = "seller-789",
                     amount = AmountDto(10000L, CurrencyEnum.USD)
                 )
@@ -34,30 +34,30 @@ class PaymentRequestMapperTest {
         )
 
         // When
-        val command = PaymentRequestMapper.toCreatePaymentCommand(dto)
+        val command = PaymentRequestMapper.toCreatePaymentIntentCommand(dto)
 
         // Then
         assertEquals(OrderId("order-123"), command.orderId)
         assertEquals(BuyerId("buyer-456"), command.buyerId)
         assertEquals(Amount.of(10000L, Currency("USD")), command.totalAmount)
-        assertEquals(1, command.paymentLines.size)
-        assertEquals(SellerId("seller-789"), command.paymentLines[0].sellerId)
-        assertEquals(Amount.of(10000L, Currency("USD")), command.paymentLines[0].amount)
+        assertEquals(1, command.paymentOrderLines.size)
+        assertEquals(SellerId("seller-789"), command.paymentOrderLines[0].sellerId)
+        assertEquals(Amount.of(10000L, Currency("USD")), command.paymentOrderLines[0].amount)
     }
 
     @Test
     fun `should map PaymentRequestDTO with multiple payment orders correctly`() {
         // Given
-        val dto = CreatePaymentRequestDTO(
+        val dto = CreatePaymentIntentRequestDTO(
             orderId = "order-123",
             buyerId = "buyer-456",
             totalAmount = AmountDto(20000L, CurrencyEnum.EUR),
             paymentOrders = listOf(
-                PaymentLineDTO(
+                PaymentOrderLineDTO(
                     sellerId = "seller-789",
                     amount = AmountDto(15000L, CurrencyEnum.EUR)
                 ),
-                PaymentLineDTO(
+                PaymentOrderLineDTO(
                     sellerId = "seller-101",
                     amount = AmountDto(5000L, CurrencyEnum.EUR)
                 )
@@ -65,17 +65,17 @@ class PaymentRequestMapperTest {
         )
 
         // When
-        val command = PaymentRequestMapper.toCreatePaymentCommand(dto)
+        val command = PaymentRequestMapper.toCreatePaymentIntentCommand(dto)
 
         // Then
         assertEquals(OrderId("order-123"), command.orderId)
         assertEquals(BuyerId("buyer-456"), command.buyerId)
         assertEquals(Amount.of(20000L, Currency("EUR")), command.totalAmount)
-        assertEquals(2, command.paymentLines.size)
-        assertEquals(SellerId("seller-789"), command.paymentLines[0].sellerId)
-        assertEquals(Amount.of(15000L, Currency("EUR")), command.paymentLines[0].amount)
-        assertEquals(SellerId("seller-101"), command.paymentLines[1].sellerId)
-        assertEquals(Amount.of(5000L, Currency("EUR")), command.paymentLines[1].amount)
+        assertEquals(2, command.paymentOrderLines.size)
+        assertEquals(SellerId("seller-789"), command.paymentOrderLines[0].sellerId)
+        assertEquals(Amount.of(15000L, Currency("EUR")), command.paymentOrderLines[0].amount)
+        assertEquals(SellerId("seller-101"), command.paymentOrderLines[1].sellerId)
+        assertEquals(Amount.of(5000L, Currency("EUR")), command.paymentOrderLines[1].amount)
     }
 
     @Test
@@ -86,7 +86,7 @@ class PaymentRequestMapperTest {
             orderId = OrderId("order-123"),
             totalAmount = Amount.of(10000L, Currency("USD")),
             paymentLines = listOf(
-                PaymentLine(
+                PaymentOrderLine(
                     sellerId = SellerId("seller-789"),
                     amount = Amount.of(10000L, Currency("USD"))
                 )
@@ -95,7 +95,7 @@ class PaymentRequestMapperTest {
 
         val response = PaymentRequestMapper.toPaymentResponseDto(payment)
 
-        assertEquals(payment.paymentId.toPublicPaymentId(), response.paymentId)
+        assertEquals(payment.paymentId.toPublicPaymentId(), response.paymentIntentId)
         assertEquals("CREATED", response.status)
         assertEquals("buyer-456", response.buyerId)
         assertEquals("order-123", response.orderId)
@@ -112,7 +112,7 @@ class PaymentRequestMapperTest {
             orderId = OrderId("order-456"),
             totalAmount = Amount.of(5000L, Currency("EUR")),
             paymentLines = listOf(
-                PaymentLine(
+                PaymentOrderLine(
                     sellerId = SellerId("seller-1"),
                     amount = Amount.of(5000L, Currency("EUR"))
                 )
@@ -123,7 +123,7 @@ class PaymentRequestMapperTest {
 
         val response = PaymentRequestMapper.toPaymentResponseDto(payment)
 
-        assertEquals(payment.paymentId.toPublicPaymentId(), response.paymentId)
+        assertEquals(payment.paymentId.toPublicPaymentId(), response.paymentIntentId)
         assertEquals("AUTHORIZED", response.status)
         assertEquals(5000L, response.totalAmount.quantity)
         assertEquals(CurrencyEnum.EUR, response.totalAmount.currency)
@@ -132,12 +132,12 @@ class PaymentRequestMapperTest {
     @Test
     fun `should handle large amounts correctly`() {
         // Given
-        val dto = CreatePaymentRequestDTO(
+        val dto = CreatePaymentIntentRequestDTO(
             orderId = "order-123",
             buyerId = "buyer-456",
             totalAmount = AmountDto(99999999L, CurrencyEnum.USD),
             paymentOrders = listOf(
-                PaymentLineDTO(
+                PaymentOrderLineDTO(
                     sellerId = "seller-789",
                     amount = AmountDto(99999999L, CurrencyEnum.USD)
                 )
@@ -145,22 +145,22 @@ class PaymentRequestMapperTest {
         )
 
         // When
-        val command = PaymentRequestMapper.toCreatePaymentCommand(dto)
+        val command = PaymentRequestMapper.toCreatePaymentIntentCommand(dto)
 
         // Then
         assertEquals(Amount.of(99999999L, Currency("USD")), command.totalAmount)
-        assertEquals(Amount.of(99999999L, Currency("USD")), command.paymentLines[0].amount)
+        assertEquals(Amount.of(99999999L, Currency("USD")), command.paymentOrderLines[0].amount)
     }
 
     @Test
     fun `should handle different currencies correctly`() {
         // Given
-        val dto = CreatePaymentRequestDTO(
+        val dto = CreatePaymentIntentRequestDTO(
             orderId = "order-123",
             buyerId = "buyer-456",
             totalAmount = AmountDto(10000L, CurrencyEnum.GBP),
             paymentOrders = listOf(
-                PaymentLineDTO(
+                PaymentOrderLineDTO(
                     sellerId = "seller-789",
                     amount = AmountDto(10000L, CurrencyEnum.GBP)
                 )
@@ -168,10 +168,10 @@ class PaymentRequestMapperTest {
         )
 
         // When
-        val command = PaymentRequestMapper.toCreatePaymentCommand(dto)
+        val command = PaymentRequestMapper.toCreatePaymentIntentCommand(dto)
 
         // Then
         assertEquals(Amount.of(10000L, Currency("GBP")), command.totalAmount)
-        assertEquals(Amount.of(10000L, Currency("GBP")), command.paymentLines[0].amount)
+        assertEquals(Amount.of(10000L, Currency("GBP")), command.paymentOrderLines[0].amount)
     }
 }

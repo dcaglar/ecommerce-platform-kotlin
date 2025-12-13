@@ -5,9 +5,8 @@ import com.dogancaglar.paymentservice.InfraTestBoot
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.OutboxEventEntity
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.OutboxEventMapper
 import com.dogancaglar.paymentservice.application.usecases.ProcessPaymentService
-import com.dogancaglar.paymentservice.ports.inbound.AuthorizePaymentUseCase
+import com.dogancaglar.paymentservice.ports.inbound.AuthorizePaymentIntentUseCase
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Tag
@@ -86,7 +85,7 @@ class OutboxEventMapperIntegrationTest {
     lateinit var outboxEventMapper: OutboxEventMapper
 
     @MockkBean
-    lateinit var authorizePaymentUseCase: AuthorizePaymentUseCase
+    lateinit var authorizePaymentUseCase: AuthorizePaymentIntentUseCase
 
     @MockkBean
     lateinit var processPaymentService: ProcessPaymentService

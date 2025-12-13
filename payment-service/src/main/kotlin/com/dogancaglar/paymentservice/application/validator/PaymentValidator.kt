@@ -4,31 +4,31 @@ import com.dogancaglar.paymentservice.adapter.inbound.rest.mapper.AmountMapper
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountStatus
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentRequestDTO
 import org.springframework.stereotype.Service
 
 @Service
 class PaymentValidator(private val accountDirectory: AccountDirectoryPort) {
-    fun validate(request: CreatePaymentRequestDTO) {
+    fun validate(request: CreatePaymentIntentRequestDTO) {
         validateUniqueSellers(request)
         validateTotals(request)
         validateCurrencies(request)
     }
 
-    private fun validateUniqueSellers(request: CreatePaymentRequestDTO) {
+    private fun validateUniqueSellers(request: CreatePaymentIntentRequestDTO) {
         val sellerIds = request.paymentOrders.map { it.sellerId }
         require(sellerIds.distinct().size == sellerIds.size) {
             "Duplicate seller IDs are not allowed in a single payment"
         }
     }
 
-    private fun validateTotals(request: CreatePaymentRequestDTO) {
+    private fun validateTotals(request: CreatePaymentIntentRequestDTO) {
         val totalOrders = request.paymentOrders.sumOf { it.amount.quantity }
         require(totalOrders == request.totalAmount.quantity) {
             "Sum of payment order amounts ($totalOrders) must equal total amount (${request.totalAmount.quantity})"
         }
     }
-    private fun validateCurrencies(request: CreatePaymentRequestDTO) {
+    private fun validateCurrencies(request: CreatePaymentIntentRequestDTO) {
         val paymentCurrency = AmountMapper.toDomain(request.totalAmount).currency
 
         request.paymentOrders.forEach { order ->

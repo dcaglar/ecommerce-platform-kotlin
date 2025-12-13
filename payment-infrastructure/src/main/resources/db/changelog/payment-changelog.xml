@@ -14,6 +14,9 @@
             <column name="payment_id" type="BIGINT">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
+            <column name="payment_intent_id" type="BIGINT">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
             <column name="buyer_id" type="VARCHAR(255)">
                 <constraints nullable="false"/>
             </column>
@@ -27,6 +30,9 @@
             </column>
 
             <column name="captured_amount_value" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="refunded_amount_value" type="BIGINT" defaultValueNumeric="0">
                 <constraints nullable="false"/>
             </column>
 
@@ -56,12 +62,13 @@
             ALTER TABLE payments
             ADD CONSTRAINT chk_payments_status_valid
             CHECK (status IN (
-            'CREATED',
-            'PENDING_AUTH',
-            'AUTHORIZED',
-            'DECLINED',
-            'PARTIALLY_CAPTURED',
             'CAPTURED'
+            'NOT_CAPTURED',
+            'PARTIALLY_CAPTURED',
+            'CAPTURED',
+            'PARTIALLY_REFUNDED',
+            'REFUNDED',
+            'VOIDED'
             ));
         </sql>
 
@@ -77,6 +84,15 @@
             CHECK (
             captured_amount_value &gt;= 0 AND
             captured_amount_value &lt;= total_amount_value
+            );
+        </sql>
+
+        <sql>
+            ALTER TABLE payments
+            ADD CONSTRAINT chk_payments_refunded_le_total
+            CHECK (
+            refunded_amount_value &gt;= 0 AND
+            refunded_amount_value &lt;= total_amount_value
             );
         </sql>
 

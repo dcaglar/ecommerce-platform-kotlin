@@ -4,9 +4,6 @@ import com.dogancaglar.paymentservice.InfraTestBoot
 import com.dogancaglar.paymentservice.ports.outbound.IdempotencyRecord
 import com.dogancaglar.paymentservice.ports.outbound.IdempotencyStatus
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.IdempotencyKeyMapper
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentMapper
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentEntity
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
@@ -26,9 +23,11 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentIntentEntity
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentIntentMapper
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.paymentservice.serialization.JacksonUtil
 import org.junit.jupiter.api.BeforeEach
@@ -118,7 +117,7 @@ class IdempotencyKeyMapperIntegrationTest {
     lateinit var idempotencyKeyMapper: IdempotencyKeyMapper
 
     @Autowired
-    lateinit var paymentMapper: PaymentMapper
+    lateinit var paymentMapper: PaymentIntentMapper
 
     private val objectMapper = JacksonUtil.createObjectMapper()
 
@@ -129,26 +128,25 @@ class IdempotencyKeyMapperIntegrationTest {
         assertEquals(expectedTree, actualTree, "JSON content should match (order may differ)")
     }
 
-    private fun createPayment(paymentId: Long) {
+    private fun createPaymentIntent(paymentIntentId: Long) {
         val now = Utc.nowInstant().normalizeToMicroseconds()
-        val paymentLines = listOf(
-            PaymentLine(
+        val paymentOrderLines = listOf(
+            PaymentOrderLine(
                 sellerId = SellerId("seller-1"),
                 amount = Amount.of(10_000, Currency("EUR"))
             )
         )
         paymentMapper.insert(
-            PaymentEntity(
-                paymentId = paymentId,
-                buyerId = "buyer-$paymentId",
-                orderId = "order-$paymentId",
+            PaymentIntentEntity(
+                paymentIntentId = paymentIntentId,
+                buyerId = "buyer-$paymentIntentId",
+                orderId = "order-$paymentIntentId",
                 totalAmountValue = 10_000,
-                capturedAmountValue = 0,
                 currency = "EUR",
                 status = "PENDING_AUTH",
                 createdAt = now,
                 updatedAt = now,
-                paymentLinesJson = objectMapper.writeValueAsString(paymentLines)
+                paymentLinesJson = objectMapper.writeValueAsString(paymentOrderLines)
             )
         )
     }
@@ -156,7 +154,7 @@ class IdempotencyKeyMapperIntegrationTest {
     private fun sampleRecord(
         key: String = "test-key-1",
         requestHash: String = "hash-abc123",
-        paymentId: Long? = null,
+        paymentIntentId: Long? = null,
         responsePayload: String? = null,
         status: IdempotencyStatus = IdempotencyStatus.PENDING,
         createdAt: Instant = Utc.nowInstant().normalizeToMicroseconds()
@@ -164,7 +162,7 @@ class IdempotencyKeyMapperIntegrationTest {
         return IdempotencyRecord(
             idempotencyKey = key,
             requestHash = requestHash,
-            paymentId = paymentId,
+            paymentIntentId = paymentIntentId,
             responsePayload = responsePayload,
             status = status,
             createdAt = createdAt
@@ -196,7 +194,7 @@ class IdempotencyKeyMapperIntegrationTest {
         assertEquals(key, row1!!.idempotencyKey)
         assertEquals(hash1, row1.requestHash)
         assertEquals(IdempotencyStatus.PENDING, row1.status)
-        assertNull(row1.paymentId)
+        assertNull(row1.paymentIntentId)
         assertNull(row1.responsePayload)
         // createdAt should be between nowBefore and nowAfter (with tolerance for clock differences)
         // Database generates timestamp, so allow 2 seconds tolerance for clock skew
@@ -229,7 +227,7 @@ class IdempotencyKeyMapperIntegrationTest {
 
         // create a real payment row (FK safety if schema uses FK)
         val paymentId = 1001L
-        createPayment(paymentId)
+        createPaymentIntent(paymentId)
 
         idempotencyKeyMapper.insertPending(
             sampleRecord(
@@ -243,7 +241,7 @@ class IdempotencyKeyMapperIntegrationTest {
 
         val row = idempotencyKeyMapper.findByKey(key)
         assertNotNull(row)
-        assertEquals(paymentId, row!!.paymentId)
+        assertEquals(paymentId, row!!.paymentIntentId)
     }
 
     @Test
