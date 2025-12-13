@@ -26,9 +26,9 @@ class PaymentController(
 
     /**
      * Create a new payment.
-     * 
+     *
      * Requires 'payment:write' authority.
-     * 
+     *
      * @param request Payment request containing order details and payment orders
      * @return ResponseEntity with 201 Created status and PaymentResponseDTO
      */
@@ -53,7 +53,7 @@ class PaymentController(
         val responseDTO = result.response as CreatePaymentIntentResponseDTO
 
         logger.info("📥 Received payment request for order: ${responseDTO.orderId}, payment id is ${responseDTO.paymentIntentId}")
-        
+
         // Return 201 Created with Location header (best practice for resource creation)
         return ResponseEntity
             .status(status)
