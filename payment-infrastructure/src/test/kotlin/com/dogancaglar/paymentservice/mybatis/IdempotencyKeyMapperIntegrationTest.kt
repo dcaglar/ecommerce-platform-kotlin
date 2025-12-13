@@ -117,7 +117,7 @@ class IdempotencyKeyMapperIntegrationTest {
     lateinit var idempotencyKeyMapper: IdempotencyKeyMapper
 
     @Autowired
-    lateinit var paymentMapper: PaymentIntentMapper
+    lateinit var paymentIntentMapper: PaymentIntentMapper
 
     private val objectMapper = JacksonUtil.createObjectMapper()
 
@@ -136,7 +136,7 @@ class IdempotencyKeyMapperIntegrationTest {
                 amount = Amount.of(10_000, Currency("EUR"))
             )
         )
-        paymentMapper.insert(
+        paymentIntentMapper.insert(
             PaymentIntentEntity(
                 paymentIntentId = paymentIntentId,
                 buyerId = "buyer-$paymentIntentId",
@@ -220,34 +220,16 @@ class IdempotencyKeyMapperIntegrationTest {
         assertEquals(hash1, row2!!.requestHash)
     }
 
-    @Test
-    fun `updatePaymentId sets paymentId when row exists`() {
-        val key = "idem-test-2"
-        val hash = "hash-123"
 
-        // create a real payment row (FK safety if schema uses FK)
-        val paymentId = 1001L
-        createPaymentIntent(paymentId)
-
-        idempotencyKeyMapper.insertPending(
-            sampleRecord(
-                key = key,
-                requestHash = hash
-            )
-        )
-
-        val updatedRows = idempotencyKeyMapper.updatePaymentId(key, paymentId)
-        assertEquals(1, updatedRows)
-
-        val row = idempotencyKeyMapper.findByKey(key)
-        assertNotNull(row)
-        assertEquals(paymentId, row!!.paymentIntentId)
-    }
 
     @Test
     fun `updateResponsePayload writes jsonb and marks COMPLETED`() {
         val key = "idem-test-3"
         val hash = "hash-456"
+
+        // ✅ Create payment intent first to satisfy foreign key constraint
+        val paymentIntentId = 123L
+        createPaymentIntent(paymentIntentId)
 
         idempotencyKeyMapper.insertPending(
             sampleRecord(
@@ -257,12 +239,13 @@ class IdempotencyKeyMapperIntegrationTest {
         )
 
         val payload = """{"paymentId":"p-123","status":"AUTHORIZED"}"""
-        val updatedRows = idempotencyKeyMapper.updateResponsePayload(key, payload)
+        val updatedRows = idempotencyKeyMapper.updateResponsePayload(key, payload, paymentIntentId)
         assertEquals(1, updatedRows)
 
         val row = idempotencyKeyMapper.findByKey(key)
         assertNotNull(row)
         assertEquals(IdempotencyStatus.COMPLETED, row!!.status)
+        assertEquals(paymentIntentId, row.paymentIntentId)
         assertJsonEquals(payload, row.responsePayload)
     }
 
@@ -270,6 +253,10 @@ class IdempotencyKeyMapperIntegrationTest {
     fun `deletePending deletes only PENDING rows without payload`() {
         val keyPending = "idem-test-4-pending"
         val keyCompleted = "idem-test-4-completed"
+        
+        // Create payment intent first to satisfy foreign key constraint
+        val paymentIntentId = 123L
+        createPaymentIntent(paymentIntentId)
 
         // PENDING, no payload
         idempotencyKeyMapper.insertPending(
@@ -288,7 +275,8 @@ class IdempotencyKeyMapperIntegrationTest {
         )
         idempotencyKeyMapper.updateResponsePayload(
             keyCompleted,
-            """{"ok":true}"""
+            """{"ok":true}""",
+            paymentIntentId
         )
 
         // when

@@ -2,13 +2,15 @@ package com.dogancaglar.paymentservice.adapter.inbound.rest.mapper
 
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentOrderLineDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentRequestDTO
-import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.AuthorizationRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentMethodDTO
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentIntentId
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
-import com.dogancaglar.paymentservice.domain.model.Payment
+import com.dogancaglar.paymentservice.domain.model.PaymentIntent
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.port.out.web.dto.*
@@ -79,13 +81,13 @@ class PaymentRequestMapperTest {
     }
 
     @Test
-    fun `should map Payment to PaymentResponseDTO correctly`() {
-        val payment = Payment.createNew(
-            paymentId = PaymentId(123L),
+    fun `should map PaymentIntent to PaymentResponseDTO correctly`() {
+        val paymentIntent = PaymentIntent.createNew(
+            paymentIntentId = PaymentIntentId(123L),
             buyerId = BuyerId("buyer-456"),
             orderId = OrderId("order-123"),
             totalAmount = Amount.of(10000L, Currency("USD")),
-            paymentLines = listOf(
+            paymentOrderLines = listOf(
                 PaymentOrderLine(
                     sellerId = SellerId("seller-789"),
                     amount = Amount.of(10000L, Currency("USD"))
@@ -93,40 +95,88 @@ class PaymentRequestMapperTest {
             )
         )
 
-        val response = PaymentRequestMapper.toPaymentResponseDto(payment)
+        val response = PaymentRequestMapper.toPaymentResponseDto(paymentIntent)
 
-        assertEquals(payment.paymentId.toPublicPaymentId(), response.paymentIntentId)
+        assertEquals(paymentIntent.paymentIntentId.toPublicPaymentIntentId(), response.paymentIntentId)
         assertEquals("CREATED", response.status)
         assertEquals("buyer-456", response.buyerId)
         assertEquals("order-123", response.orderId)
         assertEquals(10000L, response.totalAmount.quantity)
         assertEquals(CurrencyEnum.USD, response.totalAmount.currency)
-        assertEquals(payment.createdAt.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME), response.createdAt)
+        assertEquals(paymentIntent.createdAt.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME), response.createdAt)
     }
 
     @Test
-    fun `should map Payment with different status correctly`() {
-        val payment = Payment.createNew(
-            paymentId = PaymentId(456L),
+    fun `should map PaymentIntent with different status correctly`() {
+        val paymentIntent = PaymentIntent.createNew(
+            paymentIntentId = PaymentIntentId(456L),
             buyerId = BuyerId("buyer-789"),
             orderId = OrderId("order-456"),
             totalAmount = Amount.of(5000L, Currency("EUR")),
-            paymentLines = listOf(
+            paymentOrderLines = listOf(
                 PaymentOrderLine(
                     sellerId = SellerId("seller-1"),
                     amount = Amount.of(5000L, Currency("EUR"))
                 )
             )
         )
-            .startAuthorization()
-            .authorize()
+            .markAuthorizedPending()
+            .markAuthorized()
 
-        val response = PaymentRequestMapper.toPaymentResponseDto(payment)
+        val response = PaymentRequestMapper.toPaymentResponseDto(paymentIntent)
 
-        assertEquals(payment.paymentId.toPublicPaymentId(), response.paymentIntentId)
+        assertEquals(paymentIntent.paymentIntentId.toPublicPaymentIntentId(), response.paymentIntentId)
         assertEquals("AUTHORIZED", response.status)
+        assertEquals("buyer-789", response.buyerId)
+        assertEquals("order-456", response.orderId)
         assertEquals(5000L, response.totalAmount.quantity)
         assertEquals(CurrencyEnum.EUR, response.totalAmount.currency)
+    }
+
+    @Test
+    fun `should map PaymentIntent with PENDING_AUTH status correctly`() {
+        val paymentIntent = PaymentIntent.createNew(
+            paymentIntentId = PaymentIntentId(789L),
+            buyerId = BuyerId("buyer-999"),
+            orderId = OrderId("order-789"),
+            totalAmount = Amount.of(15000L, Currency("GBP")),
+            paymentOrderLines = listOf(
+                PaymentOrderLine(
+                    sellerId = SellerId("seller-2"),
+                    amount = Amount.of(15000L, Currency("GBP"))
+                )
+            )
+        )
+            .markAuthorizedPending()
+
+        val response = PaymentRequestMapper.toPaymentResponseDto(paymentIntent)
+
+        assertEquals(paymentIntent.paymentIntentId.toPublicPaymentIntentId(), response.paymentIntentId)
+        assertEquals("PENDING_AUTH", response.status)
+        assertEquals(15000L, response.totalAmount.quantity)
+        assertEquals(CurrencyEnum.GBP, response.totalAmount.currency)
+    }
+
+    @Test
+    fun `should map AuthorizationRequestDTO to AuthorizePaymentIntentCommand correctly`() {
+        // Given
+        val publicPaymentIntentId = "pi_test123"
+        val dto = AuthorizationRequestDTO(
+            paymentMethod = PaymentMethodDTO.CardToken(
+                token = "token-abc-123",
+                cvc = "123"
+            )
+        )
+
+        // When
+        val command = PaymentRequestMapper.toAuthorizePaymentIntentCommand(publicPaymentIntentId, dto)
+
+        // Then
+        assertNotNull(command.paymentIntentId)
+        assertTrue(command.paymentMethod is com.dogancaglar.paymentservice.domain.model.PaymentMethod.CardToken)
+        val cardToken = command.paymentMethod as com.dogancaglar.paymentservice.domain.model.PaymentMethod.CardToken
+        assertEquals("token-abc-123", cardToken.token)
+        assertEquals("123", cardToken.cvc)
     }
 
     @Test

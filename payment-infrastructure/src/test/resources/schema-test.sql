@@ -23,30 +23,62 @@ CREATE INDEX IF NOT EXISTS idx_outbox_status_claimed_at ON outbox_event (status,
 
 DROP TABLE IF EXISTS payment_orders;
 DROP TABLE IF EXISTS payments;
+DROP TABLE IF EXISTS payment_intents;
+
 
 CREATE TABLE payments (
     payment_id BIGINT PRIMARY KEY,
+    payment_intent_id BIGINT NOT NULL,
     buyer_id VARCHAR(255) NOT NULL,
     order_id VARCHAR(255) NOT NULL,
     total_amount_value BIGINT NOT NULL,
     captured_amount_value BIGINT NOT NULL DEFAULT 0,
+    refunded_amount_value BIGINT NOT NULL DEFAULT 0,
     currency CHAR(3) NOT NULL,
     status VARCHAR(50) NOT NULL,
     payment_lines JSONB,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
     CONSTRAINT chk_payments_status_valid CHECK (status IN (
-        'CREATED',
-        'PENDING_AUTH',
-        'AUTHORIZED',
-        'DECLINED',
+        'NOT_CAPTURED',
         'PARTIALLY_CAPTURED',
-        'CAPTURED'
+        'CAPTURED',
+        'PARTIALLY_REFUNDED',
+        'REFUNDED',
+        'VOIDED'
     )),
     CONSTRAINT chk_payments_currency_3 CHECK (currency ~ '^[A-Z]{3}$'),
     CONSTRAINT chk_payments_captured_le_total CHECK (
         captured_amount_value >= 0 AND
         captured_amount_value <= total_amount_value
+    ),
+    CONSTRAINT chk_payments_refunded_le_total CHECK (
+        refunded_amount_value >= 0 AND
+        refunded_amount_value <= total_amount_value
+    )
+);
+
+CREATE TABLE payment_intents (
+    payment_intent_id BIGINT PRIMARY KEY,
+    buyer_id VARCHAR(255) NOT NULL,
+    order_id VARCHAR(255) NOT NULL,
+    total_amount_value BIGINT NOT NULL,
+    currency CHAR(3) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    payment_order_lines JSONB,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
+    CONSTRAINT chk_payment_intent_status_valid CHECK (status IN (
+        'CREATED',
+        'PENDING_AUTH',
+        'AUTHORIZED',
+        'DECLINED',
+        'CANCELLED'
+    )),
+    CONSTRAINT chk_payment_intent_currency_3 CHECK (currency ~ '^[A-Z]{3}$'),
+    CONSTRAINT chk_payment_intent_total_amount_value_le_total CHECK (
+        total_amount_value >= 0 AND
+        total_amount_value <= total_amount_value
     )
 );
 
@@ -163,15 +195,15 @@ DROP TABLE IF EXISTS idempotency_keys;
 
 CREATE TABLE idempotency_keys (
     idempotency_key VARCHAR(255) PRIMARY KEY,
-    payment_id BIGINT NULL,
+    payment_intent_id BIGINT NULL,
     request_hash VARCHAR(128) NULL,
     response_payload JSONB NULL,
     status VARCHAR(20) NULL,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
-    CONSTRAINT fk_idempotency_keys_payment FOREIGN KEY (payment_id) REFERENCES payments(payment_id),
+    CONSTRAINT fk_idempotency_keys_payment_intent FOREIGN KEY (payment_intent_id) REFERENCES payment_intents(payment_intent_id),
     CONSTRAINT chk_idem_req_status CHECK (status IN ('PENDING', 'COMPLETED'))
 );
 
 -- Indexes for idempotency_keys table
 CREATE INDEX IF NOT EXISTS idx_idempotency_request_hash ON idempotency_keys (request_hash);
-CREATE INDEX IF NOT EXISTS idx_idempotency_payment_id ON idempotency_keys (payment_id);
+CREATE INDEX IF NOT EXISTS idx_idempotency_payment_intent_id ON idempotency_keys (payment_intent_id);

@@ -13,14 +13,15 @@ interface IdempotencyKeyMapper {
 
     fun findByKey(key: String): IdempotencyRecord?
 
-    fun updatePaymentId(
+    fun updatePaymentIntentId(
         key: String,
-        paymentId: Long
+        paymentIntentId: Long
     ): Int
 
     fun updateResponsePayload(
         key: String,
-        payload: String
+        payload: String,
+        paymentIntentId: Long
     ): Int
 
     fun deletePending(key: String): Int

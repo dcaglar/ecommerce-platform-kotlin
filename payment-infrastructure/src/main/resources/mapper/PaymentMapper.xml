@@ -6,17 +6,19 @@
     <resultMap id="PaymentResultMap"
                type="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentEntity">
         <id property="paymentId" column="payment_id"/>
+        <result property="paymentIntentId" column="payment_intent_id"/>
         <result property="buyerId" column="buyer_id"/>
         <result property="orderId" column="order_id"/>
         <result property="totalAmountValue" column="total_amount_value"/>
-        <result property="capturedAmountValue" column="captured_amount_value"/>
         <result property="currency" column="currency"/>
+        <result property="capturedAmountValue" column="captured_amount_value"/>
+        <result property="refundedAmountValue" column="refunded_amount_value"/>
         <result property="status" column="status"/>
-        <result property="paymentLinesJson" column="payment_lines"/>
         <result property="createdAt" column="created_at"
                 typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.InstantTypeHandler"/>
         <result property="updatedAt" column="updated_at"
                 typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.InstantTypeHandler"/>
+        <result property="paymentLinesJson" column="payment_lines" jdbcType="VARCHAR"/>
     </resultMap>
 
     <select id="getMaxPaymentId" resultType="long">
@@ -29,10 +31,12 @@
             >
         INSERT INTO payments (
         payment_id,
+        payment_intent_id,
         buyer_id,
         order_id,
         total_amount_value,
         captured_amount_value,
+        refunded_amount_value,
         currency,
         status,
         payment_lines,
@@ -40,13 +44,15 @@
         updated_at
         ) VALUES (
         #{paymentId},
+        #{paymentIntentId},
         #{buyerId},
         #{orderId},
         #{totalAmountValue},
         #{capturedAmountValue},
+        #{refundedAmountValue},
         #{currency},
         #{status},
-        #{paymentLinesJson, jdbcType=OTHER},
+        CAST(#{paymentLinesJson} AS jsonb),
         #{createdAt},
         #{updatedAt}
         )
@@ -54,15 +60,17 @@
 
     <select id="findById" resultMap="PaymentResultMap">
         SELECT payment_id,
+               payment_intent_id,
                buyer_id,
                order_id,
                total_amount_value,
                currency,
                captured_amount_value,
+               refunded_amount_value,
                status,
-                payment_lines,
-                created_at,
-               updated_at
+               created_at,
+               updated_at,
+               payment_lines::text as payment_lines
         FROM payments
         WHERE payment_id = #{id}
     </select>
@@ -74,13 +82,15 @@
     <update id="update"
             parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentEntity">
         UPDATE payments SET
+        payment_intent_id = #{paymentIntentId},
         order_id = #{orderId},
         buyer_id = #{buyerId},
         total_amount_value = #{totalAmountValue},
         captured_amount_value = #{capturedAmountValue},
+        refunded_amount_value = #{refundedAmountValue},
         currency = #{currency},
         status = #{status},
-        payment_lines = #{paymentLinesJson, jdbcType=OTHER},
+        payment_lines = CAST(#{paymentLinesJson} AS jsonb),
         created_at = #{createdAt},
         updated_at = #{updatedAt}
         WHERE payment_id = #{paymentId}

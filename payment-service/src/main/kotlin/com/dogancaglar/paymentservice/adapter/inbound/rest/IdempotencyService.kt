@@ -1,6 +1,7 @@
 // payment-service/src/main/kotlin/.../idempotency/IdempotencyService.kt
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
+import com.dogancaglar.common.id.PublicIdFactory
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentResponseDTO
 import com.dogancaglar.paymentservice.idempotency.CanonicalJsonHasher
 import com.dogancaglar.paymentservice.ports.outbound.IdempotencyStorePort
@@ -36,9 +37,9 @@ class IdempotencyService(
 
             try {
                 val response = block()
-
                 val json = objectMapper.writeValueAsString(response)
-                store.updateResponsePayload(key, json)
+                val internalPaymentIntentId = PublicIdFactory.toInternalId(response.paymentIntentId)
+                store.updateResponsePayload(key, json,response.paymentIntentId.toLong())
 
                 return IdempotencyResult(
                     response = response,

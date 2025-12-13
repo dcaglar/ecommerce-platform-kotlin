@@ -32,12 +32,12 @@ class IdempotencyStoreAdapter(
     override fun findByKey(key: String): IdempotencyRecord? =
         mapper.findByKey(key)
 
-    override fun updatePaymentId(key: String, paymentId: Long) {
-        mapper.updatePaymentId(key, paymentId)
+    override fun updatePaymentIntentId(key: String, paymentIntentId: Long) {
+        mapper.updatePaymentIntentId(key, paymentIntentId)
     }
 
-    override fun updateResponsePayload(key: String, payload: String) {
-        mapper.updateResponsePayload(key, payload)
+    override fun updateResponsePayload(key: String, payload: String, paymentIntentId: Long) {
+        mapper.updateResponsePayload(key, payload, paymentIntentId)
     }
 
     override fun deletePending(key: String) {

@@ -36,7 +36,7 @@
             resultMap="IdempotencyResultMap">
         SELECT idempotency_key,
         request_hash,
-        payment_id,
+        payment_intent_id,
         response_payload,
         status,
         created_at
@@ -53,7 +53,8 @@
     <update id="updateResponsePayload" parameterType="map">
         UPDATE idempotency_keys
         SET response_payload = CAST(#{payload} AS jsonb),
-        status = 'COMPLETED'
+             payment_intent_id = #{paymentIntentId},
+             status = 'COMPLETED'
         WHERE idempotency_key = #{key}
     </update>
 

@@ -11,54 +11,54 @@
         <result property="totalAmountValue" column="total_amount_value"/>
         <result property="currency" column="currency"/>
         <result property="status" column="status"/>
-        <result property="paymentLinesJson" column="payment_lines"/>
         <result property="createdAt" column="created_at"
                 typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.InstantTypeHandler"/>
         <result property="updatedAt" column="updated_at"
                 typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.InstantTypeHandler"/>
+        <result property="paymentLinesJson" column="payment_order_lines" jdbcType="VARCHAR"/>
     </resultMap>
 
-    <select id="getMaxPaymentId" resultType="long">
-        SELECT COALESCE(MAX(payment_id), 0) FROM payment_intents
+    <select id="getMaxPaymentIntentId" resultType="long">
+        SELECT COALESCE(MAX(payment_intent_id), 0) FROM payment_intents
     </select>
 
 
     <insert id="insert"
             parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentIntentEntity"
             >
-        INSERT INTO payments (
+        INSERT INTO payment_intents (
         payment_intent_id,
         buyer_id,
         order_id,
         total_amount_value,
         currency,
         status,
-        payment_lines,
+        payment_order_lines,
         created_at,
         updated_at
         ) VALUES (
-        #{paymentId},
+        #{paymentIntentId},
         #{buyerId},
         #{orderId},
         #{totalAmountValue},
         #{currency},
         #{status},
-        #{paymentLinesJson, jdbcType=OTHER},
+        CAST(#{paymentLinesJson} AS jsonb),
         #{createdAt},
         #{updatedAt}
         )
     </insert>
 
     <select id="findById" resultMap="PaymentIntentResultMap">
-        SELECT payment_id,
+        SELECT payment_intent_id,
                buyer_id,
                order_id,
                total_amount_value,
                currency,
                status,
-                payment_lines,
-                created_at,
-               updated_at
+               created_at,
+               updated_at,
+               payment_order_lines::text as payment_order_lines
         FROM payment_intents
         WHERE payment_intent_id = #{id}
     </select>
@@ -75,7 +75,7 @@
         total_amount_value = #{totalAmountValue},
         currency = #{currency},
         status = #{status},
-        payment_lines = #{paymentLinesJson, jdbcType=OTHER},
+        payment_order_lines = CAST(#{paymentLinesJson} AS jsonb),
         created_at = #{createdAt},
         updated_at = #{updatedAt}
         WHERE payment_intent_id = #{paymentIntentId}

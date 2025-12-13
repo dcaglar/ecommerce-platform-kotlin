@@ -7,13 +7,13 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.common.logging.GenericLogFields
 import com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaSerializer
-import com.dogancaglar.paymentservice.application.commands.PaymentOrderLedgerRecordingCommand
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
-import com.dogancaglar.paymentservice.application.events.PaymentAuthorizedIntent
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
+import com.dogancaglar.paymentservice.application.commands.LedgerRecordingAuthorizationCommand
+import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.Consumer
@@ -201,26 +201,6 @@ class KafkaTypedConsumerFactoryConfig(
         }
 
 
-    @Bean("${Topics.PAYMENT_INTENT_AUTHORIZED}-factory")
-    fun paymentAuthorizedFactory(
-        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
-        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
-        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
-        errorHandler: DefaultErrorHandler
-    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentAuthorizedIntent>> {
-        val cfg = cfgFor(PaymentEventMetadataCatalog.PaymentIntentAuthorizedMetadata.topic, "${Topics.PAYMENT_INTENT_AUTHORIZED}-factory")
-        return createFactory(
-            clientId = cfg.id,
-            concurrency = cfg.concurrency,
-            interceptor = interceptor,
-            consumerFactory = customFactory,
-            errorHandler = errorHandler,
-            ackMode = ContainerProperties.AckMode.MANUAL,
-            expectedEventType = PaymentEventMetadataCatalog.PaymentIntentAuthorizedMetadata.eventType,
-            batchMode = false
-        )
-    }
-
     @Bean("${Topics.PAYMENT_ORDER_CREATED}-factory")
     fun paymentOrderCreatedFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
@@ -294,7 +274,7 @@ class KafkaTypedConsumerFactoryConfig(
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
         customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler
-    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderLedgerRecordingCommand>> {
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<LedgerRecordingCommand>> {
         val cfg = cfgFor(
             Topics.LEDGER_RECORD_REQUEST_QUEUE,
             "${Topics.LEDGER_RECORD_REQUEST_QUEUE}-factory"
@@ -312,6 +292,32 @@ class KafkaTypedConsumerFactoryConfig(
             batchMode = false
         )
     }
+
+    @Bean("${Topics.PAYMENT_AUTHORIZED}-factory")
+    fun ledgerRecordingAuthorizationCommandFactory(
+        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
+        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<LedgerRecordingAuthorizationCommand>> {
+        val cfg = cfgFor(
+            Topics.PAYMENT_AUTHORIZED,
+            "${Topics.PAYMENT_AUTHORIZED}-factory"
+        )
+
+        return createFactory(
+            clientId = cfg.id,
+            concurrency = cfg.concurrency,
+            interceptor = interceptor,
+            consumerFactory = customFactory,
+            errorHandler = errorHandler,
+            ackMode = ContainerProperties.AckMode.MANUAL,
+            expectedEventType = PaymentEventMetadataCatalog.PaymentAuthorizedMetadata.eventType,
+            ackDiscarded = true,
+            batchMode = false
+        )
+    }
+
 
 
     @Bean("${Topics.LEDGER_ENTRIES_RECORDED}-factory")

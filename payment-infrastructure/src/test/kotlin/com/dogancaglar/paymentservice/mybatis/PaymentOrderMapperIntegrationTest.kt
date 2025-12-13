@@ -116,7 +116,7 @@ class PaymentOrderMapperIntegrationTest {
                 capturedAmountValue = 0,
                 refundedAmountValue = 0,
                 currency = "USD",
-                status = "PENDING_AUTH",
+                status = "NOT_CAPTURED",
                 createdAt = now,
                 updatedAt = now,
                 paymentLinesJson = objectMapper.writeValueAsString(paymentOrderLines)
