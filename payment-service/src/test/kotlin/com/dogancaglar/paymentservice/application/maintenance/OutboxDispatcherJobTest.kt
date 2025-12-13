@@ -539,7 +539,7 @@ class OutboxDispatcherJobTest {
         )
 
         val workerId = "test-instance:${Thread.currentThread().name}"
-
+        
         every { outboxEventRepository.findBatchForDispatch(10, workerId) } returns listOf(outboxEvent)
         every { outboxEventRepository.unclaimSpecific(workerId, listOf(999L)) } returns 1
 

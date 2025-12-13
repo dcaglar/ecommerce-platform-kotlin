@@ -39,7 +39,7 @@ class IdempotencyService(
                 val response = block()
                 val json = objectMapper.writeValueAsString(response)
                 val internalPaymentIntentId = PublicIdFactory.toInternalId(response.paymentIntentId)
-                store.updateResponsePayload(key, json,response.paymentIntentId.toLong())
+                store.updateResponsePayload(key, json,internalPaymentIntentId)
 
                 return IdempotencyResult(
                     response = response,

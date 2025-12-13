@@ -9,7 +9,7 @@
     <changeSet id="2025-12-06-create-payment-intents" author="dogancaglar">
 
         <!-- 1️⃣ Create table -->
-        <createTable tableName="payment-intents">
+        <createTable tableName="payment_intents">
 
             <column name="payment_intent_id" type="BIGINT">
                 <constraints primaryKey="true" nullable="false"/>

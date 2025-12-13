@@ -56,7 +56,7 @@
                total_amount_value,
                currency,
                status,
-               created_at,
+                created_at,
                updated_at,
                payment_order_lines::text as payment_order_lines
         FROM payment_intents

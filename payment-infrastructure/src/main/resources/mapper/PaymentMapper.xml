@@ -68,7 +68,7 @@
                captured_amount_value,
                refunded_amount_value,
                status,
-               created_at,
+                created_at,
                updated_at,
                payment_lines::text as payment_lines
         FROM payments

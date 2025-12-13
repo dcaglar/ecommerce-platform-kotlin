@@ -9,7 +9,6 @@ import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
 import com.dogancaglar.paymentservice.domain.util.LedgerEntryFactory
 import com.dogancaglar.paymentservice.ports.inbound.RecordAuthorizationLedgerEntriesUseCase
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
-import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -17,7 +16,6 @@ import org.springframework.stereotype.Service
 @Service
 class RecordAuthorizationLedgerEntriesService(
     private val ledgerWritePort: LedgerEntryPort,
-    private val eventPublisherPort: EventPublisherPort,
     private val accountDirectory: AccountDirectoryPort
 ) : RecordAuthorizationLedgerEntriesUseCase {
     private val ledgerEntryFactory = LedgerEntryFactory()

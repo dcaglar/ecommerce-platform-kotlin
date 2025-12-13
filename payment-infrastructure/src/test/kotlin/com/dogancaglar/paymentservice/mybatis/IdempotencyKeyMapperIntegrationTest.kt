@@ -253,7 +253,7 @@ class IdempotencyKeyMapperIntegrationTest {
     fun `deletePending deletes only PENDING rows without payload`() {
         val keyPending = "idem-test-4-pending"
         val keyCompleted = "idem-test-4-completed"
-        
+
         // Create payment intent first to satisfy foreign key constraint
         val paymentIntentId = 123L
         createPaymentIntent(paymentIntentId)

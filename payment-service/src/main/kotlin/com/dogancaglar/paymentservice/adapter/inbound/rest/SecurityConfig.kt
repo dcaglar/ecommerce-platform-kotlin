@@ -28,8 +28,10 @@ class SecurityConfig {
                 requests
                     // Allow actuator endpoints (health, liveness, readiness, prometheus) without authentication
                     .requestMatchers("/actuator/**").permitAll()
-                    // internal system (checkout) creates payments
+                    // internal system (checkout) creates payment intents
                     .requestMatchers(HttpMethod.POST, "/api/v1/payments").hasAuthority("payment:write")
+                    // internal system (checkout) authorizes payment intents
+                    .requestMatchers(HttpMethod.POST, "/api/v1/payments/*/authorize").hasAuthority("payment:write")
                     // seller self-balance (Case 1: user via frontend, Case 3: merchant API via client credentials)
                     .requestMatchers(HttpMethod.GET, "/api/v1/sellers/me/balance").hasAnyRole("SELLER", "SELLER_API")
                     // finance/admin back-office - balance queries

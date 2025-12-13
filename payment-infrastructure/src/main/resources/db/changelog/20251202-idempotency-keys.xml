@@ -54,9 +54,9 @@
             <column name="request_hash"/>
         </createIndex>
 
-        <createIndex indexName="idx_idempotency_payment_id"
+        <createIndex indexName="idx_idempotency_payment_intent_id"
                      tableName="idempotency_keys">
-            <column name="payment_id"/>
+            <column name="payment_intent_id"/>
         </createIndex>
 
         <!-- 4️⃣ Rollback -->

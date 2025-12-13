@@ -15,7 +15,7 @@
                 <constraints primaryKey="true" nullable="false"/>
             </column>
             <column name="payment_intent_id" type="BIGINT">
-                <constraints primaryKey="true" nullable="false"/>
+                <constraints primaryKey="false" nullable="false"/>
             </column>
             <column name="buyer_id" type="VARCHAR(255)">
                 <constraints nullable="false"/>
