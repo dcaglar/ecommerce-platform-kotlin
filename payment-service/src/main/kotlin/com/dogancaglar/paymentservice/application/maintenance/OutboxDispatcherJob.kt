@@ -135,24 +135,24 @@ class OutboxDispatcherJob(
                 try {
 
                     when (OutboxEventType.from(evt.eventType)) {
-                        OutboxEventType.PAYMENT_INTENT_AUTHORIZED -> {
+                        OutboxEventType.payment_intent_authorized -> {
                             val ok = handlePaymentIntentAuthorized(evt)
                             if (ok) succeeded += evt.markAsSent()
                             else failed += evt
                         }
-                        OutboxEventType.PAYMENT_AUTHORIZED -> {
+                        OutboxEventType.payment_authorized -> {
                             val ok = handlePaymentAuthorized(evt)
                             if (ok) succeeded += evt.markAsSent()
                             else failed += evt
                         }
 
-                        OutboxEventType.PAYMENT_ORDER_CREATED -> {
+                        OutboxEventType.payment_order_created -> {
                             val ok = handlePaymentOrderCreated(evt)
                             if (ok) succeeded += evt.markAsSent()
                             else failed += evt
                         }
 
-                        OutboxEventType.PAYMENT_ORDER_CAPTURE_COMMAND -> {
+                        OutboxEventType.payment_order_capture_command -> {
                             /*  val ok = handlePaymentOrderCaptureCommand(evt)
                               if (ok) succeeded += evt.markAsSent()
                               else failed += evt*/

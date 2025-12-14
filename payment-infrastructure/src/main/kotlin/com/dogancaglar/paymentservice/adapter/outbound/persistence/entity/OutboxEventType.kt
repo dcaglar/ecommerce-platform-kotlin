@@ -6,10 +6,10 @@ import com.dogancaglar.paymentservice.application.events.PaymentIntentAuthorized
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 
 enum class OutboxEventType(val eventClass: Class<*>) {
-    PAYMENT_INTENT_AUTHORIZED(PaymentIntentAuthorized::class.java),
-    PAYMENT_AUTHORIZED(PaymentAuthorized::class.java),
-    PAYMENT_ORDER_CREATED(PaymentOrderCreated::class.java),
-    PAYMENT_ORDER_CAPTURE_COMMAND(PaymentOrderCaptureCommand::class.java);
+    payment_intent_authorized(PaymentIntentAuthorized::class.java),
+    payment_authorized(PaymentAuthorized::class.java),
+    payment_order_created(PaymentOrderCreated::class.java),
+    payment_order_capture_command(PaymentOrderCaptureCommand::class.java);
 
     companion object {
         fun from(value: String): OutboxEventType? =

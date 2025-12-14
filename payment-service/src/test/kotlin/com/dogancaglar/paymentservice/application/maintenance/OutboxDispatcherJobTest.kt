@@ -7,7 +7,6 @@ import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.OutboxEventType
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
 import com.dogancaglar.paymentservice.application.events.PaymentIntentAuthorized
-import com.dogancaglar.paymentservice.application.events.PaymentIntentAuthorizedOrderLine
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.domain.model.Amount
@@ -15,9 +14,7 @@ import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentIntent
-import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
@@ -202,7 +199,7 @@ class OutboxDispatcherJobTest {
         )
         val outboxEvent = OutboxEvent.createNew(
             oeid = paymentId.value,
-            eventType = OutboxEventType.PAYMENT_AUTHORIZED.name,
+            eventType = OutboxEventType.payment_authorized.name,
             aggregateId = paymentAuthorizedEvent.paymentId,
             payload = objectMapper.writeValueAsString(envelope)
         )
@@ -269,7 +266,7 @@ class OutboxDispatcherJobTest {
         )
         val outboxEvent = OutboxEvent.createNew(
             oeid = paymentOrder.paymentOrderId.value,
-            eventType = OutboxEventType.PAYMENT_ORDER_CREATED.name,
+            eventType = OutboxEventType.payment_order_created.name,
             aggregateId = paymentOrderCreatedEvent.paymentOrderId,
             payload = objectMapper.writeValueAsString(envelope)
         )
@@ -588,7 +585,7 @@ class OutboxDispatcherJobTest {
         )
         val outboxEvent1 = OutboxEvent.createNew(
             oeid = paymentOrder1.paymentOrderId.value,
-            eventType = OutboxEventType.PAYMENT_ORDER_CREATED.name,
+            eventType = OutboxEventType.payment_order_created.name,
             aggregateId = paymentOrderCreatedEvent1.paymentOrderId,
             payload = objectMapper.writeValueAsString(envelope1)
         )
@@ -608,7 +605,7 @@ class OutboxDispatcherJobTest {
         )
         val outboxEvent2 = OutboxEvent.createNew(
             oeid = paymentOrder2.paymentOrderId.value,
-            eventType = OutboxEventType.PAYMENT_ORDER_CREATED.name,
+            eventType = OutboxEventType.payment_order_created.name,
             aggregateId = paymentOrderCreatedEvent2.paymentOrderId,
             payload = objectMapper.writeValueAsString(envelope2)
         )

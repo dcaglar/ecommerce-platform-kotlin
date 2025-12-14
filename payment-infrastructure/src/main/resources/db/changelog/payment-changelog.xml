@@ -62,7 +62,7 @@
             ALTER TABLE payments
             ADD CONSTRAINT chk_payments_status_valid
             CHECK (status IN (
-            'CAPTURED'
+            'CAPTURED',
             'NOT_CAPTURED',
             'PARTIALLY_CAPTURED',
             'CAPTURED',

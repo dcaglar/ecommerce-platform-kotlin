@@ -21,15 +21,16 @@ class AuthorizePaymentIntentService(
     override fun authorize(cmd: AuthorizePaymentIntentCommand): PaymentIntent {
         val paymentIntent = paymentIntentRepository.findById(cmd.paymentIntentId)
             ?: error("Payment ${cmd.paymentIntentId.value} not found")
-
+            val pendingPaymentIntent = paymentIntent.markAuthorizedPending()
+        paymentIntentRepository.updatePaymentIntent(pendingPaymentIntent)
         val updated =
             when (psp.authorize(
-                idempotencyKey = paymentIntent.paymentIntentId.value.toString(),
-                paymentIntent=paymentIntent,
+                idempotencyKey = pendingPaymentIntent.paymentIntentId.value.toString(),
+                paymentIntent=pendingPaymentIntent,
                 token=cmd.paymentMethod)) {
-                                            PaymentIntentStatus.AUTHORIZED -> paymentIntent.markAuthorized()
-                                            PaymentIntentStatus.DECLINED   -> paymentIntent.markDeclined()
-                                            else                     -> paymentIntent
+                                            PaymentIntentStatus.AUTHORIZED -> pendingPaymentIntent.markAuthorized()
+                                            PaymentIntentStatus.DECLINED   -> pendingPaymentIntent.markDeclined()
+                                            else                     -> pendingPaymentIntent
         }
 
         paymentIntentRepository.updatePaymentIntent(updated)

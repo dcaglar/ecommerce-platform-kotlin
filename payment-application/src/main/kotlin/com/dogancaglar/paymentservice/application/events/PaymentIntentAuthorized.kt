@@ -23,10 +23,10 @@ data class PaymentIntentAuthorized private @JsonCreator constructor(
 ) : Event {
 
     override val eventType: String
-        get() = "payment_authorized_intent"
+        get() = "payment_intent_authorized"
 
     override fun deterministicEventId(): String =
-        "$publicPaymentIntentId:authorized_intent"
+        "$publicPaymentIntentId:intent_authorized"
 
     companion object {
         fun from(

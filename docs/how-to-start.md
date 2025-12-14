@@ -193,12 +193,12 @@ curl -i -X POST "$BASE_URL/api/v1/payments" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
   -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -d '{
-    "orderId": "ORDER-4800",
-    "buyerId": "BUYER-4800",
-    "totalAmount": { "quantity": 4800, "currency": "EUR" },
+    "orderId": "ORDER-1450",
+    "buyerId": "BUYER-1450",
+    "totalAmount": { "quantity": 2900, "currency": "EUR" },
     "paymentOrders": [
-      { "sellerId": "SELLER-111", "amount": { "quantity": 2400, "currency": "EUR" }},
-      { "sellerId": "SELLER-222", "amount": { "quantity": 2400, "currency": "EUR" }}
+      { "sellerId": "SELLER-111", "amount": { "quantity": 1450, "currency": "EUR" }},
+      { "sellerId": "SELLER-222", "amount": { "quantity": 1450, "currency": "EUR" }}
     ]
   }'
 ```
@@ -209,7 +209,7 @@ curl -i -X POST "$BASE_URL/api/v1/payments" \
 
 ```bash
 # Step 2: Authorize the payment intent
-curl -i -X POST "$BASE_URL/api/v1/payments/pi_Ab6zIn_CcAA/authorize" \
+curl -i -X POST "$BASE_URL/api/v1/payments/pi_Ab9_XwmCcAA/authorize" \
   -H "Host: $HOST" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
