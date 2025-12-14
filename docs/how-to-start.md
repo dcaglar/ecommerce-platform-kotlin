@@ -165,11 +165,17 @@ infra/scripts/deploy-observability-stack.sh
 
 4) Send test payment request
 
+The payment flow is split into two steps:
+1. **Create Payment Intent** - Creates a payment intent with order details
+2. **Authorize Payment Intent** - Authorizes the payment intent with payment method
+
 You can test payment creation in two ways:
 
 ### Option A: Using curl (Command Line)
 
 Use the saved token to call the API. Prefer the dynamic example to avoid hardcoded IPs.
+
+**Step 1: Create Payment Intent**
 
 - Dynamic (reads host and base URL from infra/endpoints.json):
 ```bash
@@ -187,36 +193,32 @@ curl -i -X POST "$BASE_URL/api/v1/payments" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
   -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -d '{
-    "orderId": "ORDER-1755",
-    "buyerId": "BUYER-1755",
-    "totalAmount": { "quantity": 3510, "currency": "EUR" },
+    "orderId": "ORDER-1450",
+    "buyerId": "BUYER-1450",
+    "totalAmount": { "quantity": 2900, "currency": "EUR" },
     "paymentOrders": [
-      { "sellerId": "SELLER-111", "amount": { "quantity": 1755, "currency": "EUR" }},
-      { "sellerId": "SELLER-222", "amount": { "quantity":1755, "currency": "EUR" }}
+      { "sellerId": "SELLER-111", "amount": { "quantity": 1450, "currency": "EUR" }},
+      { "sellerId": "SELLER-222", "amount": { "quantity": 1450, "currency": "EUR" }}
     ]
   }'
 ```
 
-> **Note on Idempotency-Key**: The header is required for all payment creation requests. Use the same key for retries of the same payment request to ensure idempotent behavior. Generate a unique UUID for each new payment request.
+> **Note on Idempotency-Key**: The header is required for all payment intent creation requests. Use the same key for retries of the same payment request to ensure idempotent behavior. Generate a unique UUID for each new payment request.
 
-- Static example (replace host/IP if different):
+**Step 2: Authorize Payment Intent**
+
 ```bash
-IDEMPOTENCY_KEY="idem-$(date +%s)-$RANDOM"
-
-curl -i -X POST http://127.0.0.1/api/v1/payments \
-  -H "Host: payment.192.168.49.2.nip.io" \
+# Step 2: Authorize the payment intent
+curl -i -X POST "$BASE_URL/api/v1/payments/pi_Ab9_XwmCcAA/authorize" \
+  -H "Host: $HOST" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
-  -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -d '{
-    "orderId": "ORDER-20240508-XYZ",
-    "buyerId": "BUYER-123",
-    "totalAmount": { "quantity": 19949, "currency": "EUR" },
-    "paymentOrders": [
-      { "sellerId": "SELLER-111", "amount": { "quantity": 4999, "currency": "EUR" }},
-      { "sellerId": "SELLER-222", "amount": { "quantity": 2950, "currency": "EUR" }},
-      { "sellerId": "SELLER-333", "amount": { "quantity": 12000, "currency": "EUR" }}
-    ]
+    "paymentMethod": {
+      "type": "CardToken",
+      "token": "card_token_12345",
+      "cvc": "123"
+    }
   }'
 ```
 
@@ -260,16 +262,24 @@ The app will automatically open at `http://localhost:3000`
 
 **Usage:**
 
-1. Fill the payment form:
-   - Order ID (e.g., `ORDER-TEST-001`)
-   - Buyer ID (e.g., `BUYER-123`)
-   - Total amount (in smallest currency unit, e.g., cents)
-   - Select currency
-   - Add one or more payment orders with seller IDs and amounts
+The payment flow consists of two steps:
 
-2. Click "Send Payment Request"
+1. **Create Payment Intent:**
+   - Fill the payment form:
+     - Order ID (e.g., `ORDER-TEST-001`)
+     - Buyer ID (e.g., `BUYER-123`)
+     - Total amount (in smallest currency unit, e.g., cents)
+     - Select currency
+     - Add one or more payment orders with seller IDs and amounts
+   - Click "Create Payment Intent"
+   - View the response with `paymentIntentId`
 
-3. View the response and equivalent curl command
+2. **Authorize Payment Intent:**
+   - Enter payment method details:
+     - Card token (e.g., `card_token_12345`)
+     - CVC (optional, depending on PSP config)
+   - Click "Authorize Payment"
+   - View the authorization response
 
 The backend proxy automatically handles token acquisition and payment-service calls - no manual token management needed!
 

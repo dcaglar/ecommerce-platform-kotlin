@@ -1,10 +1,8 @@
 package com.dogancaglar.paymentservice.domain.commands
 
 import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
-import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentLine
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 
 data class CapturePaymentCommand(

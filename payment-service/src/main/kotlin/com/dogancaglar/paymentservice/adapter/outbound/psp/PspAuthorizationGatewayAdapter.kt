@@ -1,7 +1,11 @@
 package com.dogancaglar.paymentservice.adapter.outbound.psp
 
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentIntentId
 import com.dogancaglar.paymentservice.domain.model.Payment
+import com.dogancaglar.paymentservice.domain.model.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
+import com.dogancaglar.paymentservice.domain.model.PaymentMethod
 import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.util.PSPAuthorizationStatusMapper
 import com.dogancaglar.paymentservice.ports.outbound.PspAuthGatewayPort
@@ -36,20 +40,20 @@ class PspAuthorizationGatewayAdapter(
             ?: throw IllegalStateException("No scenario config for ${config.scenario}")
 
     /** Public API: caller is a Kafka listener thread. Keep it clean. */
-    override fun authorize(order: Payment): PaymentStatus {
+    override fun authorize(idempotencyKey: String, order: PaymentIntent, token: PaymentMethod): PaymentIntentStatus {
         var causeLabel = "EXCEPTION"
-        var future: Future<PaymentStatus>? = null
+        var future: Future<PaymentIntentStatus>? = null
         val enqueuedAt = System.nanoTime()
 
         return try {
-            future = pspAuthExecutor.submit<PaymentStatus>
+            future = pspAuthExecutor.submit<PaymentIntentStatus>
             {
                 val startedAt = System.nanoTime()
                 pspQueueDelay.record(startedAt - enqueuedAt, TimeUnit.NANOSECONDS)
                 val t0 = System.nanoTime()
                 try {
                     //use your unique paymetid as idempotency key.
-                    doAuth(order.paymentId.toPublicPaymentId())
+                    doAuth(order.paymentIntentId.toPublicPaymentIntentId())
                 } finally {
                     pspExecDuration.record(System.nanoTime() - t0, TimeUnit.NANOSECONDS)
                 }
@@ -63,7 +67,7 @@ class PspAuthorizationGatewayAdapter(
             future?.cancel(true)                // interrupts worker
             logger.warn("PSP call timed out (>{}s)", 1)
             causeLabel = "TIMEOUT"
-            return PaymentStatus.PENDING_AUTH
+            return PaymentIntentStatus.PENDING_AUTH
         } catch (e: InterruptedException) {
             // Listener thread was interrupted while waiting. We are continuing the listener,
             // so CLEAR the flag to avoid poisoning Kafka client paths.
@@ -71,16 +75,16 @@ class PspAuthorizationGatewayAdapter(
             logger.warn("Listener interrupted while waiting PSP result; mapping to transient timeout")
             Thread.interrupted()                // clear flag on listener thread
             causeLabel = "INTERRUPTED"
-            return PaymentStatus.PENDING_AUTH
+            return PaymentIntentStatus.PENDING_AUTH
         } catch (e: CancellationException) {
             logger.warn("PSP future cancelled; mapping to transient timeout")
             causeLabel = "CANCELLED"
-            return PaymentStatus.PENDING_AUTH
+            return PaymentIntentStatus.PENDING_AUTH
         } catch (e: ExecutionException) {
             if (e.cause is InterruptedException) {
                 logger.warn("Worker interrupted; mapping to transient timeout")
                 causeLabel = "WORKER_INTERRUPTED"
-                return PaymentStatus.PENDING_AUTH
+                return PaymentIntentStatus.PENDING_AUTH
             }
             logger.error("PSP worker failed: {}", e.cause?.message ?: e.message)
             causeLabel = "EXCEPTION"
@@ -89,13 +93,13 @@ class PspAuthorizationGatewayAdapter(
             // Thrown by submit(...) when pool/queue are saturated (AbortPolicy)
             logger.warn("PSP executor saturated; treating as transient: {}", e.message)
             causeLabel = "REJECTED"
-            return PaymentStatus.PENDING_AUTH
+            return PaymentIntentStatus.PENDING_AUTH
         } finally {
             meterRegistry.counter("psp_calls_total", "result", causeLabel).increment()
         }
     }
     /** Actual PSP work runs on the pool worker thread. */
-    private fun doAuth(idempotencyKey: String): PaymentStatus {
+    private fun doAuth(idempotencyKey: String): PaymentIntentStatus {
         // If this thread gets interrupted (e.g., due to cancel(true)),
         // any blocking/interruptible call below will throw InterruptedException.
         try {
@@ -116,7 +120,7 @@ class PspAuthorizationGatewayAdapter(
             roll < active.response.successful -> "AUTHORIZED"
             roll < active.response.successful + active.response.retryable -> "TRANSIENT_NETWORK_ERROR"
             roll < active.response.successful + active.response.retryable + active.response.nonRetryable -> "DECLINED"
-            else -> PaymentStatus.PENDING_AUTH
+            else -> PaymentIntentStatus.PENDING_AUTH
         }
         return AuthorizationPspResponse(result.toString())
     }

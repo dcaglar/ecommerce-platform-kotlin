@@ -4,6 +4,7 @@
         xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+    <include file="payment-intent-changelog.xml" relativeToChangelogFile="true"/>
     <include file="payment-changelog.xml" relativeToChangelogFile="true"/>
     <include file="payment-order-changelog.xml" relativeToChangelogFile="true"/>
     <include file="payment-outbox-changelog.xml" relativeToChangelogFile="true"/>

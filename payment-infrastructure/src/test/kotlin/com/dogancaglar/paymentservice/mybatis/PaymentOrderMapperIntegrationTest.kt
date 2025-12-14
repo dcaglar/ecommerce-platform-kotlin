@@ -9,7 +9,6 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -25,6 +24,12 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
+import com.dogancaglar.paymentservice.domain.model.vo.SellerId
+import com.dogancaglar.paymentservice.serialization.JacksonUtil
+import com.fasterxml.jackson.databind.ObjectMapper
 import java.time.Instant
 
 @Tag("integration")
@@ -91,19 +96,30 @@ class PaymentOrderMapperIntegrationTest {
     @Autowired
     lateinit var paymentOrderMapper: PaymentOrderMapper
 
+    private val objectMapper: ObjectMapper = JacksonUtil.createObjectMapper()
+
     private fun upsertPayment(paymentId: Long) {
         val now = Utc.nowInstant()
+        val paymentOrderLines = listOf(
+            PaymentOrderLine(
+                sellerId = SellerId("seller-1"),
+                amount = Amount.of(50_00, Currency("USD"))
+            )
+        )
         paymentMapper.insert(
             PaymentEntity(
                 paymentId = paymentId,
+                paymentIntentId = paymentId,
                 buyerId = "buyer-$paymentId",
                 orderId = "order-$paymentId",
                 totalAmountValue = 50_00,
                 capturedAmountValue = 0,
+                refundedAmountValue = 0,
                 currency = "USD",
-                status = "PENDING_AUTH",
+                status = "NOT_CAPTURED",
                 createdAt = now,
-                updatedAt = now
+                updatedAt = now,
+                paymentLinesJson = objectMapper.writeValueAsString(paymentOrderLines)
             )
         )
     }

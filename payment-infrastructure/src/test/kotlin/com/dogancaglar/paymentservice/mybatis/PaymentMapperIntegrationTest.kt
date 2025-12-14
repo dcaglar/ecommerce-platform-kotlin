@@ -21,6 +21,22 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.Payment
+import com.dogancaglar.paymentservice.domain.model.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
+import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
+import com.dogancaglar.paymentservice.domain.model.vo.OrderId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
+import com.dogancaglar.paymentservice.domain.model.vo.SellerId
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentEntityMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentIntentEntityMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentIntentMapper
+import com.dogancaglar.paymentservice.serialization.JacksonUtil
+import com.fasterxml.jackson.databind.ObjectMapper
 import java.time.Instant
 
 @Tag("integration")
@@ -83,26 +99,59 @@ class PaymentMapperIntegrationTest {
 
     @Autowired
     lateinit var paymentMapper: PaymentMapper
+    
+    @Autowired
+    lateinit var paymentIntentMapper: PaymentIntentMapper
 
-    private fun sampleEntity(id: Long = 101L): PaymentEntity {
-        val now = Utc.nowInstant().normalizeToMicroseconds()
-        return PaymentEntity(
-            paymentId = id,
-            buyerId = "buyer-$id",
-            orderId = "order-$id",
-            totalAmountValue = 10_000,
-            capturedAmountValue = 0,
-            currency = "USD",
-            status = "PENDING_AUTH",
-            createdAt = now,
-            updatedAt = now
+    private val objectMapper: ObjectMapper = JacksonUtil.createObjectMapper()
+    private val paymentEntityMapper: PaymentEntityMapper = PaymentEntityMapper(objectMapper)
+    private val paymentIntentEntityMapper: PaymentIntentEntityMapper = PaymentIntentEntityMapper(objectMapper)
+
+    private fun createPaymentFromIntent(paymentId: Long, paymentIntentId: Long): PaymentEntity {
+        // Create PaymentIntent with 2 payment order lines
+        val paymentOrderLines = listOf(
+            PaymentOrderLine(
+                sellerId = SellerId("seller-1"),
+                amount = Amount.of(6_000, Currency("USD"))
+            ),
+            PaymentOrderLine(
+                sellerId = SellerId("seller-2"),
+                amount = Amount.of(4_000, Currency("USD"))
+            )
         )
+        
+        val paymentIntent = PaymentIntent.createNew(
+            paymentIntentId = PaymentIntentId(paymentIntentId),
+            buyerId = BuyerId("buyer-$paymentIntentId"),
+            orderId = OrderId("order-$paymentIntentId"),
+            totalAmount = Amount.of(10_000, Currency("USD")),
+            paymentOrderLines = paymentOrderLines
+        )
+        
+        // Mark as AUTHORIZED
+        val authorizedIntent = paymentIntent
+            .markAuthorizedPending()
+            .markAuthorized()
+        
+        // Save PaymentIntent to database
+        paymentIntentMapper.insert(paymentIntentEntityMapper.toEntity(authorizedIntent))
+        
+        // Create Payment from authorized PaymentIntent
+        val payment = Payment.fromAuthorizedIntent(
+            paymentId = PaymentId(paymentId),
+            intent = authorizedIntent
+        )
+        
+        // Convert to entity
+        return paymentEntityMapper.toEntity(payment)
     }
 
     @Test
     fun `insert and findById and getMaxPaymentId`() {
-        // given
-        val entity = sampleEntity(101L)
+        // given - create payment intent with 2 payment order lines and create payment from it
+        val paymentId = 101L
+        val paymentIntentId = 201L
+        val entity = createPaymentFromIntent(paymentId, paymentIntentId)
 
         // when
         val rows = paymentMapper.insert(entity)
@@ -110,28 +159,46 @@ class PaymentMapperIntegrationTest {
         // then
         assertEquals(1, rows)
 
-        val loaded = paymentMapper.findById(101L)
+        val loaded = paymentMapper.findById(paymentId)
         assertNotNull(loaded)
 
         // normalize timestamps to match Postgres precision
-        assertEquals(
-            entity.normalizeTimestamps(),
-            loaded!!.normalizeTimestamps()
-        )
+        val normalizedEntity = entity.normalizeTimestamps()
+        val normalizedLoaded = loaded!!.normalizeTimestamps()
+        
+        // Compare all fields except paymentLinesJson (JSON property order may differ)
+        assertEquals(normalizedEntity.paymentId, normalizedLoaded.paymentId)
+        assertEquals(normalizedEntity.paymentIntentId, normalizedLoaded.paymentIntentId)
+        assertEquals(normalizedEntity.buyerId, normalizedLoaded.buyerId)
+        assertEquals(normalizedEntity.orderId, normalizedLoaded.orderId)
+        assertEquals(normalizedEntity.totalAmountValue, normalizedLoaded.totalAmountValue)
+        assertEquals(normalizedEntity.currency, normalizedLoaded.currency)
+        assertEquals(normalizedEntity.capturedAmountValue, normalizedLoaded.capturedAmountValue)
+        assertEquals(normalizedEntity.refundedAmountValue, normalizedLoaded.refundedAmountValue)
+        assertEquals(normalizedEntity.status, normalizedLoaded.status)
+        assertEquals(normalizedEntity.createdAt, normalizedLoaded.createdAt)
+        assertEquals(normalizedEntity.updatedAt, normalizedLoaded.updatedAt)
+        
+        // Compare JSON by parsing to JSON nodes (ignores property order)
+        val expectedJsonNode = objectMapper.readTree(normalizedEntity.paymentLinesJson)
+        val loadedJsonNode = objectMapper.readTree(normalizedLoaded.paymentLinesJson)
+        assertEquals(expectedJsonNode, loadedJsonNode)
 
         val maxId = paymentMapper.getMaxPaymentId()
-        assertEquals(101L, maxId)
+        assertEquals(paymentId, maxId)
     }
 
     @Test
     fun `update and deleteById`() {
-        // given
-        val entity = sampleEntity(201L)
+        // given - create payment intent with 2 payment order lines and create payment from it
+        val paymentId = 201L
+        val paymentIntentId = 202L
+        val entity = createPaymentFromIntent(paymentId, paymentIntentId)
         paymentMapper.insert(entity)
 
         // when – update some fields
         val updatedEntity = entity.copy(
-            status = "AUTHORIZED",
+            status = "NOT_CAPTURED",
             capturedAmountValue = 5_000,
             updatedAt = Utc.nowInstant().normalizeToMicroseconds()
         )
@@ -142,7 +209,7 @@ class PaymentMapperIntegrationTest {
 
         val reloaded = paymentMapper.findById(201L)
         assertNotNull(reloaded)
-        assertEquals("AUTHORIZED", reloaded!!.status)
+        assertEquals("NOT_CAPTURED", reloaded!!.status)
         assertEquals(5_000, reloaded.capturedAmountValue)
 
         // when – delete by id

@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis
 
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentEntity
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
@@ -8,21 +9,32 @@ import com.dogancaglar.paymentservice.domain.model.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
+import com.fasterxml.jackson.core.type.TypeReference
+import com.fasterxml.jackson.databind.ObjectMapper
+import org.springframework.stereotype.Component
 import java.time.ZoneOffset
 
+@Component
+class PaymentEntityMapper(
+    private val objectMapper: ObjectMapper
+) {
 
-object PaymentEntityMapper {
-    fun toEntity(payment: Payment): PaymentEntity =
+    fun toEntity(p: Payment): PaymentEntity =
         PaymentEntity(
-            paymentId = payment.paymentId.value,
-            buyerId = payment.buyerId.value,
-            orderId = payment.orderId.value,
-            totalAmountValue = payment.totalAmount.quantity,
-            capturedAmountValue = payment.capturedAmount.quantity,
-            currency = payment.totalAmount.currency.currencyCode,
-            status = payment.status.name,
-            createdAt = payment.createdAt.toInstant(ZoneOffset.UTC),
-            updatedAt = payment.updatedAt.toInstant(ZoneOffset.UTC),
+            paymentId = p.paymentId.value,
+            paymentIntentId = p.paymentIntentId.value,
+            buyerId = p.buyerId.value,
+            orderId = p.orderId.value,
+            totalAmountValue = p.totalAmount.quantity,
+            currency = p.totalAmount.currency.currencyCode,
+            capturedAmountValue = p.capturedAmount.quantity,
+            refundedAmountValue = p.refundedAmount.quantity,
+            status = p.status.name,
+            createdAt = p.createdAt.toInstant(ZoneOffset.UTC),
+            updatedAt = p.updatedAt.toInstant(ZoneOffset.UTC),
+            paymentLinesJson = objectMapper.writeValueAsString(p.paymentOrderLines)
         )
 
     fun toDomain(entity: PaymentEntity): Payment {
@@ -33,15 +45,26 @@ object PaymentEntityMapper {
         } else {
             Amount.of(entity.capturedAmountValue, currency)
         }
+        val refunded = if (entity.refundedAmountValue == 0L) {
+            Amount.zero(currency)
+        } else {
+            Amount.of(entity.refundedAmountValue, currency)
+        }
+        val lines: List<PaymentOrderLine> =
+            objectMapper.readValue(entity.paymentLinesJson, object : TypeReference<List<PaymentOrderLine>>() {})
+
         return Payment.rehydrate(
             paymentId = PaymentId(entity.paymentId),
+            paymentIntentId = PaymentIntentId(entity.paymentIntentId),
             buyerId = BuyerId(entity.buyerId),
             orderId = OrderId(entity.orderId),
             totalAmount = total,
-            capturedAmount = captured,
+            capturedAmount =captured,
+            refundedAmount = refunded,
             status = PaymentStatus.valueOf(entity.status),
-            createdAt = entity.createdAt.atOffset(ZoneOffset.UTC).toLocalDateTime(),
-            updatedAt = entity.updatedAt.atOffset(ZoneOffset.UTC).toLocalDateTime()
+            createdAt = Utc.fromInstant(entity.createdAt),
+            updatedAt = Utc.fromInstant(entity.updatedAt),
+            paymentOrderLines = lines
         )
     }
 }

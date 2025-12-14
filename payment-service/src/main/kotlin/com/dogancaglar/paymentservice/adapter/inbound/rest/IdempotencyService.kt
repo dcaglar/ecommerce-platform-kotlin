@@ -1,11 +1,9 @@
 // payment-service/src/main/kotlin/.../idempotency/IdempotencyService.kt
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
-import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentRequestDTO
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentResponseDTO
+import com.dogancaglar.common.id.PublicIdFactory
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentResponseDTO
 import com.dogancaglar.paymentservice.idempotency.CanonicalJsonHasher
-import com.dogancaglar.paymentservice.ports.outbound.IdempotencyStatus
 import com.dogancaglar.paymentservice.ports.outbound.IdempotencyStorePort
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
@@ -26,8 +24,8 @@ class IdempotencyService(
     fun run(
         key: String,
         requestBody: Any,
-        block: () -> PaymentResponseDTO
-    ): IdempotencyResult<PaymentResponseDTO> {
+        block: () -> CreatePaymentIntentResponseDTO
+    ): IdempotencyResult<CreatePaymentIntentResponseDTO> {
 
         val hash = canonicalJsonHasher.hashBody(requestBody)
 
@@ -39,9 +37,9 @@ class IdempotencyService(
 
             try {
                 val response = block()
-
                 val json = objectMapper.writeValueAsString(response)
-                store.updateResponsePayload(key, json)
+                val internalPaymentIntentId = PublicIdFactory.toInternalId(response.paymentIntentId)
+                store.updateResponsePayload(key, json,internalPaymentIntentId)
 
                 return IdempotencyResult(
                     response = response,
@@ -78,7 +76,7 @@ class IdempotencyService(
 
         val responseObj = objectMapper.readValue(
             finalRecord.responsePayload,
-            PaymentResponseDTO::class.java
+            CreatePaymentIntentResponseDTO::class.java
         )
 
         return IdempotencyResult(

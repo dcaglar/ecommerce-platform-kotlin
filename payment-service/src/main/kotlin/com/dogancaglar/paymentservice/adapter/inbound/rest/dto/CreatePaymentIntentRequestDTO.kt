@@ -3,13 +3,18 @@ package com.dogancaglar.paymentservice.adapter.inbound.rest.dto
 import com.dogancaglar.port.out.web.dto.AmountDto
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotEmpty
 import jakarta.validation.constraints.NotNull
 
-
-data class PaymentOrderRequestDTO(
+data class CreatePaymentIntentRequestDTO(
     @field:NotBlank
-    val sellerId: String,
+    val buyerId: String,
     @field:NotNull
     @field:Valid
-    val amount: AmountDto
+    val totalAmount: AmountDto,
+    @field:NotEmpty
+    val orderId: String,
+    @field:NotEmpty
+    @field:Valid
+    val paymentOrders: List<PaymentOrderLineDTO>
 )

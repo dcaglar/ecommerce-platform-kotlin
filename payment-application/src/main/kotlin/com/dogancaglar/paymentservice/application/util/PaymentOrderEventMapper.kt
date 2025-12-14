@@ -2,13 +2,11 @@ package com.dogancaglar.paymentservice.application.util
 
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
-import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
-import com.dogancaglar.paymentservice.application.events.PaymentAuthorizedLine
+import com.dogancaglar.paymentservice.application.events.PaymentIntentAuthorized
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
 import com.dogancaglar.paymentservice.domain.model.*
 import com.dogancaglar.paymentservice.domain.model.vo.*
-import java.time.Clock
 import java.time.LocalDateTime
 
 /**
@@ -17,16 +15,9 @@ import java.time.LocalDateTime
  */
 class PaymentOrderDomainEventMapper {
 
-    fun toPaymentAuthorized(updated: Payment,paymentLines: List<PaymentLine>): PaymentAuthorized{
-        return PaymentAuthorized.from(
-            payment = updated,
-            paymentLines = paymentLines.map {
-                PaymentAuthorizedLine.of(
-                    sellerId = it.sellerId.value,
-                    amountValue = it.amount.quantity,
-                    currency = it.amount.currency.currencyCode
-                )
-            },
+    fun toPaymentIntentAuthorizedIntentEvent(updated: PaymentIntent): PaymentIntentAuthorized{
+        return PaymentIntentAuthorized.from(
+            paymentIntent = updated,
             authorizedAt = Utc.toInstant(updated.createdAt)
         )
     }
@@ -42,6 +33,8 @@ class PaymentOrderDomainEventMapper {
             now = now
         )
     }
+
+
 
     /** 🔹 Domain → Event: PSP call requested */
     fun toPaymentOrderCaptureCommand(order: PaymentOrder, attempt: Int): PaymentOrderCaptureCommand {

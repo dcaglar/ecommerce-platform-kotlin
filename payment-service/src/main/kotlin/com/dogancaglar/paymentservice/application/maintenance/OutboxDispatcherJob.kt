@@ -6,6 +6,7 @@ import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.OutboxEventType
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
+import com.dogancaglar.paymentservice.application.events.PaymentIntentAuthorized
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
@@ -14,7 +15,10 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentIntentId
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
+import com.dogancaglar.paymentservice.domain.model.Payment
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_DISPATCHED_TOTAL
 import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_DISPATCHER_DURATION
 import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_DISPATCH_FAILED_TOTAL
@@ -22,6 +26,7 @@ import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_EVENT_BACKLOG
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import com.dogancaglar.paymentservice.ports.outbound.OutboxEventRepository
+import com.dogancaglar.paymentservice.ports.outbound.PaymentIntentRepository
 import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.micrometer.core.instrument.Gauge
@@ -36,7 +41,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
-import java.util.UUID
+import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
 import kotlin.collections.isNotEmpty
 
 @Service
@@ -44,6 +49,8 @@ import kotlin.collections.isNotEmpty
 class OutboxDispatcherJob(
     private val outboxEventRepository: OutboxEventRepository,
     private val paymentOrderRepository: PaymentOrderRepository,
+    private val paymentIntentRepository: PaymentIntentRepository,
+    private val paymentRepository: PaymentRepository,
     @param:Qualifier("batchPaymentEventPublisher") private val syncPaymentEventPublisher: EventPublisherPort,
     private val meterRegistry: MeterRegistry,
     private val objectMapper: ObjectMapper,
@@ -128,19 +135,24 @@ class OutboxDispatcherJob(
                 try {
 
                     when (OutboxEventType.from(evt.eventType)) {
-                        OutboxEventType.PAYMENT_AUTHORIZED -> {
+                        OutboxEventType.payment_intent_authorized -> {
+                            val ok = handlePaymentIntentAuthorized(evt)
+                            if (ok) succeeded += evt.markAsSent()
+                            else failed += evt
+                        }
+                        OutboxEventType.payment_authorized -> {
                             val ok = handlePaymentAuthorized(evt)
                             if (ok) succeeded += evt.markAsSent()
                             else failed += evt
                         }
 
-                        OutboxEventType.PAYMENT_ORDER_CREATED -> {
+                        OutboxEventType.payment_order_created -> {
                             val ok = handlePaymentOrderCreated(evt)
                             if (ok) succeeded += evt.markAsSent()
                             else failed += evt
                         }
 
-                        OutboxEventType.PAYMENT_ORDER_CAPTURE_COMMAND -> {
+                        OutboxEventType.payment_order_capture_command -> {
                             /*  val ok = handlePaymentOrderCaptureCommand(evt)
                               if (ok) succeeded += evt.markAsSent()
                               else failed += evt*/
@@ -167,31 +179,62 @@ class OutboxDispatcherJob(
             Triple(emptyList(), events.toList(), emptyList())
         }
     }
+
+    @Transactional(transactionManager = "outboxTxManager")
+    fun handlePaymentIntentAuthorized(evt: OutboxEvent):Boolean {
+        val envelopeType = objectMapper.typeFactory
+            .constructParametricType(EventEnvelope::class.java, PaymentIntentAuthorized::class.java)
+        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentIntentAuthorized>
+        val data = envelope.data
+        var ok =false
+        EventLogContext.with(envelope) {
+            // Expand PaymentIntentAuthorized into create payment + paymentcreated outbox event
+            val paymentIntent = paymentIntentRepository.findById(PaymentIntentId(data.paymentIntentId.toLong()))
+            val paymentId = PaymentId(idGeneratorPort.nextPaymentId(paymentIntent.buyerId,paymentIntent.orderId))
+            logger.info("Expanding PaymentAuthorizedIntent → Creation of Payment Entity and Outbox<PaymentCreated> for paymentIntentId=${paymentIntent.paymentIntentId.toPublicPaymentIntentId()}")
+
+            val payment = Payment.fromAuthorizedIntent(paymentId,paymentIntent)
+            //create payment and outbox<paymentauhrized>
+            val outboxEvent = toOutboxPaymentAuthorizedEvent(payment)
+            paymentRepository.save(payment)
+            outboxEventRepository.saveAll(listOf(outboxEvent))
+            logger.info("✅ Created  OutboxEvent<PaymentCreated> for paymentId=${payment.paymentId}")
+            ok = syncPaymentEventPublisher.publishBatchAtomically(
+                envelopes = listOf(envelope),
+                timeout = java.time.Duration.ofSeconds(10)
+            )
+
+        }
+        return ok
+    }
+
     @Transactional(transactionManager = "outboxTxManager")
     fun handlePaymentAuthorized(evt: OutboxEvent):Boolean {
         val envelopeType = objectMapper.typeFactory
             .constructParametricType(EventEnvelope::class.java, PaymentAuthorized::class.java)
         val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentAuthorized>
-        val data = envelope.data
+        val paymentAuthorizedEvent = envelope.data
         var ok =false
         EventLogContext.with(envelope) {
-            logger.info("Expanding PaymentAuthorized → PaymentOrderCreated for paymentId=${data.paymentId}")
-            // Expand PaymentOrders from the authorized payload from paymentline
-            val paymentOrders = data.paymentLines.map { line ->
+            // Expand PaymentAuthorized -> paymentorder geneated from paymentlines + outbox<paymentordercreated>
+            // create payment domain object +  paymentcreated outboxevent
+            logger.info("Expanding Outbox<PaymentAuthorized> → Creation of Payment Order Entities and Outbox<PaymentOrderCreated> for paymentId=${paymentAuthorizedEvent.paymentId}")
+
+            val paymentOrders = paymentAuthorizedEvent.paymentLines.map { line ->
                 val sellerId = SellerId(line.sellerId)
                 PaymentOrder.createNew(
                     paymentOrderId = PaymentOrderId(idGeneratorPort.nextPaymentOrderId(sellerId)),
-                    paymentId = PaymentId(data.paymentId.toLong()),
+                    paymentId = PaymentId(paymentAuthorizedEvent.paymentId.toLong()),
                     sellerId = SellerId(line.sellerId),
                     amount = Amount.of(line.amountValue, Currency(line.currency))
                 )
             }
-            //create outbox<paymentordercreated> with parent being set paymentaiuthorizerd event
-            val outboxEvents = paymentOrders.map { toOutboxEvent(it) }
+            //create outbox`<paymentordercreated> with parent being set paymentaiuthorizerd event
+            val outboxEvents = paymentOrders.map { toOutboxPaymentOrderCreatedEvent(it) }
             paymentOrderRepository.insertAll(paymentOrders)
             // For each order, persist an OutboxEvent<PaymentOrderCreated>
             outboxEventRepository.saveAll(outboxEvents)
-            logger.info("✅ Created ${paymentOrders.size} OutboxEvent<PaymentOrderCreated> for paymentId=${data.paymentId}")
+            logger.info("✅ Created ${paymentOrders.size} OutboxEvent<PaymentOrderCreated> for paymentId=${paymentAuthorizedEvent.paymentId}")
             ok = syncPaymentEventPublisher.publishBatchAtomically(
                 envelopes = listOf(envelope),
                 timeout = java.time.Duration.ofSeconds(10)
@@ -202,7 +245,7 @@ class OutboxDispatcherJob(
     }
 
 
-    private fun toOutboxEvent(paymentOrder: PaymentOrder): OutboxEvent {
+    private fun toOutboxPaymentOrderCreatedEvent(paymentOrder: PaymentOrder): OutboxEvent {
         val paymentOrderCreatedEvent = paymentOrderDomainEventMapper.toPaymentOrderCreated(paymentOrder)
         val envelope = EventEnvelopeFactory.envelopeFor(
             traceId = EventLogContext.getTraceId(),
@@ -213,6 +256,23 @@ class OutboxDispatcherJob(
 
         return OutboxEvent.createNew(
             oeid = paymentOrder.paymentOrderId.value,
+            eventType = envelope.eventType,
+            aggregateId = envelope.aggregateId,
+            payload = serializationPort.toJson(envelope),
+        )
+    }
+
+    private fun toOutboxPaymentAuthorizedEvent(payment: Payment): OutboxEvent {
+        val paymentCreatedEvent = PaymentAuthorized.from(payment,Utc.nowInstant())
+        val envelope = EventEnvelopeFactory.envelopeFor(
+            traceId = EventLogContext.getTraceId(),
+            data = paymentCreatedEvent,
+            aggregateId = paymentCreatedEvent.paymentId,
+            parentEventId = EventLogContext.getEventId()
+        )
+
+        return OutboxEvent.createNew(
+            oeid = payment.paymentId.value,
             eventType = envelope.eventType,
             aggregateId = envelope.aggregateId,
             payload = serializationPort.toJson(envelope),

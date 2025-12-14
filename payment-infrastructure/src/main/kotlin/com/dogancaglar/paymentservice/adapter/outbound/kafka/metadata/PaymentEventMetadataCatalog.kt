@@ -2,13 +2,14 @@ package com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.metadata.EventMetadata
+import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
-import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
+import com.dogancaglar.paymentservice.application.events.PaymentIntentAuthorized
 import com.fasterxml.jackson.core.type.TypeReference
 
 object PaymentEventMetadataCatalog {
@@ -25,6 +26,17 @@ object PaymentEventMetadataCatalog {
     }
 
 
+
+
+    object PaymentIntentAuthorizedMetadata : EventMetadata<PaymentIntentAuthorized> {
+        override val topic = Topics.PAYMENT_INTENT_AUTHORIZED
+        override val eventType = EVENT_TYPE.PAYMENT_INTENT_AUTHORIZED
+        override val clazz = PaymentIntentAuthorized::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<PaymentIntentAuthorized>>() {}
+        override val partitionKey = { evt: PaymentIntentAuthorized ->
+            evt.paymentIntentId   // <-- INTERNAL ID string
+        }
+    }
 
 
     object PaymentAuthorizedMetadata : EventMetadata<PaymentAuthorized> {
@@ -92,6 +104,7 @@ object PaymentEventMetadataCatalog {
 
     val all: List<EventMetadata<*>> = listOf(
         PaymentAuthorizedMetadata,
+        PaymentIntentAuthorizedMetadata,
         PaymentOrderCreatedMetadata,
         PaymentOrderCaptureCommandMetadata,
         PaymentOrderFinalizedMetadata,

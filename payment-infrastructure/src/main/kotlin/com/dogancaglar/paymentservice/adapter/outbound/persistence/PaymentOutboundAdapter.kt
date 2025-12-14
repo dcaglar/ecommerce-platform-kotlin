@@ -9,14 +9,19 @@ import org.springframework.stereotype.Repository
 
 @Repository
 class PaymentOutboundAdapter(
-    private val paymentMapper: PaymentMapper
+    private val paymentMapper: PaymentMapper,
+    private val entityMapper: PaymentEntityMapper
 ) : PaymentRepository {
 
 
 
     override fun save(payment: Payment): Payment {
-        paymentMapper.insert(PaymentEntityMapper.toEntity(payment))
+        paymentMapper.insert(entityMapper.toEntity(payment))
         return payment
+    }
+
+    override fun findById(paymentId: PaymentId): Payment {
+        return entityMapper.toDomain(paymentMapper.findById(paymentId.value)!!)
     }
 
 
@@ -26,7 +31,7 @@ class PaymentOutboundAdapter(
     }
 
     override fun updatePayment(payment: Payment): Unit {
-        val entity = PaymentEntityMapper.toEntity(payment)
+        val entity = entityMapper.toEntity(payment)
         paymentMapper.update(entity);
     }
 

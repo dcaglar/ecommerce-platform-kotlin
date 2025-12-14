@@ -8,8 +8,8 @@ import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
 import com.dogancaglar.port.out.web.dto.AmountDto
 import com.dogancaglar.port.out.web.dto.CurrencyEnum
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentOrderRequestDTO
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentOrderLineDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentRequestDTO
 import io.mockk.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -29,13 +29,13 @@ class PaymentValidatorTest {
     @Test
     fun `validate should pass for valid payment request`() {
         // Given
-        val request = PaymentRequestDTO(
+        val request = CreatePaymentIntentRequestDTO(
             buyerId = "buyer-123",
             totalAmount = AmountDto(quantity = 20000L, currency = CurrencyEnum.EUR),
             orderId = "ORDER-123",
             paymentOrders = listOf(
-                PaymentOrderRequestDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR)),
-                PaymentOrderRequestDTO(sellerId = "seller-2", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR))
+                PaymentOrderLineDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR)),
+                PaymentOrderLineDTO(sellerId = "seller-2", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR))
             )
         )
 
@@ -65,13 +65,13 @@ class PaymentValidatorTest {
     @Test
     fun `validate should throw when duplicate seller IDs exist`() {
         // Given
-        val request = PaymentRequestDTO(
+        val request = CreatePaymentIntentRequestDTO(
             buyerId = "buyer-123",
             totalAmount = AmountDto(quantity = 20000L, currency = CurrencyEnum.EUR),
             orderId = "ORDER-123",
             paymentOrders = listOf(
-                PaymentOrderRequestDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR)),
-                PaymentOrderRequestDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR))
+                PaymentOrderLineDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR)),
+                PaymentOrderLineDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR))
             )
         )
 
@@ -85,13 +85,13 @@ class PaymentValidatorTest {
     @Test
     fun `validate should throw when sum of payment orders does not equal total amount`() {
         // Given
-        val request = PaymentRequestDTO(
+        val request = CreatePaymentIntentRequestDTO(
             buyerId = "buyer-123",
             totalAmount = AmountDto(quantity = 30000L, currency = CurrencyEnum.EUR),
             orderId = "ORDER-123",
             paymentOrders = listOf(
-                PaymentOrderRequestDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR)),
-                PaymentOrderRequestDTO(sellerId = "seller-2", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR))
+                PaymentOrderLineDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR)),
+                PaymentOrderLineDTO(sellerId = "seller-2", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR))
             )
         )
 
@@ -117,12 +117,12 @@ class PaymentValidatorTest {
     @Test
     fun `validate should throw when payment order currency differs from total amount currency`() {
         // Given
-        val request = PaymentRequestDTO(
+        val request = CreatePaymentIntentRequestDTO(
             buyerId = "buyer-123",
             totalAmount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR),
             orderId = "ORDER-123",
             paymentOrders = listOf(
-                PaymentOrderRequestDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.USD))
+                PaymentOrderLineDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.USD))
             )
         )
 
@@ -141,12 +141,12 @@ class PaymentValidatorTest {
     @Test
     fun `validate should throw when seller account currency differs from payment currency`() {
         // Given
-        val request = PaymentRequestDTO(
+        val request = CreatePaymentIntentRequestDTO(
             buyerId = "buyer-123",
             totalAmount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR),
             orderId = "ORDER-123",
             paymentOrders = listOf(
-                PaymentOrderRequestDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR))
+                PaymentOrderLineDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR))
             )
         )
 
@@ -175,12 +175,12 @@ class PaymentValidatorTest {
     @Test
     fun `validate should throw when seller account is not active`() {
         // Given
-        val request = PaymentRequestDTO(
+        val request = CreatePaymentIntentRequestDTO(
             buyerId = "buyer-123",
             totalAmount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR),
             orderId = "ORDER-123",
             paymentOrders = listOf(
-                PaymentOrderRequestDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR))
+                PaymentOrderLineDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR))
             )
         )
 
@@ -204,12 +204,12 @@ class PaymentValidatorTest {
     @Test
     fun `validate should throw when seller account is closed`() {
         // Given
-        val request = PaymentRequestDTO(
+        val request = CreatePaymentIntentRequestDTO(
             buyerId = "buyer-123",
             totalAmount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR),
             orderId = "ORDER-123",
             paymentOrders = listOf(
-                PaymentOrderRequestDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR))
+                PaymentOrderLineDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR))
             )
         )
 
@@ -233,14 +233,14 @@ class PaymentValidatorTest {
     @Test
     fun `validate should validate all payment orders for multiple sellers`() {
         // Given
-        val request = PaymentRequestDTO(
+        val request = CreatePaymentIntentRequestDTO(
             buyerId = "buyer-123",
             totalAmount = AmountDto(quantity = 30000L, currency = CurrencyEnum.EUR),
             orderId = "ORDER-123",
             paymentOrders = listOf(
-                PaymentOrderRequestDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR)),
-                PaymentOrderRequestDTO(sellerId = "seller-2", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR)),
-                PaymentOrderRequestDTO(sellerId = "seller-3", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR))
+                PaymentOrderLineDTO(sellerId = "seller-1", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR)),
+                PaymentOrderLineDTO(sellerId = "seller-2", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR)),
+                PaymentOrderLineDTO(sellerId = "seller-3", amount = AmountDto(quantity = 10000L, currency = CurrencyEnum.EUR))
             )
         )
 

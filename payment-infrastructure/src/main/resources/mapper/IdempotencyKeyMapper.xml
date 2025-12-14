@@ -9,7 +9,7 @@
                type="com.dogancaglar.paymentservice.ports.outbound.IdempotencyRecord">
         <id     property="idempotencyKey" column="idempotency_key"/>
         <result property="requestHash"    column="request_hash"/>
-        <result property="paymentId"      column="payment_id"/>
+        <result property="paymentIntentId"      column="payment_intent_id"/>
         <result property="responsePayload" column="response_payload"/>
         <result property="status"         column="status"
                 typeHandler="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.IdempotencyStatusTypeHandler"/>
@@ -36,7 +36,7 @@
             resultMap="IdempotencyResultMap">
         SELECT idempotency_key,
         request_hash,
-        payment_id,
+        payment_intent_id,
         response_payload,
         status,
         created_at
@@ -44,16 +44,17 @@
         WHERE idempotency_key = #{key}
     </select>
 
-    <update id="updatePaymentId" parameterType="map">
+    <update id="updatePaymentIntentId" parameterType="map">
         UPDATE idempotency_keys
-        SET payment_id = #{paymentId}
+        SET payment_intent_id = #{paymentIntentId}
         WHERE idempotency_key = #{key}
     </update>
 
     <update id="updateResponsePayload" parameterType="map">
         UPDATE idempotency_keys
         SET response_payload = CAST(#{payload} AS jsonb),
-        status = 'COMPLETED'
+             payment_intent_id = #{paymentIntentId},
+             status = 'COMPLETED'
         WHERE idempotency_key = #{key}
     </update>
 

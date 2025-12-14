@@ -6,9 +6,12 @@ import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 
 interface IdGeneratorPort {
 
-     fun nextPaymentId(buyerId: BuyerId, orderId: OrderId): Long
+    fun nextPaymentIntentId(buyerId: BuyerId, orderId: OrderId): Long
 
-     fun nextPaymentOrderId(sellerId: SellerId): Long
+    fun nextPaymentId(buyerId: BuyerId, orderId: OrderId): Long
+
+
+    fun nextPaymentOrderId(sellerId: SellerId): Long
 
 
 

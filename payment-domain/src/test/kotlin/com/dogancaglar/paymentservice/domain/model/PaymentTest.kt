@@ -1,159 +1,141 @@
 package com.dogancaglar.paymentservice.domain.model
 
-import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.vo.*
-import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
+import kotlin.test.*
 
 class PaymentTest {
 
-    private val paymentId = PaymentId(1L)
-    private val buyerId = BuyerId("buyer-xyz")
-    private val orderId = OrderId("order-xyz")
     private val currency = Currency("EUR")
-    private val totalAmount = Amount.of(10000L, currency) // €100.00
+    private val buyerId = BuyerId("b1")
+    private val orderId = OrderId("o1")
+    private val line1 = PaymentOrderLine(SellerId("s1"), Amount.of(500, currency))
+    private val line2 = PaymentOrderLine(SellerId("s2"), Amount.of(500, currency))
+    private val lines = listOf(line1, line2)
+    private val totalAmount = Amount.of(1000, currency)
 
-    // --- ✅ Creation ---
+    private fun authorizedIntent(): PaymentIntent =
+        PaymentIntent.createNew(
+            PaymentIntentId(100),
+            buyerId,
+            orderId,
+            totalAmount,
+            lines
+        ).markAuthorizedPending()
+            .markAuthorized()
 
     @Test
-    fun `should create new payment with initial state`() {
-        val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount)
+    fun `fromAuthorizedIntent creates payment correctly`() {
+        val intent = authorizedIntent()
 
-        assertEquals(paymentId, payment.paymentId)
-        assertEquals(buyerId, payment.buyerId)
-        assertEquals(orderId, payment.orderId)
-        assertEquals(totalAmount, payment.totalAmount)
+        val payment = Payment.fromAuthorizedIntent(
+            paymentId = PaymentId(200),
+            intent = intent
+        )
+
+        assertEquals(PaymentStatus.NOT_CAPTURED, payment.status)
         assertEquals(Amount.zero(currency), payment.capturedAmount)
-        assertEquals(PaymentStatus.PENDING_AUTH, payment.status)
-        assertEquals(0, payment.paymentOrders.size)
-        assertNotNull(payment.createdAt)
-        assertNotNull(payment.updatedAt)
+        assertEquals(Amount.zero(currency), payment.refundedAmount)
     }
 
     @Test
-    fun `should reject creation with non-positive total amount`() {
-        val ex = assertThrows<IllegalArgumentException> {
-            Payment.createNew(paymentId, buyerId, orderId, Amount.zero( currency))
-        }
-        assertTrue(ex.message!!.contains("Total amount must be positive"))
-    }
+    fun `applyCapture transitions NOT_CAPTURED to PARTIALLY_CAPTURED`() {
+        val payment = Payment.fromAuthorizedIntent(PaymentId(1), authorizedIntent())
+        val captured = payment.applyCapture(Amount.of(400, currency))
 
-    // --- ✅ Authorize & Decline ---
-
-    @Test
-    fun `should transition from PENDING_AUTH to AUTHORIZED`() {
-        val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount)
-        val authorized = payment.authorize()
-
-        assertEquals(PaymentStatus.AUTHORIZED, authorized.status)
-        assertTrue(authorized.updatedAt.isAfter(payment.updatedAt))
+        assertEquals(Amount.of(400, currency), captured.capturedAmount)
+        assertEquals(PaymentStatus.PARTIALLY_CAPTURED, captured.status)
     }
 
     @Test
-    fun `should transition from PENDING_AUTH to DECLINED`() {
-        val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount)
-        val declined = payment.decline()
+    fun `applyCapture transitions to CAPTURED when fully captured`() {
+        val payment = Payment.fromAuthorizedIntent(PaymentId(1), authorizedIntent())
+        val captured = payment.applyCapture(Amount.of(1000, currency))
 
-        assertEquals(PaymentStatus.DECLINED, declined.status)
-        assertTrue(declined.updatedAt.isAfter(payment.updatedAt))
-    }
-
-    @Test
-    fun `should fail to authorize if already AUTHORIZED`() {
-        val authorized = Payment.createNew(paymentId, buyerId, orderId, totalAmount).authorize()
-
-        val ex = assertThrows<IllegalArgumentException> { authorized.authorize() }
-        assertTrue(ex.message!!.contains("Payment can only be authorized"))
-    }
-
-    @Test
-    fun `should fail to decline if not PENDING_AUTH`() {
-        val authorized = Payment.createNew(paymentId,  buyerId, orderId, totalAmount).authorize()
-
-        val ex = assertThrows<IllegalArgumentException> { authorized.decline() }
-        assertTrue(ex.message!!.contains("can only be declined"))
-    }
-
-    // --- ✅ Captured Amount ---
-
-    @Test
-    fun `should add captured amount and transition to CAPTURED_PARTIALLY`() {
-
-        val payment = Payment.createNew(paymentId,  buyerId, orderId, totalAmount)
-            .authorize()
-
-        val partial = payment.addCapturedAmount(Amount.of(4000L, currency)) // €40.00 captured
-
-        assertEquals(Amount.of(4000L, currency), partial.capturedAmount)
-        assertEquals(PaymentStatus.CAPTURED_PARTIALLY, partial.status)
-    }
-
-    @Test
-    fun `should transition to CAPTURED when total captured equals total amount`() {
-        val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount)
-            .authorize()
-
-        val captured = payment.addCapturedAmount(Amount.of(10000L, currency))
-
-        assertEquals(totalAmount, captured.capturedAmount)
         assertEquals(PaymentStatus.CAPTURED, captured.status)
     }
 
     @Test
-    fun `should fail when captured amount exceeds total`() {
-        val payment = Payment.createNew(paymentId,buyerId, orderId, totalAmount)
-            .authorize()
+    fun `applyCapture fails when amount exceeds total`() {
+        val payment = Payment.fromAuthorizedIntent(PaymentId(1), authorizedIntent())
 
-        val ex = assertThrows<IllegalArgumentException> {
-            payment.addCapturedAmount(Amount.of(20000L, currency))
+        assertFailsWith<IllegalArgumentException> {
+            payment.applyCapture(Amount.of(2000, currency))
         }
-        assertTrue(ex.message!!.contains("Captured amount cannot exceed total"))
-    }
-
-    // --- ✅ addPaymentOrder() ---
-
-    @Test
-    fun `should add valid payment order to payment`() {
-        val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount)
-        val order = PaymentOrder.createNew(
-            paymentOrderId = PaymentOrderId(10L),
-            paymentId = paymentId,
-            sellerId = SellerId("seller-1"),
-            amount = Amount.of(5000L, currency)
-        )
-
-        val updated = payment.addPaymentOrder(order)
-
-        assertEquals(1, updated.paymentOrders.size)
-        assertEquals(order.paymentOrderId, updated.paymentOrders.first().paymentOrderId)
     }
 
     @Test
-    fun `should reject adding PaymentOrder with mismatched payment id`() {
-        val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount)
-        val invalidOrder = PaymentOrder.createNew(
-            paymentOrderId = PaymentOrderId(10L),
-            paymentId = PaymentId(999L), // ❌ different
-            sellerId = SellerId("seller-1"),
-            amount = Amount.of(5000L, currency)
-        )
+    fun `applyRefund transitions partially captured to partially refunded`() {
+        val payment = Payment.fromAuthorizedIntent(PaymentId(1), authorizedIntent())
+            .applyCapture(Amount.of(800, currency))
 
-        val ex = assertThrows<IllegalArgumentException> { payment.addPaymentOrder(invalidOrder) }
-        assertTrue(ex.message!!.contains("must reference the same Payment"))
+        val refunded = payment.applyRefund(Amount.of(300, currency))
+
+        assertEquals(Amount.of(300, currency), refunded.refundedAmount)
+        assertEquals(PaymentStatus.PARTIALLY_REFUNDED, refunded.status)
     }
 
     @Test
-    fun `should reject adding PaymentOrder with currency mismatch`() {
-        val payment = Payment.createNew(paymentId, buyerId, orderId, totalAmount)
-        val invalidOrder = PaymentOrder.createNew(
-            paymentOrderId = PaymentOrderId(10L),
-            paymentId = paymentId,
-            sellerId = SellerId("seller-1"),
-            amount = Amount.of(5000L, Currency("USD")) // ❌ different currency
-        )
+    fun `applyRefund transitions to fully refunded`() {
+        val payment = Payment.fromAuthorizedIntent(PaymentId(1), authorizedIntent())
+            .applyCapture(Amount.of(800, currency))
 
-        val ex = assertThrows<IllegalArgumentException> { payment.addPaymentOrder(invalidOrder) }
-        assertTrue(ex.message!!.contains("Currency mismatch"))
+        val refunded = payment.applyRefund(Amount.of(800, currency))
+
+        assertEquals(PaymentStatus.REFUNDED, refunded.status)
+    }
+
+    @Test
+    fun `applyRefund fails when refund exceeds captured`() {
+        val payment = Payment.fromAuthorizedIntent(PaymentId(1), authorizedIntent())
+            .applyCapture(Amount.of(500, currency))
+
+        assertFailsWith<IllegalArgumentException> {
+            payment.applyRefund(Amount.of(600, currency))
+        }
+    }
+
+    // -------------------------------
+    // VOID AUTHORIZATION TESTS
+    // -------------------------------
+
+    @Test
+    fun `voidAuthorization transitions NOT_CAPTURED to VOIDED`() {
+        val payment = Payment.fromAuthorizedIntent(PaymentId(1), authorizedIntent())
+
+        val voided = payment.voidAuthorization()
+
+        assertEquals(PaymentStatus.VOIDED, voided.status)
+        assertEquals(Amount.zero(currency), voided.capturedAmount)
+        assertEquals(Amount.zero(currency), voided.refundedAmount)
+    }
+
+    @Test
+    fun `voidAuthorization fails if payment already partially captured`() {
+        val payment = Payment.fromAuthorizedIntent(PaymentId(1), authorizedIntent())
+            .applyCapture(Amount.of(200, currency))
+
+        assertFailsWith<IllegalArgumentException> {
+            payment.voidAuthorization()
+        }
+    }
+
+    @Test
+    fun `voidAuthorization fails if payment is already captured`() {
+        val payment = Payment.fromAuthorizedIntent(PaymentId(1), authorizedIntent())
+            .applyCapture(Amount.of(1000, currency))
+
+        assertFailsWith<IllegalArgumentException> {
+            payment.voidAuthorization()
+        }
+    }
+
+    @Test
+    fun `voidAuthorization fails if already voided`() {
+        val payment = Payment.fromAuthorizedIntent(PaymentId(1), authorizedIntent())
+        val voided = payment.voidAuthorization()
+
+        assertFailsWith<IllegalArgumentException> {
+            voided.voidAuthorization()
+        }
     }
 }

@@ -15,10 +15,10 @@
                 <constraints primaryKey="true" nullable="false"/>
             </column>
 
-            <column name="payment_id" type="BIGINT">
-                <constraints nullable="true" foreignKeyName="fk_payment_orders_payment"
-                             referencedTableName="payments"
-                             referencedColumnNames="payment_id"/>
+            <column name="payment_intent_id" type="BIGINT">
+                <constraints nullable="true" foreignKeyName="fk_payment_intent"
+                             referencedTableName="payment_intents"
+                             referencedColumnNames="payment_intent_id"/>
             </column>
             <column name="request_hash" type="VARCHAR(128)">
                 <constraints  nullable="true"/>
@@ -54,9 +54,9 @@
             <column name="request_hash"/>
         </createIndex>
 
-        <createIndex indexName="idx_idempotency_payment_id"
+        <createIndex indexName="idx_idempotency_payment_intent_id"
                      tableName="idempotency_keys">
-            <column name="payment_id"/>
+            <column name="payment_intent_id"/>
         </createIndex>
 
         <!-- 4️⃣ Rollback -->

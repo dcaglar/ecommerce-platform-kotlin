@@ -3,12 +3,10 @@ package com.dogancaglar.paymentservice.application.usecases
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
-import com.dogancaglar.paymentservice.application.events.PaymentOrderEvent
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
 import com.dogancaglar.paymentservice.ports.inbound.RequestLedgerRecordingUseCase
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import org.slf4j.LoggerFactory
-import java.time.Clock
 
 open class RequestLedgerRecordingService(
     private val eventPublisherPort: EventPublisherPort) : RequestLedgerRecordingUseCase {

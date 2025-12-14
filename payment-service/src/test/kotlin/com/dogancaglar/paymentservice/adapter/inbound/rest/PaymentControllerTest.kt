@@ -1,10 +1,10 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentRequestDTO
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentResponseDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentResponseDTO
 import com.dogancaglar.port.out.web.dto.AmountDto
 import com.dogancaglar.port.out.web.dto.CurrencyEnum
-import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentOrderRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentOrderLineDTO
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -26,20 +26,20 @@ class PaymentControllerTest {
         paymentController = PaymentController(paymentService, idempotencyService)
     }
 
-    private fun createSampleRequest() = PaymentRequestDTO(
+    private fun createSampleRequest() = CreatePaymentIntentRequestDTO(
         orderId = "order-123",
         buyerId = "buyer-456",
         totalAmount = AmountDto(10000L, CurrencyEnum.USD),
         paymentOrders = listOf(
-            PaymentOrderRequestDTO(
+            PaymentOrderLineDTO(
                 sellerId = "seller-789",
                 amount = AmountDto(10000L, CurrencyEnum.USD)
             )
         )
     )
 
-    private fun createSampleResponse() = PaymentResponseDTO(
-        paymentId = "payment-123",
+    private fun createSampleResponse() = CreatePaymentIntentResponseDTO(
+        paymentIntentId = "payment-123",
         orderId = "order-123",
         buyerId = "buyer-456",
         totalAmount = AmountDto(10000L, CurrencyEnum.USD),
@@ -61,14 +61,14 @@ class PaymentControllerTest {
                 any()
             )
         } answers {
-            val block = thirdArg<() -> PaymentResponseDTO>()
+            val block = thirdArg<() -> CreatePaymentIntentResponseDTO>()
             val result = block()
             IdempotencyResult(
                 response = result,
                 status = IdempotencyExecutionStatus.CREATED
             )
         }
-        every { paymentService.createPayment(request) } returns expectedResponse
+        every { paymentService.createPaymentIntent(request) } returns expectedResponse
 
         // When
         val result = paymentController.createPayment(idempotencyKey, request)
@@ -78,7 +78,7 @@ class PaymentControllerTest {
         assertEquals(expectedResponse, result.body)
         assertNotNull(result.headers["Location"])
         assertTrue(result.headers["Location"]!!.first().contains("payment-123"))
-        verify(exactly = 1) { paymentService.createPayment(request) }
+        verify(exactly = 1) { paymentService.createPaymentIntent(request) }
         verify(exactly = 1) {
             idempotencyService.run(idempotencyKey, request, any())
         }
@@ -109,7 +109,7 @@ class PaymentControllerTest {
         assertEquals(HttpStatus.OK, result.statusCode)
         assertEquals(cachedResponse, result.body)
         assertNotNull(result.headers["Location"])
-        verify(exactly = 0) { paymentService.createPayment(any()) }
+        verify(exactly = 0) { paymentService.createPaymentIntent(any()) }
         verify(exactly = 1) {
             idempotencyService.run(idempotencyKey, request, any())
         }
@@ -125,7 +125,7 @@ class PaymentControllerTest {
             paymentController.createPayment(null, request)
         }
         assertEquals("Idempotency-Key header is required", exception.message)
-        verify(exactly = 0) { paymentService.createPayment(any()) }
+        verify(exactly = 0) { paymentService.createPaymentIntent(any()) }
         verify(exactly = 0) { idempotencyService.run(any(), any(), any()) }
     }
 
@@ -139,7 +139,7 @@ class PaymentControllerTest {
             paymentController.createPayment("   ", request)
         }
         assertEquals("Idempotency-Key header is required", exception.message)
-        verify(exactly = 0) { paymentService.createPayment(any()) }
+        verify(exactly = 0) { paymentService.createPaymentIntent(any()) }
         verify(exactly = 0) { idempotencyService.run(any(), any(), any()) }
     }
 
@@ -162,7 +162,7 @@ class PaymentControllerTest {
         assertThrows(IdempotencyConflictException::class.java) {
             paymentController.createPayment(idempotencyKey, differentRequest)
         }
-        verify(exactly = 0) { paymentService.createPayment(any()) }
+        verify(exactly = 0) { paymentService.createPaymentIntent(any()) }
         verify(exactly = 1) {
             idempotencyService.run(idempotencyKey, differentRequest, any())
         }
@@ -230,14 +230,14 @@ class PaymentControllerTest {
                 any()
             )
         } answers {
-            val block = thirdArg<() -> PaymentResponseDTO>()
+            val block = thirdArg<() -> CreatePaymentIntentResponseDTO>()
             val result = block()
             IdempotencyResult(
                 response = result,
                 status = IdempotencyExecutionStatus.CREATED
             )
         }
-        every { paymentService.createPayment(request) } returns expectedResponse
+        every { paymentService.createPaymentIntent(request) } returns expectedResponse
 
         // When
         val result = paymentController.createPayment(idempotencyKey, request)
@@ -254,7 +254,7 @@ class PaymentControllerTest {
         val idempotencyKey2 = "idem-key-222"
         val request = createSampleRequest()
         val response1 = createSampleResponse()
-        val response2 = createSampleResponse().copy(paymentId = "payment-456")
+        val response2 = createSampleResponse().copy(paymentIntentId = "payment-456")
         
         every {
             idempotencyService.run(
@@ -263,7 +263,7 @@ class PaymentControllerTest {
                 any()
             )
         } answers {
-            val block = thirdArg<() -> PaymentResponseDTO>()
+            val block = thirdArg<() -> CreatePaymentIntentResponseDTO>()
             val result = block()
             IdempotencyResult(
                 response = result,
@@ -277,14 +277,14 @@ class PaymentControllerTest {
                 any()
             )
         } answers {
-            val block = thirdArg<() -> PaymentResponseDTO>()
+            val block = thirdArg<() -> CreatePaymentIntentResponseDTO>()
             val result = block()
             IdempotencyResult(
                 response = result,
                 status = IdempotencyExecutionStatus.CREATED
             )
         }
-        every { paymentService.createPayment(request) } returnsMany listOf(response1, response2)
+        every { paymentService.createPaymentIntent(request) } returnsMany listOf(response1, response2)
 
         // When
         val result1 = paymentController.createPayment(idempotencyKey1, request)
@@ -293,8 +293,8 @@ class PaymentControllerTest {
         // Then
         assertEquals(HttpStatus.CREATED, result1.statusCode)
         assertEquals(HttpStatus.CREATED, result2.statusCode)
-        assertEquals("payment-123", result1.body?.paymentId)
-        assertEquals("payment-456", result2.body?.paymentId)
-        verify(exactly = 2) { paymentService.createPayment(request) }
+        assertEquals("payment-123", result1.body?.paymentIntentId)
+        assertEquals("payment-456", result2.body?.paymentIntentId)
+        verify(exactly = 2) { paymentService.createPaymentIntent(request) }
     }
 }

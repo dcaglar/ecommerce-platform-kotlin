@@ -2,10 +2,12 @@ package com.dogancaglar.paymentservice.application.config
 
 import com.dogancaglar.paymentservice.adapter.outbound.id.SnowflakeIdGeneratorAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.OutboxOutboundAdapter
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentIntentOutboundAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentOutboundAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.serialization.JacksonSerializationAdapter
 import com.dogancaglar.paymentservice.application.usecases.AccountBalanceReadService
-import com.dogancaglar.paymentservice.application.usecases.AuthorizePaymentService
+import com.dogancaglar.paymentservice.application.usecases.AuthorizePaymentIntentService
+import com.dogancaglar.paymentservice.application.usecases.CreatePaymentIntentService
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceReadUseCase
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
@@ -25,22 +27,28 @@ class PaymentServiceConfig {
 
 
     @Bean
-    fun createAuthorizePaymentService(
-        idGeneratorPort: SnowflakeIdGeneratorAdapter,
-        paymentRepository: PaymentOutboundAdapter,
+    fun authorizePaymentService(
+        paymentIntentRepository: PaymentIntentOutboundAdapter,
         outboxOutboundAdapter: OutboxOutboundAdapter,
         serializationPort: JacksonSerializationAdapter,
         paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
         pspAuthGatewayPort: PspAuthGatewayPort
-    ): AuthorizePaymentService {
-        return AuthorizePaymentService(
-            idGeneratorPort = idGeneratorPort,
-            paymentRepository = paymentRepository,
+    ): AuthorizePaymentIntentService {
+        return AuthorizePaymentIntentService(
+            paymentIntentRepository = paymentIntentRepository,
             psp = pspAuthGatewayPort,
             outboxEventPort = outboxOutboundAdapter,
             serializationPort = serializationPort,
             paymentOrderDomainEventMapper = paymentOrderDomainEventMapper
         )
+    }
+
+    @Bean
+    fun createPaymentService(
+        idGeneratorPort: SnowflakeIdGeneratorAdapter,
+        paymentIntentRepository: PaymentIntentOutboundAdapter
+        ): CreatePaymentIntentService{
+        return CreatePaymentIntentService(paymentIntentRepository,idGeneratorPort)
     }
 
     @Bean
