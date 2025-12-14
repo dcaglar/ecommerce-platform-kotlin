@@ -150,7 +150,7 @@ class OutboxDispatcherJobTest {
         )
         val outboxEvent = OutboxEvent.createNew(
             oeid = paymentIntentId.value,
-            eventType = OutboxEventType.PAYMENT_INTENT_AUTHORIZED.name,
+            eventType = OutboxEventType.payment_intent_authorized.name,
             aggregateId = paymentIntentAuthorizedEvent.paymentIntentId,
             payload = objectMapper.writeValueAsString(envelope)
         )
@@ -309,7 +309,7 @@ class OutboxDispatcherJobTest {
         )
         val outboxEvent = OutboxEvent.createNew(
             oeid = paymentIntentId.value,
-            eventType = OutboxEventType.PAYMENT_INTENT_AUTHORIZED.name,
+            eventType = OutboxEventType.payment_intent_authorized.name,
             aggregateId = paymentIntentAuthorizedEvent.paymentIntentId,
             payload = objectMapper.writeValueAsString(envelope)
         )
@@ -379,7 +379,7 @@ class OutboxDispatcherJobTest {
         )
         val outboxEvent = OutboxEvent.createNew(
             oeid = paymentIntentId.value,
-            eventType = OutboxEventType.PAYMENT_INTENT_AUTHORIZED.name,
+            eventType = OutboxEventType.payment_intent_authorized.name,
             aggregateId = paymentIntentAuthorizedEvent.paymentIntentId,
             payload = objectMapper.writeValueAsString(envelope)
         )
@@ -499,7 +499,7 @@ class OutboxDispatcherJobTest {
         )
         val outboxEvent = OutboxEvent.createNew(
             oeid = paymentIntentId.value,
-            eventType = OutboxEventType.PAYMENT_INTENT_AUTHORIZED.name,
+            eventType = OutboxEventType.payment_intent_authorized.name,
             aggregateId = paymentIntentAuthorizedEvent.paymentIntentId,
             payload = objectMapper.writeValueAsString(envelope)
         )
@@ -553,7 +553,7 @@ class OutboxDispatcherJobTest {
     fun `publishBatch should handle exceptions and mark events as failed`() {
         val outboxEvent = OutboxEvent.createNew(
             oeid = paymentIntentId.value,
-            eventType = OutboxEventType.PAYMENT_INTENT_AUTHORIZED.name,
+            eventType = OutboxEventType.payment_intent_authorized.name,
             aggregateId = "agg-1",
             payload = "invalid-json"
         )
