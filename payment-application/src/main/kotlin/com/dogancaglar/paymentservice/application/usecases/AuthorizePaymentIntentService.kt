@@ -58,7 +58,7 @@ class AuthorizePaymentIntentService(
                 } else if (updated == PaymentIntentStatus.DECLINED){
                      finalizedPaymentIntent = updatedPaymentIntent.markDeclined()
                 } else {
-                    finalizedPaymentIntent = updatedPaymentIntent.markAuthorizedPending()
+                    //todo maybe retry with back off jitter?
                 }
             paymentIntentRepository.updatePaymentIntent(finalizedPaymentIntent!!);
         return finalizedPaymentIntent
