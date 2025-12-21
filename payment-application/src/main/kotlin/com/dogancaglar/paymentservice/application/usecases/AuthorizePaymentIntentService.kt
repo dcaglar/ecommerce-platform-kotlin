@@ -56,7 +56,7 @@ class AuthorizePaymentIntentService(
                     //persist all changes in on tatomic tranascation
                     paymentTransactionalFacadePort.handleAuthorized(finalizedPaymentIntent,payment,paymentOrders,outboxEventPaymentOrderCreatedList+outboxEventPaymentAuthorizedEvent)
                 } else if (updated == PaymentIntentStatus.DECLINED){
-                     finalizedPaymentIntent = updatedPaymentIntent.markAuthorized()
+                     finalizedPaymentIntent = updatedPaymentIntent.markDeclined()
                 } else {
                     finalizedPaymentIntent = updatedPaymentIntent.markAuthorizedPending()
                 }
