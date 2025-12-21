@@ -1,24 +1,12 @@
 package com.dogancaglar.paymentservice.application.maintenance
 
-import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.OutboxEventType
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
-import com.dogancaglar.paymentservice.application.events.PaymentIntentAuthorized
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.Currency
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
-import com.dogancaglar.paymentservice.domain.model.vo.SellerId
-import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
-import com.dogancaglar.paymentservice.application.util.toPublicPaymentIntentId
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
-import com.dogancaglar.paymentservice.domain.model.Payment
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_DISPATCHED_TOTAL
 import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_DISPATCHER_DURATION
 import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_DISPATCH_FAILED_TOTAL
@@ -26,8 +14,6 @@ import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_EVENT_BACKLOG
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import com.dogancaglar.paymentservice.ports.outbound.OutboxEventRepository
-import com.dogancaglar.paymentservice.ports.outbound.PaymentIntentRepository
-import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
@@ -40,17 +26,11 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
-import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
-import kotlin.collections.isNotEmpty
 
 @Service
 @DependsOn("outboxPartitionCreator")
 class OutboxDispatcherJob(
     private val outboxEventRepository: OutboxEventRepository,
-    private val paymentOrderRepository: PaymentOrderRepository,
-    private val paymentIntentRepository: PaymentIntentRepository,
-    private val paymentRepository: PaymentRepository,
     @param:Qualifier("batchPaymentEventPublisher") private val syncPaymentEventPublisher: EventPublisherPort,
     private val meterRegistry: MeterRegistry,
     private val objectMapper: ObjectMapper,
@@ -60,8 +40,6 @@ class OutboxDispatcherJob(
     @param:Value("\${app.instance-id}") private val appInstanceId: String,
     private val idGeneratorPort: IdGeneratorPort,
     @param:Value("\${outbox-backlog.resync-interval:PT5M}") private val backlogResyncInterval: String,
-    private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper,
-    private val serializationPort: SerializationPort
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val backlog = java.util.concurrent.atomic.AtomicLong(0)
@@ -135,11 +113,6 @@ class OutboxDispatcherJob(
                 try {
 
                     when (OutboxEventType.from(evt.eventType)) {
-                        OutboxEventType.payment_intent_authorized -> {
-                            val ok = handlePaymentIntentAuthorized(evt)
-                            if (ok) succeeded += evt.markAsSent()
-                            else failed += evt
-                        }
                         OutboxEventType.payment_authorized -> {
                             val ok = handlePaymentAuthorized(evt)
                             if (ok) succeeded += evt.markAsSent()
@@ -181,33 +154,15 @@ class OutboxDispatcherJob(
     }
 
     @Transactional(transactionManager = "outboxTxManager")
-    fun handlePaymentIntentAuthorized(evt: OutboxEvent):Boolean {
-        val envelopeType = objectMapper.typeFactory
-            .constructParametricType(EventEnvelope::class.java, PaymentIntentAuthorized::class.java)
-        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentIntentAuthorized>
-        val data = envelope.data
-        EventLogContext.with(envelope) {
-            // PRocess PaymentIntentAuthorized -> do nothing for now
-
-
-        }
-        return true
-    }
-
-    @Transactional(transactionManager = "outboxTxManager")
     fun handlePaymentAuthorized(evt: OutboxEvent):Boolean {
         val envelopeType = objectMapper.typeFactory
             .constructParametricType(EventEnvelope::class.java, PaymentAuthorized::class.java)
         val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentAuthorized>
         var ok =false
         EventLogContext.with(envelope) {
-            // Expand PaymentAuthorized -> paymentorder geneated from paymentlines + outbox<paymentordercreated>
-            // create payment domain object +  paymentcreated outboxevent
+
+            //dispatch
             logger.info("Publising PaymentAuthorized>")
-
-
-            //create outbox`<paymentordercreated> with parent being set paymentaiuthorizerd event
-            // For each order, persist an OutboxEvent<PaymentOrderCreated>
             ok = syncPaymentEventPublisher.publishBatchAtomically(
                 envelopes = listOf(envelope),
                 timeout = java.time.Duration.ofSeconds(10)

@@ -23,6 +23,59 @@ Please check [here](docs/architecture/architecture.md) for detailed architecture
 
 
 ```mermaid
+graph TB
+    subgraph "Users"
+        Shopper[👤 Shopper<br/>End-user making purchases<br/>across multiple sellers]
+        Seller[👤 Seller<br/>Marketplace participant<br/>receiving payments]
+    end
+
+    subgraph "Internal Systems"
+        CheckoutService[Checkout Service<br/>Handles shopper checkout flow]
+        OrderService[Order Service<br/>Manages order lifecycle]
+        FinanceService[Finance Service<br/>Financial reporting & payouts]
+    end
+
+    subgraph "Payment Platform"
+        PaymentService[Payment Service<br/>REST API Application<br/>Manages payment lifecycle:<br/>authorization, payment intent creation,<br/>seller balance tracking]
+        PaymentConsumers[Payment Consumers<br/>Kafka Consumer Application<br/>Asynchronous payment processing:<br/>capture operations, event handling,<br/>retry logic]
+    end
+
+    subgraph "External Systems"
+        PSPGateway[PSP Gateway<br/>Payment Service Provider<br/>Authorization & Capture]
+    end
+
+    %% User interactions
+    Shopper -->|Initiates checkout| CheckoutService
+    
+    %% Internal system interactions
+    CheckoutService -->|Creates payment intents<br/>Authorizes payments<br/>REST API| PaymentService
+    OrderService -->|Queries payment status<br/>REST API| PaymentService
+    FinanceService -->|Queries seller balances<br/>REST API| PaymentService
+    
+    %% Payment Platform internal interactions
+    PaymentService -.->|Publishes events<br/>Kafka| PaymentConsumers
+    
+    %% External system interactions
+    PaymentService -->|Authorizes payments<br/>HTTPS| PSPGateway
+    PaymentConsumers -->|Captures payments<br/>HTTPS| PSPGateway
+    
+    %% Indirect user interactions
+    FinanceService -.->|Provides balance info| Seller
+
+    %% Styling
+    style Shopper fill:#e1f5ff,stroke:#1976D2,stroke-width:2px
+    style Seller fill:#e1f5ff,stroke:#1976D2,stroke-width:2px
+    style PaymentService fill:#fff4e1,stroke:#FF9800,stroke-width:3px
+    style PaymentConsumers fill:#fff4e1,stroke:#FF9800,stroke-width:3px
+    style CheckoutService fill:#f0e1ff,stroke:#8E24AA,stroke-width:2px
+    style OrderService fill:#f0e1ff,stroke:#8E24AA,stroke-width:2px
+    style FinanceService fill:#f0e1ff,stroke:#8E24AA,stroke-width:2px
+    style PSPGateway fill:#ffe1e1,stroke:#C62828,stroke-width:2px
+```
+
+
+
+```mermaid
 graph TD
     Start([Checkout Service<br/>Creates Payment]) --> PI1[PaymentIntent<br/>Status: CREATED<br/>Total: 2900 EUR<br/>Lines: SELLER-111: 1450<br/>SELLER-222: 1450]
 
