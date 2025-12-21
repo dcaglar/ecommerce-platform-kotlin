@@ -30,12 +30,13 @@ The PSP simply transfers funds into the MoR account.
 Authorization happens **once for the entire basket**, matching shopper intent.  
 Captures, cancels, and refunds happen **per PaymentOrder**, since each seller’s fulfillment lifecycle is independent.
 
----
+### **5. Why do we have payment intent, and payment seperately**
+
+Separating PaymentIntent from Payment lets our system handle user interaction safely,money movement correctly,retry safely.
+
 
 # 🟧 Functional Requirements
 *(written using Shopper, Seller, and Internal Services as actors)*
-
----
 
 ## **For Shoppers**
 
@@ -104,10 +105,8 @@ Even under retries, restarts, and network issues, financial outcomes must remain
 
 # 🟦 Architecture Summary (Non-Functional / Implementation Section)
 
-> *This section is intentionally not part of Functional Requirements. It describes how the system achieves its goals.*
-
 The platform internally uses:
-- **Event-driven architecture** for asynchronous flows
+- **Event-driven architecture** for asynchronous flows for payment order and ledger
 - **Kafka topics** for PaymentOrder creation, PSP calls, and ledger events
 - **Idempotent state transitions** to ensure correctness under retries
 - **Double-entry ledger** for immutable financial history
@@ -134,8 +133,6 @@ A marketplace participant who receives part of the shopper’s payment and later
 ### **Internal Services**
 - Checkout / Order Service
 - Finance
-- Risk
-- Treasury / Payouts
 
 These actors perform operations on payments, orders, balances, and payouts.
 
@@ -148,45 +145,50 @@ These are the fundamental nouns of out Merchant-of-Record payment platform.
 
 ## **1. PaymentIntent**
 
-Represents the **entire shopper transaction**.
+Represents the **shopper's intent to pay** for a multi-seller basket.
 
-- Created at checkout
-- Contains total amount and currency
-- Linked to one or more PaymentOrders
-- Has high-level statuses (INITIATED, AUTHORIZED, PARTIALLY_CAPTURED, etc.)
+**When it's created:**
+- Step 1: Shopper initiates checkout → `POST /api/v1/payments` endpoint
+- Created with status `CREATED`
+- Contains: `buyerId`, `orderId`, `totalAmount`, `paymentOrderLines` (seller breakdown)
 
-**Why it exists:**  
-A shopper performs **one payment**, even though the order may involve multiple sellers.
+**Why it exists:**
+- Separates "intent to pay" from "actual payment transaction"
+- Allows authorization workflow to happen before committing to financial records
+- Enables idempotent authorization attempts (prevents duplicate PSP calls)
+- Supports retry logic for transient PSP failures
 
----
 
-## **2. PaymentOrder**
+## **2. Payment**
 
+Represents the **actual financial transaction** created after authorization succeeds
+
+**When it's created:**
+- when psp authorization response is authorized.
+
+**Why it exists:**
+- Models actual money movement (vs. PaymentIntent which is just "intent")
+- Tracks aggregate-level financial state across all sellers
+- Provides aggregate view: total captured, total refunded
+- Links to `PaymentIntent` via `paymentIntentId` for traceability
+- Enables financial reporting and reconciliation
+
+
+
+## **3. PaymentOrder**
 Represents the **per-seller financial component** of a Payment.
 
-- Has sellerId
-- Has per-seller amount
-- Has its own lifecycle (INITIATED → CAPTURED / REFUNDED / CANCELED)
-- Maps directly to fulfillment, refunds, and independent financial outcomes
+**When it's created:**
+  When `Payment` is created
+- One `PaymentOrder` per seller (from `Payment.paymentOrderLines`)
+- Initial status: `INITIATED_PENDING`
 
-**Why it exists:**  
-Each seller can fulfill, cancel, or refund independently — requiring independent financial flows.
-
----
-
-## **3. PSP Authorization / PSP Transaction**
-
-Represents the **result of external PSP operations**.
-
-Includes:
-- Authorization result
-- Capture result
-- Refund result
-- PSP transaction identifiers
-- PSP status codes
-
-**Why it exists:**  
-The platform does not process card payments itself; it relies on a PSP.
+**Why it exists:**
+- Each seller has independent fulfillment lifecycle
+- Sellers can be captured, refunded, or cancelled independently
+- Enables per-seller financial tracking and payouts
+- Supports retry logic per seller (if one seller's capture fails, others continue)
+- Maps directly to seller-level accounting entries
 
 ---
 
@@ -243,6 +245,143 @@ Derived from applied LedgerEntries.
 Used for reporting, analytics, payouts, and consistency validation.
 
 
-mentCo
+
+
+# 🟩 C4 Architecture Diagrams
+
+
+This document contains C4 model diagrams for the payment service system at different levels of abstraction.
+
+## Level 1: System Context Diagram
+
+The System Context diagram shows the payment service system in its environment, illustrating users and external systems it interacts with.
+
+```mermaid
+graph TB
+    subgraph "Users"
+        Shopper[👤 Shopper<br/>End-user making purchases<br/>across multiple sellers]
+        Seller[👤 Seller<br/>Marketplace participant<br/>receiving payments]
+    end
+
+    subgraph "Internal Systems"
+        CheckoutService[Checkout Service<br/>Handles shopper checkout flow]
+        OrderService[Order Service<br/>Manages order lifecycle]
+        FinanceService[Finance Service<br/>Financial reporting & payouts]
+    end
+
+    subgraph "Payment Platform"
+        PaymentService[Payment Service<br/>REST API Application<br/>Manages payment lifecycle:<br/>authorization, payment intent creation,<br/>seller balance tracking]
+        PaymentConsumers[Payment Consumers<br/>Kafka Consumer Application<br/>Asynchronous payment processing:<br/>capture operations, event handling,<br/>retry logic]
+    end
+
+    subgraph "External Systems"
+        PSPGateway[PSP Gateway<br/>Payment Service Provider<br/>Authorization & Capture]
+    end
+
+    %% User interactions
+    Shopper -->|Initiates checkout| CheckoutService
+    
+    %% Internal system interactions
+    CheckoutService -->|Creates payment intents<br/>Authorizes payments<br/>REST API| PaymentService
+    OrderService -->|Queries payment status<br/>REST API| PaymentService
+    FinanceService -->|Queries seller balances<br/>REST API| PaymentService
+    
+    %% Payment Platform internal interactions
+    PaymentService -.->|Publishes events<br/>Kafka| PaymentConsumers
+    
+    %% External system interactions
+    PaymentService -->|Authorizes payments<br/>HTTPS| PSPGateway
+    PaymentConsumers -->|Captures payments<br/>HTTPS| PSPGateway
+    
+    %% Indirect user interactions
+    FinanceService -.->|Provides balance info| Seller
+
+    %% Styling
+    style Shopper fill:#e1f5ff,stroke:#1976D2,stroke-width:2px
+    style Seller fill:#e1f5ff,stroke:#1976D2,stroke-width:2px
+    style PaymentService fill:#fff4e1,stroke:#FF9800,stroke-width:3px
+    style PaymentConsumers fill:#fff4e1,stroke:#FF9800,stroke-width:3px
+    style CheckoutService fill:#f0e1ff,stroke:#8E24AA,stroke-width:2px
+    style OrderService fill:#f0e1ff,stroke:#8E24AA,stroke-width:2px
+    style FinanceService fill:#f0e1ff,stroke:#8E24AA,stroke-width:2px
+    style PSPGateway fill:#ffe1e1,stroke:#C62828,stroke-width:2px
+```
+
+### System Context Description
+
+**Payment Platform** is an internal backend domain service that manages the complete payment lifecycle for a multi-seller marketplace platform. It operates as a Merchant-of-Record (MoR), handling all financial transactions between shoppers, sellers, and the platform. The platform consists of two main applications:
+
+- **Payment Service**: REST API application that handles synchronous operations (payment intent creation, authorization, queries)
+- **Payment Consumers**: Kafka consumer application that handles asynchronous operations (capture operations, event processing, retry logic)
+
+
+### End to End payment flow
+
+```mermaid
+graph TD
+    Start([Checkout Service<br/>Creates Payment]) --> PI1[PaymentIntent<br/>Status: CREATED<br/>Total: 2900 EUR<br/>Lines: SELLER-111: 1450<br/>SELLER-222: 1450]
+
+    PI1 -->|POST /authorize| PI2[PaymentIntent<br/>Status: PENDING_AUTH<br/>Authorization in progress]
+
+    PI2 -->|PSP Call| PSP{PSP Response}
+    
+    PSP -->|AUTHORIZED| PI3[PaymentIntent<br/>Status: AUTHORIZED]
+    PSP -->|DECLINED| PI4[PaymentIntent<br/>Status: DECLINED<br/>END]
+    PSP -->|TIMEOUT| PI2
+
+    PI3 -->|Create Payment| P1[Payment<br/>Status: NOT_CAPTURED<br/>Total: 2900 EUR<br/>Captured: 0 EUR<br/>Refunded: 0 EUR]
+
+    P1 -->|Fork into N Orders| PO1[PaymentOrder 1<br/>SELLER-111<br/>Status: INITIATED_PENDING<br/>Amount: 1450 EUR<br/>Retry: 0]
+    P1 -->|Fork into N Orders| PO2[PaymentOrder 2<br/>SELLER-222<br/>Status: INITIATED_PENDING<br/>Amount: 1450 EUR<br/>Retry: 0]
+
+    %% PaymentOrder 1 State Machine
+    PO1 -->|Enqueued| PO1A[PaymentOrder 1<br/>Status: CAPTURE_REQUESTED<br/>Retry: 0]
+    PO1A -->|PSP Capture Call| PSP1{PSP Result}
+    PSP1 -->|SUCCESS| PO1B[PaymentOrder 1<br/>Status: CAPTURED<br/>TERMINAL]
+    PSP1 -->|FAILED| PO1C[PaymentOrder 1<br/>Status: CAPTURE_FAILED<br/>TERMINAL]
+    PSP1 -->|TIMEOUT| PO1D[PaymentOrder 1<br/>Status: PENDING_CAPTURE<br/>Retry: 1]
+    PO1D -->|Retry| PO1A
+
+    %% PaymentOrder 2 State Machine
+    PO2 -->|Enqueued| PO2A[PaymentOrder 2<br/>Status: CAPTURE_REQUESTED<br/>Retry: 0]
+    PO2A -->|PSP Capture Call| PSP2{PSP Result}
+    PSP2 -->|SUCCESS| PO2B[PaymentOrder 2<br/>Status: CAPTURED<br/>TERMINAL]
+    PSP2 -->|FAILED| PO2C[PaymentOrder 2<br/>Status: CAPTURE_FAILED<br/>TERMINAL]
+    PSP2 -->|TIMEOUT| PO2D[PaymentOrder 2<br/>Status: PENDING_CAPTURE<br/>Retry: 1]
+    PO2D -->|Retry| PO2A
+
+    %% Payment Status Updates
+    PO1B -->|Update Payment| P2[Payment<br/>Status: PARTIALLY_CAPTURED<br/>Captured: 1450 EUR]
+    PO2B -->|Update Payment| P3[Payment<br/>Status: CAPTURED<br/>Captured: 2900 EUR]
+
+    %% Refund Flow (optional)
+    PO1B -.->|Refund Request| PO1E[PaymentOrder 1<br/>Status: REFUNDED]
+    PO1E -->|Update Payment| P4[Payment<br/>Status: PARTIALLY_REFUNDED<br/>Refunded: 1450 EUR]
+
+    %% Styling
+    style PI1 fill:#e1f5ff,stroke:#1976D2,stroke-width:2px
+    style PI2 fill:#fff4e1,stroke:#FF9800,stroke-width:2px
+    style PI3 fill:#e1ffe1,stroke:#388E3C,stroke-width:2px
+    style PI4 fill:#ffe1e1,stroke:#C62828,stroke-width:2px
+    style P1 fill:#f0e1ff,stroke:#8E24AA,stroke-width:2px
+    style P2 fill:#f0e1ff,stroke:#8E24AA,stroke-width:2px
+    style P3 fill:#e1ffe1,stroke:#388E3C,stroke-width:2px
+    style P4 fill:#fff4e1,stroke:#FF9800,stroke-width:2px
+    style PO1 fill:#fff4e1,stroke:#FF9800,stroke-width:2px
+    style PO1A fill:#fff4e1,stroke:#FF9800,stroke-width:2px
+    style PO1B fill:#e1ffe1,stroke:#388E3C,stroke-width:2px
+    style PO1C fill:#ffe1e1,stroke:#C62828,stroke-width:2px
+    style PO1D fill:#fff4e1,stroke:#FF9800,stroke-width:2px
+    style PO1E fill:#ffe1e1,stroke:#C62828,stroke-width:2px
+    style PO2 fill:#fff4e1,stroke:#FF9800,stroke-width:2px
+    style PO2A fill:#fff4e1,stroke:#FF9800,stroke-width:2px
+    style PO2B fill:#e1ffe1,stroke:#388E3C,stroke-width:2px
+    style PO2C fill:#ffe1e1,stroke:#C62828,stroke-width:2px
+    style PO2D fill:#fff4e1,stroke:#FF9800,stroke-width:2px
+    style PSP fill:#ffebee,stroke:#C62828,stroke-width:2px
+    style PSP1 fill:#ffebee,stroke:#C62828,stroke-width:2px
+    style PSP2 fill:#ffebee,stroke:#C62828,stroke-width:2px
+```
+
 
 
