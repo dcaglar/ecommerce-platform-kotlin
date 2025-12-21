@@ -384,4 +384,61 @@ graph TD
 ```
 
 
+#### Ledger Record Sequence Flow
+
+```mermaid
+sequenceDiagram
+    participant Kafka
+    participant Dispatcher as LedgerRecordingRequestDispatcher
+    participant Command as LedgerRecordingCommand
+    participant Consumer as LedgerRecordingConsumer
+    participant Service as RecordLedgerEntriesService
+    participant LedgerDB as Ledger Table
+
+    Kafka->>Dispatcher: Consume PaymentOrderFinalized
+    Dispatcher->>Kafka: Publish LedgerRecordingCommand
+    Kafka->>Consumer: Consume LedgerRecordingCommand
+    Consumer->>Service: recordLedgerEntries()
+    Service->>LedgerDB: Append JournalEntries
+    Service->>Kafka: Publish LedgerEntriesRecorded
+```
+
+#### Balance Flow Sequence
+
+
+```mermaid
+sequenceDiagram
+    participant Ledger as LedgerRecordingConsumer
+    participant Kafka as ledger_entries_recorded_topic
+    participant Consumer as AccountBalanceConsumer
+    participant Service as AccountBalanceService
+    participant Redis as Redis (Deltas)
+    participant Job as AccountBalanceSnapshotJob
+    participant DB as PostgreSQL (Snapshots)
+
+    Ledger->>Kafka: Publish LedgerEntriesRecorded (sellerId key)
+    Kafka->>Consumer: Consume batch (100-500 events)
+    Consumer->>Service: updateAccountBalancesBatch(ledgerEntries)
+    Service->>Service: Extract postings, compute signed amounts per account
+    Service->>DB: Load current snapshots (batch query: findByAccountCodes)
+    Service->>Service: Filter postings by watermark (ledgerEntryId > lastAppliedEntryId)
+    Service->>Service: Compute delta = sum(signed_amounts) for filtered postings
+    Service->>Redis: addDeltaAndWatermark (Lua: HINCRBY delta + HSET watermark + SADD dirty)
+    Note over Redis: TTL set on hash (5 min), dirty set marked
+    
+    Note over Job: Every 1 minute (configurable)
+    Job->>Redis: getDirtyAccounts() (reads from dirty set)
+    loop For each dirty account
+        Job->>Redis: getAndResetDeltaWithWatermark (Lua: HGET delta+watermark, then HSET delta=0)
+        alt Delta != 0
+            Job->>DB: Load current snapshot (or create default)
+            Job->>Service: Compute: newBalance = snapshot.balance + delta
+            Job->>Service: Compute: newWatermark = maxOf(current.lastAppliedEntryId, upToEntryId)
+            Job->>DB: saveSnapshot (UPSERT with WHERE watermark guard)
+            Note over DB: Only updates if new watermark > current watermark
+        end
+    end
+```
+
+
 
