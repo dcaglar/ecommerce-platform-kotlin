@@ -6,29 +6,13 @@ import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.OutboxEventType
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
-import com.dogancaglar.paymentservice.application.events.PaymentIntentAuthorized
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
-import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
-import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
-import com.dogancaglar.paymentservice.domain.model.Payment
-import com.dogancaglar.paymentservice.domain.model.PaymentIntent
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
-import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
-import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import com.dogancaglar.paymentservice.ports.outbound.OutboxEventRepository
-import com.dogancaglar.paymentservice.ports.outbound.PaymentIntentRepository
-import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
-import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
-import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
@@ -45,37 +29,18 @@ import java.time.Duration
 class OutboxDispatcherJobTest {
 
     private lateinit var outboxEventRepository: OutboxEventRepository
-    private lateinit var paymentOrderRepository: PaymentOrderRepository
-    private lateinit var paymentIntentRepository: PaymentIntentRepository
-    private lateinit var paymentRepository: PaymentRepository
     private lateinit var eventPublisherPort: EventPublisherPort
     private lateinit var meterRegistry: MeterRegistry
     private lateinit var objectMapper: ObjectMapper
     private lateinit var taskScheduler: ThreadPoolTaskScheduler
-    private lateinit var serializationPort: SerializationPort
-    private lateinit var paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
     private lateinit var idGeneratorPort: IdGeneratorPort
     private lateinit var outboxDispatcherJob: OutboxDispatcherJob
-
-    private val currency = Currency("EUR")
-    private val amount = Amount.of(5000L, currency)
-    private val buyerId = BuyerId("buyer-1")
-    private val orderId = OrderId("order-1")
-    private val paymentIntentId = PaymentIntentId(1L)
-    private val paymentId = PaymentId(100L)
-    private val sellerId1 = SellerId("seller-1")
-    private val sellerId2 = SellerId("seller-2")
 
     @BeforeEach
     fun setUp() {
         outboxEventRepository = mockk(relaxed = true)
-        paymentOrderRepository = mockk(relaxed = true)
-        paymentIntentRepository = mockk(relaxed = true)
-        paymentRepository = mockk(relaxed = true)
         eventPublisherPort = mockk(relaxed = true)
         meterRegistry = SimpleMeterRegistry()
-        serializationPort = mockk(relaxed = true)
-        paymentOrderDomainEventMapper = PaymentOrderDomainEventMapper()
         idGeneratorPort = mockk(relaxed = true)
         objectMapper = ObjectMapper().apply {
             registerModule(KotlinModule.Builder().build())
@@ -90,14 +55,9 @@ class OutboxDispatcherJobTest {
             val lambda = thirdArg<() -> Unit>()
             lambda.invoke()
         }
-        every { EventLogContext.getTraceId() } returns "test-trace-id"
-        every { EventLogContext.getEventId() } returns "parent-event-id"
         
         outboxDispatcherJob = OutboxDispatcherJob(
             outboxEventRepository = outboxEventRepository,
-            paymentOrderRepository = paymentOrderRepository,
-            paymentIntentRepository = paymentIntentRepository,
-            paymentRepository = paymentRepository,
             syncPaymentEventPublisher = eventPublisherPort,
             meterRegistry = meterRegistry,
             objectMapper = objectMapper,
@@ -106,8 +66,6 @@ class OutboxDispatcherJobTest {
             batchSize = 10,
             appInstanceId = "test-instance",
             backlogResyncInterval = "PT5M",
-            serializationPort = serializationPort,
-            paymentOrderDomainEventMapper = paymentOrderDomainEventMapper,
             idGeneratorPort = idGeneratorPort
         )
     }
@@ -119,78 +77,76 @@ class OutboxDispatcherJobTest {
     }
 
     // ============================================================
-    // Test: dispatchBatchWorker with empty batch
+    // Test: claimBatch
     // ============================================================
     @Test
-    fun `dispatchBatchWorker should return early when no events to claim`() {
-        val threadName = Thread.currentThread().name
-        val workerId = "test-instance:$threadName"
+    fun `claimBatch should claim events and update backlog`() {
+        val workerId = "test-worker"
+        val events = listOf(
+            OutboxEvent.createNew(1L, "payment_authorized", "agg-1", "{}"),
+            OutboxEvent.createNew(2L, "payment_order_created", "agg-2", "{}")
+        )
+
+        every { outboxEventRepository.findBatchForDispatch(10, workerId) } returns events
+
+        val result = outboxDispatcherJob.claimBatch(10, workerId)
+
+        assertEquals(2, result.size)
+        verify(exactly = 1) { outboxEventRepository.findBatchForDispatch(10, workerId) }
+    }
+
+    @Test
+    fun `claimBatch should return empty list when no events available`() {
+        val workerId = "test-worker"
         every { outboxEventRepository.findBatchForDispatch(10, workerId) } returns emptyList()
 
-        outboxDispatcherJob.dispatchBatchWorker()
+        val result = outboxDispatcherJob.claimBatch(10, workerId)
 
-        verify(exactly = 1) { outboxEventRepository.findBatchForDispatch(10, workerId) }
-        // With relaxed mocks, we don't need to verify non-calls
-        verify(exactly = 0) { outboxEventRepository.updateAll(any()) }
+        assertTrue(result.isEmpty())
     }
 
     // ============================================================
-    // Test: handlePaymentIntentAuthorized - successful flow
+    // Test: publishBatch - empty list
     // ============================================================
     @Test
-    fun `handlePaymentIntentAuthorized should create Payment and PaymentAuthorized outbox event`() {
-        // Create test data
-        val paymentIntent = createPaymentIntent()
-        val paymentIntentAuthorizedEvent = PaymentIntentAuthorized.from(paymentIntent, Utc.nowInstant())
-        val envelope = EventEnvelopeFactory.envelopeFor(
-            traceId = "trace-1",
-            data = paymentIntentAuthorizedEvent,
-            aggregateId = paymentIntentAuthorizedEvent.paymentIntentId,
-            parentEventId = null
-        )
-        val outboxEvent = OutboxEvent.createNew(
-            oeid = paymentIntentId.value,
-            eventType = OutboxEventType.payment_intent_authorized.name,
-            aggregateId = paymentIntentAuthorizedEvent.paymentIntentId,
-            payload = objectMapper.writeValueAsString(envelope)
-        )
+    fun `publishBatch should return empty triple for empty event list`() {
+        val (succeeded, failed, keepClaimed) = outboxDispatcherJob.publishBatch(emptyList())
 
-        // Setup mocks
-        every { paymentIntentRepository.findById(paymentIntentId) } returns paymentIntent
-        every { idGeneratorPort.nextPaymentId(buyerId, orderId) } returns paymentId.value
-        every { serializationPort.toJson(any<EventEnvelope<PaymentAuthorized>>()) } returns "{}"
-        every { 
-            eventPublisherPort.publishBatchAtomically(
-                envelopes = listOf(envelope),
-                timeout = Duration.ofSeconds(10)
-            )
-        } returns true
-
-        // Execute
-        val result = outboxDispatcherJob.handlePaymentIntentAuthorized(outboxEvent)
-
-        // Verify
-        assertTrue(result)
-        verify(exactly = 1) { paymentIntentRepository.findById(paymentIntentId) }
-        verify(exactly = 1) { idGeneratorPort.nextPaymentId(buyerId, orderId) }
-        verify(exactly = 1) { paymentRepository.save(any<Payment>()) }
-        verify(exactly = 1) { outboxEventRepository.saveAll(any<List<OutboxEvent>>()) }
-        verify(exactly = 1) { 
-            eventPublisherPort.publishBatchAtomically(
-                envelopes = listOf(envelope),
-                timeout = Duration.ofSeconds(10)
-            )
-        }
+        assertEquals(0, succeeded.size)
+        assertEquals(0, failed.size)
+        assertEquals(0, keepClaimed.size)
     }
 
     // ============================================================
-    // Test: handlePaymentAuthorized - successful flow
+    // Test: publishBatch - PaymentAuthorized success
     // ============================================================
     @Test
-    fun `handlePaymentAuthorized should create PaymentOrders and PaymentOrderCreated outbox events`() {
-        // Create test data
-        val payment = createPayment()
-        val paymentAuthorizedEvent = PaymentAuthorized.from(payment, Utc.nowInstant())
+    fun `publishBatch should handle PaymentAuthorized event successfully`() {
+        // Create domain objects
+        val currency = com.dogancaglar.paymentservice.domain.model.Currency("EUR")
+        val amount = com.dogancaglar.paymentservice.domain.model.Amount.of(5000L, currency)
+        val paymentIntent = com.dogancaglar.paymentservice.domain.model.PaymentIntent.createNew(
+            paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(1L),
+            buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer-1"),
+            orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order-1"),
+            totalAmount = amount,
+            paymentOrderLines = listOf(
+                com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine(
+                    com.dogancaglar.paymentservice.domain.model.vo.SellerId("seller-1"),
+                    amount
+                )
+            )
+        ).markAuthorizedPending().markAuthorized()
+        
+        val payment = com.dogancaglar.paymentservice.domain.model.Payment.fromAuthorizedIntent(
+            paymentId = PaymentId(100L),
+            intent = paymentIntent
+        )
+        
+        val paymentAuthorizedEvent = PaymentAuthorized.from(
+            payment = payment,
+            timestamp = Utc.nowInstant()
+        )
         val envelope = EventEnvelopeFactory.envelopeFor(
             traceId = "trace-1",
             data = paymentAuthorizedEvent,
@@ -198,127 +154,14 @@ class OutboxDispatcherJobTest {
             parentEventId = null
         )
         val outboxEvent = OutboxEvent.createNew(
-            oeid = paymentId.value,
+            oeid = 1L,
             eventType = OutboxEventType.payment_authorized.name,
             aggregateId = paymentAuthorizedEvent.paymentId,
             payload = objectMapper.writeValueAsString(envelope)
         )
 
-        val paymentOrderId1 = PaymentOrderId(200L)
-        val paymentOrderId2 = PaymentOrderId(201L)
-
-        // Setup mocks
-        every { idGeneratorPort.nextPaymentOrderId(sellerId1) } returns paymentOrderId1.value
-        every { idGeneratorPort.nextPaymentOrderId(sellerId2) } returns paymentOrderId2.value
-        every { serializationPort.toJson(any<EventEnvelope<PaymentOrderCreated>>()) } returns "{}"
         every { 
-            eventPublisherPort.publishBatchAtomically(
-                envelopes = listOf(envelope),
-                timeout = Duration.ofSeconds(10)
-            )
-        } returns true
-
-        // Execute
-        val result = outboxDispatcherJob.handlePaymentAuthorized(outboxEvent)
-
-        // Verify
-        assertTrue(result)
-        verify(exactly = 1) { idGeneratorPort.nextPaymentOrderId(sellerId1) }
-        verify(exactly = 1) { idGeneratorPort.nextPaymentOrderId(sellerId2) }
-        verify(exactly = 1) { paymentOrderRepository.insertAll(any<List<PaymentOrder>>()) }
-        verify(exactly = 1) { outboxEventRepository.saveAll(any<List<OutboxEvent>>()) }
-        verify(exactly = 1) { 
-            eventPublisherPort.publishBatchAtomically(
-                envelopes = listOf(envelope),
-                timeout = Duration.ofSeconds(10)
-            )
-        }
-        
-        // Verify PaymentOrders were created with correct data
-        val paymentOrdersCaptor = slot<List<PaymentOrder>>()
-        verify { paymentOrderRepository.insertAll(capture(paymentOrdersCaptor)) }
-        val paymentOrders = paymentOrdersCaptor.captured
-        assertEquals(2, paymentOrders.size)
-        assertEquals(paymentId, paymentOrders[0].paymentId)
-        assertEquals(sellerId1, paymentOrders[0].sellerId)
-        assertEquals(paymentId, paymentOrders[1].paymentId)
-        assertEquals(sellerId2, paymentOrders[1].sellerId)
-    }
-
-    // ============================================================
-    // Test: handlePaymentOrderCreated - successful flow (tested via publishBatch)
-    // ============================================================
-    @Test
-    fun `publishBatch should handle PAYMENT_ORDER_CREATED event successfully`() {
-        // Create test data
-        val paymentOrder = PaymentOrder.createNew(
-            paymentOrderId = PaymentOrderId(300L),
-            paymentId = paymentId,
-            sellerId = sellerId1,
-            amount = amount
-        )
-        val paymentOrderCreatedEvent = paymentOrderDomainEventMapper.toPaymentOrderCreated(paymentOrder)
-        val envelope = EventEnvelopeFactory.envelopeFor(
-            traceId = "trace-1",
-            data = paymentOrderCreatedEvent,
-            aggregateId = paymentOrderCreatedEvent.paymentOrderId,
-            parentEventId = null
-        )
-        val outboxEvent = OutboxEvent.createNew(
-            oeid = paymentOrder.paymentOrderId.value,
-            eventType = OutboxEventType.payment_order_created.name,
-            aggregateId = paymentOrderCreatedEvent.paymentOrderId,
-            payload = objectMapper.writeValueAsString(envelope)
-        )
-
-        // Setup mocks
-        every { 
-            eventPublisherPort.publishBatchAtomically(
-                envelopes = listOf(envelope),
-                timeout = Duration.ofSeconds(10)
-            )
-        } returns true
-
-        // Execute
-        val (succeeded, failed, keepClaimed) = outboxDispatcherJob.publishBatch(listOf(outboxEvent))
-
-        // Verify
-        assertEquals(1, succeeded.size)
-        assertEquals(0, failed.size)
-        assertEquals(0, keepClaimed.size)
-        verify(exactly = 1) { 
-            eventPublisherPort.publishBatchAtomically(
-                envelopes = listOf(envelope),
-                timeout = Duration.ofSeconds(10)
-            )
-        }
-    }
-
-    // ============================================================
-    // Test: publishBatch with PAYMENT_INTENT_AUTHORIZED
-    // ============================================================
-    @Test
-    fun `publishBatch should handle PAYMENT_INTENT_AUTHORIZED event successfully`() {
-        val paymentIntent = createPaymentIntent()
-        val paymentIntentAuthorizedEvent = PaymentIntentAuthorized.from(paymentIntent, Utc.nowInstant())
-        val envelope = EventEnvelopeFactory.envelopeFor(
-            traceId = "trace-1",
-            data = paymentIntentAuthorizedEvent,
-            aggregateId = paymentIntentAuthorizedEvent.paymentIntentId,
-            parentEventId = null
-        )
-        val outboxEvent = OutboxEvent.createNew(
-            oeid = paymentIntentId.value,
-            eventType = OutboxEventType.payment_intent_authorized.name,
-            aggregateId = paymentIntentAuthorizedEvent.paymentIntentId,
-            payload = objectMapper.writeValueAsString(envelope)
-        )
-
-        every { paymentIntentRepository.findById(paymentIntentId) } returns paymentIntent
-        every { idGeneratorPort.nextPaymentId(buyerId, orderId) } returns paymentId.value
-        every { serializationPort.toJson(any<EventEnvelope<PaymentAuthorized>>()) } returns "{}"
-        every { 
-            eventPublisherPort.publishBatchAtomically<PaymentIntentAuthorized>(
+            eventPublisherPort.publishBatchAtomically<PaymentAuthorized>(
                 any(), any()
             )
         } returns true
@@ -328,24 +171,119 @@ class OutboxDispatcherJobTest {
         assertEquals(1, succeeded.size)
         assertEquals(0, failed.size)
         assertEquals(0, keepClaimed.size)
-        assertTrue(succeeded[0].status == OutboxEvent.Status.SENT)
+        assertEquals(OutboxEvent.Status.SENT, succeeded[0].status)
+        verify(exactly = 1) { 
+            eventPublisherPort.publishBatchAtomically<PaymentAuthorized>(any(), any())
+        }
     }
 
     // ============================================================
-    // Test: publishBatch with empty list
+    // Test: publishBatch - PaymentOrderCreated success
     // ============================================================
     @Test
-    fun `publishBatch should return empty triple for empty event list`() {
-        val (succeeded, failed, keepClaimed) = outboxDispatcherJob.publishBatch(emptyList())
+    fun `publishBatch should handle PaymentOrderCreated event successfully`() {
+        // Create domain objects
+        val currency = com.dogancaglar.paymentservice.domain.model.Currency("EUR")
+        val amount = com.dogancaglar.paymentservice.domain.model.Amount.of(2500L, currency)
+        val paymentOrder = com.dogancaglar.paymentservice.domain.model.PaymentOrder.createNew(
+            paymentOrderId = PaymentOrderId(200L),
+            paymentId = PaymentId(100L),
+            sellerId = com.dogancaglar.paymentservice.domain.model.vo.SellerId("seller-1"),
+            amount = amount
+        )
+        
+        val paymentOrderCreatedEvent = PaymentOrderCreated.from(
+            order = paymentOrder,
+            now = Utc.nowInstant()
+        )
+        val envelope = EventEnvelopeFactory.envelopeFor(
+            traceId = "trace-1",
+            data = paymentOrderCreatedEvent,
+            aggregateId = paymentOrderCreatedEvent.paymentOrderId,
+            parentEventId = null
+        )
+        val outboxEvent = OutboxEvent.createNew(
+            oeid = 2L,
+            eventType = OutboxEventType.payment_order_created.name,
+            aggregateId = paymentOrderCreatedEvent.paymentOrderId,
+            payload = objectMapper.writeValueAsString(envelope)
+        )
 
-        assertEquals(0, succeeded.size)
+        every { 
+            eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(
+                any(), any()
+            )
+        } returns true
+
+        val (succeeded, failed, keepClaimed) = outboxDispatcherJob.publishBatch(listOf(outboxEvent))
+
+        assertEquals(1, succeeded.size)
         assertEquals(0, failed.size)
         assertEquals(0, keepClaimed.size)
-        // With relaxed mocks, we don't need to verify non-calls
+        assertEquals(OutboxEvent.Status.SENT, succeeded[0].status)
+        verify(exactly = 1) { 
+            eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(any(), any())
+        }
     }
 
     // ============================================================
-    // Test: publishBatch with unknown event type
+    // Test: publishBatch - publish failure
+    // ============================================================
+    @Test
+    fun `publishBatch should mark event as failed when publish fails`() {
+        // Create domain objects
+        val currency = com.dogancaglar.paymentservice.domain.model.Currency("EUR")
+        val amount = com.dogancaglar.paymentservice.domain.model.Amount.of(5000L, currency)
+        val paymentIntent = com.dogancaglar.paymentservice.domain.model.PaymentIntent.createNew(
+            paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(1L),
+            buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer-1"),
+            orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order-1"),
+            totalAmount = amount,
+            paymentOrderLines = listOf(
+                com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine(
+                    com.dogancaglar.paymentservice.domain.model.vo.SellerId("seller-1"),
+                    amount
+                )
+            )
+        ).markAuthorizedPending().markAuthorized()
+        
+        val payment = com.dogancaglar.paymentservice.domain.model.Payment.fromAuthorizedIntent(
+            paymentId = PaymentId(100L),
+            intent = paymentIntent
+        )
+        
+        val paymentAuthorizedEvent = PaymentAuthorized.from(
+            payment = payment,
+            timestamp = Utc.nowInstant()
+        )
+        val envelope = EventEnvelopeFactory.envelopeFor(
+            traceId = "trace-1",
+            data = paymentAuthorizedEvent,
+            aggregateId = paymentAuthorizedEvent.paymentId,
+            parentEventId = null
+        )
+        val outboxEvent = OutboxEvent.createNew(
+            oeid = 1L,
+            eventType = OutboxEventType.payment_authorized.name,
+            aggregateId = paymentAuthorizedEvent.paymentId,
+            payload = objectMapper.writeValueAsString(envelope)
+        )
+
+        every { 
+            eventPublisherPort.publishBatchAtomically<PaymentAuthorized>(
+                any(), any()
+            )
+        } returns false
+
+        val (succeeded, failed, keepClaimed) = outboxDispatcherJob.publishBatch(listOf(outboxEvent))
+
+        assertEquals(0, succeeded.size)
+        assertEquals(1, failed.size)
+        assertEquals(0, keepClaimed.size)
+    }
+
+    // ============================================================
+    // Test: publishBatch - unknown event type
     // ============================================================
     @Test
     fun `publishBatch should mark unknown event type as failed`() {
@@ -361,43 +299,110 @@ class OutboxDispatcherJobTest {
         assertEquals(0, succeeded.size)
         assertEquals(1, failed.size)
         assertEquals(0, keepClaimed.size)
-        // With relaxed mocks, we don't need to verify non-calls
     }
 
     // ============================================================
-    // Test: publishBatch with publish failure
+    // Test: publishBatch - invalid JSON payload
     // ============================================================
     @Test
-    fun `publishBatch should mark event as failed when publish fails`() {
-        val paymentIntent = createPaymentIntent()
-        val paymentIntentAuthorizedEvent = PaymentIntentAuthorized.from(paymentIntent, Utc.nowInstant())
-        val envelope = EventEnvelopeFactory.envelopeFor(
-            traceId = "trace-1",
-            data = paymentIntentAuthorizedEvent,
-            aggregateId = paymentIntentAuthorizedEvent.paymentIntentId,
-            parentEventId = null
-        )
+    fun `publishBatch should handle invalid JSON payload gracefully`() {
         val outboxEvent = OutboxEvent.createNew(
-            oeid = paymentIntentId.value,
-            eventType = OutboxEventType.payment_intent_authorized.name,
-            aggregateId = paymentIntentAuthorizedEvent.paymentIntentId,
-            payload = objectMapper.writeValueAsString(envelope)
+            oeid = 1L,
+            eventType = OutboxEventType.payment_authorized.name,
+            aggregateId = "agg-1",
+            payload = "invalid-json"
         )
-
-        every { paymentIntentRepository.findById(paymentIntentId) } returns paymentIntent
-        every { idGeneratorPort.nextPaymentId(buyerId, orderId) } returns paymentId.value
-        every { serializationPort.toJson(any<EventEnvelope<PaymentAuthorized>>()) } returns "{}"
-        every { 
-            eventPublisherPort.publishBatchAtomically(
-                any<List<EventEnvelope<PaymentIntentAuthorized>>>(),
-                any()
-            )
-        } returns false
 
         val (succeeded, failed, keepClaimed) = outboxDispatcherJob.publishBatch(listOf(outboxEvent))
 
         assertEquals(0, succeeded.size)
         assertEquals(1, failed.size)
+        assertEquals(0, keepClaimed.size)
+    }
+
+    // ============================================================
+    // Test: publishBatch - multiple events
+    // ============================================================
+    @Test
+    fun `publishBatch should handle multiple events in batch`() {
+        // Create domain objects for PaymentAuthorized
+        val currency = com.dogancaglar.paymentservice.domain.model.Currency("EUR")
+        val amount = com.dogancaglar.paymentservice.domain.model.Amount.of(5000L, currency)
+        val paymentIntent = com.dogancaglar.paymentservice.domain.model.PaymentIntent.createNew(
+            paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(1L),
+            buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer-1"),
+            orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order-1"),
+            totalAmount = amount,
+            paymentOrderLines = listOf(
+                com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine(
+                    com.dogancaglar.paymentservice.domain.model.vo.SellerId("seller-1"),
+                    amount
+                )
+            )
+        ).markAuthorizedPending().markAuthorized()
+        
+        val payment = com.dogancaglar.paymentservice.domain.model.Payment.fromAuthorizedIntent(
+            paymentId = PaymentId(100L),
+            intent = paymentIntent
+        )
+        
+        val paymentAuthorizedEvent = PaymentAuthorized.from(
+            payment = payment,
+            timestamp = Utc.nowInstant()
+        )
+        val envelope1 = EventEnvelopeFactory.envelopeFor(
+            traceId = "trace-1",
+            data = paymentAuthorizedEvent,
+            aggregateId = paymentAuthorizedEvent.paymentId,
+            parentEventId = null
+        )
+        val outboxEvent1 = OutboxEvent.createNew(
+            oeid = 1L,
+            eventType = OutboxEventType.payment_authorized.name,
+            aggregateId = paymentAuthorizedEvent.paymentId,
+            payload = objectMapper.writeValueAsString(envelope1)
+        )
+
+        // Create domain objects for PaymentOrderCreated
+        val paymentOrder = com.dogancaglar.paymentservice.domain.model.PaymentOrder.createNew(
+            paymentOrderId = PaymentOrderId(200L),
+            paymentId = PaymentId(100L),
+            sellerId = com.dogancaglar.paymentservice.domain.model.vo.SellerId("seller-1"),
+            amount = com.dogancaglar.paymentservice.domain.model.Amount.of(2500L, currency)
+        )
+        
+        val paymentOrderCreatedEvent = PaymentOrderCreated.from(
+            order = paymentOrder,
+            now = Utc.nowInstant()
+        )
+        val envelope2 = EventEnvelopeFactory.envelopeFor(
+            traceId = "trace-2",
+            data = paymentOrderCreatedEvent,
+            aggregateId = paymentOrderCreatedEvent.paymentOrderId,
+            parentEventId = null
+        )
+        val outboxEvent2 = OutboxEvent.createNew(
+            oeid = 2L,
+            eventType = OutboxEventType.payment_order_created.name,
+            aggregateId = paymentOrderCreatedEvent.paymentOrderId,
+            payload = objectMapper.writeValueAsString(envelope2)
+        )
+
+        every { 
+            eventPublisherPort.publishBatchAtomically<PaymentAuthorized>(
+                any(), any()
+            )
+        } returns true
+        every { 
+            eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(
+                any(), any()
+            )
+        } returns true
+
+        val (succeeded, failed, keepClaimed) = outboxDispatcherJob.publishBatch(listOf(outboxEvent1, outboxEvent2))
+
+        assertEquals(2, succeeded.size)
+        assertEquals(0, failed.size)
         assertEquals(0, keepClaimed.size)
     }
 
@@ -412,7 +417,6 @@ class OutboxDispatcherJobTest {
             aggregateId = "agg-1",
             payload = "{}"
         ).markAsSent()
-
 
         outboxDispatcherJob.persistResults(listOf(succeededEvent))
 
@@ -454,34 +458,18 @@ class OutboxDispatcherJobTest {
     }
 
     // ============================================================
-    // Test: reclaimStuck
+    // Test: dispatchBatchWorker - empty batch
     // ============================================================
     @Test
-    fun `reclaimStuck should reclaim stuck events`() {
-        every { outboxEventRepository.reclaimStuckClaims(600) } returns 5
+    fun `dispatchBatchWorker should return early when no events to claim`() {
+        val threadName = Thread.currentThread().name
+        val workerId = "test-instance:$threadName"
+        every { outboxEventRepository.findBatchForDispatch(10, workerId) } returns emptyList()
 
-        outboxDispatcherJob.reclaimStuck()
+        outboxDispatcherJob.dispatchBatchWorker()
 
-        verify(exactly = 1) { outboxEventRepository.reclaimStuckClaims(600) }
-    }
-
-    // ============================================================
-    // Test: claimBatch
-    // ============================================================
-    @Test
-    fun `claimBatch should claim events and update backlog`() {
-        val events = listOf(
-            OutboxEvent.createNew(1L, "TEST", "agg-1", "{}"),
-            OutboxEvent.createNew(2L, "TEST", "agg-2", "{}")
-        )
-        val workerId = "test-worker"
-
-        every { outboxEventRepository.findBatchForDispatch(10, workerId) } returns events
-
-        val result = outboxDispatcherJob.claimBatch(10, workerId)
-
-        assertEquals(2, result.size)
         verify(exactly = 1) { outboxEventRepository.findBatchForDispatch(10, workerId) }
+        verify(exactly = 0) { outboxEventRepository.updateAll(any()) }
     }
 
     // ============================================================
@@ -489,29 +477,49 @@ class OutboxDispatcherJobTest {
     // ============================================================
     @Test
     fun `dispatchBatchWorker should process events successfully`() {
-        val paymentIntent = createPaymentIntent()
-        val paymentIntentAuthorizedEvent = PaymentIntentAuthorized.from(paymentIntent, Utc.nowInstant())
+        // Create domain objects
+        val currency = com.dogancaglar.paymentservice.domain.model.Currency("EUR")
+        val amount = com.dogancaglar.paymentservice.domain.model.Amount.of(5000L, currency)
+        val paymentIntent = com.dogancaglar.paymentservice.domain.model.PaymentIntent.createNew(
+            paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(1L),
+            buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer-1"),
+            orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order-1"),
+            totalAmount = amount,
+            paymentOrderLines = listOf(
+                com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine(
+                    com.dogancaglar.paymentservice.domain.model.vo.SellerId("seller-1"),
+                    amount
+                )
+            )
+        ).markAuthorizedPending().markAuthorized()
+        
+        val payment = com.dogancaglar.paymentservice.domain.model.Payment.fromAuthorizedIntent(
+            paymentId = PaymentId(100L),
+            intent = paymentIntent
+        )
+        
+        val paymentAuthorizedEvent = PaymentAuthorized.from(
+            payment = payment,
+            timestamp = Utc.nowInstant()
+        )
         val envelope = EventEnvelopeFactory.envelopeFor(
             traceId = "trace-1",
-            data = paymentIntentAuthorizedEvent,
-            aggregateId = paymentIntentAuthorizedEvent.paymentIntentId,
+            data = paymentAuthorizedEvent,
+            aggregateId = paymentAuthorizedEvent.paymentId,
             parentEventId = null
         )
         val outboxEvent = OutboxEvent.createNew(
-            oeid = paymentIntentId.value,
-            eventType = OutboxEventType.payment_intent_authorized.name,
-            aggregateId = paymentIntentAuthorizedEvent.paymentIntentId,
+            oeid = 1L,
+            eventType = OutboxEventType.payment_authorized.name,
+            aggregateId = paymentAuthorizedEvent.paymentId,
             payload = objectMapper.writeValueAsString(envelope)
         )
 
         val workerId = "test-instance:${Thread.currentThread().name}"
 
         every { outboxEventRepository.findBatchForDispatch(10, workerId) } returns listOf(outboxEvent)
-        every { paymentIntentRepository.findById(paymentIntentId) } returns paymentIntent
-        every { idGeneratorPort.nextPaymentId(buyerId, orderId) } returns paymentId.value
-        every { serializationPort.toJson(any<EventEnvelope<PaymentAuthorized>>()) } returns "{}"
         every { 
-            eventPublisherPort.publishBatchAtomically<PaymentIntentAuthorized>(
+            eventPublisherPort.publishBatchAtomically<PaymentAuthorized>(
                 any(), any()
             )
         } returns true
@@ -547,108 +555,14 @@ class OutboxDispatcherJobTest {
     }
 
     // ============================================================
-    // Test: publishBatch with exception during processing
+    // Test: reclaimStuck
     // ============================================================
     @Test
-    fun `publishBatch should handle exceptions and mark events as failed`() {
-        val outboxEvent = OutboxEvent.createNew(
-            oeid = paymentIntentId.value,
-            eventType = OutboxEventType.payment_intent_authorized.name,
-            aggregateId = "agg-1",
-            payload = "invalid-json"
-        )
+    fun `reclaimStuck should reclaim stuck events`() {
+        every { outboxEventRepository.reclaimStuckClaims(600) } returns 5
 
-        val (succeeded, failed, keepClaimed) = outboxDispatcherJob.publishBatch(listOf(outboxEvent))
+        outboxDispatcherJob.reclaimStuck()
 
-        assertEquals(0, succeeded.size)
-        assertEquals(1, failed.size)
-        assertEquals(0, keepClaimed.size)
-    }
-
-    // ============================================================
-    // Test: publishBatch with multiple events
-    // ============================================================
-    @Test
-    fun `publishBatch should handle multiple events in batch`() {
-        val paymentOrder1 = PaymentOrder.createNew(
-            paymentOrderId = PaymentOrderId(300L),
-            paymentId = paymentId,
-            sellerId = sellerId1,
-            amount = amount
-        )
-        val paymentOrderCreatedEvent1 = paymentOrderDomainEventMapper.toPaymentOrderCreated(paymentOrder1)
-        val envelope1 = EventEnvelopeFactory.envelopeFor(
-            traceId = "trace-1",
-            data = paymentOrderCreatedEvent1,
-            aggregateId = paymentOrderCreatedEvent1.paymentOrderId,
-            parentEventId = null
-        )
-        val outboxEvent1 = OutboxEvent.createNew(
-            oeid = paymentOrder1.paymentOrderId.value,
-            eventType = OutboxEventType.payment_order_created.name,
-            aggregateId = paymentOrderCreatedEvent1.paymentOrderId,
-            payload = objectMapper.writeValueAsString(envelope1)
-        )
-
-        val paymentOrder2 = PaymentOrder.createNew(
-            paymentOrderId = PaymentOrderId(301L),
-            paymentId = paymentId,
-            sellerId = sellerId2,
-            amount = amount
-        )
-        val paymentOrderCreatedEvent2 = paymentOrderDomainEventMapper.toPaymentOrderCreated(paymentOrder2)
-        val envelope2 = EventEnvelopeFactory.envelopeFor(
-            traceId = "trace-2",
-            data = paymentOrderCreatedEvent2,
-            aggregateId = paymentOrderCreatedEvent2.paymentOrderId,
-            parentEventId = null
-        )
-        val outboxEvent2 = OutboxEvent.createNew(
-            oeid = paymentOrder2.paymentOrderId.value,
-            eventType = OutboxEventType.payment_order_created.name,
-            aggregateId = paymentOrderCreatedEvent2.paymentOrderId,
-            payload = objectMapper.writeValueAsString(envelope2)
-        )
-
-        every { 
-            eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(
-                any(),
-                any()
-            )
-        } returns true
-
-        val (succeeded, failed, keepClaimed) = outboxDispatcherJob.publishBatch(listOf(outboxEvent1, outboxEvent2))
-
-        assertEquals(2, succeeded.size)
-        assertEquals(0, failed.size)
-        assertEquals(0, keepClaimed.size)
-        verify(exactly = 2) { 
-            eventPublisherPort.publishBatchAtomically<PaymentOrderCreated>(
-                any(),
-                any()
-            )
-        }
-    }
-
-    // ============================================================
-    // Helper methods
-    // ============================================================
-    private fun createPaymentIntent(): PaymentIntent {
-        val paymentOrderLines = listOf(
-            PaymentOrderLine(sellerId1, Amount.of(3000L, currency)),
-            PaymentOrderLine(sellerId2, Amount.of(2000L, currency))
-        )
-        return PaymentIntent.createNew(
-            paymentIntentId = paymentIntentId,
-            buyerId = buyerId,
-            orderId = orderId,
-            totalAmount = amount,
-            paymentOrderLines = paymentOrderLines
-        ).markAuthorizedPending().markAuthorized()
-    }
-
-    private fun createPayment(): Payment {
-        val paymentIntent = createPaymentIntent()
-        return Payment.fromAuthorizedIntent(paymentId, paymentIntent)
+        verify(exactly = 1) { outboxEventRepository.reclaimStuckClaims(600) }
     }
 }

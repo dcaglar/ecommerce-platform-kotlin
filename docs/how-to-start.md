@@ -209,7 +209,7 @@ curl -i -X POST "$BASE_URL/api/v1/payments" \
 
 ```bash
 # Step 2: Authorize the payment intent
-curl -i -X POST "$BASE_URL/api/v1/payments/pi_Ab9_XwmCcAA/authorize" \
+curl -i -X POST "$BASE_URL/api/v1/payments/pi_AcdDJCmCcAA/authorize" \
   -H "Host: $HOST" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
