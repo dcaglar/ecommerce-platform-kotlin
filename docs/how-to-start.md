@@ -236,9 +236,8 @@ curl -i -X GET "$BASE_URL/api/v1/payments/pi_AcqzYyHCcAA/status" \
 > **Note**: In production, payment details are collected by Stripe Payment Element (browser → Stripe). The authorize endpoint doesn't require payment method details - it uses the stored PaymentIntent ID. For testing with curl, you can send an empty body or omit paymentMethod:
 
 ```bash
-# Step 2: Authorize the payment intent (no payment details needed)
-# Replace pi_AcqzYyHCcAA with the paymentIntentId from Step 1 response
-curl -i -X POST "$BASE_URL/api/v1/payments/pi_AcqzYyHCcAA/authorize" \
+# Step 2: Authorize the payment intent
+curl -i -X POST "$BASE_URL/api/v1/payments/pi_AcdDJCmCcAA/authorize" \
   -H "Host: $HOST" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
