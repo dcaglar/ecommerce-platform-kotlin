@@ -105,6 +105,8 @@ function generateEnv() {
     ...defaults,
     ...existing, // Preserve existing custom values
     VITE_KEYCLOAK_CLIENT_SECRET: clientSecret,
+    // Always use correct client ID (override any existing wrong value)
+    VITE_KEYCLOAK_CLIENT_ID: defaults.VITE_KEYCLOAK_CLIENT_ID,
   };
 
   // Override with endpoints.json if available
