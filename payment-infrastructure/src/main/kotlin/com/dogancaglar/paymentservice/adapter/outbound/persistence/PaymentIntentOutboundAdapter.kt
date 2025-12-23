@@ -6,6 +6,7 @@ import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.Payme
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentMapper
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.paymentservice.ports.outbound.PaymentIntentRepository
@@ -19,6 +20,14 @@ class PaymentIntentOutboundAdapter(
 ) : PaymentIntentRepository {
 
 
+    override fun tryMarkPendingAuth(id: PaymentIntentId, now: java.time.Instant): Boolean {
+        return paymentIntentMapper.tryMarkPendingAuth(id.value, now) == 1
+
+    }
+
+    override fun updatePspReference(paymentIntentId: Long, pspReference: String, now: java.time.Instant){
+        paymentIntentMapper.updatePspReference(paymentIntentId, pspReference, now)
+    }
 
     override fun save(paymentIntent: PaymentIntent): PaymentIntent {
         paymentIntentMapper.insert(entityMapper.toEntity(paymentIntent))

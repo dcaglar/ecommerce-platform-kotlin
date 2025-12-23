@@ -18,6 +18,8 @@ import java.time.LocalDateTime
  */
 class PaymentIntent private constructor(
     val paymentIntentId: PaymentIntentId,
+    val clientSecret : String?="",
+    val pspReference: String?=null,
     val buyerId: BuyerId,
     val orderId: OrderId,
     val totalAmount: Amount,
@@ -57,6 +59,21 @@ class PaymentIntent private constructor(
             "Can only start authorization from CREATED (current=$status)"
         }
         return copy(status = PaymentIntentStatus.PENDING_AUTH, updatedAt = now)
+    }
+
+
+    fun markAsCreated(now: LocalDateTime = Utc.nowLocalDateTime()): PaymentIntent {
+        require(status == PaymentIntentStatus.CREATED_PENDING) {
+            "Can only start authorization from CREATED (current=$status)"
+        }
+        return copy(status = PaymentIntentStatus.CREATED, updatedAt = now)
+    }
+
+    fun markAsCreatedWithPspReferenceAndClientSecret(pspReference: String,clientSecret: String,now: LocalDateTime = Utc.nowLocalDateTime()): PaymentIntent {
+        require(status == PaymentIntentStatus.CREATED_PENDING) {
+            "Can only start authorization from CREATED (current=$status)"
+        }
+        return copy(status = PaymentIntentStatus.CREATED, updatedAt = now,pspReference=pspReference,clientSecret=clientSecret)
     }
 
     /**
@@ -100,9 +117,13 @@ class PaymentIntent private constructor(
 
     private fun copy(
         status: PaymentIntentStatus = this.status,
-        updatedAt: LocalDateTime = Utc.nowLocalDateTime()
+        updatedAt: LocalDateTime = Utc.nowLocalDateTime(),
+        pspReference: String?="",
+        clientSecret: String?="",
     ): PaymentIntent = PaymentIntent(
         paymentIntentId = paymentIntentId,
+        pspReference = pspReference,
+        clientSecret = clientSecret,
         buyerId = buyerId,
         orderId = orderId,
         totalAmount = totalAmount,
@@ -127,11 +148,12 @@ class PaymentIntent private constructor(
             val now = Utc.nowLocalDateTime()
             return PaymentIntent(
                 paymentIntentId = paymentIntentId,
+                pspReference = null,
                 buyerId = buyerId,
                 orderId = orderId,
                 totalAmount = totalAmount,
                 paymentOrderLines = paymentOrderLines,
-                status = PaymentIntentStatus.CREATED,
+                status = PaymentIntentStatus.CREATED_PENDING,
                 createdAt = now,
                 updatedAt = now
             )
@@ -140,6 +162,7 @@ class PaymentIntent private constructor(
 
         fun rehydrate(
             paymentIntentId: PaymentIntentId,
+            pspReference: String?="",
             buyerId: BuyerId,
             orderId: OrderId,
             totalAmount: Amount,
@@ -149,6 +172,7 @@ class PaymentIntent private constructor(
             updatedAt: LocalDateTime
         ): PaymentIntent = PaymentIntent(
             paymentIntentId = paymentIntentId,
+            pspReference=pspReference,
             buyerId = buyerId,
             orderId = orderId,
             totalAmount = totalAmount,

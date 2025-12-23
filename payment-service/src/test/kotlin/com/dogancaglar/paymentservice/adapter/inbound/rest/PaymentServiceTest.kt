@@ -67,7 +67,7 @@ class PaymentServiceTest {
                     amount = Amount.of(10000L, Currency("USD"))
                 )
             )
-        )
+        ).markAsCreated() // After Stripe call succeeds, status becomes CREATED
 
         every { createPaymentIntentUseCase.create(any()) } returns expectedPaymentIntent
 
@@ -122,7 +122,7 @@ class PaymentServiceTest {
                     amount = Amount.of(5000L, Currency("EUR"))
                 )
             )
-        )
+        ).markAsCreated() // After Stripe call succeeds, status becomes CREATED
 
         every { createPaymentIntentUseCase.create(any()) } returns expectedPaymentIntent
 
@@ -162,7 +162,7 @@ class PaymentServiceTest {
                     amount = Amount.of(10000L, Currency("USD"))
                 )
             )
-        )
+        ).markAsCreated() // Transition to CREATED status
 
         val authorizedPaymentIntent = createdPaymentIntent
             .markAuthorizedPending()
@@ -207,7 +207,7 @@ class PaymentServiceTest {
                     amount = Amount.of(5000L, Currency("EUR"))
                 )
             )
-        )
+        ).markAsCreated() // Transition to CREATED status
 
         val pendingPaymentIntent = createdPaymentIntent.markAuthorizedPending()
 
@@ -246,7 +246,7 @@ class PaymentServiceTest {
                     amount = Amount.of(15000L, Currency("GBP"))
                 )
             )
-        )
+        ).markAsCreated() // Transition to CREATED status
 
         val declinedPaymentIntent = createdPaymentIntent
             .markAuthorizedPending()
@@ -293,7 +293,7 @@ class PaymentServiceTest {
                     amount = Amount.of(10000L, Currency("USD"))
                 )
             )
-        )
+        ).markAsCreated() // After Stripe call succeeds, status becomes CREATED
 
         every { createPaymentIntentUseCase.create(any()) } returns expectedPaymentIntent
 

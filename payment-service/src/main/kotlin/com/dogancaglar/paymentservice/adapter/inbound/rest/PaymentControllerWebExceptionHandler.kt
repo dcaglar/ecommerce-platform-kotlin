@@ -19,6 +19,7 @@ import org.springframework.transaction.TransactionTimedOutException
 import org.postgresql.util.PSQLException
 import org.postgresql.util.PSQLState
 import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.domain.exception.PaymentNotReadyException
 import java.util.concurrent.CompletionException
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeoutException
@@ -114,6 +115,11 @@ class PaymentControllerWebExceptionHandler {
 
     @ExceptionHandler(IdempotencyConflictException::class)
     fun handleNoResourceFound(ex: IdempotencyConflictException, request: HttpServletRequest)
+            = respond<ErrorResponse>(HttpStatus.CONFLICT, request, trunc(ex.localizedMessage))
+
+
+    @ExceptionHandler(PaymentNotReadyException::class)
+    fun handlePaymentNotReady(ex: PaymentNotReadyException, request: HttpServletRequest)
             = respond<ErrorResponse>(HttpStatus.CONFLICT, request, trunc(ex.localizedMessage))
 
     @ExceptionHandler(NoResourceFoundException::class)

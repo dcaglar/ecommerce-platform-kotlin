@@ -2,6 +2,7 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
 import com.dogancaglar.common.id.PublicIdFactory
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentResponseDTO
 import com.dogancaglar.paymentservice.idempotency.CanonicalJsonHasher
 import com.dogancaglar.paymentservice.ports.outbound.IdempotencyStorePort
@@ -23,7 +24,7 @@ class IdempotencyService(
 
     fun run(
         key: String,
-        requestBody: Any,
+        requestBody: CreatePaymentIntentRequestDTO,
         block: () -> CreatePaymentIntentResponseDTO
     ): IdempotencyResult<CreatePaymentIntentResponseDTO> {
 
@@ -38,7 +39,7 @@ class IdempotencyService(
             try {
                 val response = block()
                 val json = objectMapper.writeValueAsString(response)
-                val internalPaymentIntentId = PublicIdFactory.toInternalId(response.paymentIntentId)
+                val internalPaymentIntentId = PublicIdFactory.toInternalId(response.paymentIntentId!!)
                 store.updateResponsePayload(key, json,internalPaymentIntentId)
 
                 return IdempotencyResult(
@@ -65,9 +66,21 @@ class IdempotencyService(
             )
         }
 
-        // 2b — if still pending, wait for first request to finish
+        // 2b — if still pending, dont block thread return 202 with retryafter in header
         if (record.responsePayload == null) {
-            waitForCompletion(key)
+            val pending = CreatePaymentIntentResponseDTO(
+                paymentIntentId = null,
+                buyerId = requestBody.buyerId,
+                orderId = requestBody.orderId,
+                totalAmount = requestBody.totalAmount,
+                status = "PENDING",
+                createdAt = com.dogancaglar.common.time.Utc.nowInstant().toString()
+            )
+
+            return IdempotencyResult(
+                response = pending,
+                status = IdempotencyExecutionStatus.IN_PROGRESS
+            )
         }
 
         // 2c — response now available
@@ -111,6 +124,7 @@ data class IdempotencyResult<PaymentResponseDTO>(
 )
 
 enum class IdempotencyExecutionStatus {
-    CREATED,   // first request → 201
-    REPLAYED   // retry → 200 or
+    CREATED,     // 201
+    REPLAYED,    // 200
+    IN_PROGRESS  // 202
 }

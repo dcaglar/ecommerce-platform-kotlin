@@ -6,6 +6,7 @@ import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentIntent
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentOrderModificationAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentOrderOutboundAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentOutboundAdapter
+import com.dogancaglar.paymentservice.adapter.outbound.psp.StripeProperties
 import com.dogancaglar.paymentservice.adapter.outbound.serialization.JacksonSerializationAdapter
 import com.dogancaglar.paymentservice.application.usecases.AccountBalanceReadService
 import com.dogancaglar.paymentservice.application.usecases.AuthorizePaymentIntentService
@@ -16,12 +17,21 @@ import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentTransactionalFacadePort
 import com.dogancaglar.paymentservice.ports.outbound.PspAuthGatewayPort
+import com.stripe.StripeClient
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.transaction.annotation.Transactional
 
 @Configuration
 class PaymentServiceConfig {
+
+    @Bean
+    fun stripeClient(stripeProperties: StripeProperties): StripeClient {
+        // Create StripeClient with API key
+        // StripeClient constructor takes the API key directly
+        return StripeClient.StripeClientBuilder().setApiKey(stripeProperties.apiKey).
+        build()
+    }
 
 
 
@@ -52,9 +62,10 @@ class PaymentServiceConfig {
     @Bean
     fun createPaymentService(
         idGeneratorPort: SnowflakeIdGeneratorAdapter,
-        paymentIntentRepository: PaymentIntentOutboundAdapter
+        paymentIntentRepository: PaymentIntentOutboundAdapter,
+        pspAuthGatewayPort: PspAuthGatewayPort
         ): CreatePaymentIntentService{
-        return CreatePaymentIntentService(paymentIntentRepository,idGeneratorPort)
+        return CreatePaymentIntentService(paymentIntentRepository,idGeneratorPort,pspAuthGatewayPort)
     }
 
     @Bean

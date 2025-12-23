@@ -60,6 +60,7 @@ CREATE TABLE payments (
 
 CREATE TABLE payment_intents (
     payment_intent_id BIGINT PRIMARY KEY,
+    psp_reference VARCHAR(255),
     buyer_id VARCHAR(255) NOT NULL,
     order_id VARCHAR(255) NOT NULL,
     total_amount_value BIGINT NOT NULL,
@@ -69,6 +70,7 @@ CREATE TABLE payment_intents (
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
     CONSTRAINT chk_payment_intent_status_valid CHECK (status IN (
+        'CREATED_PENDING',
         'CREATED',
         'PENDING_AUTH',
         'AUTHORIZED',
@@ -81,6 +83,9 @@ CREATE TABLE payment_intents (
         total_amount_value <= total_amount_value
     )
 );
+
+-- Index for psp_reference (matching changelog)
+CREATE INDEX IF NOT EXISTS idx_payment_intents_psp_reference ON payment_intents (psp_reference);
 
 CREATE TABLE payment_orders (
     payment_order_id BIGINT PRIMARY KEY,

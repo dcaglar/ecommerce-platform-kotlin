@@ -129,8 +129,9 @@ class PaymentMapperIntegrationTest {
             paymentOrderLines = paymentOrderLines
         )
         
-        // Mark as AUTHORIZED
+        // Mark as AUTHORIZED (following correct lifecycle: CREATED_PENDING -> CREATED -> PENDING_AUTH -> AUTHORIZED)
         val authorizedIntent = paymentIntent
+            .markAsCreated()
             .markAuthorizedPending()
             .markAuthorized()
         

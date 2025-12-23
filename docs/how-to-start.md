@@ -165,9 +165,10 @@ infra/scripts/deploy-observability-stack.sh
 
 4) Send test payment request
 
-The payment flow is split into two steps:
-1. **Create Payment Intent** - Creates a payment intent with order details
-2. **Authorize Payment Intent** - Authorizes the payment intent with payment method
+The payment flow uses Stripe Payment Element for secure payment collection:
+1. **Create Payment Intent** - Creates a payment intent with order details, returns client secret
+2. **Collect Payment Details** - Stripe Payment Element collects card details (browser → Stripe, never touches your servers)
+3. **Authorize Payment Intent** - Authorizes the payment intent (no payment details sent, backend uses stored PaymentIntent ID)
 
 You can test payment creation in two ways:
 
@@ -203,32 +204,57 @@ curl -i -X POST "$BASE_URL/api/v1/payments" \
   }'
 ```
 
+**Expected Response (200 OK):**
+```json
+{
+  "paymentIntentId": "pi_AcqzYyHCcAA",
+  "clientSecret": "pi_AcqzYyHCcAA_secret_xyz123",
+  "status": "CREATED"
+}
+```
+
+**Pending Response (202 Accepted):**
+If Stripe API call is still processing, you'll receive:
+```json
+{
+  "paymentIntentId": "pi_AcqzYyHCcAA",
+  "status": "CREATED_PENDING"
+}
+```
+
+In this case, poll the status endpoint until `clientSecret` is available:
+```bash
+curl -i -X GET "$BASE_URL/api/v1/payments/pi_AcqzYyHCcAA/status" \
+  -H "Host: $HOST" \
+  -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)"
+```
+
 > **Note on Idempotency-Key**: The header is required for all payment intent creation requests. Use the same key for retries of the same payment request to ensure idempotent behavior. Generate a unique UUID for each new payment request.
 
 **Step 2: Authorize Payment Intent**
 
+> **Note**: In production, payment details are collected by Stripe Payment Element (browser → Stripe). The authorize endpoint doesn't require payment method details - it uses the stored PaymentIntent ID. For testing with curl, you can send an empty body or omit paymentMethod:
+
 ```bash
-# Step 2: Authorize the payment intent
-curl -i -X POST "$BASE_URL/api/v1/payments/pi_AcdDJCmCcAA/authorize" \
+# Step 2: Authorize the payment intent (no payment details needed)
+# Replace pi_AcqzYyHCcAA with the paymentIntentId from Step 1 response
+curl -i -X POST "$BASE_URL/api/v1/payments/pi_AcqzYyHCcAA/authorize" \
   -H "Host: $HOST" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
-  -d '{
-    "paymentMethod": {
-      "type": "CardToken",
-      "token": "card_token_12345",
-      "cvc": "123"
-    }
-  }'
+  -d '{}'
 ```
+
+> **Production Flow**: In the actual checkout flow, Stripe Payment Element collects payment details client-side and attaches the payment method to the PaymentIntent. The backend then confirms the payment using the stored PaymentIntent ID without receiving any card data.
 
 ### Option B: Using Checkout Demo Page (Interactive UI)
 
-A developer-friendly web interface for testing payment creation without managing tokens manually.
+A developer-friendly web interface for testing the complete end-to-end payment flow with Stripe Payment Element.
 
 **Prerequisites:**
 - Node.js 18+ installed
 - Steps 1-9 completed (infrastructure, Keycloak provisioning)
+- Stripe account (for Stripe publishable key)
 
 **Setup:**
 
@@ -249,7 +275,13 @@ This automatically:
 - Reads API endpoints from `infra/endpoints.json`
 - Creates `.env` file with all configuration
 
-3. Start the demo:
+3. Configure Stripe publishable key:
+```bash
+# Add your Stripe publishable key to .env file
+echo "VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your_key_here" >> checkout-demo/.env
+```
+
+4. Start the demo:
 ```bash
 npm run dev
 ```
@@ -262,34 +294,55 @@ The app will automatically open at `http://localhost:3000`
 
 **Usage:**
 
-The payment flow consists of two steps:
+The payment flow follows the complete end-to-end Stripe Payment Element flow:
 
-1. **Create Payment Intent:**
-   - Fill the payment form:
-     - Order ID (e.g., `ORDER-TEST-001`)
-     - Buyer ID (e.g., `BUYER-123`)
-     - Total amount (in smallest currency unit, e.g., cents)
-     - Select currency
-     - Add one or more payment orders with seller IDs and amounts
-   - Click "Create Payment Intent"
-   - View the response with `paymentIntentId`
+1. **Fill Order Details:**
+   - Order ID (e.g., `ORDER-TEST-001`)
+   - Buyer ID (e.g., `BUYER-123`)
+   - Total amount (in smallest currency unit, e.g., cents)
+   - Select currency
+   - Add one or more payment orders with seller IDs and amounts
+   - Click "Proceed to Checkout"
 
-2. **Authorize Payment Intent:**
-   - Enter payment method details:
-     - Card token (e.g., `card_token_12345`)
-     - CVC (optional, depending on PSP config)
-   - Click "Authorize Payment"
-   - View the authorization response
+2. **Payment Creation:**
+   - Frontend calls your backend to create payment
+   - Backend creates payment record and calls Stripe to create PaymentIntent
+   - Backend returns `paymentIntentId` and `clientSecret`
+   - If Stripe call is pending (202), frontend polls for client secret
+
+3. **Payment Details Collection (Stripe Payment Element):**
+   - Stripe Payment Element is initialized with `clientSecret`
+   - Shopper enters card details in Payment Element
+   - **Card data goes directly to Stripe** (never touches your servers)
+   - Click "Pay Now" to submit payment details to Stripe
+
+4. **Payment Authorization:**
+   - Frontend calls authorize endpoint with payment ID only
+   - **No payment details are sent** - backend uses stored PaymentIntent ID
+   - Backend confirms payment with Stripe
+   - Frontend displays success/error result
 
 The backend proxy automatically handles token acquisition and payment-service calls - no manual token management needed!
 
 **Architecture:**
 
-The checkout demo uses a production-like flow:
-- **Frontend** (React) → calls **Backend Proxy** (Node.js/Express)
+The checkout demo uses a production-like flow with Stripe Payment Element:
+- **Frontend** (React) → calls **Backend Proxy** (Node.js/Express) to create payment
 - **Backend Proxy** → gets token from Keycloak (server-to-server)
 - **Backend Proxy** → calls payment-service with token (server-to-server)
-- **Frontend** ← receives payment response
+- **Frontend** ← receives `paymentIntentId` and `clientSecret`
+- **Frontend** → initializes Stripe Payment Element with `clientSecret`
+- **Shopper** → enters card details in Payment Element
+- **Payment Element** → sends card data directly to Stripe (browser → Stripe, never touches your servers)
+- **Frontend** → calls **Backend Proxy** to authorize payment (no payment details sent)
+- **Backend Proxy** → calls payment-service authorize endpoint
+- **Backend** → confirms payment with Stripe using stored PaymentIntent ID
+- **Frontend** ← receives authorization result
+
+**Data Flow:**
+- **Card data**: Browser → Stripe (never touches your servers)
+- **Order data**: Browser → Your Backend → Database
+- **Payment control**: Browser → Your Backend → Stripe → Your Backend → Browser
 
 > 💡 **Note**: The backend proxy simulates a production backend (order-service/checkout-service) and needs CORS enabled because the browser calls it directly (browser → proxy is cross-origin).
 
@@ -297,8 +350,11 @@ The checkout demo uses a production-like flow:
 
 - **"Client secret not found"**: Run `npm run setup-env` after provisioning Keycloak
 - **"Cannot reach Keycloak"**: Ensure Keycloak port-forwarding is active: `kubectl port-forward -n payment svc/keycloak 8080:8080`
+- **"Stripe publishable key not configured"**: Add `VITE_STRIPE_PUBLISHABLE_KEY` to `.env` file
 - **Payment request errors**: Check proxy console for detailed error messages (it logs token and payment-service call errors)
 - **Network errors**: Verify payment service is running and `infra/endpoints.json` is correct
+- **Payment Element not loading**: Check browser console for Stripe.js errors and verify publishable key is correct
+- **Payment pending (202 status)**: This is normal - the frontend will automatically poll for client secret when payment creation is pending
 
 For more details, see `checkout-demo/README.md`.
 

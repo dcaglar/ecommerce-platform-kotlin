@@ -20,7 +20,8 @@ class PaymentTest {
             orderId,
             totalAmount,
             lines
-        ).markAuthorizedPending()
+        ).markAsCreated()
+            .markAuthorizedPending()
             .markAuthorized()
 
     @Test

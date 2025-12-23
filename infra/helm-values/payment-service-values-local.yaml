@@ -6,9 +6,9 @@ runPrivilegeGrantJob: true
 
 
 autoscaling:
-  enabled: true
+  enabled: false
   minReplicas: 1
-  maxReplicas: 2
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
@@ -60,7 +60,7 @@ ingress:
   tls: []   # HTTP for minikube
 
 serviceMonitor:
-  enabled: true
+  enabled: false
   path: /actuator/prometheus
   interval: 15s
   scrapeTimeout: 10s

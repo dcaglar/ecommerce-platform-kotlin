@@ -42,7 +42,9 @@ class PaymentOrderDomainEventMapperTest {
             orderId = OrderId("order-1"),
             totalAmount = Amount.of(5000L, currency),
             paymentOrderLines = lines
-        ).markAuthorizedPending().markAuthorized()
+        ).markAsCreated()
+            .markAuthorizedPending()
+            .markAuthorized()
 
 
 

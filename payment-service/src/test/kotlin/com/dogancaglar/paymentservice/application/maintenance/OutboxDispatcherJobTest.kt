@@ -136,7 +136,9 @@ class OutboxDispatcherJobTest {
                     amount
                 )
             )
-        ).markAuthorizedPending().markAuthorized()
+        ).markAsCreated()
+            .markAuthorizedPending()
+            .markAuthorized()
         
         val payment = com.dogancaglar.paymentservice.domain.model.Payment.fromAuthorizedIntent(
             paymentId = PaymentId(100L),
@@ -245,7 +247,9 @@ class OutboxDispatcherJobTest {
                     amount
                 )
             )
-        ).markAuthorizedPending().markAuthorized()
+        ).markAsCreated()
+            .markAuthorizedPending()
+            .markAuthorized()
         
         val payment = com.dogancaglar.paymentservice.domain.model.Payment.fromAuthorizedIntent(
             paymentId = PaymentId(100L),
@@ -339,7 +343,9 @@ class OutboxDispatcherJobTest {
                     amount
                 )
             )
-        ).markAuthorizedPending().markAuthorized()
+        ).markAsCreated()
+            .markAuthorizedPending()
+            .markAuthorized()
         
         val payment = com.dogancaglar.paymentservice.domain.model.Payment.fromAuthorizedIntent(
             paymentId = PaymentId(100L),
@@ -491,7 +497,9 @@ class OutboxDispatcherJobTest {
                     amount
                 )
             )
-        ).markAuthorizedPending().markAuthorized()
+        ).markAsCreated()
+            .markAuthorizedPending()
+            .markAuthorized()
         
         val payment = com.dogancaglar.paymentservice.domain.model.Payment.fromAuthorizedIntent(
             paymentId = PaymentId(100L),

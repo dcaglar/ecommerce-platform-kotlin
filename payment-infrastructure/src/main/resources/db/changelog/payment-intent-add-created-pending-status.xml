@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="2025-12-24-add-created-pending-status" author="dogancaglar">
+        <!-- Drop existing constraint -->
+        <sql>
+            ALTER TABLE payment_intents
+            DROP CONSTRAINT IF EXISTS chk_payment_intent_status_valid;
+        </sql>
+
+        <!-- Add updated constraint with CREATED_PENDING status -->
+        <sql>
+            ALTER TABLE payment_intents
+            ADD CONSTRAINT chk_payment_intent_status_valid
+            CHECK (status IN (
+                'CREATED_PENDING',
+                'CREATED',
+                'PENDING_AUTH',
+                'AUTHORIZED',
+                'DECLINED',
+                'CANCELLED'
+            ));
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>
+

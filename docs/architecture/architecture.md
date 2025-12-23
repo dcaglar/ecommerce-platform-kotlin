@@ -383,6 +383,81 @@ graph TD
     style PSP2 fill:#ffebee,stroke:#C62828,stroke-width:2px
 ```
 
+### Authorization/Idempotency Sequence Diagram
+
+```mermaid
+sequenceDiagram
+autonumber
+actor Shopper
+participant UI as Checkout UI
+participant API as payment-service (REST)
+participant IDEM as IdempotencyService (create only)
+participant DB as PostgreSQL
+participant PSP as PSP/Stripe Gateway
+participant JOB as AuthStatusPoller (background)
+
+    Note over Shopper,UI: Checkout started (no card stored in your system)
+
+    Shopper->>UI: Proceed to checkout
+    UI->>API: POST /payments (Idempotency-Key)
+    API->>IDEM: run(key, request)
+    IDEM->>DB: INSERT idempotency_keys(PENDING) if absent
+    alt first time (CREATED)
+        IDEM->>API: execute block()
+        API->>DB: INSERT payment_intents(status=CREATED)
+        API->>DB: UPDATE idempotency_keys(COMPLETED + response)
+        API-->>UI: 201 Created + paymentIntentId
+    else retry same key (REPLAYED)
+        IDEM->>DB: SELECT response by key
+        API-->>UI: 200 OK (same response)
+    else another request in-flight (IN_PROGRESS)
+        IDEM->>DB: SELECT key (still PENDING)
+        API-->>UI: 202 Accepted (Retry-After) + Location /idempotency/{key}
+    end
+
+    Note over Shopper,UI: User clicks "Pay" (no 3DS)
+
+    Shopper->>UI: Click Pay
+    UI->>API: POST /payments/{paymentIntentId}/authorize (card token)
+    API->>DB: SELECT payment_intent by id
+
+    alt status already AUTHORIZED
+        API-->>UI: 200 OK (AUTHORIZED)
+    else status already DECLINED
+        API-->>UI: 200 OK (DECLINED)
+    else status already PENDING_AUTH
+        API-->>UI: 202 Accepted (still resolving)
+    else status is CREATED (first authorize attempt)
+        API->>DB: UPDATE payment_intents SET status=PENDING_AUTH WHERE status=CREATED
+        alt update succeeded (won the race)
+            API->>PSP: authorize (idempotencyKey = paymentIntentId)
+            alt PSP returns AUTHORIZED
+                API->>DB: TX: update intent=AUTHORIZED + create Payment + PaymentOrders + Outbox
+                API-->>UI: 200 OK (AUTHORIZED)
+            else PSP returns DECLINED
+                API->>DB: UPDATE payment_intents SET status=DECLINED
+                API-->>UI: 200 OK (DECLINED)
+            else PSP TIMEOUT / unknown
+                Note over API: keep status=PENDING_AUTH
+                API-->>UI: 202 Accepted + Retry-After + Location /payments/{id}
+                JOB->>DB: find intents PENDING_AUTH older than X
+                loop up to N times
+                    JOB->>PSP: fetch status by paymentIntentId / PSP id
+                    alt PSP says AUTHORIZED
+                        JOB->>DB: TX: update intent=AUTHORIZED + create Payment + PaymentOrders + Outbox
+                    else PSP says DECLINED
+                        JOB->>DB: update intent=DECLINED
+                    else still unknown
+                        JOB->>JOB: wait/backoff
+                    end
+                end
+            end
+        else update failed (someone else started)
+            API->>DB: SELECT latest intent
+            API-->>UI: 202 Accepted or 200 depending on latest status
+        end
+    end
+```
 
 #### Ledger Record Sequence Flow
 
@@ -439,6 +514,44 @@ sequenceDiagram
         end
     end
 ```
+
+
+## 🟦 Outbox Pattern Implementation
+
+The system uses the **Transactional Outbox Pattern** to ensure reliable event publishing. When payment-related entities are created or updated within a database transaction, corresponding events are written to an `outbox_events` table atomically. The `OutboxDispatcherJob` then publishes these events to Kafka asynchronously.
+
+### **OutboxDispatcherJob**
+
+The `OutboxDispatcherJob` is a scheduled service that runs in the `payment-service` application and is responsible for reliably dispatching outbox events to Kafka.
+
+**Key Responsibilities:**
+- **Claims batches of outbox events** from the database (status: `NEW`)
+- **Publishes events to Kafka** based on event type:
+    - `payment_authorized` → Publishes `PaymentAuthorized` event to Kafka
+    - `payment_order_created` → Publishes `PaymentOrderCreated` event to Kafka
+- **Updates event status** to `SENT` after successful publication
+- **Handles failures** by unclaiming failed events for retry
+- **Reclaims stuck events** that were claimed but never completed (runs every 2 minutes)
+
+**Operational Characteristics:**
+- **Scheduled execution**: Runs every 5 seconds with configurable thread count (default: 2 workers)
+- **Batch processing**: Processes configurable batch size (default: 250 events per batch)
+- **Idempotent publishing**: Uses Kafka transactions to ensure exactly-once delivery
+- **Metrics tracking**: Monitors backlog size, dispatch duration, success/failure counts
+- **Backlog monitoring**: Maintains in-memory backlog counter, resyncs from database periodically (every 5 minutes)
+
+**Workflow:**
+1. **Claim**: Selects up to N `NEW` events and marks them as `PROCESSING` (atomically)
+2. **Publish**: Deserializes event payloads and publishes to Kafka using atomic transactions
+3. **Persist**: Updates successfully published events to `SENT` status
+4. **Unclaim**: Returns failed events to `NEW` status for retry
+5. **Reclaim**: Background job resets events stuck in `PROCESSING` status (older than 10 minutes)
+
+**Why This Pattern:**
+- **Guarantees at-least-once delivery**: Events are never lost even if Kafka is temporarily unavailable
+- **Database consistency**: Event creation is part of the same transaction as domain changes
+- **Decouples publishing**: Main request path doesn't wait for Kafka availability
+- **Retry safety**: Failed publications are automatically retried without duplicate processing
 
 
 

@@ -4,7 +4,8 @@ import com.dogancaglar.port.out.web.dto.AmountDto
 
 
 data class CreatePaymentIntentResponseDTO(
-    val paymentIntentId: String,
+    val paymentIntentId: String?,
+    val clientSecret: String?="",
     val buyerId: String,
     val orderId: String,
     val totalAmount: AmountDto,

@@ -37,7 +37,7 @@ object PaymentRequestMapper {
     fun toAuthorizePaymentIntentCommand(publicPaymentIntentId:String, dto: AuthorizationRequestDTO): AuthorizePaymentIntentCommand =
         AuthorizePaymentIntentCommand(
             paymentIntentId = PaymentIntentId(PublicIdFactory.toInternalId(publicPaymentIntentId)),
-            paymentMethod = toPaymentMethod(dto.paymentMethod)
+            paymentMethod = dto.paymentMethod?.let { toPaymentMethod(it) }
         )
 
 
@@ -47,6 +47,7 @@ object PaymentRequestMapper {
     fun toPaymentResponseDto(paymentIntent: PaymentIntent): CreatePaymentIntentResponseDTO {
         return CreatePaymentIntentResponseDTO(
             paymentIntentId = paymentIntent.paymentIntentId.toPublicPaymentIntentId(),
+            clientSecret =  paymentIntent.clientSecret,
             status = paymentIntent.status.name,
             buyerId = paymentIntent.buyerId.value,
             orderId = paymentIntent.orderId.value,
@@ -63,6 +64,9 @@ object PaymentRequestMapper {
                     cvc = dto.cvc
                 )
         }
+    
+    fun toPaymentMethodOrNull(dto: PaymentMethodDTO?): PaymentMethod? =
+        dto?.let { toPaymentMethod(it) }
 
 
 
