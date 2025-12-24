@@ -11,6 +11,7 @@ import com.dogancaglar.paymentservice.adapter.outbound.serialization.JacksonSeri
 import com.dogancaglar.paymentservice.application.usecases.AccountBalanceReadService
 import com.dogancaglar.paymentservice.application.usecases.AuthorizePaymentIntentService
 import com.dogancaglar.paymentservice.application.usecases.CreatePaymentIntentService
+import com.dogancaglar.paymentservice.application.usecases.GetPaymentIntentService
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceReadUseCase
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
@@ -66,6 +67,17 @@ class PaymentServiceConfig {
         pspAuthGatewayPort: PspAuthGatewayPort
         ): CreatePaymentIntentService{
         return CreatePaymentIntentService(paymentIntentRepository,idGeneratorPort,pspAuthGatewayPort)
+    }
+
+    @Bean
+    fun getPaymentIntentService(
+        paymentIntentRepository: PaymentIntentOutboundAdapter,
+        pspAuthGatewayPort: PspAuthGatewayPort
+    ): GetPaymentIntentService {
+        return GetPaymentIntentService(
+            paymentIntentRepository = paymentIntentRepository,
+            pspAuthGatewayPort = pspAuthGatewayPort
+        )
     }
 
     @Bean

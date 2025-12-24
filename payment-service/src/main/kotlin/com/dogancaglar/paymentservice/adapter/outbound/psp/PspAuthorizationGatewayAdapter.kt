@@ -168,8 +168,9 @@ class PspAuthorizationGatewayAdapter(
                 "Stripe PI created: paymentIntentId={}, pspReference={}, status={}",
                 intent.paymentIntentId.value, created.id, created.status
             )
-        //retiurn both created.clientsecret and created internal id, not stripe id, because it failed.
-            val createdPaymentIntent = intent.markAsCreatedWithPspReferenceAndClientSecret(pspReference = created.id!!, clientSecret = created?.clientSecret!!)
+            // Store only pspReference - clientSecret is never stored (compliance requirement)
+            // ClientSecret will be retrieved from Stripe when needed via retrieveClientSecret()
+            val createdPaymentIntent = intent.markAsCreatedWithPspReferenceAndClientSecret(pspReference = created.id, clientSecret = created.clientSecret)
             return createdPaymentIntent
         } catch (e: Exception) {
             logger.error(
@@ -225,6 +226,20 @@ class PspAuthorizationGatewayAdapter(
     private fun isRetryableStripeError(e: StripeException): Boolean {
         val t = e.stripeError?.type ?: e.code ?: ""
         return t == "api_connection_error" || t == "api_error" || t == "rate_limit_error"
+    }
+
+    override fun retrieveClientSecret(pspReference: String): String? {
+        return try {
+            val retrieved = stripeClient.v1().paymentIntents().retrieve(pspReference)
+            logger.info(
+                "Retrieved clientSecret from Stripe: pspReference={}, status={}",
+                pspReference, retrieved.status
+            )
+            retrieved.clientSecret
+        } catch (e: Exception) {
+            logger.error("Failed to retrieve clientSecret from Stripe: pspReference={}, error={}", pspReference, e.message, e)
+            null
+        }
     }
 
     private fun getAuthorizationResponse(): AuthorizationPspResponse {

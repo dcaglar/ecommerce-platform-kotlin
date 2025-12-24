@@ -186,6 +186,9 @@ db:
       lock-timeout-ms: 200
       idle-in-tx-timeout-ms: 0
 
+stripe: # on live  inject this as a seret to the environment ,or store in a vault
+  apiKey: dummy
+
 psp:
   authorization:
     simulation:

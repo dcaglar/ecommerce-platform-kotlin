@@ -168,7 +168,18 @@ class PaymentControllerWebExceptionHandler {
     @ExceptionHandler(DataAccessException::class)
     fun handleDataAccess(ex: DataAccessException, request: HttpServletRequest): ResponseEntity<ErrorResponse> {
         logger.error("DataAccessException at {}: {}", request.requestURI, causeSummary(ex))
-        return respond(HttpStatus.SERVICE_UNAVAILABLE, request, "Database temporarily unavailable")
+        // Log the root cause for debugging
+        val rootCause = ex.cause
+        if (rootCause != null) {
+            logger.error("Root cause: {} - {}", rootCause::class.simpleName, rootCause.message)
+        }
+        // Check if it's a connection/timeout issue
+        val message = when {
+            ex.message?.contains("timeout", ignoreCase = true) == true -> "Database operation timed out"
+            ex.message?.contains("connection", ignoreCase = true) == true -> "Database connection error"
+            else -> "Database temporarily unavailable"
+        }
+        return respond(HttpStatus.SERVICE_UNAVAILABLE, request, message)
     }
 
     // -------- Pool/exhaustion fast-path (no stack) --------

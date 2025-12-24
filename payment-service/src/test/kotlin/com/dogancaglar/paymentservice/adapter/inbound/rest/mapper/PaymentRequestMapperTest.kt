@@ -93,7 +93,7 @@ class PaymentRequestMapperTest {
                     amount = Amount.of(10000L, Currency("USD"))
                 )
             )
-        ).markAsCreated() // After Stripe call succeeds, status becomes CREATED
+        ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE") // After Stripe call succeeds, status becomes CREATED
 
         val response = PaymentRequestMapper.toPaymentResponseDto(paymentIntent)
 
@@ -120,7 +120,7 @@ class PaymentRequestMapperTest {
                 )
             )
         )
-            .markAsCreated()
+            .markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
             .markAuthorizedPending()
             .markAuthorized()
 
@@ -148,7 +148,7 @@ class PaymentRequestMapperTest {
                 )
             )
         )
-            .markAsCreated()
+            .markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
             .markAuthorizedPending()
 
         val response = PaymentRequestMapper.toPaymentResponseDto(paymentIntent)

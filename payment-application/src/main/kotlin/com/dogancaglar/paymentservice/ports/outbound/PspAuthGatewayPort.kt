@@ -8,4 +8,5 @@ interface PspAuthGatewayPort {
     fun createIntent(idempotencyKey: String, intent: PaymentIntent):  PaymentIntent  // "pi_..."
     fun confirmIntent(idempotencyKey: String, pspReference: String, token: PaymentMethod?): PaymentIntentStatus
     fun authorize(idempotencyKey: String, paymentIntent: PaymentIntent, token: PaymentMethod?): PaymentIntentStatus
+    fun retrieveClientSecret(pspReference: String): String? // Retrieve clientSecret from Stripe by pspReference
 }

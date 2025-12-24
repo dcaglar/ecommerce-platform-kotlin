@@ -131,7 +131,7 @@ class PaymentMapperIntegrationTest {
         
         // Mark as AUTHORIZED (following correct lifecycle: CREATED_PENDING -> CREATED -> PENDING_AUTH -> AUTHORIZED)
         val authorizedIntent = paymentIntent
-            .markAsCreated()
+            .markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
             .markAuthorizedPending()
             .markAuthorized()
         

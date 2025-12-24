@@ -19,7 +19,7 @@ import java.time.LocalDateTime
 class PaymentIntent private constructor(
     val paymentIntentId: PaymentIntentId,
     val clientSecret : String?="",
-    val pspReference: String?=null,
+    val pspReference: String?,          // Stripe PaymentIntent id (nullable only before CREATED)
     val buyerId: BuyerId,
     val orderId: OrderId,
     val totalAmount: Amount,
@@ -44,7 +44,32 @@ class PaymentIntent private constructor(
         require(sum == totalAmount.quantity) {
             "Total amount (${totalAmount.quantity}) must equal sum of payment lines ($sum)"
         }
+
+        // Domain invariants about PSP reference:
+        when (status) {
+            PaymentIntentStatus.CREATED_PENDING -> {
+                require(pspReference == null) {
+                    "pspReference must be null in CREATED_PENDING"
+                }
+            }
+            PaymentIntentStatus.CREATED,
+            PaymentIntentStatus.PENDING_AUTH,
+            PaymentIntentStatus.AUTHORIZED,
+            PaymentIntentStatus.DECLINED,
+             ->{
+                require(!pspReference.isNullOrBlank()) {
+                    "pspReference is required in status=$status"
+                }
+            }
+
+            else -> {}
+        }
     }
+
+    fun hasPspReference(): Boolean = !pspReference.isNullOrBlank()
+
+    fun pspReferenceOrThrow(): String =
+        requireNotNull(pspReference) { "pspReference is not set for paymentIntentId=$paymentIntentId" }
 
     // ------------------------
     // AUTHORIZATION WORKFLOW
@@ -69,11 +94,17 @@ class PaymentIntent private constructor(
         return copy(status = PaymentIntentStatus.CREATED, updatedAt = now)
     }
 
-    fun markAsCreatedWithPspReferenceAndClientSecret(pspReference: String,clientSecret: String,now: LocalDateTime = Utc.nowLocalDateTime()): PaymentIntent {
+
+    /**
+     *      * CREATED_PENDING -> CREATED (must provide PSP reference,client secret,seecret never persisted)
+     */
+    fun markAsCreatedWithPspReferenceAndClientSecret(pspReference: String, clientSecret: String, now: LocalDateTime = Utc.nowLocalDateTime()): PaymentIntent {
         require(status == PaymentIntentStatus.CREATED_PENDING) {
-            "Can only start authorization from CREATED (current=$status)"
+            "Can only mark CREATED from CREATED_PENDING (current=$status)"
         }
-        return copy(status = PaymentIntentStatus.CREATED, updatedAt = now,pspReference=pspReference,clientSecret=clientSecret)
+        require(pspReference.isNotBlank()) { "pspReference must not be blank" }
+        // Note: clientSecret is only set in-memory for response, never persisted
+        return copy(status = PaymentIntentStatus.CREATED, updatedAt = now, pspReference = pspReference, clientSecret = clientSecret)
     }
 
     /**
@@ -111,6 +142,14 @@ class PaymentIntent private constructor(
         return copy(status = PaymentIntentStatus.CANCELLED, updatedAt = now)
     }
 
+    /**
+     * Update clientSecret (used when retrieving from Stripe during polling)
+     * Preserves existing pspReference (must already be set for statuses that require it)
+     */
+    fun withClientSecret(clientSecret: String): PaymentIntent {
+        return copy(pspReference = this.pspReference, clientSecret = clientSecret)
+    }
+
     // ------------------------
     // INTERNAL COPY
     // ------------------------
@@ -118,8 +157,8 @@ class PaymentIntent private constructor(
     private fun copy(
         status: PaymentIntentStatus = this.status,
         updatedAt: LocalDateTime = Utc.nowLocalDateTime(),
-        pspReference: String?="",
-        clientSecret: String?="",
+        pspReference: String? = this.pspReference,
+        clientSecret: String? = this.clientSecret,
     ): PaymentIntent = PaymentIntent(
         paymentIntentId = paymentIntentId,
         pspReference = pspReference,

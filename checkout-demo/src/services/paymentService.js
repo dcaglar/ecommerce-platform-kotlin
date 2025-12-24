@@ -165,8 +165,8 @@ export async function authorizePayment(paymentIntentId) {
     } catch (parseError) {
       console.error('   Failed to parse response as JSON:', parseError);
       responseData = {};
-    }
-
+  }
+  
     if (!response.ok) {
       console.error('   Authorization failed:', response.status, response.statusText);
       console.error('   Error details:', responseData);
@@ -197,5 +197,5 @@ export async function authorizePayment(paymentIntentId) {
       data: {},
       message: error.message || 'Failed to connect to proxy server',
     };
-  }
+}
 }

@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -68,6 +69,20 @@ class PaymentController(
                 .header("Location", "/api/v1/idempotency/$idempotencyKey")
                 .body(responseDTO)
         }
+    }
+
+    /**
+     * Get payment intent status (for polling when payment is pending)
+     * Checks if pspReference exists and retrieves clientSecret from Stripe if available
+     */
+    @GetMapping("/payments/{paymentId}")
+    @PreAuthorize("hasAuthority('payment:write')")
+    fun getPaymentIntent(
+        @PathVariable("paymentId") publicPaymentId: String
+    ): ResponseEntity<CreatePaymentIntentResponseDTO> {
+        logger.info("📥 Getting payment intent: {}", publicPaymentId)
+        val dto = paymentService.getPaymentIntent(publicPaymentId)
+        return ResponseEntity.status(HttpStatus.OK).body(dto)
     }
 
     /**

@@ -136,7 +136,7 @@ class OutboxDispatcherJobTest {
                     amount
                 )
             )
-        ).markAsCreated()
+        ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
             .markAuthorizedPending()
             .markAuthorized()
         
@@ -247,7 +247,7 @@ class OutboxDispatcherJobTest {
                     amount
                 )
             )
-        ).markAsCreated()
+        ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
             .markAuthorizedPending()
             .markAuthorized()
         
@@ -343,7 +343,7 @@ class OutboxDispatcherJobTest {
                     amount
                 )
             )
-        ).markAsCreated()
+        ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
             .markAuthorizedPending()
             .markAuthorized()
         
@@ -497,7 +497,7 @@ class OutboxDispatcherJobTest {
                     amount
                 )
             )
-        ).markAsCreated()
+        ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
             .markAuthorizedPending()
             .markAuthorized()
         
