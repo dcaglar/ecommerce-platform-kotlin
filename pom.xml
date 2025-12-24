@@ -48,6 +48,7 @@ It declares that this module is:
         <logstash.version>7.4</logstash.version>
         <spring-boot.version>3.0.3</spring-boot.version>
         <caffeine.versione>3.1.8</caffeine.versione>
+        <stripe.version>31.0.0</stripe.version>
         <!-- Build plugins -->
         <kotlin.maven.plugin.version>${kotlin.version}</kotlin.maven.plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -138,6 +139,12 @@ It declares that this module is:
                 <groupId>org.jetbrains.kotlin</groupId>
                 <artifactId>kotlin-spring</artifactId>
                 <version>${kotlin.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.stripe</groupId>
+                <artifactId>stripe-java</artifactId>
+                <version>${stripe.version}</version>
             </dependency>
 
             <!-- Logstash encoder -->

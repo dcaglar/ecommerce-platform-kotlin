@@ -6,5 +6,5 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 
 data class AuthorizePaymentIntentCommand(
     val paymentIntentId: PaymentIntentId,
-    val paymentMethod: PaymentMethod
+    val paymentMethod: PaymentMethod? = null // Optional - for Stripe Payment Element, payment method is already attached
 )

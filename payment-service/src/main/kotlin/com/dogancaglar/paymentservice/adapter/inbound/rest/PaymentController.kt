@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -30,7 +31,7 @@ class PaymentController(
      * Requires 'payment:write' authority.
      *
      * @param request Payment request containing order details and payment orders
-     * @return ResponseEntity with 201 Created status and PaymentResponseDTO
+     * @return ResponseEntity with 201,202,200 Created status and PaymentResponseDTO
      */
     @PostMapping("/payments")
     @PreAuthorize("hasAuthority('payment:write')")
@@ -46,19 +47,42 @@ class PaymentController(
             paymentService.createPaymentIntent(request)
         }
 
-        val status = when (result.status) {
-            IdempotencyExecutionStatus.CREATED -> HttpStatus.CREATED   // 201 first time
-            IdempotencyExecutionStatus.REPLAYED -> HttpStatus.OK       // 200 on retry
-        }
-        val responseDTO = result.response as CreatePaymentIntentResponseDTO
-
+        val responseDTO = result.response
+        // Return 201/200/202 Created with Location header (best practice for resource creation)
         logger.info("📥 Received payment request for order: ${responseDTO.orderId}, payment id is ${responseDTO.paymentIntentId}")
+        return when (result.status) {
 
-        // Return 201 Created with Location header (best practice for resource creation)
-        return ResponseEntity
-            .status(status)
-            .header("Location", "/api/v1/payments/${responseDTO.paymentIntentId}")
-            .body(responseDTO)
+            IdempotencyExecutionStatus.CREATED -> ResponseEntity
+                .status(HttpStatus.CREATED)
+                .header("Location", "/api/v1/payments/${responseDTO.paymentIntentId}")
+                .body(responseDTO)
+
+            IdempotencyExecutionStatus.REPLAYED -> ResponseEntity
+                .status(HttpStatus.OK)
+                .header("Location", "/api/v1/payments/${responseDTO.paymentIntentId}")
+                .body(responseDTO)
+
+            IdempotencyExecutionStatus.IN_PROGRESS -> ResponseEntity
+                .status(HttpStatus.ACCEPTED)
+                .header("Retry-After", "1")
+                // use a dummy location for now OR point to idempotency status
+                .header("Location", "/api/v1/idempotency/$idempotencyKey")
+                .body(responseDTO)
+        }
+    }
+
+    /**
+     * Get payment intent status (for polling when payment is pending)
+     * Checks if pspReference exists and retrieves clientSecret from Stripe if available
+     */
+    @GetMapping("/payments/{paymentId}")
+    @PreAuthorize("hasAuthority('payment:write')")
+    fun getPaymentIntent(
+        @PathVariable("paymentId") publicPaymentId: String
+    ): ResponseEntity<CreatePaymentIntentResponseDTO> {
+        logger.info("📥 Getting payment intent: {}", publicPaymentId)
+        val dto = paymentService.getPaymentIntent(publicPaymentId)
+        return ResponseEntity.status(HttpStatus.OK).body(dto)
     }
 
     /**

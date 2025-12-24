@@ -93,7 +93,7 @@ class PaymentRequestMapperTest {
                     amount = Amount.of(10000L, Currency("USD"))
                 )
             )
-        )
+        ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE") // After Stripe call succeeds, status becomes CREATED
 
         val response = PaymentRequestMapper.toPaymentResponseDto(paymentIntent)
 
@@ -120,6 +120,7 @@ class PaymentRequestMapperTest {
                 )
             )
         )
+            .markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
             .markAuthorizedPending()
             .markAuthorized()
 
@@ -147,6 +148,7 @@ class PaymentRequestMapperTest {
                 )
             )
         )
+            .markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
             .markAuthorizedPending()
 
         val response = PaymentRequestMapper.toPaymentResponseDto(paymentIntent)
@@ -173,10 +175,27 @@ class PaymentRequestMapperTest {
 
         // Then
         assertNotNull(command.paymentIntentId)
+        assertNotNull(command.paymentMethod)
         assertTrue(command.paymentMethod is com.dogancaglar.paymentservice.domain.model.PaymentMethod.CardToken)
         val cardToken = command.paymentMethod as com.dogancaglar.paymentservice.domain.model.PaymentMethod.CardToken
         assertEquals("token-abc-123", cardToken.token)
         assertEquals("123", cardToken.cvc)
+    }
+
+    @Test
+    fun `should map AuthorizationRequestDTO with null paymentMethod to AuthorizePaymentIntentCommand correctly`() {
+        // Given - For Stripe Payment Element, paymentMethod is optional
+        val publicPaymentIntentId = "pi_test456"
+        val dto = AuthorizationRequestDTO(
+            paymentMethod = null
+        )
+
+        // When
+        val command = PaymentRequestMapper.toAuthorizePaymentIntentCommand(publicPaymentIntentId, dto)
+
+        // Then
+        assertNotNull(command.paymentIntentId)
+        assertNull(command.paymentMethod, "PaymentMethod should be null for Stripe Payment Element flow")
     }
 
     @Test

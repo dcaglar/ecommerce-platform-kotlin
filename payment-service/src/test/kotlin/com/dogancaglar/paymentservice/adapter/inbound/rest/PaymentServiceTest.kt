@@ -19,6 +19,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.paymentservice.ports.inbound.AuthorizePaymentIntentUseCase
+import com.dogancaglar.paymentservice.ports.inbound.GetPaymentIntentUseCase
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -30,6 +31,7 @@ class PaymentServiceTest {
 
     private lateinit var createPaymentIntentUseCase: CreatePaymentIntentUseCase
     private lateinit var authorizePaymentIntentUseCase: AuthorizePaymentIntentUseCase
+    private lateinit var getPaymentIntentUseCase: GetPaymentIntentUseCase
     private lateinit var paymentService: PaymentService
     private lateinit var paymentValidator: PaymentValidator
 
@@ -37,8 +39,14 @@ class PaymentServiceTest {
     fun setUp() {
         createPaymentIntentUseCase = mockk()
         authorizePaymentIntentUseCase = mockk()
+        getPaymentIntentUseCase = mockk()
         paymentValidator = mockk(relaxed = true)
-        paymentService = PaymentService(authorizePaymentIntentUseCase, createPaymentIntentUseCase, paymentValidator)
+        paymentService = PaymentService(
+            authorizePaymentIntentUseCase,
+            createPaymentIntentUseCase,
+            getPaymentIntentUseCase,
+            paymentValidator
+        )
     }
 
     @Test
@@ -67,7 +75,7 @@ class PaymentServiceTest {
                     amount = Amount.of(10000L, Currency("USD"))
                 )
             )
-        )
+        ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
 
         every { createPaymentIntentUseCase.create(any()) } returns expectedPaymentIntent
 
@@ -122,7 +130,7 @@ class PaymentServiceTest {
                     amount = Amount.of(5000L, Currency("EUR"))
                 )
             )
-        )
+        ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
 
         every { createPaymentIntentUseCase.create(any()) } returns expectedPaymentIntent
 
@@ -162,7 +170,7 @@ class PaymentServiceTest {
                     amount = Amount.of(10000L, Currency("USD"))
                 )
             )
-        )
+        ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
 
         val authorizedPaymentIntent = createdPaymentIntent
             .markAuthorizedPending()
@@ -207,7 +215,7 @@ class PaymentServiceTest {
                     amount = Amount.of(5000L, Currency("EUR"))
                 )
             )
-        )
+        ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
 
         val pendingPaymentIntent = createdPaymentIntent.markAuthorizedPending()
 
@@ -246,7 +254,7 @@ class PaymentServiceTest {
                     amount = Amount.of(15000L, Currency("GBP"))
                 )
             )
-        )
+        ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
 
         val declinedPaymentIntent = createdPaymentIntent
             .markAuthorizedPending()
@@ -293,7 +301,7 @@ class PaymentServiceTest {
                     amount = Amount.of(10000L, Currency("USD"))
                 )
             )
-        )
+        ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE") // After Stripe call succeeds, status becomes CREATED
 
         every { createPaymentIntentUseCase.create(any()) } returns expectedPaymentIntent
 
@@ -303,5 +311,122 @@ class PaymentServiceTest {
         // Then
         verify(exactly = 1) { paymentValidator.validate(request) }
         verify(exactly = 1) { createPaymentIntentUseCase.create(any()) }
+    }
+
+    @Test
+    fun `should get payment intent successfully with clientSecret`() {
+        // Given
+        val publicPaymentIntentId = "pi_test123"
+        val paymentIntentId = PaymentIntentId(123L)
+
+        val paymentIntent = PaymentIntent.createNew(
+            paymentIntentId = paymentIntentId,
+            buyerId = BuyerId("buyer-456"),
+            orderId = OrderId("order-123"),
+            totalAmount = Amount.of(10000L, Currency("USD")),
+            paymentOrderLines = listOf(
+                PaymentOrderLine(
+                    sellerId = SellerId("seller-789"),
+                    amount = Amount.of(10000L, Currency("USD"))
+                )
+            )
+        ).markAsCreatedWithPspReferenceAndClientSecret("pi_stripe_123", "secret_from_stripe")
+
+        val paymentIntentWithClientSecret = paymentIntent.withClientSecret("retrieved_secret")
+
+        every { getPaymentIntentUseCase.getPaymentIntent(any()) } returns paymentIntentWithClientSecret
+
+        // When
+        val response = paymentService.getPaymentIntent(publicPaymentIntentId)
+
+        // Then
+        assertNotNull(response)
+        assertEquals(paymentIntentWithClientSecret.paymentIntentId.toPublicPaymentIntentId(), response.paymentIntentId)
+        assertEquals("CREATED", response.status)
+        assertEquals("buyer-456", response.buyerId)
+        assertEquals("order-123", response.orderId)
+        assertEquals(10000L, response.totalAmount.quantity)
+        assertEquals(CurrencyEnum.USD, response.totalAmount.currency)
+        assertEquals("retrieved_secret", response.clientSecret)
+
+        verify(exactly = 1) { getPaymentIntentUseCase.getPaymentIntent(any()) }
+    }
+
+    @Test
+    fun `should get payment intent without pspReference`() {
+        // Given
+        val publicPaymentIntentId = "pi_test456"
+        val paymentIntentId = PaymentIntentId(456L)
+
+        val paymentIntent = PaymentIntent.createNew(
+            paymentIntentId = paymentIntentId,
+            buyerId = BuyerId("buyer-789"),
+            orderId = OrderId("order-456"),
+            totalAmount = Amount.of(5000L, Currency("EUR")),
+            paymentOrderLines = listOf(
+                PaymentOrderLine(
+                    sellerId = SellerId("seller-1"),
+                    amount = Amount.of(5000L, Currency("EUR"))
+                )
+            )
+        )
+
+        every { getPaymentIntentUseCase.getPaymentIntent(any()) } returns paymentIntent
+
+        // When
+        val response = paymentService.getPaymentIntent(publicPaymentIntentId)
+
+        // Then
+        assertNotNull(response)
+        assertEquals(paymentIntent.paymentIntentId.toPublicPaymentIntentId(), response.paymentIntentId)
+        assertEquals("CREATED_PENDING", response.status)
+        assertEquals("buyer-789", response.buyerId)
+        assertEquals("order-456", response.orderId)
+        assertEquals(5000L, response.totalAmount.quantity)
+        assertEquals(CurrencyEnum.EUR, response.totalAmount.currency)
+        assertNull(paymentIntent.pspReference)
+
+        verify(exactly = 1) { getPaymentIntentUseCase.getPaymentIntent(any()) }
+    }
+
+    @Test
+    fun `should get payment intent with AUTHORIZED status`() {
+        // Given
+        val publicPaymentIntentId = "pi_test789"
+        val paymentIntentId = PaymentIntentId(789L)
+
+        val paymentIntent = PaymentIntent.createNew(
+            paymentIntentId = paymentIntentId,
+            buyerId = BuyerId("buyer-999"),
+            orderId = OrderId("order-789"),
+            totalAmount = Amount.of(15000L, Currency("GBP")),
+            paymentOrderLines = listOf(
+                PaymentOrderLine(
+                    sellerId = SellerId("seller-2"),
+                    amount = Amount.of(15000L, Currency("GBP"))
+                )
+            )
+        ).markAsCreatedWithPspReferenceAndClientSecret("pi_stripe_789", "secret")
+            .markAuthorizedPending()
+            .markAuthorized()
+
+        val paymentIntentWithClientSecret = paymentIntent.withClientSecret("retrieved_secret_789")
+
+        every { getPaymentIntentUseCase.getPaymentIntent(any()) } returns paymentIntentWithClientSecret
+
+        // When
+        val response = paymentService.getPaymentIntent(publicPaymentIntentId)
+
+        // Then
+        assertNotNull(response)
+        assertEquals(paymentIntentWithClientSecret.paymentIntentId.toPublicPaymentIntentId(), response.paymentIntentId)
+        assertEquals("AUTHORIZED", response.status)
+        assertEquals("buyer-999", response.buyerId)
+        assertEquals("order-789", response.orderId)
+        assertEquals(15000L, response.totalAmount.quantity)
+        assertEquals(CurrencyEnum.GBP, response.totalAmount.currency)
+        assertEquals("retrieved_secret_789", response.clientSecret)
+
+        verify(exactly = 1) { getPaymentIntentUseCase.getPaymentIntent(any()) }
     }
 }

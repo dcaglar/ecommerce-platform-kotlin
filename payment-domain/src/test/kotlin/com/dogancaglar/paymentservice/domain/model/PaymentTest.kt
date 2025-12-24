@@ -20,8 +20,20 @@ class PaymentTest {
             orderId,
             totalAmount,
             lines
-        ).markAuthorizedPending()
+        ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234", "SECRET_FROM_STRIPE")
+            .markAuthorizedPending()
             .markAuthorized()
+
+    @Test
+    fun `authorizedIntent helper respects domain invariants`() {
+        val intent = authorizedIntent()
+        
+        // Verify pspReference is set (required for AUTHORIZED status)
+        assertNotNull(intent.pspReference)
+        assertTrue(intent.hasPspReference())
+        assertEquals("ST_PI_1234", intent.pspReferenceOrThrow())
+        assertEquals(PaymentIntentStatus.AUTHORIZED, intent.status)
+    }
 
     @Test
     fun `fromAuthorizedIntent creates payment correctly`() {

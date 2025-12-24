@@ -22,6 +22,7 @@ class PaymentIntentEntityMapper(
     fun toEntity(p: PaymentIntent): PaymentIntentEntity =
         PaymentIntentEntity(
             paymentIntentId = p.paymentIntentId.value,
+            pspReference = p.pspReference ?: "",
             buyerId = p.buyerId.value,
             orderId = p.orderId.value,
             totalAmountValue = p.totalAmount.quantity,
@@ -40,6 +41,7 @@ class PaymentIntentEntityMapper(
 
         return PaymentIntent.rehydrate(
             paymentIntentId = PaymentIntentId(entity.paymentIntentId),
+            pspReference = entity.pspReference,
             buyerId = BuyerId(entity.buyerId),
             orderId = OrderId(entity.orderId),
             totalAmount = total,

@@ -10,6 +10,9 @@ interface PaymentIntentMapper {
     // Removed @Select annotation to avoid duplicate mapping with XML
     fun getMaxPaymentIntentId(): Long?
 
+    fun tryMarkPendingAuth(id: Long, now: java.time.Instant): Int
+    fun updatePspReference(paymentIntentId: Long, pspReference: String, now: java.time.Instant): Int
+
     // Add other CRUD methods as needed, e.g.:
     fun insert(paymentIntent: PaymentIntentEntity): Int
     fun findById(id: Long): PaymentIntentEntity?

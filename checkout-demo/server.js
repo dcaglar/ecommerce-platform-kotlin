@@ -444,6 +444,202 @@ app.post('/api/checkout/process-payment', async (req, res) => {
   }
 });
 
+// Payment status endpoint: Check payment status (for polling when payment is pending)
+app.get('/api/checkout/payment-status/:paymentId', async (req, res) => {
+  const requestId = Date.now().toString(36);
+  const paymentId = req.params.paymentId;
+  console.log(`\n📥 [${requestId}] Checking payment status: ${paymentId}`);
+  
+  try {
+    if (!CLIENT_SECRET) {
+      console.error(`   [${requestId}] ❌ Client secret not configured`);
+      return res.status(500).json({
+        error: 'Client secret not configured',
+        message: 'Please set KEYCLOAK_CLIENT_SECRET environment variable or run npm run setup-env'
+      });
+    }
+
+    // Step 1: Get token from Keycloak
+    console.log(`   [${requestId}] 🔐 Acquiring token from Keycloak...`);
+    let token;
+    try {
+      token = await getAccessToken();
+      console.log(`   [${requestId}] ✅ Token acquired`);
+    } catch (error) {
+      console.error(`   [${requestId}] ❌ Token acquisition failed:`, error.message);
+      return res.status(500).json({
+        error: 'Failed to get authentication token',
+        message: error.message
+      });
+    }
+
+    // Step 2: Call payment-service to get payment status
+    // Note: This assumes there's a GET endpoint for payment status
+    // If not available, we'll need to implement it or use a different approach
+    console.log(`   [${requestId}] 💳 Checking payment status...`);
+    const statusUrl = `${PAYMENT_API_BASE_URL}/api/v1/payments/${paymentId}`;
+    console.log(`   [${requestId}]    URL: ${statusUrl}`);
+    console.log(`   [${requestId}]    Host header: ${PAYMENT_API_HOST_HEADER}`);
+    
+    let statusResponse;
+    try {
+      statusResponse = await httpRequestWithHost(statusUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        hostHeader: PAYMENT_API_HOST_HEADER,
+        timeout: 10000,
+      });
+      
+      console.log(`   [${requestId}] 📡 Status response: ${statusResponse.status} ${statusResponse.statusText}`);
+    } catch (fetchError) {
+      console.error(`   [${requestId}] ❌ Network error:`, fetchError.message);
+      return res.status(502).json({
+        error: 'Network error calling payment service',
+        message: fetchError.message
+      });
+    }
+
+    let statusData;
+    try {
+      statusData = await statusResponse.json();
+    } catch (parseError) {
+      console.error(`   [${requestId}] ❌ Failed to parse response:`, parseError.message);
+      statusData = {};
+    }
+
+    if (!statusResponse.ok) {
+      console.error(`   [${requestId}] ❌ Status check failed:`, statusData);
+      return res.status(statusResponse.status).json({
+        error: 'Failed to get payment status',
+        status: statusResponse.status,
+        details: statusData
+      });
+    }
+
+    console.log(`   [${requestId}] ✅ Payment status retrieved`);
+    res.json({
+      success: true,
+      payment: statusData,
+      _meta: {
+        token: token,
+        usedApiUrl: statusUrl,
+        usedHostHeader: PAYMENT_API_HOST_HEADER
+      }
+    });
+
+  } catch (error) {
+    console.error(`   [${requestId}] ❌ Unexpected error:`, error.message);
+    res.status(500).json({
+      error: 'Failed to check payment status',
+      message: error.message
+    });
+  }
+});
+
+// Authorize payment endpoint: Authorize a payment intent after Payment Element submission
+app.post('/api/checkout/authorize-payment/:paymentId', async (req, res) => {
+  const requestId = Date.now().toString(36);
+  const paymentId = req.params.paymentId;
+  console.log(`\n📥 [${requestId}] Authorizing payment: ${paymentId}`);
+  console.log(`   [${requestId}] Request body:`, JSON.stringify(req.body, null, 2));
+  
+  try {
+    if (!CLIENT_SECRET) {
+      console.error(`   [${requestId}] ❌ Client secret not configured`);
+      return res.status(500).json({
+        error: 'Client secret not configured',
+        message: 'Please set KEYCLOAK_CLIENT_SECRET environment variable or run npm run setup-env'
+      });
+    }
+
+    // Step 1: Get token from Keycloak
+    console.log(`   [${requestId}] 🔐 Acquiring token from Keycloak...`);
+    let token;
+    try {
+      token = await getAccessToken();
+      console.log(`   [${requestId}] ✅ Token acquired`);
+    } catch (error) {
+      console.error(`   [${requestId}] ❌ Token acquisition failed:`, error.message);
+      return res.status(500).json({
+        error: 'Failed to get authentication token',
+        message: error.message
+      });
+    }
+
+    // Step 2: Call payment-service authorize endpoint
+    console.log(`   [${requestId}] 🔐 Authorizing payment...`);
+    const authorizeUrl = `${PAYMENT_API_BASE_URL}/api/v1/payments/${paymentId}/authorize`;
+    console.log(`   [${requestId}]    URL: ${authorizeUrl}`);
+    console.log(`   [${requestId}]    Host header: ${PAYMENT_API_HOST_HEADER}`);
+    console.log(`   [${requestId}]    Note: No payment details sent - backend uses stored PaymentIntent ID`);
+    
+    // Build authorization request
+    // For Stripe Payment Element, payment method is already attached to PaymentIntent
+    // Backend looks up payment by internal ID and uses stored PaymentIntent ID
+    // PaymentMethod is now optional in the backend DTO, so we can send empty object
+    const authorizeRequest = req.body || {};
+    
+    let authorizeResponse;
+    try {
+      authorizeResponse = await httpRequestWithHost(authorizeUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        hostHeader: PAYMENT_API_HOST_HEADER,
+        body: JSON.stringify(authorizeRequest),
+        timeout: 30000,
+      });
+      
+      console.log(`   [${requestId}] 📡 Authorization response: ${authorizeResponse.status} ${authorizeResponse.statusText}`);
+    } catch (fetchError) {
+      console.error(`   [${requestId}] ❌ Network error:`, fetchError.message);
+      return res.status(502).json({
+        error: 'Network error calling payment service',
+        message: fetchError.message
+      });
+    }
+
+    let authorizeData;
+    try {
+      authorizeData = await authorizeResponse.json();
+    } catch (parseError) {
+      console.error(`   [${requestId}] ❌ Failed to parse response:`, parseError.message);
+      authorizeData = {};
+    }
+
+    if (!authorizeResponse.ok) {
+      console.error(`   [${requestId}] ❌ Authorization failed:`, authorizeData);
+      return res.status(authorizeResponse.status).json({
+        error: 'Payment authorization failed',
+        status: authorizeResponse.status,
+        details: authorizeData
+      });
+    }
+
+    console.log(`   [${requestId}] ✅ Payment authorized successfully`);
+    res.json({
+      success: true,
+      payment: authorizeData,
+      _meta: {
+        token: token,
+        usedApiUrl: authorizeUrl,
+        usedHostHeader: PAYMENT_API_HOST_HEADER
+      }
+    });
+
+  } catch (error) {
+    console.error(`   [${requestId}] ❌ Unexpected error:`, error.message);
+    res.status(500).json({
+      error: 'Failed to authorize payment',
+      message: error.message
+    });
+  }
+});
+
 // 404 handler for undefined routes
 app.use((req, res) => {
   console.error(`❌ Route not found: ${req.method} ${req.url}`);
@@ -454,7 +650,9 @@ app.use((req, res) => {
     availableRoutes: [
       'GET /health',
       'POST /api/token',
-      'POST /api/checkout/process-payment'
+      'POST /api/checkout/process-payment',
+      'GET /api/checkout/payment-status/:paymentId',
+      'POST /api/checkout/authorize-payment/:paymentId'
     ]
   });
 });
@@ -473,6 +671,8 @@ app.listen(PORT, () => {
   console.log(`   GET  /health`);
   console.log(`   POST /api/token`);
   console.log(`   POST /api/checkout/process-payment`);
+  console.log(`   GET  /api/checkout/payment-status/:paymentId`);
+  console.log(`   POST /api/checkout/authorize-payment/:paymentId`);
   if (!CLIENT_SECRET) {
     console.log(`\n   ⚠️  Please set KEYCLOAK_CLIENT_SECRET or run: npm run setup-env`);
   }

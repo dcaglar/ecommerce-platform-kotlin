@@ -6,6 +6,7 @@
     <resultMap id="PaymentIntentResultMap"
                type="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentIntentEntity">
         <id property="paymentIntentId" column="payment_intent_id"/>
+        <result property="pspReference" column="psp_reference"/>
         <result property="buyerId" column="buyer_id"/>
         <result property="orderId" column="order_id"/>
         <result property="totalAmountValue" column="total_amount_value"/>
@@ -28,6 +29,7 @@
             >
         INSERT INTO payment_intents (
         payment_intent_id,
+        psp_reference,
         buyer_id,
         order_id,
         total_amount_value,
@@ -38,6 +40,7 @@
         updated_at
         ) VALUES (
         #{paymentIntentId},
+        #{pspReference},
         #{buyerId},
         #{orderId},
         #{totalAmountValue},
@@ -51,6 +54,7 @@
 
     <select id="findById" resultMap="PaymentIntentResultMap">
         SELECT payment_intent_id,
+                psp_reference,
                buyer_id,
                order_id,
                total_amount_value,
@@ -70,6 +74,7 @@
     <update id="update"
             parameterType="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentIntentEntity">
         UPDATE payment_intents SET
+        psp_reference = #{pspReference},
         order_id = #{orderId},
         buyer_id = #{buyerId},
         total_amount_value = #{totalAmountValue},
@@ -80,6 +85,23 @@
         updated_at = #{updatedAt}
         WHERE payment_intent_id = #{paymentIntentId}
     </update>
+
+    <update id="tryMarkPendingAuth" parameterType="map">
+        UPDATE payment_intents
+        SET status = 'PENDING_AUTH',
+        updated_at = #{now}
+        WHERE payment_intent_id = #{id}
+        AND status = 'CREATED'
+    </update>
+
+    <update id="updatePspReference" parameterType="map">
+        UPDATE payment_intents
+        SET psp_reference = #{pspReference},
+        updated_at = #{now, typeHandler=com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.typehandler.InstantTypeHandler}
+        WHERE payment_intent_id = #{paymentIntentId}
+    </update>
+
+
 
     <delete id="deleteById">
         DELETE FROM payment_intents WHERE payment_intent_id = #{id}
