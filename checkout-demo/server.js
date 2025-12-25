@@ -319,10 +319,16 @@ app.post('/api/checkout/process-payment', async (req, res) => {
       });
     }
 
-    // Step 2: Generate idempotency key for this request
-    // In production, this would be provided by the client, but for demo we generate it
-    const idempotencyKey = randomUUID();
-    console.log(`   [${requestId}] 🔑 Generated idempotency key: ${idempotencyKey}`);
+    // Step 2: Get idempotency key from request header (browser should send it)
+    const idempotencyKey = req.headers['idempotency-key'];
+    if (!idempotencyKey) {
+      console.error(`   [${requestId}] ❌ Missing Idempotency-Key header`);
+      return res.status(400).json({
+        error: 'Idempotency-Key header is required',
+        message: 'Please include Idempotency-Key header in your request'
+      });
+    }
+    console.log(`   [${requestId}] 🔑 Using idempotency key from request: ${idempotencyKey}`);
 
     // Step 3: Call payment-service with token (server-to-server)
     // Access via ingress: base URL + Host header (matches how-to-start.md)
@@ -416,21 +422,26 @@ app.post('/api/checkout/process-payment', async (req, res) => {
     console.log(`   [${requestId}] ✅ Payment created successfully`);
     console.log(`   [${requestId}]    Response:`, JSON.stringify(paymentResponseData, null, 2));
 
-    // Step 4: Return payment response to frontend (with metadata for curl generation)
+    // Step 4: Return payment response to frontend with preserved status and headers
     console.log(`   [${requestId}] 📤 Returning response to frontend`);
-    const response = {
-      success: true,
-      payment: paymentResponseData,
-      // Include metadata for curl command generation
-      _meta: {
-        token: token,
-        idempotencyKey: idempotencyKey,
-        usedApiUrl: paymentUrl,
-        usedHostHeader: PAYMENT_API_HOST_HEADER
-      }
-    };
-    res.json(response);
-    console.log(`   [${requestId}] ✅ Request completed successfully\n`);
+    
+    // Extract and forward important headers
+    const responseHeaders = {};
+    const retryAfter = paymentResponse.headers['retry-after'] || paymentResponse.headers['Retry-After'];
+    const location = paymentResponse.headers['location'] || paymentResponse.headers['Location'];
+    const idempotentReplayed = paymentResponse.headers['idempotent-replayed'] || paymentResponse.headers['Idempotent-Replayed'];
+    
+    if (retryAfter) responseHeaders['retry-after'] = retryAfter;
+    if (location) responseHeaders['location'] = location;
+    if (idempotentReplayed) responseHeaders['idempotent-replayed'] = idempotentReplayed;
+    
+    // Preserve HTTP status code and forward headers
+    res.status(paymentResponse.status)
+       .set(responseHeaders)
+       .json({
+         payment: paymentResponseData
+       });
+    console.log(`   [${requestId}] ✅ Request completed successfully (status: ${paymentResponse.status})\n`);
 
   } catch (error) {
     console.error(`   [${requestId}] ❌ Unexpected error in payment processing:`, error.message);
@@ -519,15 +530,20 @@ app.get('/api/checkout/payment-status/:paymentId', async (req, res) => {
     }
 
     console.log(`   [${requestId}] ✅ Payment status retrieved`);
-    res.json({
-      success: true,
-      payment: statusData,
-      _meta: {
-        token: token,
-        usedApiUrl: statusUrl,
-        usedHostHeader: PAYMENT_API_HOST_HEADER
-      }
-    });
+    
+    // Preserve HTTP status code and forward headers
+    const responseHeaders = {};
+    const retryAfter = statusResponse.headers['retry-after'] || statusResponse.headers['Retry-After'];
+    const location = statusResponse.headers['location'] || statusResponse.headers['Location'];
+    
+    if (retryAfter) responseHeaders['retry-after'] = retryAfter;
+    if (location) responseHeaders['location'] = location;
+    
+    res.status(statusResponse.status)
+       .set(responseHeaders)
+       .json({
+         payment: statusData
+       });
 
   } catch (error) {
     console.error(`   [${requestId}] ❌ Unexpected error:`, error.message);
@@ -621,15 +637,20 @@ app.post('/api/checkout/authorize-payment/:paymentId', async (req, res) => {
     }
 
     console.log(`   [${requestId}] ✅ Payment authorized successfully`);
-    res.json({
-      success: true,
-      payment: authorizeData,
-      _meta: {
-        token: token,
-        usedApiUrl: authorizeUrl,
-        usedHostHeader: PAYMENT_API_HOST_HEADER
-      }
-    });
+    
+    // Preserve HTTP status code and forward headers
+    const responseHeaders = {};
+    const retryAfter = authorizeResponse.headers['retry-after'] || authorizeResponse.headers['Retry-After'];
+    const location = authorizeResponse.headers['location'] || authorizeResponse.headers['Location'];
+    
+    if (retryAfter) responseHeaders['retry-after'] = retryAfter;
+    if (location) responseHeaders['location'] = location;
+    
+    res.status(authorizeResponse.status)
+       .set(responseHeaders)
+       .json({
+         payment: authorizeData
+       });
 
   } catch (error) {
     console.error(`   [${requestId}] ❌ Unexpected error:`, error.message);

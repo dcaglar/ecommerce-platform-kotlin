@@ -4,10 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Configuration
 
 @Configuration
-@ConfigurationProperties(prefix = "stripe")
-class StripeProperties {
-    var apiKey: String = ""
-    var clientId: String? = null
-    var stripeAccount: String? = null
+@ConfigurationProperties(prefix = "stripe.api")
+class StripeProperties(val apiKey:String,val connectTimeout:Int,val readTimeout: Int) {
 }
 

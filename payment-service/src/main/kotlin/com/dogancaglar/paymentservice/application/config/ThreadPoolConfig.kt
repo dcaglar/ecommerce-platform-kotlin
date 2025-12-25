@@ -76,6 +76,20 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
         return scheduler
     }
 
+    // ... existing beans ...
+
+    @Bean("pspCallbackExecutor")
+    fun pspCallbackExecutor(decorator: TaskDecorator): ThreadPoolTaskExecutor =
+        ThreadPoolTaskExecutor().apply {
+            corePoolSize = 4
+            maxPoolSize = 4
+            queueCapacity = 256
+            setThreadNamePrefix("po-psp-callback-")
+            setTaskDecorator(decorator)
+            setRejectedExecutionHandler(ThreadPoolExecutor.AbortPolicy())
+            initialize()
+        }
+
     @Bean("taskScheduler")
     fun defaultSpringScheduler(): ThreadPoolTaskScheduler =
         ThreadPoolTaskScheduler().apply {

@@ -19,13 +19,14 @@ class PaymentService(
     private val authorizePaymentIntentUseCase: AuthorizePaymentIntentUseCase,
     private val createPaymentIntentUseCase: CreatePaymentIntentUseCase,
     private val getPaymentIntentUseCase: GetPaymentIntentUseCase,
-    private val paymentValidator: PaymentValidator
+    private val paymentValidator: PaymentValidator,
 ) {
     private val logger = LoggerFactory.getLogger(PaymentService::class.java)
 
     fun createPaymentIntent(request: CreatePaymentIntentRequestDTO): CreatePaymentIntentResponseDTO {
         paymentValidator.validate(request)
         val cmd = PaymentRequestMapper.toCreatePaymentIntentCommand(request)
+        //only persist to db.
         val paymentIntent = createPaymentIntentUseCase.create(cmd)
         return PaymentRequestMapper.toPaymentResponseDto(paymentIntent)
     }
