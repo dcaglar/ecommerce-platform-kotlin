@@ -16,7 +16,6 @@ import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPor
 import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
 import org.slf4j.LoggerFactory
 import com.dogancaglar.common.time.Utc
-import org.springframework.beans.factory.annotation.Qualifier
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
@@ -27,7 +26,6 @@ import kotlin.math.pow
 import kotlin.random.Random
 
 open class ProcessPaymentService(
-    @param:Qualifier("syncPaymentEventPublisher")
     private val eventPublisher: EventPublisherPort,
     private val retryQueuePort: RetryQueuePort<PaymentOrderCaptureCommand>,
     private val paymentOrderModificationPort: PaymentOrderModificationPort,

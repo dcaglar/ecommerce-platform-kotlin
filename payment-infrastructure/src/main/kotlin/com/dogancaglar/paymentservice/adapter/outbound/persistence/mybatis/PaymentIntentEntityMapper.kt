@@ -22,7 +22,7 @@ class PaymentIntentEntityMapper(
     fun toEntity(p: PaymentIntent): PaymentIntentEntity =
         PaymentIntentEntity(
             paymentIntentId = p.paymentIntentId.value,
-            pspReference = p.pspReference ?: "",
+            pspReference = p.pspReference,
             buyerId = p.buyerId.value,
             orderId = p.orderId.value,
             totalAmountValue = p.totalAmount.quantity,
@@ -39,16 +39,20 @@ class PaymentIntentEntityMapper(
         val lines: List<PaymentOrderLine> =
             objectMapper.readValue(entity.paymentLinesJson, object : TypeReference<List<PaymentOrderLine>>() {})
 
+        // Convert empty string to null (defensive, in case old data has "")
+        // Domain validation requires null for CREATED_PENDING status
+        val pspRef = if (entity.pspReference.isNullOrBlank()) null else entity.pspReference
+
         return PaymentIntent.rehydrate(
             paymentIntentId = PaymentIntentId(entity.paymentIntentId),
-            pspReference = entity.pspReference,
+            pspReference = pspRef,
             buyerId = BuyerId(entity.buyerId),
             orderId = OrderId(entity.orderId),
             totalAmount = total,
+            paymentOrderLines = lines,
             status = PaymentIntentStatus.valueOf(entity.status),
             createdAt = Utc.fromInstant(entity.createdAt),
-            updatedAt = Utc.fromInstant(entity.updatedAt),
-            paymentOrderLines = lines
+            updatedAt = Utc.fromInstant(entity.updatedAt)
         )
     }
 }

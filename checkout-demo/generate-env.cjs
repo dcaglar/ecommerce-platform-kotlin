@@ -20,7 +20,8 @@ const defaults = {
   VITE_KEYCLOAK_CLIENT_ID: 'payment-service',
   VITE_KEYCLOAK_CLIENT_SECRET: '',
   VITE_API_BASE_URL: 'http://127.0.0.1',
-  VITE_API_HOST_HEADER: 'payment.192.168.49.2.nip.io'
+  VITE_API_HOST_HEADER: 'payment.192.168.49.2.nip.io',
+  VITE_STRIPE_PUBLISHABLE_KEY: 'pk_test_placeholder' // ⚠️ MUST BE REPLACED with your actual Stripe publishable key
 };
 
 function readSecrets() {
@@ -103,11 +104,16 @@ function generateEnv() {
   // Build env object
   const env = {
     ...defaults,
-    ...existing, // Preserve existing custom values
+    ...existing, // Preserve existing custom values (including VITE_STRIPE_PUBLISHABLE_KEY if already set)
     VITE_KEYCLOAK_CLIENT_SECRET: clientSecret,
     // Always use correct client ID (override any existing wrong value)
     VITE_KEYCLOAK_CLIENT_ID: defaults.VITE_KEYCLOAK_CLIENT_ID,
   };
+  
+  // Preserve Stripe publishable key if it was set in existing env (don't override with placeholder)
+  if (existing.VITE_STRIPE_PUBLISHABLE_KEY && existing.VITE_STRIPE_PUBLISHABLE_KEY !== defaults.VITE_STRIPE_PUBLISHABLE_KEY) {
+    env.VITE_STRIPE_PUBLISHABLE_KEY = existing.VITE_STRIPE_PUBLISHABLE_KEY;
+  }
 
   // Override with endpoints.json if available
   if (endpoints) {
@@ -131,6 +137,12 @@ function generateEnv() {
     '# These can be read from infra/endpoints.json, but can be overridden here',
     `VITE_API_BASE_URL=${env.VITE_API_BASE_URL}`,
     `VITE_API_HOST_HEADER=${env.VITE_API_HOST_HEADER}`,
+    '',
+    '# Stripe Configuration',
+    '# ⚠️ IMPORTANT: Replace pk_test_placeholder with your actual Stripe publishable key',
+    '# Get your publishable key from: https://dashboard.stripe.com/test/apikeys',
+    '# Test keys start with pk_test_, Live keys start with pk_live_',
+    `VITE_STRIPE_PUBLISHABLE_KEY=${env.VITE_STRIPE_PUBLISHABLE_KEY}`,
     ''
   ];
 
@@ -145,7 +157,15 @@ function generateEnv() {
   console.log(`   Client ID: ${env.VITE_KEYCLOAK_CLIENT_ID}`);
   console.log(`   Client Secret: ${clientSecret.substring(0, 8)}... (hidden)`);
   console.log(`   API Base URL: ${env.VITE_API_BASE_URL}`);
-  console.log(`   API Host Header: ${env.VITE_API_HOST_HEADER}\n`);
+  console.log(`   API Host Header: ${env.VITE_API_HOST_HEADER}`);
+  console.log(`   Stripe Publishable Key: ${env.VITE_STRIPE_PUBLISHABLE_KEY.substring(0, 20)}...`);
+  
+  if (env.VITE_STRIPE_PUBLISHABLE_KEY === 'pk_test_placeholder') {
+    console.log('\n⚠️  WARNING: Stripe publishable key is still set to placeholder!');
+    console.log('   Please update VITE_STRIPE_PUBLISHABLE_KEY in .env with your actual Stripe key.');
+    console.log('   Get it from: https://dashboard.stripe.com/test/apikeys\n');
+  }
+  
   console.log('💡 You can now run: npm run dev');
 }
 

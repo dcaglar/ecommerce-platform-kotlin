@@ -10,5 +10,4 @@ interface PaymentIntentRepository {
         fun getMaxPaymentIntentId(): PaymentIntentId
     fun updatePaymentIntent(paymentIntent: PaymentIntent)
      fun tryMarkPendingAuth(id: PaymentIntentId, now: java.time.Instant): Boolean
-     fun updatePspReference(paymentIntentId: Long, pspReference: String, now: java.time.Instant)
     }

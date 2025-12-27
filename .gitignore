@@ -39,10 +39,33 @@
 
 ### macOS ###
 .DS_Store
+**/.DS_Store
+
+### Node.js ###
+**/node_modules/
+**/package-lock.json
+**/.npm/
+**/dist/
+
+### Logs & Temporary Files ###
+**/*.log
+**/*.tmp
+**/conversation_dump.txt
+
+### Secrets & Credentials ###
+**/*.pem
+**/*.key
+**/*secrets*.txt
+**/*secrets*.yaml
+**/*secrets*.yml
+**/*secrets*.json
+**/apikeys.txt
+**/credentials.txt
 # Keycloak client secrets and access tokens
 keycloak/output/secrets.txt
 keycloak/output/jwt/
 keycloak/*.token
+**/secrets/
 /local-dir/
 
 # Ignore generated payment config scripts and configmaps
@@ -58,4 +81,17 @@ infra/k8s/payment/configmap/payment-service-configmap.yaml
 /infra/k8s/overlays/local/monitoring/secrets/
 /infra/k8s/overlays/local/messaging/secrets/
 /infra/k8s/overlays/local/keycloak/secrets/
+infra/secrets/
+infra/k8s/**/secrets/
+
+### Docker ###
+**/Dockerfile.bak
+
+### Test Coverage ###
+**/jacoco.exec
+**/*.exec
+**/jacoco/
+**/coverage/
+
 .aiexclude
+.GEMINI.md

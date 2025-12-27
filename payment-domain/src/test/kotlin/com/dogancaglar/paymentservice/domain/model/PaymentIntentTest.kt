@@ -159,15 +159,13 @@ class PaymentIntentTest {
     }
 
     @Test
-    fun `cancel allowed from CREATED or PENDING_AUTH`() {
+    fun `cancel allowed from CREATED_PENDING, CREATED or PENDING_AUTH`() {
         val intent = PaymentIntent.createNew(
             PaymentIntentId(1), buyerId, orderId, totalAmount, lines
         )
 
-        // Cancel should fail from CREATED_PENDING
-        assertFailsWith<IllegalArgumentException> {
-            intent.markCancelled()
-        }
+        // Cancel allowed from CREATED_PENDING
+        assertEquals(PaymentIntentStatus.CANCELLED, intent.markCancelled().status)
 
         // Cancel allowed from CREATED
         val created = intent.markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")

@@ -5,6 +5,7 @@ import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.Paymen
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentIntentMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -92,7 +93,16 @@ class PaymentIntentMapperIntegrationTest {
 
     private val objectMapper: ObjectMapper = JacksonUtil.createObjectMapper()
 
-    private fun sampleEntity(id: Long = 101L, status: String = "CREATED_PENDING"): PaymentIntentEntity {
+    @BeforeEach
+    fun cleanup() {
+        paymentIntentMapper.deleteAll()
+    }
+
+    private fun sampleEntity(
+        id: Long = 101L,
+        status: String = "CREATED_PENDING",
+        pspReference: String? = null
+    ): PaymentIntentEntity {
         val now = Utc.nowInstant().normalizeToMicroseconds()
         val paymentOrderLines = listOf(
             PaymentOrderLine(
@@ -102,7 +112,7 @@ class PaymentIntentMapperIntegrationTest {
         )
         return PaymentIntentEntity(
             paymentIntentId = id,
-            pspReference = "", // Default empty string for new payment intents
+            pspReference = pspReference,
             buyerId = "buyer-$id",
             orderId = "order-$id",
             totalAmountValue = 10_000,
@@ -115,25 +125,47 @@ class PaymentIntentMapperIntegrationTest {
     }
 
     @Test
-    fun `insert and findById and getMaxPaymentIntentId`() {
+    fun `getMaxPaymentIntentId returns 0 when table is empty`() {
+        // when
+        val maxId = paymentIntentMapper.getMaxPaymentIntentId()
+
+        // then
+        assertEquals(0L, maxId)
+    }
+
+    @Test
+    fun `getMaxPaymentIntentId returns max ID when table has data`() {
         // given
-        val entity = sampleEntity(101L)
+        paymentIntentMapper.insert(sampleEntity(100L))
+        paymentIntentMapper.insert(sampleEntity(200L))
+        paymentIntentMapper.insert(sampleEntity(150L))
+
+        // when
+        val maxId = paymentIntentMapper.getMaxPaymentIntentId()
+
+        // then
+        assertEquals(200L, maxId)
+    }
+
+    @Test
+    fun `insert and findById with null pspReference`() {
+        // given
+        val entity = sampleEntity(101L, "CREATED_PENDING", null)
 
         // when
         val rows = paymentIntentMapper.insert(entity)
+        val loaded = paymentIntentMapper.findById(101L)
 
         // then
         assertEquals(1, rows)
-
-        val loaded = paymentIntentMapper.findById(101L)
         assertNotNull(loaded)
 
-        // normalize timestamps to match Postgres precision
         val normalizedEntity = entity.normalizeTimestamps()
         val normalizedLoaded = loaded!!.normalizeTimestamps()
-        
-        // Compare all fields except paymentLinesJson (JSON property order may differ)
+
         assertEquals(normalizedEntity.paymentIntentId, normalizedLoaded.paymentIntentId)
+        assertNull(normalizedEntity.pspReference, "Original entity should have null pspReference")
+        assertNull(normalizedLoaded.pspReference, "Loaded entity should have null pspReference (not empty string)")
         assertEquals(normalizedEntity.buyerId, normalizedLoaded.buyerId)
         assertEquals(normalizedEntity.orderId, normalizedLoaded.orderId)
         assertEquals(normalizedEntity.totalAmountValue, normalizedLoaded.totalAmountValue)
@@ -141,26 +173,63 @@ class PaymentIntentMapperIntegrationTest {
         assertEquals(normalizedEntity.status, normalizedLoaded.status)
         assertEquals(normalizedEntity.createdAt, normalizedLoaded.createdAt)
         assertEquals(normalizedEntity.updatedAt, normalizedLoaded.updatedAt)
-        
+
         // Compare JSON by parsing to JSON nodes (ignores property order)
         val expectedJsonNode = objectMapper.readTree(normalizedEntity.paymentLinesJson)
         val loadedJsonNode = objectMapper.readTree(normalizedLoaded.paymentLinesJson)
         assertEquals(expectedJsonNode, loadedJsonNode)
-
-        val maxId = paymentIntentMapper.getMaxPaymentIntentId()
-        assertEquals(101L, maxId)
     }
 
     @Test
-    fun `update and deleteById`() {
+    fun `insert and findById with pspReference set`() {
         // given
-        val entity = sampleEntity(201L)
+        val pspRef = "pi_3ShY7NEAJKUKtoJw1h8nCnIC"
+        val entity = sampleEntity(102L, "CREATED", pspRef)
+
+        // when
+        paymentIntentMapper.insert(entity)
+        val loaded = paymentIntentMapper.findById(102L)
+
+        // then
+        assertNotNull(loaded)
+        assertEquals(pspRef, loaded!!.pspReference)
+        assertEquals("CREATED", loaded.status)
+    }
+
+    @Test
+    fun `findById returns null for non-existent ID`() {
+        // when
+        val loaded = paymentIntentMapper.findById(999L)
+
+        // then
+        assertNull(loaded)
+    }
+
+    @Test
+    fun `update all fields including pspReference`() {
+        // given
+        val entity = sampleEntity(201L, "CREATED_PENDING", null)
         paymentIntentMapper.insert(entity)
 
-        // when – update some fields
+        // when - update all fields
+        val newPspRef = "pi_updated123"
+        val newStatus = "AUTHORIZED"
+        val newBuyerId = "buyer-updated"
+        val newOrderId = "order-updated"
+        val newTotalAmount = 20_000L
+        val newCurrency = "EUR"
+        val newUpdatedAt = Utc.nowInstant().normalizeToMicroseconds()
+
+        Thread.sleep(10) // Ensure time difference
+
         val updatedEntity = entity.copy(
-            status = "AUTHORIZED",
-            updatedAt = Utc.nowInstant().normalizeToMicroseconds()
+            pspReference = newPspRef,
+            status = newStatus,
+            buyerId = newBuyerId,
+            orderId = newOrderId,
+            totalAmountValue = newTotalAmount,
+            currency = newCurrency,
+            updatedAt = newUpdatedAt
         )
         val updatedRows = paymentIntentMapper.update(updatedEntity)
 
@@ -169,39 +238,83 @@ class PaymentIntentMapperIntegrationTest {
 
         val reloaded = paymentIntentMapper.findById(201L)
         assertNotNull(reloaded)
-        assertEquals("AUTHORIZED", reloaded!!.status)
+        assertEquals(newPspRef, reloaded!!.pspReference, "pspReference should be updated")
+        assertEquals(newStatus, reloaded.status, "status should be updated")
+        assertEquals(newBuyerId, reloaded.buyerId, "buyerId should be updated")
+        assertEquals(newOrderId, reloaded.orderId, "orderId should be updated")
+        assertEquals(newTotalAmount, reloaded.totalAmountValue, "totalAmountValue should be updated")
+        assertEquals(newCurrency, reloaded.currency, "currency should be updated")
+        assertEquals(newUpdatedAt, reloaded.updatedAt.normalizeToMicroseconds(), "updatedAt should be updated")
+    }
 
-        // when – delete by id
-        val deletedRows = paymentIntentMapper.deleteById(201L)
-        assertEquals(1, deletedRows)
+    @Test
+    fun `update pspReference from null to value`() {
+        // given
+        val entity = sampleEntity(301L, "CREATED_PENDING", null)
+        paymentIntentMapper.insert(entity)
 
-        val afterDelete = paymentIntentMapper.findById(201L)
-        assertNull(afterDelete)
+        // when
+        val newPspRef = "pi_new123"
+        val newUpdatedAt = Utc.nowInstant().normalizeToMicroseconds()
+        Thread.sleep(10)
+
+        val updatedEntity = entity.copy(
+            pspReference = newPspRef,
+            status = "CREATED",
+            updatedAt = newUpdatedAt
+        )
+        paymentIntentMapper.update(updatedEntity)
+
+        // then
+        val reloaded = paymentIntentMapper.findById(301L)
+        assertNotNull(reloaded)
+        assertEquals(newPspRef, reloaded!!.pspReference, "pspReference should be updated from null to value")
+        assertEquals("CREATED", reloaded.status)
+    }
+
+    @Test
+    fun `update pspReference from value to null`() {
+        // given
+        val entity = sampleEntity(302L, "CREATED", "pi_old123")
+        paymentIntentMapper.insert(entity)
+
+        // when
+        val newUpdatedAt = Utc.nowInstant().normalizeToMicroseconds()
+        Thread.sleep(10)
+
+        val updatedEntity = entity.copy(
+            pspReference = null,
+            updatedAt = newUpdatedAt
+        )
+        paymentIntentMapper.update(updatedEntity)
+
+        // then
+        val reloaded = paymentIntentMapper.findById(302L)
+        assertNotNull(reloaded)
+        assertNull(reloaded!!.pspReference, "pspReference should be updated from value to null")
     }
 
     @Test
     fun `tryMarkPendingAuth updates status from CREATED to PENDING_AUTH`() {
-        // given - First create with CREATED_PENDING, then update to CREATED
-        val entity = sampleEntity(301L, "CREATED_PENDING")
+        // given
+        val entity = sampleEntity(401L, "CREATED_PENDING", null)
         paymentIntentMapper.insert(entity)
-        
-        // Update to CREATED status (simulating markAsCreated)
+
+        // First update to CREATED status
         val createdEntity = entity.copy(status = "CREATED")
         paymentIntentMapper.update(createdEntity)
-        
+
         val originalUpdatedAt = createdEntity.updatedAt
         val newUpdatedAt = Utc.nowInstant().normalizeToMicroseconds()
-        
-        // Ensure there's a time difference
         Thread.sleep(10)
-        
+
         // when
-        val updatedRows = paymentIntentMapper.tryMarkPendingAuth(301L, newUpdatedAt)
-        
+        val updatedRows = paymentIntentMapper.tryMarkPendingAuth(401L, newUpdatedAt)
+
         // then
         assertEquals(1, updatedRows, "Should update exactly one row")
-        
-        val reloaded = paymentIntentMapper.findById(301L)
+
+        val reloaded = paymentIntentMapper.findById(401L)
         assertNotNull(reloaded)
         assertEquals("PENDING_AUTH", reloaded!!.status, "Status should be updated to PENDING_AUTH")
         assertEquals(newUpdatedAt, reloaded.updatedAt.normalizeToMicroseconds(), "updated_at should be updated")
@@ -210,34 +323,32 @@ class PaymentIntentMapperIntegrationTest {
     @Test
     fun `tryMarkPendingAuth does not update if status is not CREATED`() {
         // given - Test with CREATED_PENDING status (should not update)
-        val entity = sampleEntity(401L, "CREATED_PENDING")
+        val entity = sampleEntity(501L, "CREATED_PENDING", null)
         paymentIntentMapper.insert(entity)
-        
+
         val originalUpdatedAt = entity.updatedAt
         val newUpdatedAt = Utc.nowInstant().normalizeToMicroseconds()
-        
-        // Ensure there's a time difference
         Thread.sleep(10)
-        
+
         // when
-        val updatedRows = paymentIntentMapper.tryMarkPendingAuth(401L, newUpdatedAt)
-        
+        val updatedRows = paymentIntentMapper.tryMarkPendingAuth(501L, newUpdatedAt)
+
         // then
         assertEquals(0, updatedRows, "Should not update any rows when status is CREATED_PENDING (not CREATED)")
-        
-        val reloaded = paymentIntentMapper.findById(401L)
+
+        val reloaded = paymentIntentMapper.findById(501L)
         assertNotNull(reloaded)
         assertEquals("CREATED_PENDING", reloaded!!.status, "Status should remain CREATED_PENDING")
         assertEquals(originalUpdatedAt, reloaded.updatedAt.normalizeToMicroseconds(), "updated_at should not change")
-        
+
         // Also test with AUTHORIZED status
         val authorizedEntity = entity.copy(status = "AUTHORIZED", updatedAt = Utc.nowInstant().normalizeToMicroseconds())
         paymentIntentMapper.update(authorizedEntity)
-        
-        val updatedRows2 = paymentIntentMapper.tryMarkPendingAuth(401L, newUpdatedAt)
+
+        val updatedRows2 = paymentIntentMapper.tryMarkPendingAuth(501L, newUpdatedAt)
         assertEquals(0, updatedRows2, "Should not update any rows when status is AUTHORIZED")
-        
-        val reloaded2 = paymentIntentMapper.findById(401L)
+
+        val reloaded2 = paymentIntentMapper.findById(501L)
         assertEquals("AUTHORIZED", reloaded2!!.status, "Status should remain AUTHORIZED")
     }
 
@@ -246,38 +357,63 @@ class PaymentIntentMapperIntegrationTest {
         // given
         val nonExistentId = 999L
         val newUpdatedAt = Utc.nowInstant().normalizeToMicroseconds()
-        
+
         // when
         val updatedRows = paymentIntentMapper.tryMarkPendingAuth(nonExistentId, newUpdatedAt)
-        
+
         // then
         assertEquals(0, updatedRows, "Should not update any rows for non-existent payment intent")
     }
 
     @Test
-    fun `updatePspReference updates psp_reference and updated_at`() {
+    fun `updatePspReference updates psp_reference from null to value`() {
         // given
-        val entity = sampleEntity(501L, "CREATED_PENDING")
+        val entity = sampleEntity(601L, "CREATED_PENDING", null)
         paymentIntentMapper.insert(entity)
-        
+
         val originalUpdatedAt = entity.updatedAt
         val newUpdatedAt = Utc.nowInstant().normalizeToMicroseconds()
         val pspReference = "pi_3ShY7NEAJKUKtoJw1h8nCnIC"
-        
-        // Ensure there's a time difference
+
         Thread.sleep(10)
-        
+
         // when
-        val updatedRows = paymentIntentMapper.updatePspReference(501L, pspReference, newUpdatedAt)
-        
+        val updatedRows = paymentIntentMapper.updatePspReference(601L, pspReference, newUpdatedAt)
+
         // then
         assertEquals(1, updatedRows, "Should update exactly one row")
-        
-        val reloaded = paymentIntentMapper.findById(501L)
+
+        val reloaded = paymentIntentMapper.findById(601L)
         assertNotNull(reloaded)
-        assertEquals(pspReference, reloaded!!.pspReference, "psp_reference should be updated")
+        assertEquals(pspReference, reloaded!!.pspReference, "psp_reference should be updated from null to value")
         assertEquals(newUpdatedAt, reloaded.updatedAt.normalizeToMicroseconds(), "updated_at should be updated")
         assertEquals("CREATED_PENDING", reloaded.status, "Status should remain unchanged")
+    }
+
+    @Test
+    fun `updatePspReference updates psp_reference from value to new value`() {
+        // given
+        val originalPspRef = "pi_old123"
+        val entity = sampleEntity(602L, "CREATED", originalPspRef)
+        paymentIntentMapper.insert(entity)
+
+        val originalUpdatedAt = entity.updatedAt
+        val newUpdatedAt = Utc.nowInstant().normalizeToMicroseconds()
+        val newPspReference = "pi_new456"
+
+        Thread.sleep(10)
+
+        // when
+        val updatedRows = paymentIntentMapper.updatePspReference(602L, newPspReference, newUpdatedAt)
+
+        // then
+        assertEquals(1, updatedRows, "Should update exactly one row")
+
+        val reloaded = paymentIntentMapper.findById(602L)
+        assertNotNull(reloaded)
+        assertEquals(newPspReference, reloaded!!.pspReference, "psp_reference should be updated to new value")
+        assertEquals(newUpdatedAt, reloaded.updatedAt.normalizeToMicroseconds(), "updated_at should be updated")
+        assertEquals("CREATED", reloaded.status, "Status should remain unchanged")
     }
 
     @Test
@@ -285,43 +421,124 @@ class PaymentIntentMapperIntegrationTest {
         // given
         val nonExistentId = 999L
         val newUpdatedAt = Utc.nowInstant().normalizeToMicroseconds()
-        val pspReference = "pi_3ShY7NEAJKUKtoJw1h8nCnIC"
-        
+        val pspReference = "pi_123"
+
         // when
         val updatedRows = paymentIntentMapper.updatePspReference(nonExistentId, pspReference, newUpdatedAt)
-        
+
         // then
         assertEquals(0, updatedRows, "Should not update any rows for non-existent payment intent")
     }
 
     @Test
-    fun `updatePspReference can update psp_reference multiple times`() {
+    fun `deleteById removes existing payment intent`() {
         // given
-        val entity = sampleEntity(601L, "CREATED")
+        val entity = sampleEntity(701L)
         paymentIntentMapper.insert(entity)
-        
-        val firstPspReference = "pi_3ShY7NEAJKUKtoJw1h8nCnIC"
-        val firstUpdatedAt = Utc.nowInstant().normalizeToMicroseconds()
-        Thread.sleep(10)
-        
-        // when - first update
-        val firstUpdateRows = paymentIntentMapper.updatePspReference(601L, firstPspReference, firstUpdatedAt)
-        assertEquals(1, firstUpdateRows)
-        
-        val afterFirstUpdate = paymentIntentMapper.findById(601L)
-        assertEquals(firstPspReference, afterFirstUpdate!!.pspReference)
-        
-        // when - second update with different psp_reference
-        Thread.sleep(10)
-        val secondPspReference = "pi_3ShY7NEAJKUKtoJw1h8nCnID"
-        val secondUpdatedAt = Utc.nowInstant().normalizeToMicroseconds()
-        val secondUpdateRows = paymentIntentMapper.updatePspReference(601L, secondPspReference, secondUpdatedAt)
-        assertEquals(1, secondUpdateRows)
-        
+
+        // verify it exists
+        val beforeDelete = paymentIntentMapper.findById(701L)
+        assertNotNull(beforeDelete)
+
+        // when
+        val deletedRows = paymentIntentMapper.deleteById(701L)
+
         // then
-        val afterSecondUpdate = paymentIntentMapper.findById(601L)
-        assertEquals(secondPspReference, afterSecondUpdate!!.pspReference, "psp_reference should be updated to new value")
-        assertEquals(secondUpdatedAt, afterSecondUpdate.updatedAt.normalizeToMicroseconds(), "updated_at should be updated")
+        assertEquals(1, deletedRows, "Should delete exactly one row")
+
+        val afterDelete = paymentIntentMapper.findById(701L)
+        assertNull(afterDelete, "Payment intent should be deleted")
+    }
+
+    @Test
+    fun `deleteById returns 0 for non-existent payment intent`() {
+        // when
+        val deletedRows = paymentIntentMapper.deleteById(999L)
+
+        // then
+        assertEquals(0, deletedRows, "Should return 0 for non-existent payment intent")
+    }
+
+    @Test
+    fun `deleteAll clears entire table`() {
+        // given
+        paymentIntentMapper.insert(sampleEntity(801L))
+        paymentIntentMapper.insert(sampleEntity(802L))
+        paymentIntentMapper.insert(sampleEntity(803L))
+
+        // verify they exist
+        assertNotNull(paymentIntentMapper.findById(801L))
+        assertNotNull(paymentIntentMapper.findById(802L))
+        assertNotNull(paymentIntentMapper.findById(803L))
+
+        // when
+        val deletedRows = paymentIntentMapper.deleteAll()
+
+        // then
+        assertEquals(3, deletedRows, "Should delete all 3 rows")
+
+        val maxId = paymentIntentMapper.getMaxPaymentIntentId()
+        assertEquals(0L, maxId, "Max ID should be 0 after deleteAll")
+
+        val allDeleted = paymentIntentMapper.findById(801L)
+        assertNull(allDeleted, "All payment intents should be deleted")
+    }
+
+    @Test
+    fun `complete lifecycle insert CREATED_PENDING with null pspReference update to CREATED with pspReference tryMarkPendingAuth then update`() {
+        // given - Insert with CREATED_PENDING and null pspReference
+        val entity = sampleEntity(901L, "CREATED_PENDING", null)
+        paymentIntentMapper.insert(entity)
+
+        var loaded = paymentIntentMapper.findById(901L)
+        assertNotNull(loaded)
+        assertNull(loaded!!.pspReference)
+        assertEquals("CREATED_PENDING", loaded.status)
+
+        // when - Update to CREATED with pspReference
+        val pspRef = "pi_lifecycle123"
+        val updatedAt1 = Utc.nowInstant().normalizeToMicroseconds()
+        Thread.sleep(10)
+
+        val createdEntity = entity.copy(
+            status = "CREATED",
+            pspReference = pspRef,
+            updatedAt = updatedAt1
+        )
+        paymentIntentMapper.update(createdEntity)
+
+        loaded = paymentIntentMapper.findById(901L)
+        assertNotNull(loaded)
+        assertEquals(pspRef, loaded!!.pspReference)
+        assertEquals("CREATED", loaded.status)
+
+        // when - Use tryMarkPendingAuth to transition to PENDING_AUTH
+        val updatedAt2 = Utc.nowInstant().normalizeToMicroseconds()
+        Thread.sleep(10)
+
+        val authRows = paymentIntentMapper.tryMarkPendingAuth(901L, updatedAt2)
+        assertEquals(1, authRows)
+
+        loaded = paymentIntentMapper.findById(901L)
+        assertNotNull(loaded)
+        assertEquals("PENDING_AUTH", loaded!!.status)
+        assertEquals(pspRef, loaded.pspReference, "pspReference should remain unchanged")
+        assertEquals(updatedAt2, loaded.updatedAt.normalizeToMicroseconds())
+
+        // when - Final update to AUTHORIZED
+        val updatedAt3 = Utc.nowInstant().normalizeToMicroseconds()
+        Thread.sleep(10)
+
+        val authorizedEntity = loaded.copy(
+            status = "AUTHORIZED",
+            updatedAt = updatedAt3
+        )
+        paymentIntentMapper.update(authorizedEntity)
+
+        loaded = paymentIntentMapper.findById(901L)
+        assertNotNull(loaded)
+        assertEquals("AUTHORIZED", loaded!!.status)
+        assertEquals(pspRef, loaded.pspReference, "pspReference should remain unchanged")
+        assertEquals(updatedAt3, loaded.updatedAt.normalizeToMicroseconds())
     }
 }
-

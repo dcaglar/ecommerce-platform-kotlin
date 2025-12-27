@@ -139,6 +139,7 @@ class IdempotencyKeyMapperIntegrationTest {
         paymentIntentMapper.insert(
             PaymentIntentEntity(
                 paymentIntentId = paymentIntentId,
+                null,
                 buyerId = "buyer-$paymentIntentId",
                 orderId = "order-$paymentIntentId",
                 totalAmountValue = 10_000,

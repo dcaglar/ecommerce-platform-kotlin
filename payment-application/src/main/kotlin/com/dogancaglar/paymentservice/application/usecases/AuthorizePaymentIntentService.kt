@@ -12,6 +12,7 @@ import com.dogancaglar.paymentservice.domain.exception.PaymentNotReadyException
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentIntent
 import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
+import com.dogancaglar.paymentservice.domain.model.PaymentMethod
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
@@ -73,7 +74,7 @@ class AuthorizePaymentIntentService(
     private fun processPspAuthorizationResponse( pendingPaymentIntent: PaymentIntent, pspStatus: PaymentIntentStatus): PaymentIntent{
         var finalizedPaymentIntent : PaymentIntent?=null
         if(pspStatus == PaymentIntentStatus.AUTHORIZED){
-            var finalizedPaymentIntent = pendingPaymentIntent.markAuthorized()
+            finalizedPaymentIntent = pendingPaymentIntent.markAuthorized()
             val paymentId = PaymentId(idGeneratorPort.nextPaymentId(finalizedPaymentIntent.buyerId,finalizedPaymentIntent.orderId))
             //2.create payment + paymentorders + outboxevents + updated[pamyentintent
             val payment = Payment.fromAuthorizedIntent(paymentId,finalizedPaymentIntent)

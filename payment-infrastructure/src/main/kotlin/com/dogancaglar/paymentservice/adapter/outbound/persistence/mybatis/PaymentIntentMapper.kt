@@ -18,4 +18,5 @@ interface PaymentIntentMapper {
     fun findById(id: Long): PaymentIntentEntity?
     fun update(paymentIntent: PaymentIntentEntity): Int
     fun deleteById(id: Long): Int
+    fun deleteAll(): Int
 }

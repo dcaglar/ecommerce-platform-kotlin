@@ -100,8 +100,11 @@ class PaymentController(
         @PathVariable("paymentId") publicPaymentId: String,
         @Valid @RequestBody request: AuthorizationRequestDTO
     ): ResponseEntity<CreatePaymentIntentResponseDTO> {
-
-        val dto = paymentService.authorizePayment(publicPaymentId,request)
+        logger.info("🔐 [Authorize] Received authorization request for paymentId: {}", publicPaymentId)
+        
+        val dto = paymentService.authorizePayment(publicPaymentId, request)
+        
+        logger.info("✅ [Authorize] Authorization completed for paymentId: {}, status: {}", publicPaymentId, dto.status)
 
         return ResponseEntity
             .status(HttpStatus.OK)

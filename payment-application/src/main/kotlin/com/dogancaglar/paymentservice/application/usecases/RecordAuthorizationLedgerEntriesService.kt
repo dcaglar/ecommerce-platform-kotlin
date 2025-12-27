@@ -11,9 +11,7 @@ import com.dogancaglar.paymentservice.ports.inbound.RecordAuthorizationLedgerEnt
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
 import org.slf4j.LoggerFactory
-import org.springframework.stereotype.Service
 
-@Service
 class RecordAuthorizationLedgerEntriesService(
     private val ledgerWritePort: LedgerEntryPort,
     private val accountDirectory: AccountDirectoryPort

@@ -131,13 +131,14 @@ class PaymentIntent private constructor(
 
     /**
      * Cancel the intent before authorization is completed.
-     * Allowed from CREATED or PENDING_AUTH.
+     * Allowed from CREATED_PENDING, CREATED or PENDING_AUTH.
      */
     fun markCancelled(now: LocalDateTime = Utc.nowLocalDateTime()): PaymentIntent {
         require(
-            status == PaymentIntentStatus.CREATED ||
+            status == PaymentIntentStatus.CREATED_PENDING ||
+                    status == PaymentIntentStatus.CREATED ||
                     status == PaymentIntentStatus.PENDING_AUTH
-        ) { "Can only cancel from CREATED or PENDING_AUTH (current=$status)" }
+        ) { "Can only cancel from CREATED_PENDING, CREATED or PENDING_AUTH (current=$status)" }
 
         return copy(status = PaymentIntentStatus.CANCELLED, updatedAt = now)
     }

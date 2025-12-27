@@ -1,192 +1,188 @@
 # 🚀 How to Start
 
-Follow these steps to provision auth, get a token, test the API, and run load tests locally.
+A step-by-step guide to get the ecommerce payment platform running locally on minikube.
 
-This is a short, practical “start order” for spinning up the stack on minikube, with one‑line notes on what each script does.
+## Prerequisites
 
-Prereqs (once):
 - Docker Desktop (or Docker Engine) running
-- minikube, kubectl, helm installed
-- Troubleshooting connectivity? See docs/troubleshooting/connectivity.md
+- minikube, kubectl, and helm installed
+- jq installed (for parsing JSON)
 
-## 0️⃣ Start the infrastructure and services
+For troubleshooting connectivity issues, see `docs/troubleshooting/connectivity.md`.
 
-Pre-step: switch to the project root directory and make scripts executable
+## Step 1: Prepare Scripts
+
+Make all deployment scripts executable:
+
 ```bash
 cd /path/to/ecommerce-platform-kotlin
 chmod +x infra/scripts/*.sh
 ```
 
-Recommended order
+## Step 2: Start Kubernetes Cluster
 
-1) Bootstrap a local Kubernetes cluster
-- What: Creates/uses a minikube profile sized from your Docker resources and enables metrics-server.
-- Run:
+Bootstrap a local minikube cluster:
+
 ```bash
 infra/scripts/bootstrap-minikube-cluster.sh
 ```
 
-2) Deploy core infrastructure
-- What: Config, Keycloak, Postgres, Redis, and Kafka in the payment namespace.
-- Run:
+This creates a minikube profile with auto-detected CPU/RAM resources and enables metrics-server.
+
+## Step 3: Deploy Core Infrastructure
+
+Deploy Keycloak, PostgreSQL, Redis, and Kafka:
+
 ```bash
 infra/scripts/deploy-all-local.sh
 ```
 
-3) Monitoring stack (Prometheus + Grafana)
-- What: Installs kube-prometheus-stack into monitoring.
-- Run:
+This deploys all core infrastructure components to the `payment` namespace.
+
+## Step 4: Deploy Monitoring Stack (Optional)
+
+Install Prometheus and Grafana for monitoring:
+
 ```bash
-infra/scripts/deploy-monitoring-stack.sh
+infra/scripts/deploy-monitoring-stack.sh\
 ```
 
-4) Kafka Exporter (Prometheus metrics for Kafka)
-- What: Exposes Kafka consumer lag, offsets, etc. for Prometheus.
-- Run:
+After deployment, access Grafana at `http://localhost:3000` (requires port-forwarding).
+
+
+## Deployment
+run the scripts below for payment-service 
+This scripts:
+- build docker image and commit to remote docker repo
+- Deploys the payment-service Helm chart
+- Sets up ingress routing
+- Writes API endpoints to `infra/endpoints.json`
 ```bash
-infra/scripts/deploy-kafka-exporter-local.sh
+build-and-push-payment-service-docker-repo.sh 
 ```
 
-5) Payment Service (Ingress, endpoints.json)
-- What: Deploys the payment-service chart and sets up ingress. Writes infra/endpoints.json.
-- Tip: For a LoadBalancer IP, run in a separate terminal:
 ```bash
-sudo -E minikube -p newprofile tunnel
-```
-- Then run:
-```bash
+# Optional: For LoadBalancer access, run minikube tunnel in a separate terminal:
+# sudo -E minikube -p newprofile tunnel
 infra/scripts/deploy-payment-service-local.sh
 ```
 
-6) Payment Consumers
-- What: Deploys the Kafka consumer workers for payment flows.
-- Run:
+
+This scripts:
+- build docker image and commit to` remote docker repo`
+- Deploys the payment-consumers Helm chart
+
+```bash
+build-and-push-payment-consumers-docker-repo.sh 
+```
+
+```bash
+infra/scripts/deploy-payment-consumers-local.sh 
+```
+
+
+
+## Step 6: Deploy Payment Consumers
+
+Deploy the Kafka consumer workers that process payment operations:
+
 ```bash
 infra/scripts/deploy-payment-consumers-local.sh
 ```
 
-7) Expose consumer lag as an external metric (for HPA)
-- What: Installs/promotes prometheus-adapter with a rule that surfaces worst consumer-lag per group.
-- Run:
-```bash
-infra/scripts/add-consumer-lag-metric.sh
-```
+## Step 7: Set Up Port Forwarding (Recommended)
 
-8) Local access via port-forwarding (optional, recommended before Keycloak provisioning)
-- What: Opens local ports to Keycloak, Postgres, Prometheus, Grafana, etc. Press Ctrl+C to stop.
-- Run:
+Enable local access to services:
+
 ```bash
 infra/scripts/port-forwarding.sh
 ```
 
-9) Provision Keycloak realm and clients
-- What: Creates realm, role, and OIDC confidential clients; writes secrets to keycloak/output/secrets.txt.
-- Tip: If you aren’t using port-forwarding, set KEYCLOAK_URL to your reachable Keycloak base.
-- Run:
+This forwards:
+- Keycloak: `http://localhost:8080`
+- PostgreSQL: `localhost:5432`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000`
+
+Keep this terminal running. Press Ctrl+C to stop.
+
+## Step 8: Provision Keycloak
+
+Create Keycloak realm, roles, and OIDC clients:
+
 ```bash
 KEYCLOAK_URL=http://127.0.0.1:8080 ./keycloak/provision-keycloak.sh
 ```
 
-10) Generate access tokens
-- What: Get JWT tokens for different use cases; saves tokens under `keycloak/output/jwt`.
-- Tip: KC_URL defaults to http://keycloak:8080; override if needed (e.g., when port-forwarding).
-- Default validity is ~1 hour. Append a TTL (hours) as the final argument to keep a test token alive longer (e.g., `... 6` for 6 h).
-- Reuse the saved token across requests until it expires; no need to regenerate for every call.
+This creates:
+- Realm: `ecommerce-platform`
+- Service account clients (payment-service, order-service, finance-service)
+- User accounts for testing (seller-111, seller-222, seller-333, finance-ops)
+- Merchant API clients
+- Writes client secrets to `keycloak/output/secrets.txt`
 
-**For Payment Creation (Service Account with payment:write):**
+> **Note**: If not using port-forwarding, set `KEYCLOAK_URL` to your reachable Keycloak endpoint.
+
+## Step 9: Generate Access Tokens
+
+Get JWT tokens for API authentication. Tokens are saved to `keycloak/output/jwt/`.
+
+### For Payment API (Service Account)
+
 ```bash
 KC_URL=http://127.0.0.1:8080 ./keycloak/get-token.sh
-# Token saved to: keycloak/output/jwt/payment-service.token
-# Claims saved to: keycloak/output/jwt/payment-service.claims.json
 
-# Request a 6-hour token via CLI override:
+# Optional: Request a longer-lived token (6 hours)
 ./keycloak/get-token.sh http://127.0.0.1:8080 6
 ```
-> Optional CLI override (with TTL): `./keycloak/get-token.sh http://my-keycloak:8080 6`
 
-**For Balance Queries - Finance/Admin (Backoffice user with FINANCE role):**
+Token saved to: `keycloak/output/jwt/payment-service.token`
+
+### For Finance/Admin Access
+
 ```bash
 KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-finance.sh
-# Token saved to: keycloak/output/jwt/finance-<username>.token
-# Claims saved to: keycloak/output/jwt/finance-<username>.claims.json
 
-# Request a 4-hour token for finance-ops:
+# Optional: Specify user and TTL
 ./keycloak/get-token-finance.sh finance-ops finance123 http://127.0.0.1:8080 4
 ```
-> Example: running without arguments issues a token for the `finance-ops / finance123` user.
-> Optional CLI override (with TTL): `./keycloak/get-token-finance.sh finance-ops finance123 http://my-keycloak:8080 6`
 
-**For Balance Queries - Seller User (User Account with SELLER role, Case 1):**
+Token saved to: `keycloak/output/jwt/finance-<username>.token`
+
+### For Seller User Access
+
 ```bash
 # Default: seller-111 (SELLER-111)
 KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-seller.sh
 
-# Or specify a different seller
+# Specify different seller
 KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-seller.sh seller-222 seller123
-# Token saved to: keycloak/output/jwt/seller-<username>.token
-# Claims saved to: keycloak/output/jwt/seller-<username>.claims.json
-
-# Request an 8-hour token for seller-222:
-./keycloak/get-token-seller.sh seller-222 seller123 http://127.0.0.1:8080 8
 ```
-> Example: running without arguments produces `keycloak/output/jwt/seller-seller-111.token`.
-> Optional CLI override: third argument can pass Keycloak URL; append a fourth argument for TTL (hours).
 
-**For Balance Queries - Merchant API (M2M with SELLER_API role, Case 3):**
+Token saved to: `keycloak/output/jwt/seller-<username>.token`
+
+### For Merchant API (M2M)
+
 ```bash
 # Default: SELLER-111
 KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-merchant-api.sh
 
-# Or specify a different merchant
+# Specify different merchant
 KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-merchant-api.sh SELLER-222
-# Token saved to: keycloak/output/jwt/merchant-api-<SELLER_ID>.token
-# Claims saved to: keycloak/output/jwt/merchant-api-<SELLER_ID>.claims.json
-
-# Request a 12-hour token for SELLER-222:
-./keycloak/get-token-merchant-api.sh SELLER-222 http://127.0.0.1:8080 12
-```
-> Example: `SELLER_ID=SELLER-111` writes to `keycloak/output/jwt/merchant-api-SELLER-111.token`.
-> Optional CLI override: second argument can pass Keycloak URL; append a third argument for TTL (hours).
-
-Each script issues a token from a different principal:
-- **payment-service** → service account with `payment:write`
-- **finance-* user** → backoffice user with `FINANCE`
-- **seller-* user** → interactive user with `SELLER`
-- **merchant-api-* client** → machine-to-machine client with `SELLER_API`
-
-Tokens are intentionally scoped to those roles so you can exercise each endpoint with the appropriate identity.
-
-11) Elasticsearch/Logstash/Kibana stack (OPTIONAL)
-- What: Installs ELK stack for log aggregation and searching.
-- Run:
-```bash
-infra/scripts/deploy-observability-stack.sh
 ```
 
-4) Send test payment request
+Token saved to: `keycloak/output/jwt/merchant-api-<SELLER_ID>.token`
 
-The payment flow uses Stripe Payment Element for secure payment collection:
-1. **Create Payment Intent** - Creates a payment intent with order details, returns client secret
-2. **Collect Payment Details** - Stripe Payment Element collects card details (browser → Stripe, never touches your servers)
-3. **Authorize Payment Intent** - Authorizes the payment intent (no payment details sent, backend uses stored PaymentIntent ID)
+## Step 10: Test Payment API
 
-You can test payment creation in two ways:
+### Option A: Using curl
 
-### Option A: Using curl (Command Line)
+**1. Create a Payment Intent**
 
-Use the saved token to call the API. Prefer the dynamic example to avoid hardcoded IPs.
-
-**Step 1: Create Payment Intent**
-
-- Dynamic (reads host and base URL from infra/endpoints.json):
 ```bash
 BASE_URL=$(jq -r .base_url infra/endpoints.json)
 HOST=$(jq -r .host_header infra/endpoints.json)
 IDEMPOTENCY_KEY="idem-$(date +%s)-$RANDOM"
-
-echo "Using BASE_URL=$BASE_URL"
-echo "Using Host header=$HOST"
-echo "Using Idempotency-Key=$IDEMPOTENCY_KEY"
 
 curl -i -X POST "$BASE_URL/api/v1/payments" \
   -H "Host: $HOST" \
@@ -194,8 +190,8 @@ curl -i -X POST "$BASE_URL/api/v1/payments" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
   -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
   -d '{
-    "orderId": "ORDER-1450",
-    "buyerId": "BUYER-1450",
+    "orderId": "ORDER-001",
+    "buyerId": "BUYER-001",
     "totalAmount": { "quantity": 2900, "currency": "EUR" },
     "paymentOrders": [
       { "sellerId": "SELLER-111", "amount": { "quantity": 1450, "currency": "EUR" }},
@@ -204,252 +200,84 @@ curl -i -X POST "$BASE_URL/api/v1/payments" \
   }'
 ```
 
-**Expected Response (200 OK):**
+**Expected Response (201 Created):**
 ```json
 {
-  "paymentIntentId": "pi_AcqzYyHCcAA",
-  "clientSecret": "pi_AcqzYyHCcAA_secret_xyz123",
-  "status": "CREATED"
+  "paymentIntentId": "pi_xxxxx",
+  "clientSecret": "pi_xxxxx_secret_xxxxx",
+  "status": "CREATED",
+  "orderId": "ORDER-001",
+  "buyerId": "BUYER-001",
+  "totalAmount": { "quantity": 2900, "currency": "EUR" },
+  "createdAt": "2024-01-01T12:00:00Z"
 }
 ```
 
-**Pending Response (202 Accepted):**
-If Stripe API call is still processing, you'll receive:
-```json
-{
-  "paymentIntentId": "pi_AcqzYyHCcAA",
-  "status": "CREATED_PENDING"
-}
-```
-
-In this case, poll the status endpoint until `clientSecret` is available:
-```bash
-curl -i -X GET "$BASE_URL/api/v1/payments/pi_AcqzYyHCcAA/status" \
-  -H "Host: $HOST" \
-  -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)"
-```
-
-> **Note on Idempotency-Key**: The header is required for all payment intent creation requests. Use the same key for retries of the same payment request to ensure idempotent behavior. Generate a unique UUID for each new payment request.
-
-**Step 2: Authorize Payment Intent**
-
-> **Note**: In production, payment details are collected by Stripe Payment Element (browser → Stripe). The authorize endpoint doesn't require payment method details - it uses the stored PaymentIntent ID. For testing with curl, you can send an empty body or omit paymentMethod:
+**2. Authorize Payment Intent**
 
 ```bash
-# Step 2: Authorize the payment intent
-curl -i -X POST "$BASE_URL/api/v1/payments/pi_AcdDJCmCcAA/authorize" \
+PAYMENT_ID="pi_xxxxx"  # Use the paymentIntentId from step 1
+
+curl -i -X POST "$BASE_URL/api/v1/payments/$PAYMENT_ID/authorize" \
   -H "Host: $HOST" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
   -d '{}'
 ```
 
-> **Production Flow**: In the actual checkout flow, Stripe Payment Element collects payment details client-side and attaches the payment method to the PaymentIntent. The backend then confirms the payment using the stored PaymentIntent ID without receiving any card data.
+> **Note**: The `Idempotency-Key` header is required for payment creation. Use the same key for retries to ensure idempotent behavior.
 
-### Option B: Using Checkout Demo Page (Interactive UI)
+### Option B: Using Checkout Demo UI
 
-A developer-friendly web interface for testing the complete end-to-end payment flow with Stripe Payment Element.
+See `checkout-demo/README.md` for the interactive web interface that handles the complete payment flow with Stripe Payment Element.
 
-**Prerequisites:**
-- Node.js 18+ installed
-- Steps 1-9 completed (infrastructure, Keycloak provisioning)
-- Stripe account (for Stripe publishable key)
+## Step 11: Query Seller Balances
 
-**Setup:**
+The platform supports three authentication scenarios for balance queries:
 
-1. Install dependencies:
-```bash
-cd checkout-demo
-npm install
-```
+### Case 1: Seller Views Own Balance
 
-2. Generate environment configuration:
-```bash
-# Make sure you've run step 9 (provision-keycloak.sh) first
-npm run setup-env
-```
+**Endpoint:** `GET /api/v1/sellers/me/balance`  
+**Role:** `SELLER`
 
-This automatically:
-- Reads client secret from `keycloak/output/secrets.txt`
-- Reads API endpoints from `infra/endpoints.json`
-- Creates `.env` file with all configuration
-
-3. Configure Stripe publishable key:
-```bash
-# Add your Stripe publishable key to .env file
-echo "VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your_key_here" >> checkout-demo/.env
-```
-
-4. Start the demo:
-```bash
-npm run dev
-```
-
-This starts both:
-- Frontend server at `http://localhost:3000` (Vite)
-- Backend proxy server at `http://localhost:3001` (simulates order-service/checkout-service)
-
-The app will automatically open at `http://localhost:3000`
-
-**Usage:**
-
-The payment flow follows the complete end-to-end Stripe Payment Element flow:
-
-1. **Fill Order Details:**
-   - Order ID (e.g., `ORDER-TEST-001`)
-   - Buyer ID (e.g., `BUYER-123`)
-   - Total amount (in smallest currency unit, e.g., cents)
-   - Select currency
-   - Add one or more payment orders with seller IDs and amounts
-   - Click "Proceed to Checkout"
-
-2. **Payment Creation:**
-   - Frontend calls your backend to create payment
-   - Backend creates payment record and calls Stripe to create PaymentIntent
-   - Backend returns `paymentIntentId` and `clientSecret`
-   - If Stripe call is pending (202), frontend polls for client secret
-
-3. **Payment Details Collection (Stripe Payment Element):**
-   - Stripe Payment Element is initialized with `clientSecret`
-   - Shopper enters card details in Payment Element
-   - **Card data goes directly to Stripe** (never touches your servers)
-   - Click "Pay Now" to submit payment details to Stripe
-
-4. **Payment Authorization:**
-   - Frontend calls authorize endpoint with payment ID only
-   - **No payment details are sent** - backend uses stored PaymentIntent ID
-   - Backend confirms payment with Stripe
-   - Frontend displays success/error result
-
-The backend proxy automatically handles token acquisition and payment-service calls - no manual token management needed!
-
-**Architecture:**
-
-The checkout demo uses a production-like flow with Stripe Payment Element:
-- **Frontend** (React) → calls **Backend Proxy** (Node.js/Express) to create payment
-- **Backend Proxy** → gets token from Keycloak (server-to-server)
-- **Backend Proxy** → calls payment-service with token (server-to-server)
-- **Frontend** ← receives `paymentIntentId` and `clientSecret`
-- **Frontend** → initializes Stripe Payment Element with `clientSecret`
-- **Shopper** → enters card details in Payment Element
-- **Payment Element** → sends card data directly to Stripe (browser → Stripe, never touches your servers)
-- **Frontend** → calls **Backend Proxy** to authorize payment (no payment details sent)
-- **Backend Proxy** → calls payment-service authorize endpoint
-- **Backend** → confirms payment with Stripe using stored PaymentIntent ID
-- **Frontend** ← receives authorization result
-
-**Data Flow:**
-- **Card data**: Browser → Stripe (never touches your servers)
-- **Order data**: Browser → Your Backend → Database
-- **Payment control**: Browser → Your Backend → Stripe → Your Backend → Browser
-
-> 💡 **Note**: The backend proxy simulates a production backend (order-service/checkout-service) and needs CORS enabled because the browser calls it directly (browser → proxy is cross-origin).
-
-**Troubleshooting:**
-
-- **"Client secret not found"**: Run `npm run setup-env` after provisioning Keycloak
-- **"Cannot reach Keycloak"**: Ensure Keycloak port-forwarding is active: `kubectl port-forward -n payment svc/keycloak 8080:8080`
-- **"Stripe publishable key not configured"**: Add `VITE_STRIPE_PUBLISHABLE_KEY` to `.env` file
-- **Payment request errors**: Check proxy console for detailed error messages (it logs token and payment-service call errors)
-- **Network errors**: Verify payment service is running and `infra/endpoints.json` is correct
-- **Payment Element not loading**: Check browser console for Stripe.js errors and verify publishable key is correct
-- **Payment pending (202 status)**: This is normal - the frontend will automatically poll for client secret when payment creation is pending
-
-For more details, see `checkout-demo/README.md`.
-
-## 5️⃣ Query Balance Endpoints
-
-Balance endpoints support three authentication scenarios (matching real-world marketplace patterns):
-
-### Case 1: Seller User via Customer Area Frontend
-- **Endpoint**: `GET /api/v1/sellers/me/balance`
-- **Authorization**: Requires `SELLER` role and `seller_id` claim in JWT
-- **Token Type**: User token (OIDC Authorization Code flow or Direct Access Grants for testing)
-- **Use Case**: Merchant logs into customer-area web app and views their balance
-- **Client**: `customer-area-frontend`
-
-**Steps:**
-1. Get a token for a seller user:
-```bash
-# Default: seller-111 (SELLER-111)
-KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-seller.sh
-
-# Or specify a different seller
-KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-seller.sh seller-222 seller123
-# Token saved to: keycloak/output/jwt/seller-<username>.token
-```
-
-2. Query your own balance (dynamic):
 ```bash
 BASE_URL=$(jq -r .base_url infra/endpoints.json)
 HOST=$(jq -r .host_header infra/endpoints.json)
-
-echo "Using BASE_URL=$BASE_URL"
-echo "Using Host header=$HOST"
 
 curl -i -X GET "$BASE_URL/api/v1/sellers/me/balance" \
   -H "Host: $HOST" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $(cat ./keycloak/output/jwt/seller-SELLER-111.token)" 
+  -H "Authorization: Bearer $(cat ./keycloak/output/jwt/seller-seller-111.token)"
 ```
 
-### Case 2: Finance/Admin User via Backoffice
-- **Endpoint**: `GET /api/v1/sellers/{sellerId}/balance`
-- **Authorization**: Requires `FINANCE` or `ADMIN` role
-- **Token Type**: User token (OIDC Authorization Code flow / Direct Access Grants for testing)
-- **Use Case**: Internal finance or support staff log into backoffice app and check any seller's balance
-- **Client**: `backoffice-ui`
+### Case 2: Finance/Admin Views Any Seller Balance
 
-**Steps:**
-1. Get a token with FINANCE role (backoffice user for testing):
-```bash
-KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-finance.sh
-# Token saved to: keycloak/output/jwt/finance-<username>.token
-```
+**Endpoint:** `GET /api/v1/sellers/{sellerId}/balance`  
+**Role:** `FINANCE` or `ADMIN`
 
-2. Query balance for any seller (dynamic):
 ```bash
 BASE_URL=$(jq -r .base_url infra/endpoints.json)
 HOST=$(jq -r .host_header infra/endpoints.json)
 
-echo "Using BASE_URL=$BASE_URL"
-echo "Using Host header=$HOST"
 curl -i -X GET "$BASE_URL/api/v1/sellers/SELLER-111/balance" \
   -H "Host: $HOST" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/finance-finance-ops.token)"
 ```
 
+### Case 3: Merchant API (M2M) Views Own Balance
 
-### Case 3: Merchant API (Machine-to-Machine)
-- **Endpoint**: `GET /api/v1/sellers/me/balance`
-- **Authorization**: Requires `SELLER_API` role and `seller_id` claim in JWT
-- **Token Type**: Machine token (Client Credentials flow)
-- **Use Case**: Merchant's system (ERP, OMS) calls Seller API directly to retrieve balances
-- **Client**: `merchant-api-{SELLER_ID}` (one per merchant)
+**Endpoint:** `GET /api/v1/sellers/me/balance`  
+**Role:** `SELLER_API`
 
-**Steps:**
-1. Get a token for merchant API (M2M):
-```bash
-# Default: SELLER-111
-KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-merchant-api.sh
-
-# Or specify a different merchant
-KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-merchant-api.sh SELLER-222
-# Token saved to: keycloak/output/jwt/merchant-api-<SELLER_ID>.token
-```
-
-2. Query balance via merchant API (dynamic):
 ```bash
 BASE_URL=$(jq -r .base_url infra/endpoints.json)
 HOST=$(jq -r .host_header infra/endpoints.json)
 
 curl -i -X GET "$BASE_URL/api/v1/sellers/me/balance" \
   -H "Host: $HOST" \
-  -H "Authorization: Bearer $(cat ./keycloak/output/jwt/merchant-api-SELLER-111.token)"  
+  -H "Authorization: Bearer $(cat ./keycloak/output/jwt/merchant-api-SELLER-111.token)"
 ```
 
-
-**Expected Response (all cases):**
+**Expected Response:**
 ```json
 {
   "balance": 50000,
@@ -459,156 +287,95 @@ curl -i -X GET "$BASE_URL/api/v1/sellers/me/balance" \
 }
 ```
 
-**Test Credentials Created by Provisioning:**
-- **User Accounts (Case 1):**
-  - `seller-111` / `seller123` → seller_id: `SELLER-111`
-  - `seller-222` / `seller123` → seller_id: `SELLER-222`
-  - `seller-333` / `seller123` → seller_id: `SELLER-333`
-- **Merchant API Clients (Case 3):**
-  - `merchant-api-SELLER-111` → Client Credentials, SELLER_API role
-  - `merchant-api-SELLER-222` → Client Credentials, SELLER_API role
-  - `merchant-api-SELLER-333` → Client Credentials, SELLER_API role
+## Step 12: Run Tests
 
-**Authentication Flow Summary:**
-
-| Case | Endpoint | Role | Client | Grant Type | Token Type |
-|------|----------|------|--------|------------|------------|
-| 1 | `/api/v1/sellers/me/balance` | `SELLER` | `customer-area-frontend` | OIDC Auth Code / Password | User token |
-| 2 | `/api/v1/sellers/{sellerId}/balance` | `FINANCE`/`ADMIN` | `backoffice-ui` | OIDC Auth Code / Direct Access (testing) | User token |
-| 3 | `/api/v1/sellers/me/balance` | `SELLER_API` | `merchant-api-{SELLER_ID}` | Client Credentials | Machine token |
-
-**HTTP Status Codes:**
-- `200 OK` - Success
-- `400 Bad Request` - Invalid request (e.g., missing seller_id claim)
-- `401 Unauthorized` - Missing or invalid JWT token
-- `403 Forbidden` - Valid token but insufficient permissions
-- `404 Not Found` - Seller account not found
-
-## 2️⃣ Run Unit & Integration Tests
-
-- Why: Verify the codebase using MockK and Testcontainers.
-- What: Tests cover domain logic, application services, and infrastructure adapters.
+### Unit Tests
 
 ```bash
-# Run only unit tests (fast, excludes integration tests by filename pattern)
 mvn clean test
-
-# Run only integration tests (slower, uses TestContainers, runs via Failsafe)
-mvn -B clean verify -DskipUnitTests=true
-
-# Run both unit and integration tests (requires both commands)
-mvn  clean verify
-
-# Run tests for specific modules (unit tests only)
-mvn clean test -pl payment-application,payment-infrastructure,payment-domain,common
-
-# Run integration tests for specific modules
-mvn clean verify -DskipUnitTests=true -pl payment-infrastructure
-
-# Run specific test classes (unit tests)
-mvn test -Dtest=CreatePaymentServiceTest,ProcessPaymentServiceTest
-
-# Run specific integration test classes
-mvn verify -DskipUnitTests=true -Dtest=AccountBalanceMapperIntegrationTest 
 ```
 
-**Test Organization:**
-- **Unit Tests** (`*Test.kt`): Use mocks only, no external dependencies
-  - **Execution**: Run with `mvn test` (Maven Surefire plugin, `test` phase)
-  - **Design**: Fast tests run on every build for quick feedback
-  - **Configuration**: Surefire excludes `*IntegrationTest.kt` files by filename pattern
-- **Integration Tests** (`*IntegrationTest.kt`): Use real external dependencies via TestContainers, all tagged with `@Tag("integration")`
-  - **Execution**: Run with `mvn verify` (Maven Failsafe plugin, `integration-test` + `verify` phases)
-  - **Design**: Slower tests run before release/deployment for comprehensive validation
-  - **Configuration**: Failsafe includes `*IntegrationTest.kt` files by filename pattern
-  - **Lifecycle Separation**: Surefire and Failsafe complement each other - unit tests provide fast feedback, integration tests provide comprehensive validation before releases
-- **No Hanging Tests**: All MockK syntax issues resolved for reliable test execution
-- **Type Inference Fixed**: Resolved MockK type inference issues in `OutboxDispatcherJobTest.kt` with explicit type hints and Jackson JSR310 module configuration
+### Integration Tests
 
-## 3️⃣ Run Load Tests
-
-- Why: Exercise the system under constant RPS profiles (run from project root).
 ```bash
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=10 PRE_VUS=40 MAX_VUS=160 DURATION=20m k6 run load-tests/baseline-smoke-test.js
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=10 PRE_VUS=40 MAX_VUS=160  DURATION=20m k6 run load-tests/baseline-smoke-test.js
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=40 PRE_VUS=40 MAX_VUS=160 DURATION=20m  k6 run load-tests/baseline-smoke-test.js
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=60 PRE_VUS=40 MAX_VUS=160 DURATION=20m  k6 run load-tests/baseline-smoke-test.js
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=80 PRE_VUS=40 MAX_VUS=160 DURATION=100m DURATION=20m k6 run load-tests/baseline-smoke-test.js
+mvn clean verify -DskipUnitTests=true
 ```
 
-## Local Kubernetes Deployment Scripts
+### Run Both
 
-What each script does (quick reference)
-- bootstrap-minikube-cluster.sh
-    - Starts minikube with a docker driver, CPU/RAM auto-detected, enables metrics-server, sets kubectl context.
-- deploy-all-local.sh
-    - Applies platform config, then deploys Keycloak, Postgres (payment-db), Redis, and Kafka to the payment namespace.
-- deploy-monitoring-stack.sh
-    - Installs kube-prometheus-stack with values under infra/helm-values; waits for core components to be ready.
-- deploy-kafka-exporter-local.sh
-    - Installs prometheus-kafka-exporter (Helm) into payment; provides kafka_consumergroup_* metrics to Prometheus.
-- deploy-payment-service-local.sh
-    - Installs ingress-nginx (disables minikube addon to avoid duplicates), deploys payment-service, computes endpoint base URL, and writes infra/endpoints.json. Supports LoadBalancer via minikube tunnel or falls back to NodePort.
-- deploy-payment-consumers-local.sh
-    - Deploys the payment-consumers Helm chart.
-- add-consumer-lag-metric.sh
-    - Installs prometheus-adapter and configures an external metric (kafka_consumer_group_lag_worst2) derived from Prometheus data, so HPAs can scale on consumer lag.
-- port-forwarding.sh
-    - Resilient port-forward loops to: Keycloak (8080), Postgres (5432), Prometheus (9090), Grafana (3000), and payment-service mgmt (9000). Optionally ingress if PF_INGRESS=true.
-- keycloak/provision-keycloak.sh
-    - Provisions Keycloak (realm, role, clients), writes client secrets to keycloak/output/secrets.txt.
-- keycloak/get-token.sh
-    - Fetches a client-credentials access token for payment-service and saves it to `keycloak/output/jwt/payment-service.token`. Pass an optional TTL (hours) as the final argument.
-- keycloak/get-token-seller.sh
-    - Fetches a user token with SELLER role via Direct Access Grants (password grant) and saves it to `keycloak/output/jwt/seller-<username>.token`. CLI order: username, password, Keycloak URL, TTL (hours).
-- keycloak/get-token-finance.sh
-    - Fetches a user token with FINANCE role (backoffice) and saves it to `keycloak/output/jwt/finance-<username>.token`. CLI order: username, password, Keycloak URL, TTL.
-- keycloak/get-token-merchant-api.sh
-    - Fetches a client-credentials access token for merchant API clients with SELLER_API role and saves it to `keycloak/output/jwt/merchant-api-<SELLER_ID>.token`. CLI order: SELLER_ID, Keycloak URL, TTL.
+```bash
+mvn clean verify
+```
 
-Name hints vs. your list
-- deploy-monitoring-stack  → deploy-monitoring-stack.sh
-- deploy-kafka-exporter    → deploy-kafka-exporter-local.sh
-- deploy-payment-sercice   → deploy-payment-service-local.sh
-- deploy-payment-consumers → deploy-payment-consumers-local.sh
-- add-consumer-lag         → add-consumer-lag-metric.sh
+## Step 13: Run Load Tests (Optional)
 
-Troubleshooting quick tips
-- If payment-service Ingress says pending, run:
+Exercise the system under load:
+
+```bash
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=10 PRE_VUS=40 MAX_VUS=160 DURATION=20m \
+  k6 run load-tests/baseline-smoke-test.js
+```
+
+## Deployment Scripts Reference
+
+| Script | Purpose |
+|--------|---------|
+| `bootstrap-minikube-cluster.sh` | Creates minikube cluster with metrics-server |
+| `deploy-all-local.sh` | Deploys Keycloak, Postgres, Redis, Kafka |
+| `deploy-monitoring-stack.sh` | Installs Prometheus + Grafana |
+| `deploy-kafka-exporter-local.sh` | Exposes Kafka metrics for Prometheus |
+| `deploy-payment-service-local.sh` | Deploys payment-service with ingress |
+| `deploy-payment-consumers-local.sh` | Deploys Kafka consumer workers |
+| `add-consumer-lag-metric.sh` | Configures HPA metric for consumer lag |
+| `port-forwarding.sh` | Forwards local ports to services |
+
+## Test Credentials
+
+Created by Keycloak provisioning:
+
+**User Accounts:**
+- `seller-111` / `seller123` → SELLER-111
+- `seller-222` / `seller123` → SELLER-222
+- `seller-333` / `seller123` → SELLER-333
+- `finance-ops` / `finance123` → FINANCE role
+
+**Merchant API Clients:**
+- `merchant-api-SELLER-111` → SELLER_API role
+- `merchant-api-SELLER-222` → SELLER_API role
+- `merchant-api-SELLER-333` → SELLER_API role
+
+## Troubleshooting
+
+**Payment Service Ingress Pending:**
 ```bash
 sudo -E minikube -p newprofile tunnel
 ```
-- If Grafana/Prometheus aren’t reachable, run port-forwarding and open the UIs:
-```bash
-./infra/scripts/port-forwarding.sh
-```
-- Keycloak scripts use http://keycloak:8080 by default. If running from your host, either port-forward or override URLs:
+
+**Services Not Reachable:**
+- Run `infra/scripts/port-forwarding.sh` to forward ports
+- Verify services are running: `kubectl get pods -n payment`
+
+**Keycloak Connection Issues:**
 ```bash
 export KEYCLOAK_URL=http://127.0.0.1:8080
 export KC_URL=http://127.0.0.1:8080
 ```
-- To verify the external metric appears:
+
+**Verify External Metrics:**
 ```bash
 kubectl get --raw "/apis/external.metrics.k8s.io/v1beta1/namespaces/payment/kafka_consumer_group_lag_worst2" | jq .
 ```
-- More: docs/troubleshooting/connectivity.md
 
+## Summary
 
----
+You should now have:
+- ✅ Kubernetes cluster running
+- ✅ Core infrastructure deployed (Keycloak, Postgres, Redis, Kafka)
+- ✅ Payment service and consumers running
+- ✅ Keycloak provisioned with test users and clients
+- ✅ Access tokens generated for testing
 
-## ✅ Summary
-
-You now have:
-
-- 🟢 A fully running stack: Keycloak, Postgres, Kafka, Redis, payment-service, and payment-consumers.
-- 📊 Monitoring (Prometheus + Grafana): [http://localhost:3000](http://localhost:3000)
-- 🔍 Observability (ELK): [http://localhost:5601](http://localhost:5601)
-- 🔐 Auth via Keycloak: [http://localhost:8080](http://localhost:8080)
-
-If everything’s green in Grafana and Kibana, your platform is ready for testing.
-
-For deep architecture or flow diagrams, see:
-- [`docs/architecture.md`](architecture-internal-reader.md)
-- [`README.md`](../README.md)
-
----
+For more details:
+- Architecture: `docs/architecture/architecture.md`
+- Checkout Demo: `checkout-demo/README.md`
+- Troubleshooting: `docs/troubleshooting/connectivity.md`

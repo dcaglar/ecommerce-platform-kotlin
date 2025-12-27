@@ -187,7 +187,10 @@ db:
       idle-in-tx-timeout-ms: 0
 
 stripe: # on live  inject this as a seret to the environment ,or store in a vault
-  apiKey: dummy
+  api:
+    api-key: sk_test_51ShA8HEAJKUKtoJwTALvrfMadP0eoKwyggnasHkqgY6y6jLoSjg9YqewkxiYrRw54TnZ7tVFX5Xreg3qaHm5wWAX00tupdpr6y
+    connect-timeout: 5000  # 10 seconds in milliseconds (was 5ms - too short!)
+    read-timeout: 30000     # 30 seconds in milliseconds (was 20ms - too short!)
 
 psp:
   authorization:

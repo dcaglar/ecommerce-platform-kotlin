@@ -527,8 +527,8 @@ The `OutboxDispatcherJob` is a scheduled service that runs in the `payment-servi
 **Key Responsibilities:**
 - **Claims batches of outbox events** from the database (status: `NEW`)
 - **Publishes events to Kafka** based on event type:
-    - `payment_authorized` → Publishes `PaymentAuthorized` event to Kafka
-    - `payment_order_created` → Publishes `PaymentOrderCreated` event to Kafka
+    - `Outbox<payment_order_created>` → Publishes `PaymentOrderCreated` event to Kafka
+    - `Outbox<payment_authorized>` → Publishes `PaymentOrderCreated` event to Kafka
 - **Updates event status** to `SENT` after successful publication
 - **Handles failures** by unclaiming failed events for retry
 - **Reclaims stuck events** that were claimed but never completed (runs every 2 minutes)

@@ -27,9 +27,7 @@ class PaymentIntentOutboundAdapter(
 
     }
 
-    override fun updatePspReference(paymentIntentId: Long, pspReference: String, now: java.time.Instant){
-        paymentIntentMapper.updatePspReference(paymentIntentId, pspReference, now)
-    }
+
 
     override fun save(paymentIntent: PaymentIntent): PaymentIntent {
         paymentIntentMapper.insert(entityMapper.toEntity(paymentIntent))
