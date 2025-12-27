@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { PaymentForm } from './components/PaymentElement';
@@ -34,6 +34,9 @@ function App() {
   const [clientSecret, setClientSecret] = useState(null);
   const [paymentIntentId, setPaymentIntentId] = useState(null);
   const [error, setError] = useState(null);
+  const [retryCountdown, setRetryCountdown] = useState(null);
+  const retryTimeoutRef = useRef(null);
+  const retryIntervalRef = useRef(null);
 
   // Payment order management
   const addPaymentOrder = () => {
@@ -53,62 +56,219 @@ function App() {
     ));
   };
 
-  const calculateTotal = () => {
-    return paymentOrders.reduce((sum, po) => sum + (parseInt(po.amount) || 0), 0);
+  const totalCalculated = paymentOrders.reduce((sum, po) => sum + (parseInt(po.amount) || 0), 0);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+      if (retryIntervalRef.current) {
+        clearInterval(retryIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // ============================================
+  // Payment Flow Handlers
+  // ============================================
+
+  /**
+   * Handles 201 CREATED / 200 OK responses
+   * Uses response body content to determine action (same HTTP status can have different meanings)
+   */
+  const handlePaymentCreated = async (payment) => {
+    // Case 1: Payment created successfully with clientSecret
+    if (payment.clientSecret && payment.paymentIntentId) {
+      setClientSecret(payment.clientSecret);
+      setPaymentIntentId(payment.paymentIntentId);
+      setStep(STEPS.PAYMENT);
+      return;
+    }
+
+    // Case 2: Payment declined
+    if (payment.status === 'DECLINED') {
+      setError('Payment was declined by the payment provider. Please try a different payment method.');
+      setStep(STEPS.ERROR);
+      return;
+    }
+
+    // Case 3: Payment pending (can happen with 200 REPLAYED when original was 202)
+    if (payment.status === 'CREATED_PENDING' && payment.paymentIntentId) {
+      await handlePaymentAccepted(payment);
+      return;
+    }
+
+    // Case 4: Unexpected state
+    setError('Payment created but client secret is not available. Please try again.');
+    setStep(STEPS.ERROR);
   };
 
-  // Payment creation
+  /**
+   * Handles 202 ACCEPTED - payment is processing asynchronously
+   * Polls the status endpoint until clientSecret is available
+   */
+  const handlePaymentAccepted = async (payment) => {
+    if (!payment.paymentIntentId) {
+      setError('Payment ID missing');
+      setStep(STEPS.ERROR);
+      return;
+    }
+
+    setPaymentIntentId(payment.paymentIntentId);
+    
+    try {
+      const pollResult = await pollPaymentStatus(payment.paymentIntentId);
+      if (pollResult.payment?.clientSecret) {
+        setClientSecret(pollResult.payment.clientSecret);
+        setPaymentIntentId(pollResult.payment.paymentIntentId || payment.paymentIntentId);
+        setStep(STEPS.PAYMENT);
+      } else {
+        throw new Error('Client secret not available after polling. Payment may still be processing.');
+      }
+    } catch (pollErr) {
+      setError(getErrorMessage(pollErr) || 'Failed to poll payment status');
+      setStep(STEPS.ERROR);
+    }
+  };
+
+  /**
+   * Handles 409 CONFLICT with Retry-After header (temporary conflict)
+   * Retries the createPayment call after the delay
+   * Note: Uses same idempotency key for retry (idempotency purpose)
+   */
+  const handleTemporaryConflict = (retryAfterSeconds, paymentRequest) => {
+    // Ensure idempotency key exists (should already be set, but fallback for safety)
+    if (!paymentRequest._idempotencyKey) {
+      paymentRequest._idempotencyKey = crypto.randomUUID();
+    }
+    setRetryCountdown(retryAfterSeconds);
+    setError(`Payment is still being processed. Retrying in ${retryAfterSeconds} seconds...`);
+    
+    // Clear any existing retry
+    if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+    if (retryIntervalRef.current) clearInterval(retryIntervalRef.current);
+
+    // Countdown timer
+    let remaining = retryAfterSeconds;
+    retryIntervalRef.current = setInterval(() => {
+      remaining--;
+      setRetryCountdown(remaining);
+      if (remaining <= 0) {
+        clearInterval(retryIntervalRef.current);
+        retryIntervalRef.current = null;
+      }
+    }, 1000);
+
+    // Schedule retry
+    retryTimeoutRef.current = setTimeout(async () => {
+      if (retryIntervalRef.current) {
+        clearInterval(retryIntervalRef.current);
+        retryIntervalRef.current = null;
+      }
+      setRetryCountdown(null);
+      setError(null);
+      setStep(STEPS.CREATING);
+      
+      try {
+        // Use same idempotency key for retry (idempotency purpose)
+        await processPaymentRequest(paymentRequest, paymentRequest._idempotencyKey);
+      } catch (retryErr) {
+        // If retry also gets 409 with Retry-After, schedule another retry
+        if (retryErr.status === 409 && retryErr.data?.headers?.['retry-after']) {
+          const newRetryAfter = parseInt(retryErr.data.headers['retry-after']) || 2;
+          handleTemporaryConflict(newRetryAfter, paymentRequest);
+        } else {
+          setError(getErrorMessage(retryErr));
+          setStep(STEPS.ERROR);
+        }
+      }
+    }, retryAfterSeconds * 1000);
+  };
+
+  /**
+   * Extracts error message from error object
+   */
+  const getErrorMessage = (err) => {
+    return err.data?.message || err.data?.error || err.message || 'An error occurred';
+  };
+
+  /**
+   * Handles 409 CONFLICT without Retry-After (permanent conflict)
+   */
+  const handlePermanentConflict = () => {
+    setError('This idempotency key was already used with a different request. Please use a new idempotency key.');
+    setStep(STEPS.ERROR);
+  };
+
+  /**
+   * Processes payment creation request
+   * Uses HTTP status codes as primary decision point
+   */
+  const processPaymentRequest = async (paymentRequest, idempotencyKey) => {
+    const result = await createPayment(paymentRequest, idempotencyKey);
+    const { payment, status } = result;
+    setPaymentData(payment);
+
+    // HTTP 202 ACCEPTED → Always poll (payment is processing asynchronously)
+    if (status === 202) {
+      await handlePaymentAccepted(payment);
+      return;
+    }
+
+    // HTTP 201 CREATED / 200 OK → Use response body content to decide
+    // (Same HTTP status can mean: success with clientSecret, declined, or pending replay)
+    if (status === 201 || status === 200) {
+      await handlePaymentCreated(payment);
+      return;
+    }
+
+    // Unexpected status
+    throw new Error(`Unexpected HTTP status: ${status}`);
+  };
+
+  // Payment creation entry point
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setStep(STEPS.CREATING);
 
+    // Generate idempotency key (browser responsibility)
+    const idempotencyKey = crypto.randomUUID();
+
+    const paymentRequest = {
+      orderId: orderId.trim(),
+      buyerId: buyerId.trim(),
+      totalAmount: { quantity: parseInt(totalAmount), currency },
+      paymentOrders: paymentOrders.map(po => ({
+        sellerId: po.sellerId.trim(),
+        amount: { quantity: parseInt(po.amount), currency }
+      }))
+    };
+
+    // Store idempotency key in request object for retries
+    paymentRequest._idempotencyKey = idempotencyKey;
+
     try {
-      const paymentRequest = {
-        orderId: orderId.trim(),
-        buyerId: buyerId.trim(),
-        totalAmount: { quantity: parseInt(totalAmount), currency },
-        paymentOrders: paymentOrders.map(po => ({
-          sellerId: po.sellerId.trim(),
-          amount: { quantity: parseInt(po.amount), currency }
-        }))
-      };
-
-      const result = await createPayment(paymentRequest);
-      const { payment, status } = result;
-      setPaymentData(payment);
-
-      if (status === 201 || status === 200) {
-        if (payment.clientSecret && payment.paymentIntentId) {
-          setClientSecret(payment.clientSecret);
-          setPaymentIntentId(payment.paymentIntentId);
-          setStep(STEPS.PAYMENT);
+      await processPaymentRequest(paymentRequest, idempotencyKey);
+    } catch (err) {
+      // Handle 409 CONFLICT errors
+      if (err.status === 409) {
+        const retryAfter = err.data?.headers?.['retry-after'];
+        
+        if (retryAfter) {
+          // Temporary conflict → retry createPayment after delay (uses same idempotency key)
+          const retrySeconds = parseInt(retryAfter) || 2;
+          handleTemporaryConflict(retrySeconds, paymentRequest);
         } else {
-          setError('Missing client secret');
-          setStep(STEPS.ERROR);
-        }
-      } else if (status === 202) {
-        if (payment.paymentIntentId) {
-          setPaymentIntentId(payment.paymentIntentId);
-          const pollResult = await pollPaymentStatus(payment.paymentIntentId);
-          if (pollResult.payment?.clientSecret) {
-            setClientSecret(pollResult.payment.clientSecret);
-            setPaymentIntentId(pollResult.payment.paymentIntentId || payment.paymentIntentId);
-            setStep(STEPS.PAYMENT);
-          } else {
-            throw new Error('Client secret not available');
-          }
-        } else {
-          setError('Payment ID missing');
-          setStep(STEPS.ERROR);
+          // Permanent conflict → show error
+          handlePermanentConflict();
         }
       } else {
-        setError(`Unexpected status: ${status}`);
+        setError(getErrorMessage(err) || 'Failed to create payment');
         setStep(STEPS.ERROR);
       }
-    } catch (err) {
-      setError(err.message || 'Failed to create payment');
-      setStep(STEPS.ERROR);
     }
   };
 
@@ -135,17 +295,28 @@ function App() {
         setStep(STEPS.SUCCESS);
       }
     } catch (err) {
-      setError(err.message || 'Failed to authorize payment');
+      setError(getErrorMessage(err) || 'Failed to authorize payment');
       setStep(STEPS.ERROR);
     }
   };
 
   const handleReset = () => {
+    // Clear any pending retries
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+    if (retryIntervalRef.current) {
+      clearInterval(retryIntervalRef.current);
+      retryIntervalRef.current = null;
+    }
+    // Reset all state
     setStep(STEPS.FORM);
     setPaymentData(null);
     setClientSecret(null);
     setPaymentIntentId(null);
     setError(null);
+    setRetryCountdown(null);
   };
 
   return (
@@ -182,7 +353,7 @@ function App() {
                     required 
                   />
                   <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: '4px' }}>
-                    Calculated: {calculateTotal()}
+                    Calculated: {totalCalculated}
                   </small>
                 </div>
                 <div className="form-group">
@@ -251,7 +422,13 @@ function App() {
       )}
 
       {step === STEPS.CREATING && (
-        <LoadingScreen message="Creating payment intent..." />
+        <LoadingScreen 
+          message={
+            retryCountdown !== null 
+              ? `Payment is still being processed. Retrying in ${retryCountdown} seconds...`
+              : "Creating payment intent..."
+          } 
+        />
       )}
 
       {step === STEPS.PAYMENT && clientSecret && (

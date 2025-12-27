@@ -5,6 +5,7 @@ import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentInte
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentResponseDTO
 import jakarta.validation.Valid
 import org.slf4j.LoggerFactory
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
@@ -52,21 +53,26 @@ class PaymentController(
         logger.info("📥 Received payment request for order: ${responseDTO.orderId}, payment id is ${responseDTO.paymentIntentId}")
         return when (result.status) {
 
-            IdempotencyExecutionStatus.CREATED -> ResponseEntity
-                .status(HttpStatus.CREATED)
-                .header("Location", "/api/v1/payments/${responseDTO.paymentIntentId}")
-                .body(responseDTO)
+            IdempotencyExecutionStatus.CREATED -> {
+                // Check if payment is pending (Stripe timed out)
+                if (responseDTO.status == "CREATED_PENDING") {
+                    ResponseEntity
+                        .status(HttpStatus.ACCEPTED)  // 202
+                        .header("Location", "/api/v1/payments/${responseDTO.paymentIntentId}")
+                        .header("Retry-After", "2")
+                        .body(responseDTO)  // clientSecret will be null/empty
+                } else {
+                    ResponseEntity
+                        .status(HttpStatus.CREATED)  // 201
+                        .header("Location", "/api/v1/payments/${responseDTO.paymentIntentId}")
+                        .body(responseDTO)  // clientSecret should be present
+                }
+            }
 
             IdempotencyExecutionStatus.REPLAYED -> ResponseEntity
                 .status(HttpStatus.OK)
+                .header("Idempotent-Replayed", "true")
                 .header("Location", "/api/v1/payments/${responseDTO.paymentIntentId}")
-                .body(responseDTO)
-
-            IdempotencyExecutionStatus.IN_PROGRESS -> ResponseEntity
-                .status(HttpStatus.ACCEPTED)
-                .header("Retry-After", "1")
-                // use a dummy location for now OR point to idempotency status
-                .header("Location", "/api/v1/idempotency/$idempotencyKey")
                 .body(responseDTO)
         }
     }

@@ -4,12 +4,12 @@ import com.dogancaglar.paymentservice.domain.commands.GetPaymentIntentCommand
 import com.dogancaglar.paymentservice.domain.model.PaymentIntent
 import com.dogancaglar.paymentservice.ports.inbound.GetPaymentIntentUseCase
 import com.dogancaglar.paymentservice.ports.outbound.PaymentIntentRepository
-import com.dogancaglar.paymentservice.ports.outbound.PspAuthGatewayPort
+import com.dogancaglar.paymentservice.ports.outbound.PspAuthorizationGatewayPort
 import org.slf4j.LoggerFactory
 
 class GetPaymentIntentService(
     private val paymentIntentRepository: PaymentIntentRepository,
-    private val pspAuthGatewayPort: PspAuthGatewayPort
+    private val pspAuthGatewayPort: PspAuthorizationGatewayPort
 ) : GetPaymentIntentUseCase {
 
     private val logger = LoggerFactory.getLogger(javaClass)

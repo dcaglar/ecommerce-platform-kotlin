@@ -12,7 +12,6 @@ import com.dogancaglar.paymentservice.domain.exception.PaymentNotReadyException
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentIntent
 import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
-import com.dogancaglar.paymentservice.domain.model.PaymentMethod
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
@@ -22,7 +21,7 @@ import kotlin.collections.plus
 class AuthorizePaymentIntentService(
     private val idGeneratorPort: IdGeneratorPort,
     private val paymentIntentRepository: PaymentIntentRepository,
-    private val psp: PspAuthGatewayPort,
+    private val psp: PspAuthorizationGatewayPort,
     private val serializationPort: SerializationPort,
     private val paymentTransactionalFacadePort: PaymentTransactionalFacadePort,
     private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper

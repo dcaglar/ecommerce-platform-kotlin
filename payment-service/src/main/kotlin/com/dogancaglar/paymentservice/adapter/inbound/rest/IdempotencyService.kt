@@ -4,7 +4,10 @@ package com.dogancaglar.paymentservice.adapter.inbound.rest
 import com.dogancaglar.common.id.PublicIdFactory
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentResponseDTO
+import com.dogancaglar.paymentservice.domain.exception.PaymentIntentNotReadyException
+import com.dogancaglar.paymentservice.domain.exception.PspTransientException
 import com.dogancaglar.paymentservice.idempotency.CanonicalJsonHasher
+import com.dogancaglar.paymentservice.ports.outbound.IdempotencyStatus
 import com.dogancaglar.paymentservice.ports.outbound.IdempotencyStorePort
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
@@ -27,7 +30,6 @@ class IdempotencyService(
         requestBody: CreatePaymentIntentRequestDTO,
         block: () -> CreatePaymentIntentResponseDTO
     ): IdempotencyResult<CreatePaymentIntentResponseDTO> {
-
         val hash = canonicalJsonHasher.hashBody(requestBody)
 
         // 1️⃣ Try to insert PENDING row
@@ -65,37 +67,22 @@ class IdempotencyService(
                 "Idempotency-Key reused with different request body"
             )
         }
-
-        // 2b — if still pending, dont block thread return 202 with retryafter in header
-        if (record.responsePayload == null) {
-            val pending = CreatePaymentIntentResponseDTO(
-                paymentIntentId = null,
-                buyerId = requestBody.buyerId,
-                orderId = requestBody.orderId,
-                totalAmount = requestBody.totalAmount,
-                status = "PENDING",
-                createdAt = com.dogancaglar.common.time.Utc.nowInstant().toString()
+        if(record.status== IdempotencyStatus.PENDING){
+            throw PaymentIntentNotReadyException("It is a duplicate but originial request not processd yet")
+        }
+        else{
+            //it is retried this time record is COMPLETED,then replayed
+            val responseObj = objectMapper.readValue(
+                record.responsePayload,
+                CreatePaymentIntentResponseDTO::class.java
             )
 
             return IdempotencyResult(
-                response = pending,
-                status = IdempotencyExecutionStatus.IN_PROGRESS
+                response = responseObj,
+                status = IdempotencyExecutionStatus.REPLAYED
             )
         }
 
-        // 2c — response now available
-        val finalRecord = store.findByKey(key)
-            ?: error("Record disappeared during wait")
-
-        val responseObj = objectMapper.readValue(
-            finalRecord.responsePayload,
-            CreatePaymentIntentResponseDTO::class.java
-        )
-
-        return IdempotencyResult(
-            response = responseObj,
-            status = IdempotencyExecutionStatus.REPLAYED
-        )
     }
 
     private fun waitForCompletion(key: String) {
@@ -126,5 +113,4 @@ data class IdempotencyResult<PaymentResponseDTO>(
 enum class IdempotencyExecutionStatus {
     CREATED,     // 201
     REPLAYED,    // 200
-    IN_PROGRESS  // 202
 }

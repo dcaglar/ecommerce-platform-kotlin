@@ -58,3 +58,4 @@ infra/k8s/payment/configmap/payment-service-configmap.yaml
 /infra/k8s/overlays/local/monitoring/secrets/
 /infra/k8s/overlays/local/messaging/secrets/
 /infra/k8s/overlays/local/keycloak/secrets/
+.aiexclude
