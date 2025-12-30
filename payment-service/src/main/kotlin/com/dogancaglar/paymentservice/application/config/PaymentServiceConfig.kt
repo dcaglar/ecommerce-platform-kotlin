@@ -2,7 +2,6 @@ package com.dogancaglar.paymentservice.application.config
 
 import com.dogancaglar.paymentservice.adapter.outbound.id.SnowflakeIdGeneratorAdapter
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.PaymentIntentOutboundAdapter
-import com.dogancaglar.paymentservice.adapter.outbound.psp.StripeProperties
 import com.dogancaglar.paymentservice.adapter.outbound.serialization.JacksonSerializationAdapter
 import com.dogancaglar.paymentservice.application.usecases.AccountBalanceReadService
 import com.dogancaglar.paymentservice.application.usecases.AuthorizePaymentIntentService
@@ -16,20 +15,24 @@ import com.dogancaglar.paymentservice.ports.outbound.PaymentTransactionalFacadeP
 import com.dogancaglar.paymentservice.ports.outbound.PspAuthorizationGatewayPort
 import com.stripe.StripeClient
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
+import java.util.concurrent.Executor
 
 @Configuration
 class PaymentServiceConfig {
 
     @Bean
-    fun stripeClient(stripeProperties: StripeProperties): StripeClient {
-        // Create StripeClient with API key
-        // StripeClient constructor takes the API key directly
-        return StripeClient.StripeClientBuilder().setApiKey(stripeProperties.apiKey)
-            .setConnectTimeout(stripeProperties.connectTimeout)
-            .setReadTimeout(stripeProperties.readTimeout)
+    fun stripeClient(
+        @Value("\${stripe.api.api-key}") apiKey: String,
+        @Value("\${stripe.api.connect-timeout:5000}") connectTimeout: Int,
+        @Value("\${stripe.api.read-timeout:30000}") readTimeout: Int
+    ): StripeClient {
+        return StripeClient.StripeClientBuilder()
+            .setApiKey(apiKey)
+            .setConnectTimeout(connectTimeout)
+            .setReadTimeout(readTimeout)
             .build()
     }
 
@@ -64,9 +67,9 @@ class PaymentServiceConfig {
         idGeneratorPort: SnowflakeIdGeneratorAdapter,
         paymentIntentRepository: PaymentIntentOutboundAdapter,
         pspAuthGatewayPort: PspAuthorizationGatewayPort,
-        @Qualifier("pspCallbackExecutor") pspCallbackExecutor : ThreadPoolTaskExecutor
-        ): CreatePaymentIntentService{
-        return CreatePaymentIntentService(paymentIntentRepository,idGeneratorPort,pspAuthGatewayPort,pspCallbackExecutor)
+        @Qualifier("pspCallbackExecutor") pspCallbackExecutor: Executor
+    ): CreatePaymentIntentService {
+        return CreatePaymentIntentService(paymentIntentRepository, idGeneratorPort, pspAuthGatewayPort, pspCallbackExecutor)
     }
 
     @Bean

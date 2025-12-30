@@ -10,11 +10,10 @@ import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentIntentRepository
 import com.dogancaglar.paymentservice.ports.outbound.PspAuthorizationGatewayPort
 import org.slf4j.LoggerFactory
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
-import java.time.Instant
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
@@ -22,7 +21,7 @@ class CreatePaymentIntentService(
     private val paymentIntentRepository: PaymentIntentRepository,
     private val idGeneratorPort: IdGeneratorPort,
     private val pspAuthGatewayPort: PspAuthorizationGatewayPort,
-    private val pspCallbackExecutor: ThreadPoolTaskExecutor
+    private val pspCallbackExecutor: Executor
 ) : CreatePaymentIntentUseCase {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -62,10 +61,11 @@ class CreatePaymentIntentService(
                 }
 
                 is PspPermanentException -> {/* mark failed */
-                    // Mark as permanently failed
-                    val declined = paymentIntent.markDeclined()
-                    paymentIntentRepository.updatePaymentIntent(declined)
-                    return declined
+                    // Mark as cancelled since PaymentIntent is still in CREATED_PENDING
+                    // (markDeclined() only works from PENDING_AUTH status)
+                    val cancelled = paymentIntent.markCancelled()
+                    paymentIntentRepository.updatePaymentIntent(cancelled)
+                    return cancelled
                 }
 
                 else -> throw RuntimeException("Unexpected failure", cause)
@@ -99,8 +99,9 @@ class CreatePaymentIntentService(
                             if (cause is PspTransientException) {
                                 //schedule for later on
                             } else {
-                                //fail permanaetly.
-                                paymentIntentRepository.updatePaymentIntent(paymentIntent.markDeclined())
+                                //fail permanently - use markCancelled() since PaymentIntent is in CREATED_PENDING
+                                //(markDeclined() only works from PENDING_AUTH status)
+                                paymentIntentRepository.updatePaymentIntent(paymentIntent.markCancelled())
                             }
                         }
 
@@ -116,20 +117,4 @@ class CreatePaymentIntentService(
                 }
             },pspCallbackExecutor)
         }
-
-
-
-
-    private fun updatePspReferenceSafely(paymentIntent: PaymentIntent) {
-        try {
-            paymentIntentRepository.updatePspReference(
-                paymentIntent.paymentIntentId.value,
-                paymentIntent.pspReferenceOrThrow(),
-                Instant.now()
-            )
-            logger.info("Updated pspReference: {}", paymentIntent.pspReferenceOrThrow())
-        } catch (ex: Exception) {
-            logger.warn("Unexpected error updating pspReference: {}", ex.message)
-        }
-    }
 }
