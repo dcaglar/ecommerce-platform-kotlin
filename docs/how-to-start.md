@@ -608,7 +608,7 @@ You now have:
 If everything’s green in Grafana and Kibana, your platform is ready for testing.
 
 For deep architecture or flow diagrams, see:
-- [`docs/architecture.md`](architecture-internal-reader.md)
+- [`docs/architecture.md`](./architecture/architecture.md)
 - [`README.md`](../README.md)
 
 ---

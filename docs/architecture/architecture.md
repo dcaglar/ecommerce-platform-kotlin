@@ -464,9 +464,9 @@ sequenceDiagram
     Note over Shopper, Stripe: Phase 3: Confirm Payment & Finalize State
 
     Shopper->>Browser: Clicks "Pay Now"
-    Browser->>Stripe: stripe.confirmPayment()
-    Stripe-->>Browser: Payment successfully confirmed by Stripe
-
+    Browser->>Stripe: elements.submit() (Tokenize & Associate)
+    Note right of Browser: Stripe JS sends card data,<br/>creates PaymentMethod,<br/>links it to PaymentIntent
+    Stripe-->>Browser: Validation OK
     Browser->>Proxy: POST /api/checkout/authorize-payment/{paymentId}
     
     Proxy->>Keycloak: Request service token (can be cached)
@@ -474,6 +474,9 @@ sequenceDiagram
 
     Proxy->>PaymentSvc: POST /api/v1/payments/{paymentId}/authorize
     
+    PaymentSvc->>Stripe: paymentIntents.confirm(id)
+    Stripe-->>PaymentSvc: SUCCEEDED
+
     rect rgb(230, 240, 255)
         note over PaymentSvc: @Transactional
         PaymentSvc->>PaymentSvc: Update PaymentIntent status to AUTHORIZED
