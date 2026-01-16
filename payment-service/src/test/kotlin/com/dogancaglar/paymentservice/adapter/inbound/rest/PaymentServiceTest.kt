@@ -20,6 +20,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.paymentservice.ports.inbound.AuthorizePaymentIntentUseCase
 import com.dogancaglar.paymentservice.ports.inbound.GetPaymentIntentUseCase
+import com.dogancaglar.paymentservice.ports.inbound.ProcessPaymentIntentUpdateUseCase
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.Assertions.*
 class PaymentServiceTest {
 
     private lateinit var createPaymentIntentUseCase: CreatePaymentIntentUseCase
+    private lateinit var processPaymentIntentUpdateUseCase: ProcessPaymentIntentUpdateUseCase
     private lateinit var authorizePaymentIntentUseCase: AuthorizePaymentIntentUseCase
     private lateinit var getPaymentIntentUseCase: GetPaymentIntentUseCase
     private lateinit var paymentService: PaymentService
@@ -38,6 +40,7 @@ class PaymentServiceTest {
     @BeforeEach
     fun setUp() {
         createPaymentIntentUseCase = mockk()
+        processPaymentIntentUpdateUseCase = mockk()
         authorizePaymentIntentUseCase = mockk()
         getPaymentIntentUseCase = mockk()
         paymentValidator = mockk(relaxed = true)
@@ -45,6 +48,7 @@ class PaymentServiceTest {
             authorizePaymentIntentUseCase,
             createPaymentIntentUseCase,
             getPaymentIntentUseCase,
+            processPaymentIntentUpdateUseCase,
             paymentValidator
         )
     }

@@ -413,11 +413,18 @@ sequenceDiagram
     PaymentSvc->>IdemSvc: checkKey(idempotencyKey)
     alt First Request (Key is new)
         IdemSvc->>PaymentSvc: Proceed
-        PaymentSvc->>PaymentSvc: Create PaymentIntent (status=CREATED)
+        PaymentSvc->>PaymentSvc: Create PaymentIntent (status=CREATED_PENDING)
         note right of PaymentSvc: DB: INSERT payment_intents
+        
+        PaymentSvc->>Stripe: Create PaymentIntent (API Call)  <-- MISSING
+        Stripe-->>PaymentSvc: Return { id, clientSecret }    <-- MISSING
+        
+        PaymentSvc->>PaymentSvc: Update PaymentIntent (status=CREATED)
+        note right of PaymentSvc: DB: UPDATE payment_intents
+        
         PaymentSvc->>IdemSvc: storeResponse(key, response)
-        note right of IdemSvc: DB: UPDATE idempotency_keys
-        PaymentSvc-->>Proxy: 201 Created<br/>{ paymentIntentId, clientSecret }
+        PaymentSvc-->>Proxy: 201 Created { clientSecret }
+    end
     else Retry (Key already processed)
         IdemSvc->>PaymentSvc: Return stored response
         note right of IdemSvc: DB: SELECT response FROM idempotency_keys
