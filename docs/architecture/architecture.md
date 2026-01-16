@@ -149,7 +149,7 @@ Represents the **shopper's intent to pay** for a multi-seller basket.
 
 **When it's created:**
 - Step 1: Shopper initiates checkout → `POST /api/v1/payments` endpoint
-- Created with status `CREATED`
+- Created with status `CREATED_PENDING` (initially), then transitions to `CREATED` once Stripe ID is obtained.
 - Contains: `buyerId`, `orderId`, `totalAmount`, `paymentOrderLines` (seller breakdown)
 
 **Why it exists:**
@@ -416,15 +416,32 @@ sequenceDiagram
         PaymentSvc->>PaymentSvc: Create PaymentIntent (status=CREATED_PENDING)
         note right of PaymentSvc: DB: INSERT payment_intents
         
-        PaymentSvc->>Stripe: Create PaymentIntent (API Call)  <-- MISSING
-        Stripe-->>PaymentSvc: Return { id, clientSecret }    <-- MISSING
-        
-        PaymentSvc->>PaymentSvc: Update PaymentIntent (status=CREATED)
-        note right of PaymentSvc: DB: UPDATE payment_intents
-        
-        PaymentSvc->>IdemSvc: storeResponse(key, response)
-        PaymentSvc-->>Proxy: 201 Created { clientSecret }
-    end
+        par Async Stripe Call
+            PaymentSvc->>Stripe: Create PaymentIntent (API Call)
+        and Wait for Result
+            PaymentSvc->>PaymentSvc: Wait up to 3 seconds
+        end
+
+        alt Stripe Responds < 3s
+            Stripe-->>PaymentSvc: Return { id, clientSecret }
+            PaymentSvc->>PaymentSvc: Update PaymentIntent (status=CREATED)
+            PaymentSvc->>IdemSvc: storeResponse(key, response)
+            PaymentSvc-->>Proxy: 201 Created<br/>{ paymentIntentId, clientSecret }
+        else Timeout (> 3s)
+            PaymentSvc-->>Proxy: 202 Accepted (Retry-After: 2s)<br/>{ paymentIntentId, clientSecret: null }
+            
+            Note over Proxy, PaymentSvc: Client enters polling loop
+            
+            loop Polling
+                Proxy->>PaymentSvc: GET /payments/{id}
+                PaymentSvc-->>Proxy: 200 OK { ... }
+            end
+
+            Note right of PaymentSvc: Background Thread
+            Stripe-->>PaymentSvc: Return { id, clientSecret } (Delayed)
+            PaymentSvc->>PaymentSvc: Update PaymentIntent (status=CREATED)
+        end
+
     else Retry (Key already processed)
         IdemSvc->>PaymentSvc: Return stored response
         note right of IdemSvc: DB: SELECT response FROM idempotency_keys
@@ -562,6 +579,3 @@ The `OutboxDispatcherJob` is a scheduled service that runs in the `payment-servi
 - **Database consistency**: Event creation is part of the same transaction as domain changes
 - **Decouples publishing**: Main request path doesn't wait for Kafka availability
 - **Retry safety**: Failed publications are automatically retried without duplicate processing
-
-
-
