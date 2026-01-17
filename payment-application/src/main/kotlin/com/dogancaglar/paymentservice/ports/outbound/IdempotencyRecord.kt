@@ -9,11 +9,11 @@ data class IdempotencyRecord(
     val requestHash: String,
     val paymentIntentId: Long? = null,
     val responsePayload: String? = null,
-    val status: IdempotencyStatus = IdempotencyStatus.PENDING,
+    val status: InitialRequestStatus = InitialRequestStatus.PENDING,
     val createdAt: Instant = Utc.nowInstant()
 )
-
-enum class IdempotencyStatus {
+//this tell if the intial request is pending or completed already
+enum class InitialRequestStatus {
     PENDING,
     COMPLETED
 }

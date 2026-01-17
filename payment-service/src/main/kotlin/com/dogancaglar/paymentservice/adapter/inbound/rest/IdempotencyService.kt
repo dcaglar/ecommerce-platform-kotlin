@@ -5,10 +5,9 @@ import com.dogancaglar.common.id.PublicIdFactory
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentResponseDTO
 import com.dogancaglar.paymentservice.domain.exception.PaymentIntentNotReadyException
-import com.dogancaglar.paymentservice.domain.exception.PspTransientException
 import com.dogancaglar.paymentservice.idempotency.CanonicalJsonHasher
-import com.dogancaglar.paymentservice.ports.outbound.IdempotencyStatus
 import com.dogancaglar.paymentservice.ports.outbound.IdempotencyStorePort
+import com.dogancaglar.paymentservice.ports.outbound.InitialRequestStatus
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -63,12 +62,17 @@ class IdempotencyService(
 
         // 2a — ensure payload is identical
         if (record.requestHash != hash) {
-            throw IdempotencyConflictException(
-                "Idempotency-Key reused with different request body"
+            throw IdempotencyConflictClientException(
+                "Request hash is not same with intial request's hash,client sent bad request"
             )
+            //return http 422
         }
-        if(record.status== IdempotencyStatus.PENDING){
-            throw PaymentIntentNotReadyException("It is a duplicate but originial request not processd yet")
+        if(record.status== InitialRequestStatus.PENDING){
+            //it mean request is a retry possible caused by client sending multiple times
+            // before even intial request is compelte, throw PaymentIntentNotReadyException, and in controller advice
+            //return 409 http
+            throw PaymentIntentNotReadyException("It is a duplicate request,but originial request not completed yet," +
+                    "so we cant return 200 or ")
         }
         else{
             //it is retried this time record is COMPLETED,then replayed
@@ -84,26 +88,9 @@ class IdempotencyService(
         }
 
     }
-
-    private fun waitForCompletion(key: String) {
-        val start = System.currentTimeMillis()
-
-        while (System.currentTimeMillis() - start < maxWaitMs) {
-            Thread.sleep(pollIntervalMs)
-
-            val row = store.findByKey(key)
-            if (row?.responsePayload != null) {
-                return
-            }
-        }
-
-        throw IllegalStateException(
-            "Idempotent request timed out waiting for first execution to complete (key=$key)"
-        )
-    }
 }
 
-class IdempotencyConflictException(msg: String) : RuntimeException(msg)
+class IdempotencyConflictClientException(msg: String) : RuntimeException(msg)
 
 data class IdempotencyResult<PaymentResponseDTO>(
     val response: PaymentResponseDTO,
