@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.mybatis
 
 import com.dogancaglar.paymentservice.InfraTestBoot
 import com.dogancaglar.paymentservice.ports.outbound.IdempotencyRecord
-import com.dogancaglar.paymentservice.ports.outbound.IdempotencyStatus
+import com.dogancaglar.paymentservice.ports.outbound.InitialRequestStatus
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.IdempotencyKeyMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -156,7 +156,7 @@ class IdempotencyKeyMapperIntegrationTest {
         requestHash: String = "hash-abc123",
         paymentIntentId: Long? = null,
         responsePayload: String? = null,
-        status: IdempotencyStatus = IdempotencyStatus.PENDING,
+        status: InitialRequestStatus = InitialRequestStatus.PENDING,
         createdAt: Instant = Utc.nowInstant().normalizeToMicroseconds()
     ): IdempotencyRecord {
         return IdempotencyRecord(
@@ -193,7 +193,7 @@ class IdempotencyKeyMapperIntegrationTest {
         assertNotNull(row1)
         assertEquals(key, row1!!.idempotencyKey)
         assertEquals(hash1, row1.requestHash)
-        assertEquals(IdempotencyStatus.PENDING, row1.status)
+        assertEquals(InitialRequestStatus.PENDING, row1.status)
         assertNull(row1.paymentIntentId)
         assertNull(row1.responsePayload)
         // createdAt should be between nowBefore and nowAfter (with tolerance for clock differences)
@@ -244,7 +244,7 @@ class IdempotencyKeyMapperIntegrationTest {
 
         val row = idempotencyKeyMapper.findByKey(key)
         assertNotNull(row)
-        assertEquals(IdempotencyStatus.COMPLETED, row!!.status)
+        assertEquals(InitialRequestStatus.COMPLETED, row!!.status)
         assertEquals(paymentIntentId, row.paymentIntentId)
         assertJsonEquals(payload, row.responsePayload)
     }
@@ -292,7 +292,7 @@ class IdempotencyKeyMapperIntegrationTest {
 
         assertNull(rowPending)
         assertNotNull(rowCompleted)
-        assertEquals(IdempotencyStatus.COMPLETED, rowCompleted!!.status)
+        assertEquals(InitialRequestStatus.COMPLETED, rowCompleted!!.status)
     }
 }
 

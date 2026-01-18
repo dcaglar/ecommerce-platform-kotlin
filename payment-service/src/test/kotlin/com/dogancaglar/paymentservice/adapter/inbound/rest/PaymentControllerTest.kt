@@ -156,10 +156,10 @@ class PaymentControllerTest {
                 differentRequest,
                 any()
             )
-        } throws IdempotencyConflictException("Idempotency-Key reused with different payload")
+        } throws IdempotencyConflictClientException("Idempotency-Key reused with different payload")
 
         // When & Then
-        assertThrows(IdempotencyConflictException::class.java) {
+        assertThrows(IdempotencyConflictClientException::class.java) {
             paymentController.createPayment(idempotencyKey, differentRequest)
         }
         verify(exactly = 0) { paymentService.createPaymentIntent(any()) }

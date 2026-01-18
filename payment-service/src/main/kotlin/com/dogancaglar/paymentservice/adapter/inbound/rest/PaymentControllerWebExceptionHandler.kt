@@ -21,8 +21,6 @@ import org.postgresql.util.PSQLState
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.exception.PaymentIntentNotReadyException
 import com.dogancaglar.paymentservice.domain.exception.PaymentNotReadyException
-import java.util.concurrent.CompletionException
-import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeoutException
 
 @RestControllerAdvice
@@ -114,17 +112,18 @@ class PaymentControllerWebExceptionHandler {
 
     // -------- Validation / routing --------
 
-    @ExceptionHandler(IdempotencyConflictException::class)
-    fun handleNoResourceFound(ex: IdempotencyConflictException, request: HttpServletRequest)
-            = respond<ErrorResponse>(HttpStatus.CONFLICT, request, trunc(ex.localizedMessage))
+    @ExceptionHandler(IdempotencyConflictClientException::class)
+    fun handleIdempotencyConflictClientException(ex: IdempotencyConflictClientException, request: HttpServletRequest)
+            = respond<ErrorResponse>(HttpStatus.UNPROCESSABLE_ENTITY, request, trunc(ex.localizedMessage))
 
 
 
     @ExceptionHandler(PaymentIntentNotReadyException::class)
-    fun handlePaymentIntentNotReady(ex: PaymentIntentNotReadyException, request: HttpServletRequest): ResponseEntity<ErrorResponse>{
+    fun handlePaymentIntentNotReadyException(ex: PaymentIntentNotReadyException, request: HttpServletRequest): ResponseEntity<ErrorResponse>{
         val headers = HttpHeaders().apply {
             add(HttpHeaders.RETRY_AFTER, "2")
         }
+        //return http 409 with retry at header
            val respond = respond<ErrorResponse>(HttpStatus.CONFLICT, request, trunc(ex.localizedMessage),
                 headers = headers
     )
@@ -132,15 +131,12 @@ class PaymentControllerWebExceptionHandler {
     }
 
 
-
-
-
     @ExceptionHandler(PaymentNotReadyException::class)
     fun handlePaymentNotReady(ex: PaymentNotReadyException, request: HttpServletRequest)
             = respond<ErrorResponse>(HttpStatus.CONFLICT, request, trunc(ex.localizedMessage))
 
     @ExceptionHandler(NoResourceFoundException::class)
-    fun handleNoResourceFound(ex: NoResourceFoundException, request: HttpServletRequest)
+    fun handleIdempotencyExceptionDueToRetriesWhenInitialRequestIsPending(ex: NoResourceFoundException, request: HttpServletRequest)
             = respond<ErrorResponse>(HttpStatus.NOT_FOUND, request, trunc(ex.localizedMessage))
 
     @ExceptionHandler(NoHandlerFoundException::class)
