@@ -1,4 +1,8 @@
-# 🟦 Event-Driven Payments & Ledger Infrastructure for Multi-Seller Platforms
+# 🟦 Payment Service for MerchantofRecord for Multi-Seller 
+#    Platforms  powered by an append_only double_entry ledger core.
+I would like to mention the the goal is not a build an actual product, it is more about a journey 
+of thinking about the HARD Problems faced on payment systems, at each change,making myse\lf more intituitecly alighned
+# 🟦 Event-Driven Payments & Ledger Infrastructure for MarketPlace Platforms
 
 This project represents a backend **payment platform for a Merchant-of-Record (MoR) environment**.  
 Think of a multi-seller e-commerce marketplace where shoppers can buy items from different sellers in a single checkout.  

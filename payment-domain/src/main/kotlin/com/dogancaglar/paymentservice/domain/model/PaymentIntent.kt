@@ -81,7 +81,7 @@ class PaymentIntent private constructor(
      */
     fun markAuthorizedPending(now: LocalDateTime = Utc.nowLocalDateTime()): PaymentIntent {
         require(status == PaymentIntentStatus.CREATED) {
-            "Can only start authorization from CREATED (current=$status)"
+            "Can only start authorization_pending from CREATED (current=$status)"
         }
         return copy(status = PaymentIntentStatus.PENDING_AUTH, updatedAt = now)
     }
