@@ -3,13 +3,20 @@
 # 📦 ecommerce-platform-kotlin
 ### Event-Driven Payments & Ledger Infrastructure for Multi-Seller Platforms
 
-This project is a **technical showcase** demonstrating how large multi-entity platforms (Uber, bol.com, Amazon Marketplace, Airbnb) structure their payment and accounting flows. The system models the financial primitives that appear in every Merchant-of-Record (MoR) or marketplace environment, where all business events reduce to three fundamental money movements:
+This project is a **technical showcase** demonstrating how large multi-entity platforms (Uber, bol.com,
+Amazon Marketplace, Airbnb) structure their payment and accounting flows. The system models the financial 
+primitives that appear in every Merchant-of-Record (MoR) or marketplace environment, where all business
+events reduce to three fundamental money movements:
 
 - **Pay-ins** — shopper → platform (authorization + capture)
 - **Internal reallocations** — platform → internal accounts (fees, commissions, settlements)
 - **Pay-outs** — platform → sellers or external beneficiaries
 
-Rather than simulating a single business model, the platform implements a **small but realistic subset** of the flows used in production systems: synchronous authorization, multi-seller decomposition, asynchronous capture pipelines, idempotent state transitions, retries, and **double-entry ledger recording**. The goal is not to be feature-complete, but to demonstrate **sound architectural design**, correctness guarantees, and event-driven coordination across bounded contexts.
+Rather than simulating a single business model, the platform implements a **small but realistic subset** of the flows
+used in production systems: synchronous authorization, multi-seller decomposition, asynchronous capture pipelines, 
+idempotent state transitions, retries, and **double-entry ledger recording**. The goal is not to be feature-complete,
+but to demonstrate **sound architectural design**, correctness guarantees, and event-driven coordination across
+bounded contexts.
 
 At the domain layer, the system follows **DDD principles** with clear aggregate boundaries (`PaymentIntent`,'`Payment`, `PaymentOrder`, `Ledger`). Each event (authorization, capture request, PSP result, finalization, journal posting) is immutable and drives the next step in the workflow. At the architecture level, the system uses **hexagonal architecture**, the **outbox pattern**, **Kafka-based orchestration**, and **idempotent command/event handlers** to guarantee exactly-once processing across distributed components. Payment and ledger flows are completely asynchronous, partition-aligned, and fault-tolerant by design.
 
