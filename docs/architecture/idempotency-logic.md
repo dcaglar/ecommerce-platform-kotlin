@@ -1,13 +1,3 @@
-//
-
-
-
-
-get  from modificqueue
-
-t1
-
-Based on the analysis of Mollie’s specific interview patterns and general distributed system design principles found in the sources, here is the breakdown of the scenarios, the logic flow, and the exact HTTP status codes you should propose during a Code Review or System Design interview.
 The Core Mechanism: The Idempotency Check
 You should implement a check at the very beginning of your controller (or via middleware). This usually involves looking up the Idempotency-Key header in a high-speed store (for now normal db) that maps the key to the request status, the payload hash, and the stored response.
 Here are the four specific scenarios you must handle:
