@@ -11,6 +11,8 @@ import com.dogancaglar.paymentservice.ports.outbound.InitialRequestStatus
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+
 @Service
 class IdempotencyService(
     private val store: IdempotencyStorePort,
@@ -24,6 +26,7 @@ class IdempotencyService(
     private val maxWaitMs = 2000L
     private val pollIntervalMs = 50L
 
+    @Transactional
     fun run(
         key: String,
         requestBody: CreatePaymentIntentRequestDTO,
@@ -65,7 +68,7 @@ class IdempotencyService(
             throw IdempotencyConflictClientException(
                 "Request hash is not same with intial request's hash,client sent bad request"
             )
-            //return http 422
+            //return http 422s
         }
         if(record.status== InitialRequestStatus.PENDING){
             //it mean request is a retry possible caused by client sending multiple times

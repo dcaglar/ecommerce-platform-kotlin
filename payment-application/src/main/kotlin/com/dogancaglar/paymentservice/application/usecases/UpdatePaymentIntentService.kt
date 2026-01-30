@@ -3,13 +3,13 @@ package com.dogancaglar.paymentservice.application.usecases
 import com.dogancaglar.paymentservice.domain.commands.ProcessPaymentIntentUpdateCommand
 import com.dogancaglar.paymentservice.domain.model.PaymentIntent
 import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
-import com.dogancaglar.paymentservice.ports.inbound.ProcessPaymentIntentUpdateUseCase
+import com.dogancaglar.paymentservice.ports.inbound.UpdatePaymentIntentUseCase
 import com.dogancaglar.paymentservice.ports.outbound.PaymentIntentRepository
 import org.slf4j.LoggerFactory
 
-class ProcessPaymentIntentUpdateService(
+class UpdatePaymentIntentService(
     private val paymentIntentRepository: PaymentIntentRepository
-) : ProcessPaymentIntentUpdateUseCase {
+) : UpdatePaymentIntentUseCase {
 
     private val logger = LoggerFactory.getLogger(javaClass)
 

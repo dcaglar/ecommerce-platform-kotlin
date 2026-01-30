@@ -13,7 +13,7 @@ import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentInte
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentResponseDTO
 import com.dogancaglar.paymentservice.ports.inbound.CreatePaymentIntentUseCase
 import com.dogancaglar.paymentservice.ports.inbound.GetPaymentIntentUseCase
-import com.dogancaglar.paymentservice.ports.inbound.ProcessPaymentIntentUpdateUseCase
+import com.dogancaglar.paymentservice.ports.inbound.UpdatePaymentIntentUseCase
 import com.stripe.model.Event
 import com.stripe.model.PaymentIntent
 import org.slf4j.LoggerFactory
@@ -24,7 +24,7 @@ class PaymentService(
     private val authorizePaymentIntentUseCase: AuthorizePaymentIntentUseCase,
     private val createPaymentIntentUseCase: CreatePaymentIntentUseCase,
     private val getPaymentIntentUseCase: GetPaymentIntentUseCase,
-    private val processPaymentIntentUpdateUseCase: ProcessPaymentIntentUpdateUseCase,
+    private val updatePaymentIntentUseCase: UpdatePaymentIntentUseCase,
     private val paymentValidator: PaymentValidator,
 ) {
     private val logger = LoggerFactory.getLogger(PaymentService::class.java)
@@ -74,7 +74,7 @@ class PaymentService(
                                 clientSecret = stripeObject.clientSecret,
                                 status = PaymentIntentStatus.CREATED
                             )
-                            processPaymentIntentUpdateUseCase.processUpdate(cmd)
+                            updatePaymentIntentUseCase.processUpdate(cmd)
                             logger.info("Processed webhook payment_intent.created for ${paymentIntentId.value}")
                         } catch (e: NumberFormatException) {
                             logger.error("Invalid payment_intent_id in metadata: $metaId")

@@ -7,6 +7,7 @@ import com.dogancaglar.paymentservice.application.usecases.AccountBalanceReadSer
 import com.dogancaglar.paymentservice.application.usecases.AuthorizePaymentIntentService
 import com.dogancaglar.paymentservice.application.usecases.CreatePaymentIntentService
 import com.dogancaglar.paymentservice.application.usecases.GetPaymentIntentService
+import com.dogancaglar.paymentservice.application.usecases.UpdatePaymentIntentService
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceReadUseCase
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
@@ -60,6 +61,12 @@ class PaymentServiceConfig {
             paymentOrderDomainEventMapper = paymentOrderDomainEventMapper,
             paymentTransactionalFacadePort = paymentTransactionalFacadePort
         )
+    }
+
+
+    @Bean
+    fun updatePaymentIntentService(paymentIntentRepository: PaymentIntentOutboundAdapter): UpdatePaymentIntentService{
+        return UpdatePaymentIntentService(paymentIntentRepository)
     }
 
     @Bean

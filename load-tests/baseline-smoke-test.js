@@ -1,6 +1,6 @@
 import http from 'k6/http';
-import { check } from 'k6';
-import { Counter } from 'k6/metrics';
+import { check, sleep, group } from 'k6';
+import { Counter, Trend } from 'k6/metrics';
 import { b64decode } from 'k6/encoding';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.4/index.js';
 
@@ -18,27 +18,27 @@ const API_BASE = `${BASE_URL}/api/v1`;
 if (!HOST_HEADER) throw new Error('Missing HOST (env HOST or endpoints.json host_header)');
 
 // ---------- load knobs ----------
-const MODE      = (__ENV.MODE || 'constant').toLowerCase(); // 'constant' | 'step'
-const VUS       = __ENV.VUS ? parseInt(__ENV.VUS) : undefined; // optional legacy
-const DURATION  = __ENV.DURATION || '20m';
-const RPS       = __ENV.RPS ? parseInt(__ENV.RPS) : 20;
+const MODE = (__ENV.MODE || 'constant').toLowerCase(); // 'constant' | 'step'
+const VUS = __ENV.VUS ? parseInt(__ENV.VUS) : undefined; // optional legacy
+const DURATION = __ENV.DURATION || '20m';
+const RPS = __ENV.RPS ? parseInt(__ENV.RPS) : 20;
 const CLIENT_TIMEOUT = __ENV.CLIENT_TIMEOUT || '3s';
 
 // Step mode stages: "rate:duration,rate:duration,..."
 const STAGES_STR = __ENV.STAGES || '20:1m,60:1m,80:1m,100:15m';
 
 // Expected p95 (ms) used to size VU pool if PRE_VUS not provided
-const LAT_MS    = __ENV.LAT_MS ? parseInt(__ENV.LAT_MS) : 60;
+const LAT_MS = __ENV.LAT_MS ? parseInt(__ENV.LAT_MS) : 60;
 
 // Allow overrides, else auto-calc
-const PRE_VUS   = __ENV.PRE_VUS ? parseInt(__ENV.PRE_VUS)
+const PRE_VUS = __ENV.PRE_VUS ? parseInt(__ENV.PRE_VUS)
   : Math.ceil(RPS * (LAT_MS / 1000) * 1.5) || 20;   // autosize if constant mode
-const MAX_VUS   = __ENV.MAX_VUS ? parseInt(__ENV.MAX_VUS)
+const MAX_VUS = __ENV.MAX_VUS ? parseInt(__ENV.MAX_VUS)
   : Math.max(3 * PRE_VUS, 100);
 
 // Optional thresholds (env overrides)
 const ERROR_RATE = __ENV.ERROR_RATE || '0';    // e.g. '0.01' for 1%
-const P95_MS     = __ENV.P95_MS || '500';
+const P95_MS = __ENV.P95_MS || '500';
 
 // ---------- scenario builder ----------
 function buildOptions() {
@@ -46,7 +46,7 @@ function buildOptions() {
     noConnectionReuse: false,           // keep-alives ON for realistic load
     discardResponseBodies: true,        // less memory GC
     thresholds: {
-      http_req_failed:   [`rate<=${ERROR_RATE}`],
+      http_req_failed: [`rate<=${ERROR_RATE}`],
       http_req_duration: [`p(95)<=${P95_MS}`],
     },
   };
@@ -64,10 +64,10 @@ function buildOptions() {
 
     // choose a VU pool big enough for the largest step
     const peakRate = stages.reduce((m, s) => Math.max(m, s.target), 0);
-    const preVUs   = __ENV.PRE_VUS
+    const preVUs = __ENV.PRE_VUS
       ? PRE_VUS
       : Math.ceil(peakRate * (LAT_MS / 1000) * 1.5) || 30;
-    const maxVUs   = __ENV.MAX_VUS ? MAX_VUS : Math.max(3 * preVUs, 120);
+    const maxVUs = __ENV.MAX_VUS ? MAX_VUS : Math.max(3 * preVUs, 120);
 
     return {
       ...base,
@@ -110,8 +110,11 @@ const ACCESS_TOKEN = open('../keycloak/output/jwt/payment-service.token').replac
 
 // ---------- metrics ----------
 const statusCount = new Counter('status_count');
-const failKinds   = new Counter('fail_kind_count');
-const reqs        = new Counter('reqs');
+const failKinds = new Counter('fail_kind_count');
+const reqs = new Counter('reqs');
+
+// BEST PRACTICE: Track end-to-end checkout duration
+const checkoutTrend = new Trend('checkout_flow_duration');
 
 // ---------- helpers ----------
 const KNOWN_SELLER_IDS = ['SELLER-111', 'SELLER-222'];
@@ -173,41 +176,87 @@ export function setup() {
 
 export default function (data) {
   reqs.add(1);
+  const startTime = Date.now();
 
+  const idempotencyKey = randomId('IDEM');
   const headers = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${data.authToken}`,
-    'Host': HOST_HEADER, // ingress routing key
+    'Host': HOST_HEADER,
+    'Idempotency-Key': idempotencyKey,
   };
   const params = { headers, timeout: CLIENT_TIMEOUT };
   const payload = buildPaymentPayload();
 
-  let res;
-  try {
-    res = http.post(`${API_BASE}/payments`, payload, params);
-  } catch (e) {
-    // Network/timeout/DNS/etc. -> count by kind
-    failKinds.add(1, { kind: e.name || 'network_error' });
-    console.error(`❌ client-fail kind=${e.name || 'network_error'} msg="${e.message}" timeout=${CLIENT_TIMEOUT}`);
-    return;
-  }
+  group('Transactional Checkout', function () {
+    // --- STEP 1: Create Payment Intent ---
+    let res = http.post(`${API_BASE}/payments`, payload, params, { tags: { name: '01_CreateIntent' } });
 
-  statusCount.add(1, { status: String(res.status) });
-  const ok = check(res, { 'status is 200': (r) => r.status === 200 });
-  if (!ok) {
-    failKinds.add(1, { kind: `http_${res.status}` });
-    console.error(`HTTP ${res.status} dur=${res.timings?.duration}ms body=${truncate(res.body, 200)}`);
-  }
+    statusCount.add(1, { status: String(res.status), stage: 'create' });
+    const createdOk = check(res, {
+      'create status is 2xx': (r) => [200, 201, 202].includes(r.status),
+    });
+
+    if (!createdOk) {
+      failKinds.add(1, { kind: `create_http_${res.status}` });
+      return; // Short-circuit: don't attempt Step 2 if Step 1 fails
+    }
+
+    let body = res.json();
+    let paymentId = body.paymentIntentId;
+    let status = body.status;
+
+    // --- POLLING: Only if HTTP 202 Accepted (Stripe/Backend still processing) ---
+    if (res.status === 202) {
+      let attempts = 0;
+      while (attempts < 5) {
+        attempts++;
+        sleep(1.5); // Realistic polling interval
+        res = http.get(`${API_BASE}/payments/${paymentId}`, params, { tags: { name: '01_PollIntent' } });
+
+        if (res.status === 200) {
+          body = res.json();
+          status = body.status;
+          if (status !== 'CREATED_PENDING') break; // Success: intent is now ready
+        }
+      }
+    }
+
+    if (status !== 'CREATED' && status !== 'AUTHORIZED') {
+      failKinds.add(1, { kind: 'create_timeout' });
+      return;
+    }
+
+    // --- BEST PRACTICE: Randomized "Think Time" ---
+    // Simulates user entering card details into Stripe Payment Element (e.g., 2-5 seconds)
+    sleep(Math.random() * 3 + 2);
+
+    // --- STEP 2: Authorize Payment Intent ---
+    const authPayload = JSON.stringify({});
+    res = http.post(`${API_BASE}/payments/${paymentId}/authorize`, authPayload, params, { tags: { name: '02_Authorize' } });
+
+    statusCount.add(1, { status: String(res.status), stage: 'auth' });
+    const authOk = check(res, {
+      'auth status is 200': (r) => r.status === 200,
+    });
+
+    if (!authOk) {
+      failKinds.add(1, { kind: `auth_http_${res.status}` });
+    } else {
+      // Record total end-to-end checkout time (excluding setup, including polling and think time)
+      checkoutTrend.add(Date.now() - startTime);
+    }
+  });
 }
 
 export function handleSummary(data) {
   const byStatus = aggregateTags(data.metrics['status_count'], 'status');
-  const byKind   = aggregateTags(data.metrics['fail_kind_count'], 'kind');
+  const byKind = aggregateTags(data.metrics['fail_kind_count'], 'kind');
 
   let extra = '\nStatus histogram:\n';
   for (const k of Object.keys(byStatus).sort()) extra += `  ${k}: ${byStatus[k]}\n`;
   extra += 'Failure kinds:\n';
-  for (const k of Object.keys(byKind).sort())   extra += `  ${k}\n`;
+  for (const k of Object.keys(byKind).sort()) extra += `  ${k}\n`;
 
   return { stdout: textSummary(data, { indent: ' ', enableColors: true }) + extra };
 }

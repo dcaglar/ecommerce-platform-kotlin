@@ -26,12 +26,12 @@ import org.junit.jupiter.api.assertThrows
 class ProcessPaymentIntentUpdateServiceTest {
 
     private lateinit var paymentIntentRepository: PaymentIntentRepository
-    private lateinit var service: ProcessPaymentIntentUpdateService
+    private lateinit var service: UpdatePaymentIntentService
 
     @BeforeEach
     fun setUp() {
         paymentIntentRepository = mockk()
-        service = ProcessPaymentIntentUpdateService(paymentIntentRepository)
+        service = UpdatePaymentIntentService(paymentIntentRepository)
     }
 
     @AfterEach

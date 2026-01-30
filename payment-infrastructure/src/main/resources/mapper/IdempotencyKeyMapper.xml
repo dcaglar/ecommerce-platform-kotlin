@@ -20,7 +20,7 @@
     <select id="insertPending"
             parameterType="com.dogancaglar.paymentservice.ports.outbound.IdempotencyRecord">
         INSERT INTO idempotency_keys (
-        idempotency_key, request_hash, status,created_at
+        idempotency_key, reqsuest_hash, status,created_at
         ) VALUES (
         #{idempotencyKey},
         #{requestHash},
