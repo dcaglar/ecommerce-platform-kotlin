@@ -8,6 +8,7 @@ export DOCKER_BUILDKIT=1
 default_user="dcaglar1987"
 default_tag="latest"
 
+
 DOCKERHUB_USER=${1:-$default_user}
 TAG=${2:-$default_tag}
 
@@ -17,11 +18,11 @@ if [ -z "$DOCKERHUB_USER" ] || [ -z "$TAG" ]; then
 fi
 
 # Prompt for PAT token
-read -s -p "Enter your Docker PAT token: " DOCKER_TOKEN
+#read -s -p "Enter your Docker PAT token: " DOCKER_TOKEN
 echo
 
 echo "Logging in to Docker Hub..."
-echo "$DOCKER_TOKEN" | docker login --username "$DOCKERHUB_USER" --password-stdin
+echo "$DOCKER_TOKEN" | docker login --username "$DOCKERHUB_USER" --password "$DOCKER_TOKEN"
 
 SERVICE_DIR="$(dirname "$0")/../../payment-service"
 REPO_ROOT="$(dirname "$0")/../.."
