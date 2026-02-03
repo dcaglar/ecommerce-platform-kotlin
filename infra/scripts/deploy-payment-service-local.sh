@@ -6,7 +6,6 @@ REPO_ROOT="$SCRIPT_DIR/../.."
 VALUES_TPL="$REPO_ROOT/infra/helm-values/payment-service-values-local.yaml"
 INGRESS_VALUES="$REPO_ROOT/infra/helm-values/ingress-values.yaml"
 ENDPOINTS_JSON="$REPO_ROOT/infra/endpoints.json"
-
 # 1) Ensure we don't have two ingress controllers
 if minikube addons list  | grep -qE '^- +ingress +enabled'; then
   echo "⚠️  Disabling minikube ingress addon to avoid duplicate controllers..."
