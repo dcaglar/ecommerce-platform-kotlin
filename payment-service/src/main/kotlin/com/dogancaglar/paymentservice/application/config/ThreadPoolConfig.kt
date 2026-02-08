@@ -55,12 +55,12 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
     @Bean("pspAuthExecutor")
     fun pspAuthExecutor(decorator: TaskDecorator): ThreadPoolTaskExecutor =
         ThreadPoolTaskExecutor().apply {
-            corePoolSize = 8          // match per-pod listener concurrency
-            maxPoolSize = 8
-            queueCapacity = 64       // or 16; keeps back-pressure tight
+            corePoolSize = 250          // Align with Tomcat max-threads
+            maxPoolSize = 250
+            queueCapacity = 50       // Minimal queue to ensure low latency
             setThreadNamePrefix("po-psp-")
             setTaskDecorator(decorator)
-            setRejectedExecutionHandler(ThreadPoolExecutor.AbortPolicy())
+            setRejectedExecutionHandler(ThreadPoolExecutor.CallerRunsPolicy())
             initialize()
         }
 
@@ -81,12 +81,12 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
     @Bean("pspCallbackExecutor")
     fun pspCallbackExecutor(decorator: TaskDecorator): ThreadPoolTaskExecutor =
         ThreadPoolTaskExecutor().apply {
-            corePoolSize = 4
-            maxPoolSize = 4
-            queueCapacity = 256
+            corePoolSize = 32
+            maxPoolSize = 32
+            queueCapacity = 500
             setThreadNamePrefix("po-psp-callback-")
             setTaskDecorator(decorator)
-            setRejectedExecutionHandler(ThreadPoolExecutor.AbortPolicy())
+            setRejectedExecutionHandler(ThreadPoolExecutor.CallerRunsPolicy())
             initialize()
         }
 

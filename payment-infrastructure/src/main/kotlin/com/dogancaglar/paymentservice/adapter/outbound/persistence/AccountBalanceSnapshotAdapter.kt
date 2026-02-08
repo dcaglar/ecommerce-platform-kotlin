@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.persistence
 
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.AccountBalanceEntity
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.AccountBalanceMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web.AccountBalanceMapper
 import com.dogancaglar.paymentservice.domain.model.balance.AccountBalanceSnapshot
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import org.springframework.stereotype.Repository

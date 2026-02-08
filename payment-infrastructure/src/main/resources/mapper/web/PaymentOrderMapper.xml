@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentOrderMapper">
+<mapper namespace="com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web.PaymentOrderMapper">
     <resultMap id="PaymentOrderResultMap"
                type="com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentOrderEntity">
         <id property="paymentOrderId" column="payment_order_id"/>

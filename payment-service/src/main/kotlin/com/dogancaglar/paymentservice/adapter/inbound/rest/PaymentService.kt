@@ -75,7 +75,7 @@ class PaymentService(
                                 status = PaymentIntentStatus.CREATED
                             )
                             updatePaymentIntentUseCase.processUpdate(cmd)
-                            logger.info("Processed webhook payment_intent.created for ${paymentIntentId.value}")
+                            logger.debug("Processed webhook payment_intent.created for ${paymentIntentId.value}")
                         } catch (e: NumberFormatException) {
                             logger.error("Invalid payment_intent_id in metadata: $metaId")
                         }

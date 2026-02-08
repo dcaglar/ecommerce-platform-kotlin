@@ -3,8 +3,8 @@ package com.dogancaglar.paymentservice.mybatis
 import com.dogancaglar.paymentservice.InfraTestBoot
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentEntity
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentOrderEntity
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentMapper
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentOrderMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web.PaymentMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web.PaymentOrderMapper
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -38,7 +38,7 @@ import java.time.Instant
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers
 @TestPropertySource(properties = ["spring.liquibase.enabled=false"])
-@MapperScan("com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis")
+@MapperScan("com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web")
 class PaymentOrderMapperIntegrationTest {
 
     /**

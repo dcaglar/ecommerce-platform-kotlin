@@ -14,6 +14,7 @@ import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentTransactionalFacadePort
 import com.dogancaglar.paymentservice.ports.outbound.PspAuthorizationGatewayPort
+import com.dogancaglar.paymentservice.ports.outbound.ResilientExecutionPort
 import com.stripe.StripeClient
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
@@ -56,7 +57,7 @@ class PaymentServiceConfig {
         return AuthorizePaymentIntentService(
             idGeneratorPort = idGeneratorPort,
             paymentIntentRepository = paymentIntentRepository,
-            psp = pspAuthGatewayPort,
+            pspAuthGatewayPort = pspAuthGatewayPort,
             serializationPort = serializationPort,
             paymentOrderDomainEventMapper = paymentOrderDomainEventMapper,
             paymentTransactionalFacadePort = paymentTransactionalFacadePort
@@ -71,12 +72,19 @@ class PaymentServiceConfig {
 
     @Bean
     fun createPaymentService(
+        @Qualifier("pspCallbackExecutor") pspCallbackExecutor: Executor,
         idGeneratorPort: SnowflakeIdGeneratorAdapter,
         paymentIntentRepository: PaymentIntentOutboundAdapter,
         pspAuthGatewayPort: PspAuthorizationGatewayPort,
-        @Qualifier("pspCallbackExecutor") pspCallbackExecutor: Executor
+        resilientExecutionPort: ResilientExecutionPort
     ): CreatePaymentIntentService {
-        return CreatePaymentIntentService(paymentIntentRepository, idGeneratorPort, pspAuthGatewayPort, pspCallbackExecutor)
+        return CreatePaymentIntentService(
+            paymentIntentRepository = paymentIntentRepository,
+            idGeneratorPort = idGeneratorPort,
+            pspAuthGatewayPort = pspAuthGatewayPort,
+            resilientExecutionPort = resilientExecutionPort,
+            pspCallbackExecutor = pspCallbackExecutor
+        )
     }
 
     @Bean

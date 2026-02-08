@@ -1,3 +1,10 @@
-package com.dogancaglar.com.dogancaglar.payment.domain.exception
+package com.dogancaglar.paymentservice.domain.exception
 
-class PaymentValidationException(message: String) : RuntimeException(message)
+sealed class PaymentValidationException(message: String) : RuntimeException(message)
+
+
+class PspInvalidPaymentException(mesage:String) : PaymentValidationException(mesage)
+
+class PaymentNotReadyException(mesage:String) : PaymentValidationException(mesage)
+
+class PaymentIntentNotReadyException(message: String) : PaymentValidationException(message)

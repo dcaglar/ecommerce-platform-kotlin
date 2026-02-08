@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component
 
 @Component
 class JacksonSerializationAdapter(
-    @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper
+    @param:Qualifier("myObjectMapper") private val objectMapper: ObjectMapper
 ) : SerializationPort {
     override fun <T> toJson(value: T): String = objectMapper.writeValueAsString(value)
 }

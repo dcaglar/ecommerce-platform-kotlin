@@ -23,7 +23,7 @@ class AuthorizationNetworkSimulator(
                     config.scenario
                 }] Simulated PSP timeout"
             )
-            Thread.sleep(5_000)
+            Thread.sleep(10_000)
         }
 
         // 2) latency buckets

@@ -7,9 +7,11 @@ const ACCESS_TOKEN = open('../keycloak/output/jwt/payment-service.token').replac
 const endpoints = JSON.parse(open('../infra/endpoints.json'));
 
 export const options = {
-  //vus: 10,
+  vus: 1,
+  iterations:1
   //duration: '30s',
 };
+
 
 export default function () {
   // 2. SETUP: Define the URL and Payload
@@ -34,15 +36,15 @@ export default function () {
       'Content-Type': 'application/json'
           },
   };
-
   const res = http.post(url, payload, params);
-console.log(`Total Duration: ${res.timings.duration} ms`);
-  console.log(`  - Blocked (DNS/Queue): ${res.timings.blocked} ms`);
-  console.log(`  - Connecting (TCP):    ${res.timings.connecting} ms`);
-  console.log(`  - TLS Handshake:       ${res.timings.tls_handshaking} ms`);
-  console.log(`  - Sending (Upload):    ${res.timings.sending} ms`);
-  console.log(`  - Waiting (TTFB):      ${res.timings.waiting} ms`); // <--- Critical: Server processing time
-  console.log(`  - Receiving (Download):${res.timings.receiving} ms`);
+  console.log(`Total Duration: ${res.timings.duration} ms`);
+    console.log(`  - Blocked (DNS/Queue): ${res.timings.blocked} ms`);
+    console.log(`  - Connecting (TCP):    ${res.timings.connecting} ms`);
+    console.log(`  - TLS Handshake:       ${res.timings.tls_handshaking} ms`);
+    console.log(`  - Sending (Upload):    ${res.timings.sending} ms`);
+    console.log(`  - Waiting (TTFB):      ${res.timings.waiting} ms`); // <--- Critical: Server processing time
+    console.log(`  - Receiving (Download):${res.timings.receiving} ms`);
+
   check(res, {
     'is status 201': (r) => r.status === 201,
   });

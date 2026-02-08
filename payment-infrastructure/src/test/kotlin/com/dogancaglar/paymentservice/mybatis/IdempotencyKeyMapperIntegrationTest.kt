@@ -3,7 +3,7 @@ package com.dogancaglar.paymentservice.mybatis
 import com.dogancaglar.paymentservice.InfraTestBoot
 import com.dogancaglar.paymentservice.ports.outbound.IdempotencyRecord
 import com.dogancaglar.paymentservice.ports.outbound.InitialRequestStatus
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.IdempotencyKeyMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web.IdempotencyKeyMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
@@ -24,7 +24,7 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentIntentEntity
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentIntentMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web.PaymentIntentMapper
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
@@ -53,7 +53,7 @@ import java.time.Instant
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers
 @TestPropertySource(properties = ["spring.liquibase.enabled=false"])
-@MapperScan("com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis")
+@MapperScan("com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web")
 class IdempotencyKeyMapperIntegrationTest {
 
     /**

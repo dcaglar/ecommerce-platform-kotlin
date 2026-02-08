@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.outbound.persistence
 
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.AccountDirectoryMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web.AccountDirectoryMapper
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountProfile
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort

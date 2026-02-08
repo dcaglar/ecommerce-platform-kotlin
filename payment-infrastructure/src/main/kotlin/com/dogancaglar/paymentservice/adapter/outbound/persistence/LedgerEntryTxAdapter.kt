@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.outbound.persistence
 
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.LedgerMapper
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.LedgerPersistenceMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web.LedgerMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web.LedgerEntitiyMapper
 import com.dogancaglar.paymentservice.domain.model.ledger.LedgerEntry
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
 import org.slf4j.LoggerFactory
@@ -23,7 +23,7 @@ open class LedgerEntryTxAdapter(
 
         entries.forEach { entry ->
             // 1. Insert journal entry (idempotent via ON CONFLICT)
-            val journalEntity = LedgerPersistenceMapper.toJournalEntryEntity(entry)
+            val journalEntity = LedgerEntitiyMapper.toJournalEntryEntity(entry)
             val journalInserted = ledgerMapper.insertJournalEntry(journalEntity)
             if (journalInserted == 0) {
                 logger.debug("🟦 Duplicate journal entry id={} — skipping insert", journalEntity.id)
@@ -31,7 +31,7 @@ open class LedgerEntryTxAdapter(
             }
 
             // 2. Insert ledger entry (auto-generates ID)
-            val ledgerEntity = LedgerPersistenceMapper.toLedgerEntryEntity(entry)
+            val ledgerEntity = LedgerEntitiyMapper.toLedgerEntryEntity(entry)
             ledgerMapper.insertLedgerEntry(ledgerEntity)
             val ledgerEntryId = ledgerEntity.id ?: throw IllegalStateException("Ledger entry ID was not generated")
             
@@ -39,7 +39,7 @@ open class LedgerEntryTxAdapter(
             entry.ledgerEntryId = ledgerEntryId
             
             // 4. Insert postings
-            LedgerPersistenceMapper.toPostingEntities(entry).forEach { posting ->
+            LedgerEntitiyMapper.toPostingEntities(entry).forEach { posting ->
                 ledgerMapper.insertPosting(posting)
             }
             

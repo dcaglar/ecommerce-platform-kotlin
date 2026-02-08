@@ -26,7 +26,6 @@ class IdempotencyService(
     private val maxWaitMs = 2000L
     private val pollIntervalMs = 50L
 
-    @Transactional
     fun run(
         key: String,
         requestBody: CreatePaymentIntentRequestDTO,
@@ -38,12 +37,15 @@ class IdempotencyService(
         val isFirst = store.tryInsertPending(key, hash)
 
         if (isFirst) {
-            logger.info("Idempotency FIRST request for key={}", key)
+            logger.debug("Idempotency FIRST request for key={}", key)
 
             try {
-                val response = block()
+                // this block is actually paymentsercvice.createPAymentIntent()
+                val response = block() // methid is  called
+                //response is what returned by createPAymentyIntent which is an paymentintent with the stripe id updated already
                 val json = objectMapper.writeValueAsString(response)
                 val internalPaymentIntentId = PublicIdFactory.toInternalId(response.paymentIntentId!!)
+                //then the moment paymentsercvice.createPAymentIntent() completes we update our idempotency recordf as well , we have reponse already
                 store.updateResponsePayload(key, json,internalPaymentIntentId)
 
                 return IdempotencyResult(
@@ -58,7 +60,7 @@ class IdempotencyService(
         }
 
         // 2️⃣ RETRY path
-        logger.info("Idempotency RETRY request for key={}", key)
+        logger.debug("Idempotency RETRY request for key={}", key)
 
         val record = store.findByKey(key)
             ?: error("Inconsistent state: idempotency key exists but row missing")

@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis
+package com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web
 
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.JournalEntryEntity
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.LedgerEntryEntity
@@ -7,7 +7,7 @@ import com.dogancaglar.paymentservice.domain.model.ledger.LedgerEntry
 import com.dogancaglar.paymentservice.domain.model.ledger.Posting
 import java.time.ZoneOffset
 
-internal object LedgerPersistenceMapper {
+internal object LedgerEntitiyMapper {
 
     fun toLedgerEntryEntity(entry: LedgerEntry): LedgerEntryEntity =
         LedgerEntryEntity(

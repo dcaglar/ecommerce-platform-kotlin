@@ -13,5 +13,12 @@ import org.springframework.context.annotation.Import
     RedisConfig::class,
     // etc...
 )
-@MapperScan("com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis")
+@MapperScan(
+    basePackages = ["com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web"],
+    sqlSessionFactoryRef = "webSqlSessionFactory"
+)
+@MapperScan(
+    basePackages = ["com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.outbox"],
+    sqlSessionFactoryRef = "outboxSqlSessionFactory"
+)
 class PaymentInfrastructureAutoConfig

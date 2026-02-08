@@ -5,7 +5,6 @@ import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentInte
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentResponseDTO
 import jakarta.validation.Valid
 import org.slf4j.LoggerFactory
-import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
@@ -39,7 +38,7 @@ class PaymentController(
     fun createPayment(
         @RequestHeader("Idempotency-Key") idempotencyKey: String?,
         @Valid @RequestBody request: CreatePaymentIntentRequestDTO): ResponseEntity<CreatePaymentIntentResponseDTO> {
-        logger.info("📥 Sending payment request for order: ${request.orderId} with idempodencykey: $idempotencyKey")
+        logger.debug("📥 Sending payment request for order: ${request.orderId} with idempodencykey: $idempotencyKey")
         require(!idempotencyKey.isNullOrBlank()) {
             "Idempotency-Key header is required"
         }
@@ -50,7 +49,7 @@ class PaymentController(
 
         val responseDTO = result.response
         // Return 201/200/202 Created with Location header (best practice for resource creation)
-        logger.info("📥 Received payment request for order: ${responseDTO.orderId}, payment id is ${responseDTO.paymentIntentId}")
+        logger.debug("📥 Received payment request for order: ${responseDTO.orderId}, payment id is ${responseDTO.paymentIntentId}")
         return when (result.status) {
 
             IdempotencyExecutionStatus.CREATED -> {
@@ -86,7 +85,7 @@ class PaymentController(
     fun getPaymentIntent(
         @PathVariable("paymentId") publicPaymentId: String
     ): ResponseEntity<CreatePaymentIntentResponseDTO> {
-        logger.info("📥 Getting payment intent: {}", publicPaymentId)
+        logger.debug("📥 Getting payment intent: {}", publicPaymentId)
         val dto = paymentService.getPaymentIntent(publicPaymentId)
         return ResponseEntity.status(HttpStatus.OK).body(dto)
     }

@@ -1,9 +1,7 @@
-// payment-infrastructure/src/main/kotlin/.../idempotency/IdempotencyKeyMapper.kt
-package com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis
+package com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web
 
 import com.dogancaglar.paymentservice.ports.outbound.IdempotencyRecord
 import org.apache.ibatis.annotations.Mapper
-import org.apache.ibatis.annotations.Param
 
 @Mapper
 interface IdempotencyKeyMapper {

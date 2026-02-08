@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.adapter.outbound.persistence
 
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentOrderEntityMapper
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentOrderMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web.PaymentOrderMapper
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort

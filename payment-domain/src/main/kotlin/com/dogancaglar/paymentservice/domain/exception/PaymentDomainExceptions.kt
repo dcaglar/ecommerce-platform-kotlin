@@ -1,4 +1,4 @@
-package com.dogancaglar.com.dogancaglar.payment.domain.exception
+package com.dogancaglar.paymentservice.domain.exception
 
 class PaymentDomainExceptions {
 }

@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component
 
 @Component
 class PaymentOrderPspResultApplier(
-    @Qualifier("syncPaymentTx")
+    @param:Qualifier("syncPaymentTx")
     private val kafkaTx: KafkaTxExecutor,
     private val processPspResult: ProcessPspResultUseCase,
     private val dedupe: EventDeduplicationPort,

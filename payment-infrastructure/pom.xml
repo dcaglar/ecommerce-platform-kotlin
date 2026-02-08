@@ -166,6 +166,9 @@
                         <include>**/*IT.java</include>
                         <include>**/*IT.kt</include>
                     </includes>
+                    <environmentVariables>
+                        <DOCKER_HOST>unix:///Users/dogancaglar/.orbstack/run/docker.sock</DOCKER_HOST>
+                    </environmentVariables>
                 </configuration>
                 <executions>
                     <execution>

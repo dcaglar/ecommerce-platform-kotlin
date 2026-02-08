@@ -21,8 +21,8 @@ import java.time.temporal.ChronoUnit
 
 @Component
 class OutboxPartitionCreator(
-    @Qualifier("maintenanceJdbcTemplate") private val jdbcTemplate: JdbcTemplate,
-    @Qualifier("outboxEventPartitionMaintenanceScheduler") private val taskScheduler: ThreadPoolTaskScheduler
+    @param:Qualifier("maintenanceJdbcTemplate") private val jdbcTemplate: JdbcTemplate,
+    @param:Qualifier("outboxEventPartitionMaintenanceScheduler") private val taskScheduler: ThreadPoolTaskScheduler
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val partitionFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmm")

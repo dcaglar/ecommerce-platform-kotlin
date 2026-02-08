@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis
+package com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web
 
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.AccountBalanceEntity
 import org.apache.ibatis.annotations.Mapper
