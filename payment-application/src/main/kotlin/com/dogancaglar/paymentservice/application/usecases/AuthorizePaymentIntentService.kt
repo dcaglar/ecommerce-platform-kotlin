@@ -1,5 +1,6 @@
 package com.dogancaglar.paymentservice.application.usecases
 
+import com.dogancaglar.paymentservice.domain.exception.PaymentNotReadyException
 import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.time.Utc
@@ -8,7 +9,6 @@ import com.dogancaglar.paymentservice.domain.model.OutboxEvent
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.inbound.AuthorizePaymentIntentUseCase
 import com.dogancaglar.paymentservice.domain.commands.AuthorizePaymentIntentCommand
-import com.dogancaglar.paymentservice.domain.exception.PaymentNotReadyException
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentIntent
 import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
@@ -21,7 +21,7 @@ import kotlin.collections.plus
 class AuthorizePaymentIntentService(
     private val idGeneratorPort: IdGeneratorPort,
     private val paymentIntentRepository: PaymentIntentRepository,
-    private val psp: PspAuthorizationGatewayPort,
+    private val pspAuthGatewayPort: PspAuthorizationGatewayPort,
     private val serializationPort: SerializationPort,
     private val paymentTransactionalFacadePort: PaymentTransactionalFacadePort,
     private val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
@@ -58,26 +58,19 @@ class AuthorizePaymentIntentService(
         // 3) We "own" the authorization attempt; update to pending before psp call (in-memory)
         val pendingPaymentIntent = paymentIntent.markAuthorizedPending()
         //call the actual psp
-        val stripeConfirmIdempotencyKey= "confirm:${paymentIntent.paymentIntentId.value}"
         // For Stripe Payment Element, paymentMethod is optional - payment method is already attached to PaymentIntent
-        val pspStatus = psp.authorize(
-            idempotencyKey = stripeConfirmIdempotencyKey,
-            paymentIntent = pendingPaymentIntent,
-            token = cmd.paymentMethod
-        )
-        return processPspAuthorizationResponse(pendingPaymentIntent,pspStatus)
-
+        val confirmedPaymentIntent = pspAuthGatewayPort.authorizePaymentIntent(pendingPaymentIntent,cmd.paymentMethod)
+        generatePaymentOrderLines(confirmedPaymentIntent)
+        return  confirmedPaymentIntent
     }
 
 
-    private fun processPspAuthorizationResponse( pendingPaymentIntent: PaymentIntent, pspStatus: PaymentIntentStatus): PaymentIntent{
-        var finalizedPaymentIntent : PaymentIntent?=null
-        if(pspStatus == PaymentIntentStatus.AUTHORIZED){
-            var finalizedPaymentIntent = pendingPaymentIntent.markAuthorized()
-            val paymentId = PaymentId(idGeneratorPort.nextPaymentId(finalizedPaymentIntent.buyerId,finalizedPaymentIntent.orderId))
+    private fun generatePaymentOrderLines(confirmedPaymentIntent : PaymentIntent){
+        if(confirmedPaymentIntent.status == PaymentIntentStatus.AUTHORIZED){
+            val paymentId = PaymentId(idGeneratorPort.nextPaymentId(confirmedPaymentIntent.buyerId,confirmedPaymentIntent.orderId))
             //2.create payment + paymentorders + outboxevents + updated[pamyentintent
-            val payment = Payment.fromAuthorizedIntent(paymentId,finalizedPaymentIntent)
-            val paymentOrders = finalizedPaymentIntent.paymentOrderLines.map { line ->
+            val payment = Payment.fromAuthorizedIntent(paymentId,confirmedPaymentIntent)
+            val paymentOrders = confirmedPaymentIntent.paymentOrderLines.map { line ->
                 val sellerId = line.sellerId
                 PaymentOrder.createNew(
                     paymentOrderId = PaymentOrderId(idGeneratorPort.nextPaymentOrderId(sellerId)),
@@ -90,15 +83,9 @@ class AuthorizePaymentIntentService(
             val outboxEventPaymentAuthorizedEvent = toOutboxPaymentAuthorizedEvent(payment)
             val outboxEventPaymentOrderCreatedList = paymentOrders.map { toOutboxPaymentOrderCreatedEvent(it) }
             //persist all changes in on tatomic tranascation
-            paymentTransactionalFacadePort.handleAuthorized(finalizedPaymentIntent,payment,paymentOrders,outboxEventPaymentOrderCreatedList+outboxEventPaymentAuthorizedEvent)
-        } else if (pspStatus == PaymentIntentStatus.DECLINED){
-            finalizedPaymentIntent = pendingPaymentIntent.markDeclined()
-        } else {
-           finalizedPaymentIntent = pendingPaymentIntent
+            paymentTransactionalFacadePort.handleAuthorized(confirmedPaymentIntent,payment,paymentOrders,outboxEventPaymentOrderCreatedList+outboxEventPaymentAuthorizedEvent)
         }
-        return finalizedPaymentIntent!!
     }
-
 
     private fun toOutboxPaymentAuthorizedEvent(payment: Payment): OutboxEvent {
         val paymentCreatedEvent = PaymentAuthorized.from(payment,Utc.nowInstant())

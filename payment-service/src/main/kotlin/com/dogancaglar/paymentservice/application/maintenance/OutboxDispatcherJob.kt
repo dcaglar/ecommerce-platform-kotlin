@@ -33,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @DependsOn("outboxPartitionCreator")
 class OutboxDispatcherJob(
-    private val outboxEventRepository: OutboxEventRepository,
+    @param:Qualifier("outboxWebAdapter") private val outboxEventRepository: OutboxEventRepository,
     @param:Qualifier("batchPaymentEventPublisher") private val syncPaymentEventPublisher: EventPublisherPort,
     private val meterRegistry: MeterRegistry,
     private val objectMapper: ObjectMapper,

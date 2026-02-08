@@ -29,9 +29,9 @@ app:
       password: ${SPRING_DATASOURCE_PASSWORD}
       driver-class-name: org.postgresql.Driver
       pool-name: web-pool
-      maximum-pool-size: 12
-      minimum-idle: 6
-      connection-timeout: 1000
+      maximum-pool-size: 12   # Reverted as per user preference
+      minimum-idle: 12
+      connection-timeout: 5000 # Keep 5s to allow threads to wait in queue during spikes
       validation-timeout: 1000
       idle-timeout: 600000
       max-lifetime: 1800000
@@ -63,15 +63,31 @@ app:
       idle-timeout: 60000
       max-lifetime: 1800000
 
-
 server:
   port: 8080
   tomcat:
     mbeanregistry:
       enabled: true
     threads:
-      max: 16
-    accept-count: 64
+      # $N = {Requests/sec} *Response Time}$
+      # 200 Vus * 0.8(response time of a single request)=160
+      #160
+      max: 300
+      # for vus =250 , 0 sleep
+      # $$N = \text{Requests per Second} (\lambda) \times \text{Response Time} (W)$$$\lambda$ (Target Load):
+      #200 req/s$W$ (Response Time): 0.8 seconds (Derived from your logs for single request: ~800ms).$$N
+      #200 \times 0.8 = 160 { Threads}}
+      #What this number means$N = 160$ is your Minimum Survival Number.This is the exact number of threads required
+      #if your traffic is perfectly smooth (robot-like) and Stripe never deviates from 650ms.If you configure maxThreads: 160
+      #your CPU will be active, but you will have Zero room for error.
+      #Why we recommended 250 (The Buffer) 🛡️In production systems, we never run at 100% capacity because of Standard Deviation.
+      #If Stripe slows down by just 0.1s (to 0.9s total response):$$N_{\text{new}}
+      #200 \times 0.9 = 180 \text{ Threads}$$If you had set it to 160, those extra 20 requests would instantly queue, increasing latency.
+      #By setting it to 250, you have a "shock absorber" that handles these fluctuations without the user ever noticing.
+      min-spare: 50
+    max-connections: 8192
+    accept-count: 100
+    connection-timeout: 20000 # Idle connection timeout
 
 
 spring:
@@ -118,7 +134,7 @@ spring:
 spring.jackson.time-zone: UTC
 
 mybatis:
-  mapper-locations: classpath:mapper/*.xml
+  mapper-locations: classpath:mapper/**/*.xml
 
 management:
   server:
@@ -186,10 +202,15 @@ db:
       lock-timeout-ms: 200
       idle-in-tx-timeout-ms: 0
 
-stripe: # on live  inject this as a seret to the environment ,or store in a vault
-  apiKey: dummy
+stripe:
+  api:
+    api-key: sk_test_51ShA8HEAJKUKtoJwTALvrfMadP0eoKwyggnasHkqgY6y6jLoSjg9YqewkxiYrRw54TnZ7tVFX5Xreg3qaHm5wWAX00tupdpr6y
+    connect-timeout: 5000
+    read-timeout: 30000
 
 psp:
+  gateway:
+    type: SIMULATED   # Options: STRIPE, SIMULATED
   authorization:
     simulation:
       currentScenario: NORMAL
@@ -197,20 +218,20 @@ psp:
         NORMAL:
           timeouts:
             enabled: true
-            probability: 0       # 2% of total requests time out
+            probability: 0       # 0% of total requests time out
           latency:
             fast:
-              probability: 100    # rest of 100% are fast (50–150ms)
-              minMs: 50
-              maxMs: 150
-            moderate:
-              probability: 20    # 0% are moderate (150–300ms)
-              minMs: 150
+              probability: 0    # 40% are fast (150–300ms)
+              minMs: 100
               maxMs: 300
-            slow:
-              probability: 0     # 0% are slow (300–600ms)
+            moderate:
+              probability: 100    # 40% are moderate (400–500ms)
               minMs: 300
-              maxMs: 600
+              maxMs: 500
+            slow:
+              probability: 0     # 40% are slow (300–600ms)
+              minMs: 500
+              maxMs: 900
           response:
             successful: 100
             retryable: 0
