@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.idempotency
 
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.IdempotencyKeyMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web.IdempotencyKeyMapper
 import com.dogancaglar.paymentservice.ports.outbound.IdempotencyRecord
 import com.dogancaglar.paymentservice.ports.outbound.IdempotencyStorePort
 import org.slf4j.LoggerFactory
@@ -14,33 +14,56 @@ class IdempotencyStoreAdapter(
 
 
     override fun tryInsertPending(key: String, requestHash: String): Boolean {
-        logger.info("🔵 [Idempotency] Trying insertPending(key='{}', hash='{}')", key, requestHash)
+        logger.debug("🔵 [Idempotency] Trying insertPending(key='{}', hash='{}')", key, requestHash)
         val record = IdempotencyRecord(
             idempotencyKey = key,
             requestHash = requestHash
         )
+        val start = System.currentTimeMillis()
         val insertedKey = mapper.insertPending(record)
-        logger.info(
+        val finish = System.currentTimeMillis()
+        logger.info("db.insertPending took {} ms", finish - start)
+
+        logger.debug(
             "🟡 [Idempotency] insertPending returned key $insertedKey , key: $key")
+        
+        val startFind = System.currentTimeMillis()
         val dbRecord = mapper.findByKey(key)
-        logger.info(
+        val finishFind = System.currentTimeMillis()
+        logger.info("db.findByKey took {} ms", finishFind - startFind)
+
+        logger.debug(
             "🟢 [Idempotency] After insertPending → DB says: $dbRecord "
         )
         return insertedKey != null      // first request → true, duplicate → false
     }
 
-    override fun findByKey(key: String): IdempotencyRecord? =
-        mapper.findByKey(key)
+    override fun findByKey(key: String): IdempotencyRecord? {
+        val start = System.currentTimeMillis()
+        val result = mapper.findByKey(key)
+        val finish = System.currentTimeMillis()
+        logger.info("db.findByKey took {} ms", finish - start)
+        return result
+    }
 
     override fun updatePaymentIntentId(key: String, paymentIntentId: Long) {
+        val start = System.currentTimeMillis()
         mapper.updatePaymentIntentId(key, paymentIntentId)
+        val finish = System.currentTimeMillis()
+        logger.info("db.updatePaymentIntentId took {} ms", finish - start)
     }
 
     override fun updateResponsePayload(key: String, payload: String, paymentIntentId: Long) {
+        val start = System.currentTimeMillis()
         mapper.updateResponsePayload(key, payload, paymentIntentId)
+        val finish = System.currentTimeMillis()
+        logger.info("db.updateResponsePayload took {} ms", finish - start)
     }
 
     override fun deletePending(key: String) {
+        val start = System.currentTimeMillis()
         mapper.deletePending(key)
+        val finish = System.currentTimeMillis()
+        logger.info("db.deletePending took {} ms", finish - start)
     }
 }

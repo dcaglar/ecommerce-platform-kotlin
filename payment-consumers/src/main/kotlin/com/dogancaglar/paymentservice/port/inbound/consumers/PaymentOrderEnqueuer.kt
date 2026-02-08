@@ -23,10 +23,10 @@ import org.springframework.stereotype.Component
 
 @Component
 class PaymentOrderEnqueuer(
-    @Qualifier("syncPaymentTx")
+    @param:Qualifier("syncPaymentTx")
     private val kafkaTx: KafkaTxExecutor,
 
-    @Qualifier("syncPaymentEventPublisher")
+    @param:Qualifier("syncPaymentEventPublisher")
     private val publisher: EventPublisherPort,
 
     private val dedupe: EventDeduplicationPort,

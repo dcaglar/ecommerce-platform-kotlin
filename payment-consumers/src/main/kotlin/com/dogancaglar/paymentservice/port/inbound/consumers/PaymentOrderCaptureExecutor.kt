@@ -32,9 +32,9 @@ import java.util.concurrent.TimeUnit
 class PaymentOrderCaptureExecutor(
     private val psp: PspCaptureGatewayPort,
     private val meterRegistry: MeterRegistry,
-    @Qualifier("syncPaymentTx")
+    @param:Qualifier("syncPaymentTx")
     private val kafkaTx: KafkaTxExecutor,
-    @Qualifier("syncPaymentEventPublisher")
+    @param:Qualifier("syncPaymentEventPublisher")
     private val publisher: EventPublisherPort,
     private val paymentOrderRepository: PaymentOrderRepository,
     private val mapper: PaymentOrderDomainEventMapper,

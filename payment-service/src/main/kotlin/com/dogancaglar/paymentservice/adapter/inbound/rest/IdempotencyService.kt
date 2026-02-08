@@ -11,6 +11,8 @@ import com.dogancaglar.paymentservice.ports.outbound.InitialRequestStatus
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+
 @Service
 class IdempotencyService(
     private val store: IdempotencyStorePort,
@@ -35,12 +37,15 @@ class IdempotencyService(
         val isFirst = store.tryInsertPending(key, hash)
 
         if (isFirst) {
-            logger.info("Idempotency FIRST request for key={}", key)
+            logger.debug("Idempotency FIRST request for key={}", key)
 
             try {
-                val response = block()
+                // this block is actually paymentsercvice.createPAymentIntent()
+                val response = block() // methid is  called
+                //response is what returned by createPAymentyIntent which is an paymentintent with the stripe id updated already
                 val json = objectMapper.writeValueAsString(response)
                 val internalPaymentIntentId = PublicIdFactory.toInternalId(response.paymentIntentId!!)
+                //then the moment paymentsercvice.createPAymentIntent() completes we update our idempotency recordf as well , we have reponse already
                 store.updateResponsePayload(key, json,internalPaymentIntentId)
 
                 return IdempotencyResult(
@@ -55,7 +60,7 @@ class IdempotencyService(
         }
 
         // 2️⃣ RETRY path
-        logger.info("Idempotency RETRY request for key={}", key)
+        logger.debug("Idempotency RETRY request for key={}", key)
 
         val record = store.findByKey(key)
             ?: error("Inconsistent state: idempotency key exists but row missing")
@@ -65,7 +70,7 @@ class IdempotencyService(
             throw IdempotencyConflictClientException(
                 "Request hash is not same with intial request's hash,client sent bad request"
             )
-            //return http 422
+            //return http 422s
         }
         if(record.status== InitialRequestStatus.PENDING){
             //it mean request is a retry possible caused by client sending multiple times

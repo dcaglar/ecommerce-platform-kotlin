@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component
 class PaymentOrderRetryQueueAdapter(
     private val paymentOrderRetryRedisCache: PaymentOrderRetryRedisCache,
     meterRegistry: MeterRegistry,
-    @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper,
+    @param:Qualifier("myObjectMapper") private val objectMapper: ObjectMapper,
     val paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
 ) : RetryQueuePort<PaymentOrderCaptureCommand> {
 

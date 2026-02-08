@@ -51,7 +51,7 @@ open class ProcessPaymentService(
         }
 
         val duration = java.time.Duration.between(start, Utc.nowInstant()).toMillis()
-        logger.info("⏱ processPspResult total={}ms poId={}", duration, order.paymentOrderId)
+        logger.debug("⏱ processPspResult total={}ms poId={}", duration, order.paymentOrderId)
     }
 
     private fun handleRetry(order: PaymentOrder) {
@@ -85,7 +85,7 @@ open class ProcessPaymentService(
             EventLogContext.getTraceId(),
             parentEventId = EventLogContext.getEventId()
         )
-        logger.info("✅ Capture succeeded for {}", order.paymentOrderId)
+        logger.debug("✅ Capture succeeded for {}", order.paymentOrderId)
     }
 
     private fun handleFailed(order: PaymentOrder) {
@@ -111,7 +111,7 @@ open class ProcessPaymentService(
         val scheduledLocal = LocalDateTime.ofInstant(scheduledInstant, amsterdamZone)
         val formattedLocal = scheduledLocal.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))
 
-        logger.info(
+        logger.debug(
             "Scheduling retry for paymentOrderId=${order.paymentOrderId.toPublicPaymentOrderId()} " +
                     "[attempt $nextRetryCount/$MAX_RETRIES] due at $formattedLocal (Amsterdam time)"
         )

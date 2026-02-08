@@ -14,7 +14,7 @@ import org.springframework.stereotype.Repository
 @Repository
 open class PaymentOrderRetryRedisCache(
     private val redisTemplate: StringRedisTemplate,
-    @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper
+    @param:Qualifier("myObjectMapper") private val objectMapper: ObjectMapper
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val queue = "payment_order_retry_queue"

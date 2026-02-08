@@ -12,7 +12,7 @@ import java.util.concurrent.TimeoutException
 
 @Component
 class ResilientExecutionAdapter(
-    @Qualifier("pspCallbackExecutor") private val executor: Executor
+    @param:Qualifier("pspCallbackExecutor") private val executor: Executor
 ) : ResilientExecutionPort {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -28,7 +28,7 @@ class ResilientExecutionAdapter(
             // Try to get the result within the timeout
             return primaryTask.get(timeoutMs, TimeUnit.MILLISECONDS)
         } catch (e: TimeoutException) {
-            logger.info("Task timed out after {}ms, switching to background execution", timeoutMs)
+            logger.warn("Task timed out after {}ms, switching to background execution", timeoutMs)
             
             // Schedule background completion handlers
             primaryTask.whenCompleteAsync({ result, error ->

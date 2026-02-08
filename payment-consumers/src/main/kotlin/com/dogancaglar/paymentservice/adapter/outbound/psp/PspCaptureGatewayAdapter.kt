@@ -18,7 +18,7 @@ import kotlin.random.Random
 class PspCaptureGatewayAdapter(
     private val simulator: CaptureNetworkSimulator,
     private val config: CaptureSimulationProperties,
-    @Qualifier("paymentOrderPspPool") private val pspExecutor: ThreadPoolTaskExecutor,
+    @param:Qualifier("paymentOrderPspPool") private val pspExecutor: ThreadPoolTaskExecutor,
     private val meterRegistry: MeterRegistry        // <--- add this
 ) : PspCaptureGatewayPort {
     private val pspQueueDelay = Timer.builder("psp_queue_delay")

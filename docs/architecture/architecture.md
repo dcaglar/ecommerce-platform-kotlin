@@ -546,6 +546,37 @@ sequenceDiagram
 ```
 
 
+
+
+
+# 🟦 System Design & Modular Architecture
+
+The platform follows a **Hexagonal (Ports & Adapters)** pattern to separate business policy from technical details, ensuring high availability (NFR1) and consistency (NFR2).
+
+### **1. `payment-domain` (Core Business Logic)**
+- **Role**: Pure Kotlin business rules and data models.
+- **Components**: Entities (`Payment`, `PaymentIntent`), Value Objects, and Domain Events.
+- **Traits**: Zero dependencies on Spring or MyBatis. Implements **Double-entry ledger** logic and **Idempotent state transitions**.
+
+### **2. `payment-application` (Orchestration)**
+- **Role**: Implements Use Cases and coordinates data flow.
+- **Components**: Inbound/Outbound Ports and Services.
+- **Logic**: Manages internal fund distribution, platform fees, and retry policies for PSP operations.
+
+### **3. `payment-infrastructure` (Adapters)**
+- **Role**: Concrete implementations of Outbound Ports.
+- **Persistence**: **MyBatis** with PostgreSQL using the Data Mapper pattern.
+- **Messaging**: **Apache Kafka** for asynchronous PaymentOrder and Ledger events.
+- **Identity**: Distributed **Snowflake** algorithm for time-ordered, unique IDs.
+- **Performance**: Redis-backed balance caching and idempotency storage.
+
+### **4. `payment-service` (Composition Root)**
+- **Role**: System Entry Point and Inbound Adapter.
+- **REST API**: Spring Web MVC controllers exposed to internal checkout services.
+- **Reliability**: Implements the **Transactional Outbox Pattern** via the `OutboxDispatcherJob` for guaranteed event delivery.
+- **Wiring**: Manages global lifecycle, thread pools, and multi-datasource transaction coordination.
+
+
 ## 🟦 Outbox Pattern Implementation
 
 The system uses the **Transactional Outbox Pattern** to ensure reliable event publishing. When payment-related entities are created or updated within a database transaction, corresponding events are written to an `outbox_events` table atomically. The `OutboxDispatcherJob` then publishes these events to Kafka asynchronously.

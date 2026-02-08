@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.outbound.persistence
 
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentEntityMapper
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web.PaymentMapper
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository

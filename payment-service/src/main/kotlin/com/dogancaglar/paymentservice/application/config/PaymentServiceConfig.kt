@@ -7,12 +7,14 @@ import com.dogancaglar.paymentservice.application.usecases.AccountBalanceReadSer
 import com.dogancaglar.paymentservice.application.usecases.AuthorizePaymentIntentService
 import com.dogancaglar.paymentservice.application.usecases.CreatePaymentIntentService
 import com.dogancaglar.paymentservice.application.usecases.GetPaymentIntentService
+import com.dogancaglar.paymentservice.application.usecases.UpdatePaymentIntentService
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceReadUseCase
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentTransactionalFacadePort
 import com.dogancaglar.paymentservice.ports.outbound.PspAuthorizationGatewayPort
+import com.dogancaglar.paymentservice.ports.outbound.ResilientExecutionPort
 import com.stripe.StripeClient
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
@@ -55,21 +57,34 @@ class PaymentServiceConfig {
         return AuthorizePaymentIntentService(
             idGeneratorPort = idGeneratorPort,
             paymentIntentRepository = paymentIntentRepository,
-            psp = pspAuthGatewayPort,
+            pspAuthGatewayPort = pspAuthGatewayPort,
             serializationPort = serializationPort,
             paymentOrderDomainEventMapper = paymentOrderDomainEventMapper,
             paymentTransactionalFacadePort = paymentTransactionalFacadePort
         )
     }
 
+
+    @Bean
+    fun updatePaymentIntentService(paymentIntentRepository: PaymentIntentOutboundAdapter): UpdatePaymentIntentService{
+        return UpdatePaymentIntentService(paymentIntentRepository)
+    }
+
     @Bean
     fun createPaymentService(
+        @Qualifier("pspCallbackExecutor") pspCallbackExecutor: Executor,
         idGeneratorPort: SnowflakeIdGeneratorAdapter,
         paymentIntentRepository: PaymentIntentOutboundAdapter,
         pspAuthGatewayPort: PspAuthorizationGatewayPort,
-        @Qualifier("pspCallbackExecutor") pspCallbackExecutor: Executor
+        resilientExecutionPort: ResilientExecutionPort
     ): CreatePaymentIntentService {
-        return CreatePaymentIntentService(paymentIntentRepository, idGeneratorPort, pspAuthGatewayPort, pspCallbackExecutor)
+        return CreatePaymentIntentService(
+            paymentIntentRepository = paymentIntentRepository,
+            idGeneratorPort = idGeneratorPort,
+            pspAuthGatewayPort = pspAuthGatewayPort,
+            resilientExecutionPort = resilientExecutionPort,
+            pspCallbackExecutor = pspCallbackExecutor
+        )
     }
 
     @Bean

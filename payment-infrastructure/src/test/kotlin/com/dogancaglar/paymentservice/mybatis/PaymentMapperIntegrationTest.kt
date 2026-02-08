@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.mybatis
 
 import com.dogancaglar.paymentservice.InfraTestBoot
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.PaymentEntity
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web.PaymentMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -26,7 +26,6 @@ import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.Payment
 import com.dogancaglar.paymentservice.domain.model.PaymentIntent
-import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
@@ -35,7 +34,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentEntityMapper
 import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentIntentEntityMapper
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.PaymentIntentMapper
+import com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web.PaymentIntentMapper
 import com.dogancaglar.paymentservice.serialization.JacksonUtil
 import com.fasterxml.jackson.databind.ObjectMapper
 import java.time.Instant
@@ -46,7 +45,7 @@ import java.time.Instant
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers
 @TestPropertySource(properties = ["spring.liquibase.enabled=false"])
-@MapperScan("com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis")
+@MapperScan("com.dogancaglar.paymentservice.adapter.outbound.persistence.mybatis.web")
 class PaymentMapperIntegrationTest {
 
     /**

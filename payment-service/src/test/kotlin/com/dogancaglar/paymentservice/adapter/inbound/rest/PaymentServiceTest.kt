@@ -12,7 +12,6 @@ import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentOrderLineD
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentIntent
-import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
@@ -20,7 +19,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.paymentservice.ports.inbound.AuthorizePaymentIntentUseCase
 import com.dogancaglar.paymentservice.ports.inbound.GetPaymentIntentUseCase
-import com.dogancaglar.paymentservice.ports.inbound.ProcessPaymentIntentUpdateUseCase
+import com.dogancaglar.paymentservice.ports.inbound.UpdatePaymentIntentUseCase
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -31,7 +30,7 @@ import org.junit.jupiter.api.Assertions.*
 class PaymentServiceTest {
 
     private lateinit var createPaymentIntentUseCase: CreatePaymentIntentUseCase
-    private lateinit var processPaymentIntentUpdateUseCase: ProcessPaymentIntentUpdateUseCase
+    private lateinit var updatePaymentIntentUseCase: UpdatePaymentIntentUseCase
     private lateinit var authorizePaymentIntentUseCase: AuthorizePaymentIntentUseCase
     private lateinit var getPaymentIntentUseCase: GetPaymentIntentUseCase
     private lateinit var paymentService: PaymentService
@@ -40,7 +39,7 @@ class PaymentServiceTest {
     @BeforeEach
     fun setUp() {
         createPaymentIntentUseCase = mockk()
-        processPaymentIntentUpdateUseCase = mockk()
+        updatePaymentIntentUseCase = mockk()
         authorizePaymentIntentUseCase = mockk()
         getPaymentIntentUseCase = mockk()
         paymentValidator = mockk(relaxed = true)
@@ -48,7 +47,7 @@ class PaymentServiceTest {
             authorizePaymentIntentUseCase,
             createPaymentIntentUseCase,
             getPaymentIntentUseCase,
-            processPaymentIntentUpdateUseCase,
+            updatePaymentIntentUseCase,
             paymentValidator
         )
     }
