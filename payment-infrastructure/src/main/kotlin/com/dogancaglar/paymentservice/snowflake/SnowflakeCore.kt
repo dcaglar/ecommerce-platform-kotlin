@@ -13,7 +13,7 @@ open class SnowflakeCore(
     }
 
     /**
-     * State per logical nodeId (we use nodeId == shardId)
+     * State per logical nodeId
      */
     private data class NodeState(
         var lastTimestamp: Long = -1L,
@@ -24,7 +24,6 @@ open class SnowflakeCore(
 
     /**
      * Generate a new Snowflake ID for the given nodeId (0..31).
-     * We treat nodeId as "logical shard id".
      */
     @Synchronized
     open fun nextId(nodeId: Int): Long {

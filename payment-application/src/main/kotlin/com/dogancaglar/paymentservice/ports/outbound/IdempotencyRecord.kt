@@ -5,6 +5,7 @@ import com.dogancaglar.common.time.Utc
 import java.time.Instant
 
 data class IdempotencyRecord(
+    val id: Long? = null,
     val idempotencyKey: String,
     val requestHash: String,
     val paymentIntentId: Long? = null,

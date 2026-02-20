@@ -1,0 +1,82 @@
+k6-baseline-smoke-test.js start 16:23
+
+---k6 script  logs,and k6 results-----
+
+
+         /\      Grafana   /‾‾/
+    /\  /  \     |\  __   /  /
+   /  \/    \    | |/ /  /   ‾‾\
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/
+
+     execution: local
+        script: load-tests/k6-baseline-smoke-test.js
+        output: -
+
+     scenarios: (100.00%) 4 scenarios, 600 max VUs, 15m30s max duration (incl. graceful stop):
+              * warmup_scenario: Up to 50.00 iterations/s for 1m0s over 1 stages (maxVUs: 10-50, gracefulStop: 30s)
+              * human_scenario: 200 looping VUs for 2m0s (startTime: 1m0s, gracefulStop: 30s)
+              * robot_scenario: 200 looping VUs for 2m0s (startTime: 3m0s, gracefulStop: 30s)
+              * rps_scenario: 200.00 iterations/s for 10m0s (maxVUs: 100-400, startTime: 5m0s, gracefulStop: 30s)
+
+INFO[0591] Request: {"orderId":"ORDER-1450","buyerId":"BUYER-1450","totalAmount":{"quantity":2900,"currency":"EUR"},"paymentOrders":[{"sellerId":"SELLER-111","amount":{"quantity":1450,"currency":"EUR"}},{"sellerId":"SELLER-222","amount":{"quantity":1450,"currency":"EUR"}}]}  source=console
+INFO[0591] Http status: 200   Response: {"paymentIntentId":"pi_AggO4VGCcAA","clientSecret":"sim_cs_5afe59f4-c448-4584-8558-b44af65b083a","buyerId":"BUYER-1450","orderId":"ORDER-1450","totalAmount":{"quantity":2900,"currency":"EUR"},"status":"CREATED","createdAt":"2026-02-08T22:35:10.022723383"}  source=console
+INFO[0772] Request: {"orderId":"ORDER-1450","buyerId":"BUYER-1450","totalAmount":{"quantity":2900,"currency":"EUR"},"paymentOrders":[{"sellerId":"SELLER-111","amount":{"quantity":1450,"currency":"EUR"}},{"sellerId":"SELLER-222","amount":{"quantity":1450,"currency":"EUR"}}]}  source=console
+INFO[0772] Http status: 200   Response: {"paymentIntentId":"pi_AgjDp0ECcAA","clientSecret":"sim_cs_aa53f2a9-01ad-4938-9799-785fd3aa98a4","buyerId":"BUYER-1450","orderId":"ORDER-1450","totalAmount":{"quantity":2900,"currency":"EUR"},"status":"CREATED","createdAt":"2026-02-09T11:44:58.628111269"}  source=console
+
+
+  █ THRESHOLDS
+
+    http_req_duration
+    ✓ 'p(95)<600' p(95)=526.07ms
+
+
+  █ TOTAL RESULTS
+
+    checks_total.......................: 192022 213.2388/s
+    checks_succeeded...................: 99.99% 192020 out of 192022
+    checks_failed......................: 0.00%  2 out of 192022
+
+    ✗ is status 201
+      ↳  99% — ✓ 192020 / ✗ 2
+
+    HTTP
+    http_req_duration.......................................................: avg=428.09ms min=6.78ms med=423.62ms max=1.31s p(90)=506.07ms p(95)=526.07ms
+      { expected_response:true }............................................: avg=428.09ms min=6.78ms med=423.62ms max=1.31s p(90)=506.07ms p(95)=526.07ms
+    http_req_failed.........................................................: 0.00%  0 out of 192022
+    http_reqs...............................................................: 192022 213.2388/s
+
+    EXECUTION
+    dropped_iterations......................................................: 64     0.071071/s
+    iteration_duration......................................................: avg=516.58ms min=9.61ms med=434.51ms max=2.3s  p(90)=664.07ms p(95)=1.4s
+    iterations..............................................................: 192022 213.2388/s
+    vus.....................................................................: 88     min=0           max=270
+    vus_max.................................................................: 458    min=400         max=458
+
+    NETWORK
+    data_received...........................................................: 119 MB 132 kB/s
+    data_sent...............................................................: 341 MB 379 kB/s
+
+
+
+
+running (15m00.5s), 000/458 VUs, 192022 complete and 0 interrupted iterations
+warmup_scenario ✓ [======================================] 00/25 VUs    1m0s   49.99 iters/s
+human_scenario  ✓ [======================================] 200 VUs      2m0s
+robot_scenario  ✓ [======================================] 200 VUs      2m0s
+rps_scenario    ✓ [======================================] 000/143 VUs  10m0s  200.00 iters/s
+
+
+
+
+app log -> payment-service-1600-pod-logs.txt
+refer the prom snapshot file: prom_10022026:16:20:35.txt
+
+
+I also added payment servive pod log, together with promteheus snaphots each 2 second
+
+I do need comprehensive narrative explaining how certain postgre or app metrics impacting each other
+And also explain each mettrics change are being iompacted by correlatinog with the load test schedule, also you can correlate where you are at timelinewise, you can use http request per second panel the first panel in payment dashboartd
+
+
+DO NOT FORGET FAILED MONITORING garanap rpm compoents in kubernetes

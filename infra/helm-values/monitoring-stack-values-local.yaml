@@ -11,14 +11,16 @@ prometheusOperator:
 
 prometheus:
   prometheusSpec:
+    enableAdminAPI: true
+    enableRemoteWriteReceiver: true
     containers:
       - name: config-reloader
         resources:
           requests: { cpu: 5m,  memory: 24Mi }
           limits:   { cpu: 30m, memory: 48Mi }
     resources:
-      requests: { cpu: 80m,  memory: 128Mi }
-      limits:   { cpu: 300m, memory: 256Mi }
+      requests: { cpu: 150m, memory: 256Mi }
+      limits:   { cpu: 500m, memory: 512Mi }
     retention: 6h
     walCompression: true
     scrapeInterval: 60s
@@ -41,8 +43,8 @@ alertmanager:
 
 grafana:
   resources:
-    requests: { cpu: 40m, memory: 96Mi }
-    limits:   { cpu: 200m, memory: 256Mi }
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 400m, memory: 512Mi }
   sidecar:
     datasources:
       resources:

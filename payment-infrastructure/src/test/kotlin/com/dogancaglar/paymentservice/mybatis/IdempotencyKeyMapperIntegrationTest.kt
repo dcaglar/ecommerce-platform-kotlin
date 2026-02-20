@@ -185,20 +185,22 @@ class IdempotencyKeyMapperIntegrationTest {
                 requestHash = hash1
             )
         )
-        assertEquals(key, first)
+        assertNotNull(first)
 
         val nowAfter = Utc.nowInstant().normalizeToMicroseconds()
 
         val row1 = idempotencyKeyMapper.findByKey(key)
         assertNotNull(row1)
-        assertEquals(key, row1!!.idempotencyKey)
-        assertEquals(hash1, row1.requestHash)
-        assertEquals(InitialRequestStatus.PENDING, row1.status)
-        assertNull(row1.paymentIntentId)
-        assertNull(row1.responsePayload)
+        val nonNullRow1 = row1!!
+        assertEquals(first, nonNullRow1.id)
+        assertEquals(key, nonNullRow1.idempotencyKey)
+        assertEquals(hash1, nonNullRow1.requestHash)
+        assertEquals(InitialRequestStatus.PENDING, nonNullRow1.status)
+        assertNull(nonNullRow1.paymentIntentId)
+        assertNull(nonNullRow1.responsePayload)
         // createdAt should be between nowBefore and nowAfter (with tolerance for clock differences)
         // Database generates timestamp, so allow 2 seconds tolerance for clock skew
-        val createdAt = row1.createdAt.normalizeToMicroseconds()
+        val createdAt = nonNullRow1.createdAt.normalizeToMicroseconds()
         assertTrue(createdAt >= nowBefore.minusSeconds(2), 
             "createdAt ($createdAt) should be >= nowBefore - 2s ($nowBefore)")
         assertTrue(createdAt <= nowAfter.plusSeconds(2),

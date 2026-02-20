@@ -3,7 +3,6 @@ package com.dogancaglar.paymentservice.application.config
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Tag
 import org.slf4j.MDC
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -11,8 +10,6 @@ import org.springframework.core.task.TaskDecorator
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Component
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ThreadPoolExecutor
 
 
@@ -52,15 +49,28 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
     }
 
 
-    @Bean("pspAuthExecutor")
-    fun pspAuthExecutor(decorator: TaskDecorator): ThreadPoolTaskExecutor =
+    @Bean("createPaymentIntentExecutor")
+    fun createPaymentIntentExecutor(decorator: TaskDecorator): ThreadPoolTaskExecutor =
         ThreadPoolTaskExecutor().apply {
-            corePoolSize = 250          // Align with Tomcat max-threads
-            maxPoolSize = 250
+            corePoolSize = 80          // Align with Tomcat max-threads
+            maxPoolSize = 200
             queueCapacity = 50       // Minimal queue to ensure low latency
             setThreadNamePrefix("po-psp-")
             setTaskDecorator(decorator)
-            setRejectedExecutionHandler(ThreadPoolExecutor.CallerRunsPolicy())
+            setRejectedExecutionHandler(ThreadPoolExecutor.DiscardPolicy())
+            initialize()
+        }
+
+
+    @Bean("authorizePaymentIntentExecutor")
+    fun authorizePaymentIntentExecutor(decorator: TaskDecorator): ThreadPoolTaskExecutor =
+        ThreadPoolTaskExecutor().apply {
+            corePoolSize = 80          // Align with Tomcat max-threads
+            maxPoolSize = 200
+            queueCapacity = 50       // Minimal queue to ensure low latency
+            setThreadNamePrefix("po-psp-")
+            setTaskDecorator(decorator)
+            setRejectedExecutionHandler(ThreadPoolExecutor.DiscardPolicy())
             initialize()
         }
 
@@ -76,7 +86,7 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
         return scheduler
     }
 
-    // ... existing beans ...
+     // ... existing beans ...
 
     @Bean("pspCallbackExecutor")
     fun pspCallbackExecutor(decorator: TaskDecorator): ThreadPoolTaskExecutor =

@@ -11,13 +11,5 @@ data class IdGenerationProperties(
     /**
      * Region / DC id (0..31), e.g. EU1=1, US1=2...
      */
-    val regionId: Int = 1,
-    /**
-     * Number of logical Payment coordination shards, e.g. 8.
-     */
-    val numCoordShards: Int = 8,
-    /**
-     * Number of seller shards for PaymentOrder + Ledger, e.g. 32.
-     */
-    val numSellerShards: Int = 32
+    val regionId: Int = 1
 )

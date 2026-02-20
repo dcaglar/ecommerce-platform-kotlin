@@ -8,7 +8,7 @@ import java.util.concurrent.CompletableFuture
 //todo remove idempote4ncy keyparam
 interface PspAuthorizationGatewayPort {
     fun createPaymentIntent(paymentIntent: PaymentIntent):  CompletableFuture<PaymentIntent>  // "pi_..."
-    fun authorizePaymentIntent(paymentIntent: PaymentIntent, token: PaymentMethod?): PaymentIntent
-    fun retrieveClientSecret(pspReference: String): String? // Retrieve clientSecret from Stripe by pspReference
+    fun authorizePaymentIntent(paymentIntent: PaymentIntent, token: PaymentMethod?): CompletableFuture<PaymentIntent>
+    fun retrieveClientSecret(pspReference: String): CompletableFuture<String>? // Retrieve clientSecret from Stripe by pspReference
 
 }

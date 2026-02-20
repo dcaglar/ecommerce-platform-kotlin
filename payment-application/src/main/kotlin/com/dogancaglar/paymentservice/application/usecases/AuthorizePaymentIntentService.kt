@@ -58,7 +58,7 @@ class AuthorizePaymentIntentService(
         // 3) We "own" the authorization attempt; update to pending before psp call (in-memory)
         val pendingPaymentIntent = paymentIntent.markAuthorizedPending()
         //call the actual psp
-        // For Stripe Payment Element, paymentMethod is optional - payment method is already attached to PaymentIntent
+        // For Stripe Payment Element, paymentMethod is optional - payment method is already attached to PaymentIntent,but we use simulatort
         val confirmedPaymentIntent = pspAuthGatewayPort.authorizePaymentIntent(pendingPaymentIntent,cmd.paymentMethod)
         generatePaymentOrderLines(confirmedPaymentIntent)
         return  confirmedPaymentIntent
@@ -67,13 +67,13 @@ class AuthorizePaymentIntentService(
 
     private fun generatePaymentOrderLines(confirmedPaymentIntent : PaymentIntent){
         if(confirmedPaymentIntent.status == PaymentIntentStatus.AUTHORIZED){
-            val paymentId = PaymentId(idGeneratorPort.nextPaymentId(confirmedPaymentIntent.buyerId,confirmedPaymentIntent.orderId))
+            val paymentId = PaymentId(idGeneratorPort.nextPaymentId())
             //2.create payment + paymentorders + outboxevents + updated[pamyentintent
             val payment = Payment.fromAuthorizedIntent(paymentId,confirmedPaymentIntent)
             val paymentOrders = confirmedPaymentIntent.paymentOrderLines.map { line ->
                 val sellerId = line.sellerId
                 PaymentOrder.createNew(
-                    paymentOrderId = PaymentOrderId(idGeneratorPort.nextPaymentOrderId(sellerId)),
+                    paymentOrderId = PaymentOrderId(idGeneratorPort.nextPaymentOrderId()),
                     paymentId = paymentId,
                     sellerId = sellerId,
                     amount = line.amount

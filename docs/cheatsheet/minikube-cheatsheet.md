@@ -125,3 +125,11 @@ dogancaglar@Dogans-MacBook-Pro ecommerce-platform-kotlin % helm template payment
 -n payment \
 -f infra/helm-values/payment-consumers-values-local.yaml  --debug > rendered.yaml
 
+
+
+
+---check tunnel works
+
+pgrep -f "minikube.*tunnel"
+
+pgrep -f port-forwarding.sh

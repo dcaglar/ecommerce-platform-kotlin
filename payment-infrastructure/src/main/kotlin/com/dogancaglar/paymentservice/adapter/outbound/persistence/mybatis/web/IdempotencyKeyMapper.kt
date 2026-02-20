@@ -7,7 +7,7 @@ import org.apache.ibatis.annotations.Mapper
 interface IdempotencyKeyMapper {
 
     /** Returns number of inserted rows (1 for first request, 0 for duplicate) */
-    fun insertPending(record: IdempotencyRecord): String?
+    fun insertPending(record: IdempotencyRecord): Long?
 
     fun findByKey(key: String): IdempotencyRecord?
 

@@ -18,3 +18,17 @@ spec:
       port: 9000
       targetPort: 9000
       protocol: TCP
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "payment-service.fullname" . }}-headless
+spec:
+  clusterIP: None # This is the magic "headless" flag
+  selector:
+    app: {{ include "payment-service.fullname" . }}
+  ports:
+    - name: http
+      port: 8080

@@ -53,7 +53,7 @@ envsubst < "$VALUES_TPL" > "$TMP_VALUES"
 echo "🚀 Deploying payment-service..."
 helm upgrade --install payment-service "$REPO_ROOT/charts/payment-service" \
   -n payment --create-namespace -f "$TMP_VALUES"
-kubectl -n payment rollout status deploy/payment-service --timeout=180s || true
+kubectl -n payment rollout status stefulset payment-service  --timeout=180s || true
 
 # Ensure Ingress object exists before writing endpoints.json
 for _ in {1..30}; do

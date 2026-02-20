@@ -29,7 +29,7 @@ class CreatePaymentIntentService(
 
     override fun create(cmd: CreatePaymentIntentCommand): PaymentIntent {
         // 1. Generate ID and create PaymentIntent
-        val paymentIntentId = PaymentIntentId(idGeneratorPort.nextPaymentIntentId(cmd.buyerId, cmd.orderId))
+        val paymentIntentId = PaymentIntentId(idGeneratorPort.nextPaymentIntentId())
         val paymentIntent = PaymentIntent.createNew(
             paymentIntentId = paymentIntentId,
             buyerId = cmd.buyerId,
@@ -72,7 +72,7 @@ class CreatePaymentIntentService(
                 onBackgroundFailure = { error -> handleBackgroundFailure(paymentIntent, error) }
             )
             val finishStripe = System.currentTimeMillis()
-            logger.info("Stripe createPaymentIntent took {} ms", finishStripe - startStripe)
+          //  logger.info("Stripe createPaymentIntent took {} ms", finishStripe - startStripe)
             result
         } catch (e: Exception){
             handleImmediateFailure(paymentIntent,e)
