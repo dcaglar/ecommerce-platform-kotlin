@@ -19,7 +19,7 @@ class AccountBalanceSnapshotJob(
 
     @Scheduled(fixedDelayString = "\${account-balance.snapshot-interval:PT1M}")
     fun mergeDeltasToSnapshots() {
-        logger.info("🔁 Starting AccountBalanceSnapshotJob")
+        logger.debug("🔁 Starting AccountBalanceSnapshotJob")
 
         try {
             val dirtyAccounts = cachePort.getDirtyAccounts()
@@ -46,7 +46,7 @@ class AccountBalanceSnapshotJob(
                 )
 
                 snapshotPort.saveSnapshot(updated)
-                logger.info("✅ Merged Δ{} for {}, new balance={}, watermark={}", delta, accountCode, newBalance, newWatermark)
+                logger.debug("✅ Merged Δ{} for {}, new balance={}, watermark={}", delta, accountCode, newBalance, newWatermark)
             }
 
         } catch (ex: Exception) {

@@ -20,17 +20,16 @@ enum class PaymentOrderStatus {
     // RETRYABLE FAILURES
     PENDING_CAPTURE,
     TIMEOUT_EXCEEDED_1S_TRANSIENT,                // PSP call timeout
-    PSP_UNAVAILABLE_TRANSIENT,
+    PSP_UNAVAILABLE_TRANSIENT;
 
+    fun isExternalCapturePspResponse(): Boolean =
+        isRetryablePspResponse() || isTerminalPspResponse()
+
+    fun isTerminalPspResponse(): Boolean =
+        this in setOf(CAPTURE_FAILED, CAPTURED)
+
+    fun isRetryablePspResponse(): Boolean =
+        this in setOf(PENDING_CAPTURE, TIMEOUT_EXCEEDED_1S_TRANSIENT, PSP_UNAVAILABLE_TRANSIENT)
+
+    fun requiresRetry(): Boolean = isRetryablePspResponse()
 }
-
-fun PaymentOrderStatus.isExternalCapturePspResponse(): Boolean =
-    isRetryablePspResponse() ||  isTerminalPspResponse()
-
-
-fun PaymentOrderStatus.isTerminalPspResponse(): Boolean=
-    this in setOf(PaymentOrderStatus.CAPTURE_FAILED, PaymentOrderStatus.CAPTURED)
-
-
-fun PaymentOrderStatus.isRetryablePspResponse(): Boolean=
-    this in setOf(PaymentOrderStatus.PENDING_CAPTURE, PaymentOrderStatus.CAPTURED)

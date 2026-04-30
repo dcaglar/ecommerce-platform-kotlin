@@ -54,11 +54,10 @@ It declares that this module is:
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>${java.version}</maven.compiler.release>
         <!--test dependencies-->
-        <maven.surefire.version>3.2.5</maven.surefire.version>
         <assertj.version>3.25.3</assertj.version>
         <mockito.kotlin.version>5.2.1</mockito.kotlin.version>
         <mockk.version>1.13.8</mockk.version>
-        <container.test.version>1.19.3</container.test.version>
+        <container.test.version>1.21.4</container.test.version>
         <mybatis.spring.starter.version>3.0.3</mybatis.spring.starter.version>
         <skipUnitTests>false</skipUnitTests>
     </properties>
@@ -255,7 +254,6 @@ It declares that this module is:
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>${maven.surefire.version}</version>
                 <configuration>
                     <skipTests>${skipUnitTests}</skipTests>
                     <!-- Only run *Test classes, not *IntegrationTest -->
@@ -286,7 +284,6 @@ It declares that this module is:
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
-                <version>${maven.surefire.version}</version>
                 <configuration>
                     <!-- Only run *IntegrationTest classes -->
                     <includes combine.self="override">

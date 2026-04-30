@@ -30,7 +30,7 @@ service:
 autoscaling:
   enabled: false
   minReplicas: 1
-  maxReplicas: 1
+  maxReplicas: 4
   metrics:
     - type: External
       external:

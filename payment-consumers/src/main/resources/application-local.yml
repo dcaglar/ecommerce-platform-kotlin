@@ -98,7 +98,7 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
-        spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaDeserializer
+        spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.config.EventEnvelopeKafkaDeserializer
         partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
     properties:
       security.protocol: PLAINTEXT

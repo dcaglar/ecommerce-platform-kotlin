@@ -43,7 +43,7 @@ class OutboxPartitionCreator(
             ensureCurrentAndNext()
             val end = Utc.nowLocalDateTime()
             val durationMs = ChronoUnit.MILLIS.between(start, end)  // long
-            logger.info("Partition check complete started at $start, ended at $end, duration: $durationMs ")
+            logger.debug("Partition check complete started at $start, ended at $end, duration: $durationMs ")
 
         }
     }
@@ -80,7 +80,7 @@ class OutboxPartitionCreator(
 
                 /** 2) Immediately disable autovacuum on the child */
                 jdbcTemplate.execute("""ALTER TABLE $partitionName SET (autovacuum_enabled = false);""")
-                logger.info("Disabled autovacuum on child partition: $partitionName")
+                logger.debug("Disabled autovacuum on child partition: $partitionName")
             } catch (e: Exception) {
                 logger.error("Error creating partition $partitionName: ${e.message}", e)
             } finally {
@@ -117,7 +117,7 @@ class OutboxPartitionCreator(
             pruneOldPartitions()
             val end = Utc.nowLocalDateTime()
             val durationMs = ChronoUnit.MILLIS.between(start, end)  // long
-            logger.info("Partition prune complete started at $start, ended at $end, duration: $durationMs ")
+            logger.debug("Partition prune complete started at $start, ended at $end, duration: $durationMs ")
         }
     }
 
@@ -167,7 +167,7 @@ class OutboxPartitionCreator(
 
             try {
                 jdbcTemplate.execute(sql)
-                logger.info("Pruned old partitions up to $currWindowStart")
+                logger.debug("Pruned old partitions up to $currWindowStart")
             } catch (e: Exception) {
                 logger.error("Partition prune failed: ${e.message}", e)
             }
@@ -187,7 +187,7 @@ class OutboxPartitionCreator(
             vacuumOldPartitionsWithNewRows()
             val end = Utc.nowLocalDateTime()
             val durationMs = ChronoUnit.MILLIS.between(start, end)  // long
-            logger.info("Partition vacuum check complete started at $start, ended at $end, duration: $durationMs ")
+            logger.debug("Partition vacuum check complete started at $start, ended at $end, duration: $durationMs ")
         }
     }
 
@@ -201,7 +201,7 @@ class OutboxPartitionCreator(
         val currPartitionName = "outbox_event_${currWindowStart.format(partitionFormatter)}"
         val nextPartitionName = "outbox_event_${nextWindowStart.format(partitionFormatter)}"
 
-        logger.info("Vacuum check for partitions (skipping: $currPartitionName and $nextPartitionName)")
+        logger.debug("Vacuum check for partitions (skipping: $currPartitionName and $nextPartitionName)")
 
         val partitionNames: List<String> = jdbcTemplate.queryForList(
             """
@@ -218,7 +218,7 @@ class OutboxPartitionCreator(
                 "SELECT count(*) FROM $partitionName WHERE status = 'NEW'", Int::class.java
             )
             if ((newCount ?: 0) > 0) {
-                logger.info("VACUUM: $partitionName ($newCount NEW rows remaining)")
+                logger.debug("VACUUM: $partitionName ($newCount NEW rows remaining)")
                 try {
                     jdbcTemplate.execute("VACUUM $partitionName")
                 } catch (ex: Exception) {

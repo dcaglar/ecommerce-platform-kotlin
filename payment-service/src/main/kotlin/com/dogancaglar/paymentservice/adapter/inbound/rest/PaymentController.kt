@@ -3,6 +3,8 @@ package com.dogancaglar.paymentservice.adapter.inbound.rest
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.AuthorizationRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentResponseDTO
+import com.dogancaglar.paymentservice.application.service.IdempotencyExecutionStatus
+import com.dogancaglar.paymentservice.application.service.IdempotencyService
 import jakarta.validation.Valid
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -19,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/v1")
 class PaymentController(
-    private val paymentService: PaymentService,
+    private val paymentApiOrchestrator: PaymentApiOrchestrator,
     private val idempotencyService: IdempotencyService
 
 ) {
@@ -37,19 +39,30 @@ class PaymentController(
     @PreAuthorize("hasAuthority('payment:write')")
     fun createPayment(
         @RequestHeader("Idempotency-Key") idempotencyKey: String?,
-        @Valid @RequestBody request: CreatePaymentIntentRequestDTO): ResponseEntity<CreatePaymentIntentResponseDTO> {
-        logger.debug("📥 Sending payment request for order: ${request.orderId} with idempodencykey: $idempotencyKey")
+        @Valid @RequestBody request: CreatePaymentIntentRequestDTO
+    ): ResponseEntity<CreatePaymentIntentResponseDTO> {
+        logger.info("📥 Starting payment create intent reqeust")
         require(!idempotencyKey.isNullOrBlank()) {
             "Idempotency-Key header is required"
         }
 
-        val result = idempotencyService.run(idempotencyKey, request) {
-            paymentService.createPaymentIntent(request)
-        }
+        val result = idempotencyService.run(
+            key = idempotencyKey,
+            requestBody = request,
+            responseClass = CreatePaymentIntentResponseDTO::class.java, // Arg 3: The type
+            idExtractor = { response ->
+                // Arg 4: The lambda to get the internal ID for DB storage
+                com.dogancaglar.common.id.PublicIdFactory.toInternalId(response.paymentIntentId!!)
+            },
+            block = {
+                // Arg 5: The business logic block
+                paymentApiOrchestrator.createPaymentIntent(request)
+            }
+        )
 
         val responseDTO = result.response
         // Return 201/200/202 Created with Location header (best practice for resource creation)
-        logger.debug("📥 Received payment request for order: ${responseDTO.orderId}, payment id is ${responseDTO.paymentIntentId}")
+        logger.info("📥 Received payment request for order: ${responseDTO.orderId}, payment id is ${responseDTO.paymentIntentId}")
         return when (result.status) {
 
             IdempotencyExecutionStatus.CREATED -> {
@@ -86,13 +99,10 @@ class PaymentController(
         @PathVariable("paymentId") publicPaymentId: String
     ): ResponseEntity<CreatePaymentIntentResponseDTO> {
         logger.debug("📥 Getting payment intent: {}", publicPaymentId)
-        val dto = paymentService.getPaymentIntent(publicPaymentId)
+        val dto = paymentApiOrchestrator.getPaymentIntent(publicPaymentId)
         return ResponseEntity.status(HttpStatus.OK).body(dto)
     }
 
-    /**
-     * STEP 2 — Authorize Existing Payment
-     */
     @PostMapping("/payments/{paymentId}/authorize")
     @PreAuthorize("hasAuthority('payment:write')")
     fun authorizePayment(
@@ -100,7 +110,7 @@ class PaymentController(
         @Valid @RequestBody request: AuthorizationRequestDTO
     ): ResponseEntity<CreatePaymentIntentResponseDTO> {
 
-        val dto = paymentService.authorizePayment(publicPaymentId,request)
+        val dto = paymentApiOrchestrator.authorizePayment(publicPaymentId, request)
 
         return ResponseEntity
             .status(HttpStatus.OK)
@@ -112,7 +122,7 @@ class PaymentController(
     @PreAuthorize("hasAuthority('payment:write')")
     fun capturePayment(@Valid @RequestBody request: CreatePaymentIntentRequestDTO): ResponseEntity<CreatePaymentIntentResponseDTO> {
         logger.debug("📥 Sending payment request for order: ${request.orderId}")
-        val responseDTO = paymentService.createPaymentIntent(request)
+        val responseDTO = paymentApiOrchestrator.createPaymentIntent(request)
         logger.debug("📥 Received payment request for order: ${responseDTO.orderId}, payment id is ${responseDTO.paymentIntentId}")
 
         // Return 201 Created with Location header (best practice for resource creation)

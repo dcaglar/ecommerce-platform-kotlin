@@ -164,11 +164,11 @@ echo "   - Keycloak    → http://127.0.0.1:8080"
 echo "   - Postgres    → 127.0.0.1:5432"
 echo "   - PG Exporter → http://127.0.0.1:9187/metrics (New!)"
 echo "   - Grafana     → http://127.0.0.1:3000"
-echo "   - Promotheus     → http://127.0.0.1:9090"
+echo "   - Prometheus    → http://127.0.0.1:9090"
 echo "   - Elasticsearch → https://127.0.0.1:9200 (user: elastic, password: fUNIuW1Kdl3qFUyh%)"
 echo "   - Kibana      → http://127.0.0.1:5601"
 if [[ "$PF_INGRESS" != "true" ]]; then
-  echo "   - Ingress     → via LoadBalancer (ensure 'minikube tunnel' is running)"
+  echo "   - Ingress     → via LoadBalancer (Automatic on OrbStack; Docker Desktop needs 'minikube tunnel')"
 fi
 
 echo "Press Ctrl+C to stop."

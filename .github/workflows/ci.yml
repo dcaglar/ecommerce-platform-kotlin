@@ -62,7 +62,7 @@ jobs:
         run: docker info
 
       - name: Run Integration Tests (Failsafe only)
-        run: mvn -B clean verify -DskipUnitTests=true
+        run: mvn -B clean verify -DskipUnitTests=true -Ddocker.client.api.version=1.44
 
       - name: Archive Integration Test Results
         if: always()

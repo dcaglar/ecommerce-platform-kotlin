@@ -24,26 +24,39 @@ kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller --timeou
 MINI_IP="$(minikube ip)"
 INGRESS_HOST="payment.${MINI_IP}.nip.io"
 
-# Prefer LoadBalancer EXTERNAL-IP (requires: `minikube tunnel` running)
-echo "⏳ Waiting for LoadBalancer EXTERNAL-IP (run ' sudo -E minikube -p newprofile tunnel' in another terminal)..."
+# Prefer LoadBalancer EXTERNAL-IP (OrbStack/Minikube Tunnel)
+echo "⏳ Detecting LoadBalancer EXTERNAL-IP..."
 EXT_IP=""
-for _ in {1..60}; do   # 120s total (60 * 2s)
+for _ in {1..10}; do
   EXT_IP="$(kubectl -n ingress-nginx get svc ingress-nginx-controller \
     -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
-  [ -n "$EXT_IP" ] && break
+  [ -z "$EXT_IP" ] && EXT_IP="$(kubectl -n ingress-nginx get svc ingress-nginx-controller \
+    -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)"
+  
+  # If we found an IP/Hostname, verify Port 80 is actually open on our host
+  if [ -n "$EXT_IP" ]; then
+    if nc -zw1 "$EXT_IP" 80 2>/dev/null; then
+       echo "✅ Found reachable LoadBalancer: $EXT_IP"
+       break
+    else
+       echo "⚠️  Found $EXT_IP but Port 80 is REFUSED. (Is 'tunnel.sh' running?)"
+       EXT_IP=""
+    fi
+  fi
   sleep 2
 done
 
 if [ -n "$EXT_IP" ]; then
   BASE_URL="http://$EXT_IP"
-  echo "✅ Using LoadBalancer: EXTERNAL-IP=$EXT_IP  (BASE_URL=$BASE_URL)"
 else
   NODE_PORT="$(kubectl -n ingress-nginx get svc ingress-nginx-controller \
     -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}')"
   BASE_URL="http://${MINI_IP}:${NODE_PORT}"
-  echo "ℹ️  No EXTERNAL-IP yet (LB pending). Falling back to NodePort: $BASE_URL"
-  echo "   Tip: start 'sudo -E minikube -p newprofile tunnel' for a LoadBalancer IP and rerun the script."
+  echo "ℹ️  No reachable LoadBalancer found. Falling back to NodePort: $BASE_URL"
+  echo "   Tip: Run 'infra/scripts/tunnel.sh' in a separate terminal to enable Port 80."
 fi
+
+echo "✅ Using Base URL: $BASE_URL (Host: $INGRESS_HOST)"
 
 # 4) Render chart values (inject INGRESS_HOST) and deploy app
 TMP_VALUES="$(mktemp)"; trap 'rm -f "$TMP_VALUES"' EXIT
@@ -53,7 +66,7 @@ envsubst < "$VALUES_TPL" > "$TMP_VALUES"
 echo "🚀 Deploying payment-service..."
 helm upgrade --install payment-service "$REPO_ROOT/charts/payment-service" \
   -n payment --create-namespace -f "$TMP_VALUES"
-kubectl -n payment rollout status stefulset payment-service  --timeout=180s || true
+kubectl -n payment rollout status statefulset payment-service  --timeout=180s || true
 
 # Ensure Ingress object exists before writing endpoints.json
 for _ in {1..30}; do

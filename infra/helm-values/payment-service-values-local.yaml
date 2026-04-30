@@ -8,7 +8,7 @@ runPrivilegeGrantJob: true
 autoscaling:
   enabled: false
   minReplicas: 1
-  maxReplicas: 1
+  maxReplicas: 2
   metrics:
     - type: Resource
       resource:

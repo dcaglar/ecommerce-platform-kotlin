@@ -5,13 +5,13 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
-import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventEntityMapper
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.config.KafkaTxExecutor
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
-import com.dogancaglar.paymentservice.ports.inbound.ProcessPspResultUseCase
+import com.dogancaglar.paymentservice.ports.inbound.usecases.ProcessPspResultUseCase
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
 import io.mockk.*
 import org.apache.kafka.clients.consumer.Consumer
@@ -20,7 +20,6 @@ import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
@@ -70,7 +69,7 @@ class PaymentOrderPspResultApplierTest {
             createdAt = now,
             updatedAt = now
         )
-        val captureCommand = PaymentOrderDomainEventMapper().toPaymentOrderCaptureCommand(paymentOrder, attempt = 0)
+        val captureCommand = PaymentOrderDomainEventEntityMapper.toPaymentOrderCaptureCommand(paymentOrder, attempt = 0)
         val pspResultUpdated = PaymentOrderPspResultUpdated.from(
             cmd = captureCommand,
             pspStatus = PaymentOrderStatus.CAPTURED,
@@ -158,7 +157,7 @@ class PaymentOrderPspResultApplierTest {
             createdAt = now,
             updatedAt = now
         )
-        val captureCommand = PaymentOrderDomainEventMapper().toPaymentOrderCaptureCommand(paymentOrder, attempt = 0)
+        val captureCommand = PaymentOrderDomainEventEntityMapper.toPaymentOrderCaptureCommand(paymentOrder, attempt = 0)
         val pspResultUpdated = PaymentOrderPspResultUpdated.from(
             cmd = captureCommand,
             pspStatus = PaymentOrderStatus.PENDING_CAPTURE,

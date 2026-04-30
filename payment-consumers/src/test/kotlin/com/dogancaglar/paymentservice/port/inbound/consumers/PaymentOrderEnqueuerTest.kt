@@ -4,12 +4,12 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
-import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventEntityMapper
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
-import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.config.KafkaTxExecutor
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
@@ -17,6 +17,7 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
+import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.MissingPaymentOrderException
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import io.mockk.*
 import org.apache.kafka.clients.consumer.Consumer
@@ -30,7 +31,6 @@ class PaymentOrderEnqueuerTest {
 
     private lateinit var kafkaTxExecutor: KafkaTxExecutor
     private lateinit var eventPublisherPort: EventPublisherPort
-    private lateinit var paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
     private lateinit var dedupe: com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
     private lateinit var modification: com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
     private lateinit var enqueuer: PaymentOrderEnqueuer
@@ -39,7 +39,6 @@ class PaymentOrderEnqueuerTest {
     fun setUp() {
         kafkaTxExecutor = mockk()
         eventPublisherPort = mockk()
-        paymentOrderDomainEventMapper = PaymentOrderDomainEventMapper()
         dedupe = mockk()
         modification = mockk()
 
@@ -47,9 +46,7 @@ class PaymentOrderEnqueuerTest {
             kafkaTx = kafkaTxExecutor,
             publisher = eventPublisherPort,
             dedupe = dedupe,
-            modification = modification,
-            mapper = paymentOrderDomainEventMapper
-        )
+            modification = modification)
     }
 
     @Test
@@ -72,7 +69,7 @@ class PaymentOrderEnqueuerTest {
             createdAt = expectedCreatedAt,
             updatedAt = expectedCreatedAt
         )
-        val paymentOrderCreated = paymentOrderDomainEventMapper.toPaymentOrderCreated(paymentOrder)
+        val paymentOrderCreated = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(paymentOrder)
         
         // Mock the modification port to return the updated order
         val updatedOrder = paymentOrder.markCaptureRequested()
@@ -80,7 +77,7 @@ class PaymentOrderEnqueuerTest {
         every { dedupe.markProcessed(any(), any()) } just Runs
         every { modification.updateReturningIdempotentInitialCaptureRequest(paymentOrderId.value) } returns updatedOrder
         // The mapper is a real object, so we can use it directly
-        val captureCommand = paymentOrderDomainEventMapper.toPaymentOrderCaptureCommand(updatedOrder, 0)
+        val captureCommand = PaymentOrderDomainEventEntityMapper.toPaymentOrderCaptureCommand(updatedOrder, 0)
         
         val envelope = EventEnvelopeFactory.envelopeFor(
             data = paymentOrderCreated,
@@ -183,13 +180,13 @@ class PaymentOrderEnqueuerTest {
             createdAt = now,
             updatedAt = now
         )
-        val paymentOrderCreated = paymentOrderDomainEventMapper.toPaymentOrderCreated(validOrder)
+        val paymentOrderCreated = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(validOrder)
         
         // Mock the dedupe and modification ports
         // The test simulates a scenario where markAsCaptureRequested throws MissingPaymentOrderException
         // (e.g., order was already processed or doesn't exist)
         every { dedupe.exists(any()) } returns false
-        every { modification.updateReturningIdempotentInitialCaptureRequest(paymentOrderId.value) } throws com.dogancaglar.paymentservice.adapter.outbound.persistence.MissingPaymentOrderException(paymentOrderId.value)
+        every { modification.updateReturningIdempotentInitialCaptureRequest(paymentOrderId.value) } throws MissingPaymentOrderException(paymentOrderId.value)
         
         val envelope = EventEnvelopeFactory.envelopeFor(
             data = paymentOrderCreated,

@@ -7,7 +7,6 @@ PROFILE="newprofile"
 # --- cleanup on exit ---
 cleanup() {
   echo -e "\n🛑 Stopping resilient tunnel..."
-  # No need to kill minikube tunnel explicitly as it's the foreground process
   exit 0
 }
 trap cleanup INT TERM
@@ -17,10 +16,11 @@ echo "💡 This script will automatically restart if the tunnel crashes during l
 
 while true; do
   echo "🧹 Cleaning up stale routes..."
-  sudo -E minikube -p "$PROFILE" tunnel --cleanup >/dev/null 2>&1 || true
+  # Removed >/dev/null so you can see if it asks for a password
+  sudo -E minikube -p "$PROFILE" tunnel --cleanup || true
   
   echo "▶️ Running: minikube tunnel"
-  # Run in foreground. If it crashes (exit code != 0), the loop continues.
+  # Run in foreground. 
   if ! sudo -E minikube -p "$PROFILE" tunnel; then
     echo "⚠️ Minikube tunnel crashed or exited unexpectedly."
   fi

@@ -1,6 +1,5 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
-import com.dogancaglar.paymentservice.adapter.inbound.rest.PaymentService
 import com.stripe.exception.SignatureVerificationException
 import com.stripe.net.Webhook
 import org.slf4j.LoggerFactory
@@ -14,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 class WebhookController(
-    private val paymentService: PaymentService,
+    private val paymentApiOrchestrator: PaymentApiOrchestrator,
     @Value("\${stripe.webhook-secret:}") private val endpointSecret: String
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -35,7 +34,7 @@ class WebhookController(
 
         return try {
             val event = Webhook.constructEvent(payload, sigHeader, endpointSecret)
-            paymentService.processWebhook(event)
+            paymentApiOrchestrator.processWebhook(event)
             ResponseEntity.ok("")
         } catch (e: SignatureVerificationException) {
             logger.warn("Invalid Stripe signature: {}", e.message)

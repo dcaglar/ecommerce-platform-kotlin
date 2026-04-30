@@ -4,17 +4,18 @@ package com.dogancaglar.paymentservice.consumers
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.common.event.Event
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.common.logging.GenericLogFields
-import com.dogancaglar.paymentservice.config.kafka.EventEnvelopeKafkaSerializer
-import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.config.EventEnvelopeKafkaSerializer
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
-import com.dogancaglar.paymentservice.application.commands.LedgerRecordingAuthorizationCommand
-import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
+import com.dogancaglar.paymentservice.application.command.LedgerRecordingAuthorizationCommand
+import com.dogancaglar.paymentservice.application.command.LedgerRecordingCommand
+import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.Topics
+import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.MissingPaymentOrderException
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -135,7 +136,7 @@ class KafkaTypedConsumerFactoryConfig(
                 org.apache.kafka.clients.consumer.CommitFailedException::class.java,
             )
             addNotRetryableExceptions(
-                com.dogancaglar.paymentservice.adapter.outbound.persistence.MissingPaymentOrderException::class.java,
+                MissingPaymentOrderException::class.java,
                 java.lang.IllegalArgumentException::class.java,
                 java.lang.NullPointerException::class.java,
                 java.lang.ClassCastException::class.java,

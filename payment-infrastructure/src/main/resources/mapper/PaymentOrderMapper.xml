@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentOrderMapper">
+    <resultMap id="PaymentOrderResultMap"
+               type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentOrderEntity">
+        <id property="paymentOrderId" column="payment_order_id"/>
+        <result property="paymentId" column="payment_id"/>
+        <result property="sellerId" column="seller_id"/>
+        <result property="amountValue" column="amount_value"/>
+        <result property="amountCurrency" column="amount_currency"/>
+        <result property="status" column="status"
+                typeHandler="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.PaymentOrderStatusTypeHandler"/>
+        <result property="createdAt" column="created_at"
+                typeHandler="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.InstantTypeHandler"/>
+        <result property="updatedAt" column="updated_at"
+                typeHandler="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.InstantTypeHandler"/>
+        <result property="retryCount" column="retry_count"/>
+    </resultMap>
+
+    <select id="findByPaymentId" resultMap="PaymentOrderResultMap">
+        SELECT payment_order_id,
+               payment_id,
+               seller_id,
+               amount_value,
+               amount_currency,
+               status,
+               created_at,
+               updated_at,
+               retry_count
+        FROM payment_orders
+        WHERE payment_id = #{paymentId}
+    </select>
+
+    <select id="findByPaymentOrderId" resultMap="PaymentOrderResultMap">
+        SELECT payment_order_id,
+               payment_id,
+               seller_id,
+               amount_value,
+               amount_currency,
+               status,
+               created_at,
+               updated_at,
+               retry_count
+        FROM payment_orders
+        WHERE payment_order_id = #{paymentOrderId}
+    </select>
+
+    <select id="countByPaymentId" resultType="long">
+        SELECT COUNT(*) FROM payment_orders WHERE payment_id = #{paymentId}
+    </select>
+
+    <select id="countByPaymentIdAndStatusIn" resultType="long">
+        SELECT COUNT(*) FROM payment_orders WHERE payment_id = #{paymentId} AND status IN
+        <foreach item="status" collection="statuses" open="(" separator="," close=")">
+            #{status}
+        </foreach>
+    </select>
+
+    <select id="existsByPaymentIdAndStatus" resultType="boolean">
+        SELECT CASE WHEN COUNT(*) > 0 THEN TRUE ELSE FALSE END FROM payment_orders WHERE payment_id = #{paymentId} AND
+        status = #{status}
+    </select>
+
+    <select id="getMaxPaymentOrderId" resultType="long">
+        SELECT MAX(payment_order_id) FROM payment_orders
+    </select>
+
+    <delete id="deleteAll">
+        DELETE FROM payment_orders
+    </delete>
+
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM payment_orders
+    </select>
+
+
+    <insert id="insertAllIgnore" parameterType="java.util.List">
+        INSERT INTO payment_orders (
+        payment_order_id,
+        payment_id,
+        seller_id,
+        amount_value,
+        amount_currency,
+        status,
+        created_at,
+        updated_at,
+        retry_count
+        )
+        VALUES
+        <foreach collection="list" item="po" separator=",">
+            (#{po.paymentOrderId},
+            #{po.paymentId},
+            #{po.sellerId},
+            #{po.amountValue},
+            #{po.amountCurrency},
+            #{po.status, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.PaymentOrderStatusTypeHandler},
+            #{po.createdAt},
+            #{po.updatedAt},
+            #{po.retryCount})
+        </foreach>
+        ON CONFLICT (payment_order_id) DO NOTHING
+    </insert>
+
+
+    <insert id="insert"
+            parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentOrderEntity">
+        INSERT INTO payment_orders (
+        payment_order_id,
+        payment_id,
+        seller_id,
+        amount_value,
+        amount_currency,
+        status,
+        created_at,
+        updated_at,
+        retry_count
+        ) VALUES (
+        #{paymentOrderId},
+        #{paymentId},
+        #{sellerId},
+        #{amountValue},
+        #{amountCurrency},
+        #{status, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.PaymentOrderStatusTypeHandler},
+        #{createdAt},
+        #{updatedAt},
+        #{retryCount}
+        )
+    </insert>
+
+    <select id="updateReturningIdempotent"
+            parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentOrderEntity"
+            resultMap="PaymentOrderResultMap">
+
+        WITH updated AS (
+        UPDATE payment_orders p
+        SET
+        -- 🔒 1. STATUS: terminal is sticky, others can move forward
+        status = CASE
+        -- once terminal, always terminal: ignore any later status
+        WHEN p.status IN ('CAPTURED', 'CAPTURE_FAILED')
+        THEN p.status
+
+        -- INITIATED_PENDING → only allow CAPTURE_REQUESTED (first PSP call)
+        WHEN p.status = 'INITIATED_PENDING'
+        AND #{status, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.PaymentOrderStatusTypeHandler}
+        = 'CAPTURE_REQUESTED'
+        THEN #{status, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.PaymentOrderStatusTypeHandler}
+
+        -- CAPTURE_REQUESTED / PENDING_CAPTURE → can go to PENDING_CAPTURE, CAPTURED, CAPTURE_FAILED
+        WHEN p.status IN ('CAPTURE_REQUESTED', 'PENDING_CAPTURE')
+        AND #{status, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.PaymentOrderStatusTypeHandler}
+        IN ('PENDING_CAPTURE', 'CAPTURED', 'CAPTURE_FAILED')
+        THEN #{status, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.PaymentOrderStatusTypeHandler}
+
+        -- any other combination = ignore (no downgrade / weird jump)
+        ELSE p.status
+        END,
+
+        -- 🔁 2. RETRY_COUNT: monotonic, and frozen once terminal (FIXED: check both old and new status)
+        retry_count = CASE
+        -- Freeze if CURRENT status is already terminal (idempotency protection)
+        WHEN p.status IN ('CAPTURED', 'CAPTURE_FAILED')
+        THEN p.retry_count
+        -- Freeze if NEW status is terminal (correct logic for transitions to terminal)
+        WHEN #{status, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.PaymentOrderStatusTypeHandler}
+        IN ('CAPTURED', 'CAPTURE_FAILED')
+        THEN p.retry_count
+        -- Otherwise, monotonic increase
+        ELSE GREATEST(p.retry_count, #{retryCount})
+        END,
+
+        -- 🕒 3. UPDATED_AT: always take the max
+        updated_at = GREATEST(
+        p.updated_at,
+        #{updatedAt, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.InstantTypeHandler}
+        )
+
+        WHERE p.payment_order_id = #{paymentOrderId}
+        RETURNING
+        p.payment_order_id,
+        p.payment_id,
+        p.seller_id,
+        p.amount_value,
+        p.amount_currency,
+        p.status,
+        p.created_at,
+        p.updated_at,
+        p.retry_count
+        )
+        SELECT * FROM updated
+    </select>
+
+    <select id="updateReturningIdempotentInitialCaptureRequest"
+            resultMap="PaymentOrderResultMap">
+        WITH updated AS (
+        UPDATE payment_orders p
+        SET
+        status = 'CAPTURE_REQUESTED',
+        updated_at = GREATEST(p.updated_at, #{updateAt})
+        WHERE p.payment_order_id = #{paymentOrderId} and
+        p.status='INITIATED_PENDING' and p.retry_count=0
+        RETURNING
+        p.payment_order_id,
+        p.payment_id,
+        p.seller_id,
+        p.amount_value,
+        p.amount_currency,
+        p.status,
+        p.created_at,
+        p.updated_at,
+        p.retry_count
+        )
+        SELECT * FROM updated
+    </select>
+
+</mapper>
