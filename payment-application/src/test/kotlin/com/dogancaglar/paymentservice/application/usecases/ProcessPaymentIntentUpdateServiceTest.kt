@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.application.usecases
 
-import com.dogancaglar.paymentservice.domain.commands.ProcessPaymentIntentUpdateCommand
+import com.dogancaglar.paymentservice.application.command.ProcessPaymentIntentUpdateCommand
+import com.dogancaglar.paymentservice.application.service.UpdatePaymentIntentService
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentIntent

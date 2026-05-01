@@ -1,0 +1,32 @@
+config:
+  datasource:
+    host: "payment-db-postgresql.payment.svc.cluster.local"
+    port: "5432"
+    user: "postgres"
+    database: "payment_db"
+    sslmode: "disable"
+    # This tells the chart to get the password from your existing secret
+    passwordSecret:
+      name: "payment-db-credentials"
+      key: "ADMIN_POSTGRES_PASSWORD"
+
+serviceMonitor:
+  enabled: true
+  namespace: "payment"
+  interval: 10s
+  telemetryPath: /metrics
+  labels:
+    release: prometheus-stack
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+service:
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9187"

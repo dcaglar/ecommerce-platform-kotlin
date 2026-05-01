@@ -1,10 +1,10 @@
 package com.dogancaglar.paymentservice.service
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.PaymentEventPublisher
-import com.dogancaglar.paymentservice.adapter.outbound.redis.PaymentOrderRetryQueueAdapter
-import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
+import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.PaymentEventPublisher
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
+import com.dogancaglar.paymentservice.infra.adapter.outbound.redis.PaymentOrderRetryQueueAdapter
 import io.micrometer.core.instrument.*
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier

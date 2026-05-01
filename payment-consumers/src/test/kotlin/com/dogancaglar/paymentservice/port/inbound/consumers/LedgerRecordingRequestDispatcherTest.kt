@@ -3,14 +3,12 @@ package com.dogancaglar.paymentservice.port.inbound.consumers
 import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.EventLogContext
-import com.dogancaglar.paymentservice.application.events.PaymentOrderEvent
-import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.config.KafkaTxExecutor
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
-import com.dogancaglar.paymentservice.ports.inbound.RequestLedgerRecordingUseCase
+import com.dogancaglar.paymentservice.ports.inbound.usecases.RequestLedgerRecordingUseCase
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import io.mockk.*
 import org.apache.kafka.clients.consumer.Consumer

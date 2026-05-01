@@ -1,17 +1,17 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ID
 import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ORDER_ID
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
-import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.config.KafkaTxExecutor
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
-import com.dogancaglar.paymentservice.ports.inbound.ProcessPspResultUseCase
+import com.dogancaglar.paymentservice.ports.inbound.usecases.ProcessPspResultUseCase
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
 import org.apache.kafka.clients.consumer.ConsumerRecord

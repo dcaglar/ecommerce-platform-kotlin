@@ -6,6 +6,7 @@ import com.dogancaglar.paymentservice.domain.model.balance.AccountBalanceSnapsho
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.application.service.AccountBalanceService
 import com.dogancaglar.paymentservice.util.LedgerEntryTestHelper
 import io.mockk.*
 import org.junit.jupiter.api.BeforeEach

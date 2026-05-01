@@ -21,11 +21,10 @@ import io.mockk.unmockkObject
 import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
-import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
+import com.dogancaglar.paymentservice.application.command.LedgerRecordingCommand
+import com.dogancaglar.paymentservice.application.service.RecordLedgerEntriesService
 import org.junit.jupiter.api.Test
 import java.util.UUID
 

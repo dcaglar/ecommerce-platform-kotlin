@@ -58,6 +58,16 @@ sudo -E minikube -p newprofile tunnel
 infra/scripts/deploy-payment-service-local.sh
 ```
 
+)-️REMEMBER-- USe the monitoring dashboards for payment service and payment-db in 2 sperate grafana dashboarld, i add links below
+http://localhost:3000/d/20250615df/payment-dashboard is monitoring payment service on granfana
+
+http://localhost:3000/d/asdasdasdas/payment-db-dc is monitoring payment db on grafana
+
+
+
+
+
+
 6) Payment Consumers
 - What: Deploys the Kafka consumer workers for payment flows.
 - Run:
@@ -529,11 +539,11 @@ mvn verify -DskipUnitTests=true -Dtest=AccountBalanceMapperIntegrationTest
 
 - Why: Exercise the system under constant RPS profiles (run from project root).
 ```bash
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=10 PRE_VUS=40 MAX_VUS=160 DURATION=20m k6 run load-tests/baseline-smoke-test.js
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=10 PRE_VUS=40 MAX_VUS=160  DURATION=20m k6 run load-tests/baseline-smoke-test.js
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=40 PRE_VUS=40 MAX_VUS=160 DURATION=20m  k6 run load-tests/baseline-smoke-test.js
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=60 PRE_VUS=40 MAX_VUS=160 DURATION=20m  k6 run load-tests/baseline-smoke-test.js
-CLIENT_TIMEOUT=3100ms MODE=constant RPS=80 PRE_VUS=40 MAX_VUS=160 DURATION=100m DURATION=20m k6 run load-tests/baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=10 PRE_VUS=40 MAX_VUS=160 DURATION=20m k6 run load-tests/k6-baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=10 PRE_VUS=40 MAX_VUS=160  DURATION=20m k6 run load-tests/k6-baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=40 PRE_VUS=40 MAX_VUS=160 DURATION=20m  k6 run load-tests/k6-baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=60 PRE_VUS=40 MAX_VUS=160 DURATION=20m  k6 run load-tests/k6-baseline-smoke-test.js
+CLIENT_TIMEOUT=3100ms MODE=constant RPS=80 PRE_VUS=40 MAX_VUS=160 DURATION=100m DURATION=20m k6 run load-tests/k6-baseline-smoke-test.js
 ```
 
 ## Local Kubernetes Deployment Scripts

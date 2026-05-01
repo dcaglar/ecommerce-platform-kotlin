@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
-import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceUseCase
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.config.KafkaTxExecutor
+import com.dogancaglar.paymentservice.ports.inbound.usecases.AccountBalanceUseCase
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import io.mockk.mockk
 import org.junit.jupiter.api.BeforeEach

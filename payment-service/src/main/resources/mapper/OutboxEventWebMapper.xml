@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.OutboxEventWebMapper">
+
+    <insert id="insertOutboxEvent"
+            parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.OutboxEventEntity">
+        INSERT INTO outbox_event (
+        oeid, event_type, aggregate_id, payload, status,
+        created_at, updated_at, claimed_at, claimed_by
+        )
+        VALUES (
+        #{oeid}, #{eventType}, #{aggregateId}, #{payload}, #{status},
+        #{createdAt}, #{updatedAt}, #{claimedAt}, #{claimedBy}
+        )
+    </insert>
+
+    <insert id="insertAllOutboxEvents" parameterType="java.util.List">
+        INSERT INTO outbox_event (
+        oeid, event_type, aggregate_id, payload, status,
+        created_at, updated_at, claimed_at, claimed_by
+        )
+        VALUES
+        <foreach collection="list" item="event" separator=",">
+            (#{event.oeid},
+            #{event.eventType},
+            #{event.aggregateId},
+            #{event.payload},
+            #{event.status},
+            #{event.createdAt},
+            #{event.updatedAt},
+            #{event.claimedAt},
+            #{event.claimedBy})
+        </foreach>
+    </insert>
+</mapper>

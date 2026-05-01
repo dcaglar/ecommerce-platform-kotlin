@@ -1,18 +1,29 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers.config
 
 
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.PaymentEventPublisher
-import com.dogancaglar.paymentservice.adapter.outbound.redis.PaymentOrderRetryQueueAdapter
-import com.dogancaglar.paymentservice.application.usecases.ProcessPaymentService
-import com.dogancaglar.paymentservice.application.usecases.RecordLedgerEntriesService
-import com.dogancaglar.paymentservice.application.usecases.RequestLedgerRecordingService
-import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
-import com.dogancaglar.paymentservice.application.usecases.AccountBalanceService
+import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.application.service.ProcessPaymentService
+import com.dogancaglar.paymentservice.application.service.RecordLedgerEntriesService
+import com.dogancaglar.paymentservice.application.service.RequestLedgerRecordingService
+import com.dogancaglar.paymentservice.application.service.AccountBalanceService
+import com.dogancaglar.paymentservice.application.service.CapturePaymentService
+import com.dogancaglar.paymentservice.application.service.RecordAuthorizationLedgerEntriesService
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.PaymentEventPublisher
+import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.AccountDirectoryImpl
+import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.LedgerEntryTxAdapter
+import com.dogancaglar.paymentservice.infra.adapter.outbound.redis.PaymentOrderRetryQueueAdapter
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
+import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
+import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
+import com.dogancaglar.paymentservice.ports.outbound.OutboxEventRepository
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
+import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
+import com.dogancaglar.paymentservice.ports.outbound.PspAuthorizationGatewayPort
+import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
+import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -22,38 +33,36 @@ class PaymentConsumerConfig {
 
 
     @Bean
-    fun paymentOrderDomainEventMapper(): PaymentOrderDomainEventMapper =
-        PaymentOrderDomainEventMapper()
-
-
-    @Bean
     fun processPaymentService(
         paymentOrderModificationPort: PaymentOrderModificationPort,
-        @Qualifier("syncPaymentEventPublisher") syncPaymentEventPublisher: PaymentEventPublisher,
-        paymentOrderRetryQueueAdapter: PaymentOrderRetryQueueAdapter,
-        paymentOrderDomainEventMapper: PaymentOrderDomainEventMapper
-    ): ProcessPaymentService {
+        @Qualifier("syncPaymentEventPublisher") syncPaymentEventPublisher: EventPublisherPort,
+        paymentOrderRetryQueueAdapter:  RetryQueuePort<PaymentOrderCaptureCommand>): ProcessPaymentService {
         return ProcessPaymentService(
             paymentOrderModificationPort = paymentOrderModificationPort,
             eventPublisher = syncPaymentEventPublisher,
-            retryQueuePort = paymentOrderRetryQueueAdapter,
-            paymentOrderDomainEventMapper = paymentOrderDomainEventMapper
-        )
+            retryQueuePort = paymentOrderRetryQueueAdapter)
     }
+
+
+
 
     @Bean
     fun requestLedgerRecordingService(
         @Qualifier(
-            "syncPaymentEventPublisher") syncPaymentEventPublisher: PaymentEventPublisher): RequestLedgerRecordingService{
+            "syncPaymentEventPublisher") syncPaymentEventPublisher: EventPublisherPort): RequestLedgerRecordingService{
 
         return RequestLedgerRecordingService(syncPaymentEventPublisher)
     }
 
 
     @Bean
+    fun recordAuthorizationLedgerEntriesService(ledgerWriterPort: LedgerEntryPort,accountDirectoryPort: AccountDirectoryPort)
+= RecordAuthorizationLedgerEntriesService(ledgerWritePort = ledgerWriterPort,accountDirectoryPort=accountDirectoryPort)
+
+    @Bean
     fun recordLedgerEntriesService(
         ledgerEntrPort: LedgerEntryPort,
-        syncPaymentEventPublisher: PaymentEventPublisher,
+        syncPaymentEventPublisher: EventPublisherPort,
         @Qualifier(
             "accountDirectoryImpl") accountDirectoryImpl: AccountDirectoryPort): RecordLedgerEntriesService{
 

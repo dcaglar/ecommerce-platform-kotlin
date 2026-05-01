@@ -1,5 +1,13 @@
+
 # ingress-values.yaml
 controller:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: ingress-nginx # or wherever your operator is
+      additionalLabels:
+        release: prometheus-stack # Match the label your operator looks for
   service:
     type: LoadBalancer
     ports:
@@ -11,7 +19,7 @@ controller:
       memory: 90Mi
     limits:
       cpu: 300m
-      memory: 256Mi
+      memory: 912Mi
 
   admissionWebhooks:
     patch:

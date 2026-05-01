@@ -4,15 +4,15 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ID
 import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ORDER_ID
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
-import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
-import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventEntityMapper
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.config.KafkaTxExecutor
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.Topics
+import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.MissingPaymentOrderException
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.MissingPaymentOrderException
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
@@ -30,9 +30,7 @@ class PaymentOrderEnqueuer(
     private val publisher: EventPublisherPort,
 
     private val dedupe: EventDeduplicationPort,
-    private val modification: PaymentOrderModificationPort,
-    private val mapper: PaymentOrderDomainEventMapper
-) {
+    private val modification: PaymentOrderModificationPort) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -80,7 +78,7 @@ class PaymentOrderEnqueuer(
 
             // 3. Build new event
             val work = try {
-                mapper.toPaymentOrderCaptureCommand(updated, attempt = 0)
+                PaymentOrderDomainEventEntityMapper.toPaymentOrderCaptureCommand(updated, attempt = 0)
             } catch (ex: IllegalArgumentException) {
                 // this comes from require(...) in from()
                 logger.warn(

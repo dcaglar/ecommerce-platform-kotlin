@@ -1,0 +1,80 @@
+k6-baseline-smoke-test.js
+
+---k6 script  logs,and k6 results-----
+
+ k6 run load-tests/k6-baseline-smoke-test.js
+
+         /\      Grafana   /‾‾/
+    /\  /  \     |\  __   /  /
+   /  \/    \    | |/ /  /   ‾‾\
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/
+
+     execution: local
+        script: load-tests/k6-baseline-smoke-test.js
+        output: -
+
+     scenarios: (100.00%) 4 scenarios, 600 max VUs, 15m30s max duration (incl. graceful stop):
+              * warmup_scenario: Up to 50.00 iterations/s for 1m0s over 1 stages (maxVUs: 10-50, gracefulStop: 30s)
+              * human_scenario: 200 looping VUs for 2m0s (startTime: 1m0s, gracefulStop: 30s)
+              * robot_scenario: 200 looping VUs for 2m0s (startTime: 3m0s, gracefulStop: 30s)
+              * rps_scenario: 200.00 iterations/s for 10m0s (maxVUs: 100-400, startTime: 5m0s, gracefulStop: 30s)
+
+INFO[0324] Request: {"orderId":"ORDER-1450","buyerId":"BUYER-1450","totalAmount":{"quantity":2900,"currency":"EUR"},"paymentOrders":[{"sellerId":"SELLER-111","amount":{"quantity":1450,"currency":"EUR"}},{"sellerId":"SELLER-222","amount":{"quantity":1450,"currency":"EUR"}}]}  source=console
+INFO[0324] Http status: 200   Response: {"paymentIntentId":"pi_Agjg3D5CcAA","clientSecret":"sim_cs_4acac91f-f59e-4250-94a8-01cfd989398e","buyerId":"BUYER-1450","orderId":"ORDER-1450","totalAmount":{"quantity":2900,"currency":"EUR"},"status":"CREATED","createdAt":"2026-02-09T13:52:35.065637026"}  source=console
+
+
+  █ THRESHOLDS
+
+    http_req_duration
+    ✓ 'p(95)<600' p(95)=555.95ms
+
+
+  █ TOTAL RESULTS
+
+    checks_total.......................: 192516 213.800852/s
+    checks_succeeded...................: 99.99% 192515 out of 192516
+    checks_failed......................: 0.00%  1 out of 192516
+
+    ✗ is status 201
+      ↳  99% — ✓ 192515 / ✗ 1
+
+    HTTP
+    http_req_duration.......................................................: avg=435.65ms min=306.02ms med=428.06ms max=1.97s p(90)=511.48ms p(95)=555.95ms
+      { expected_response:true }............................................: avg=435.65ms min=306.02ms med=428.06ms max=1.97s p(90)=511.48ms p(95)=555.95ms
+    http_req_failed.........................................................: 0.00%  0 out of 192516
+    http_reqs...............................................................: 192516 213.800852/s
+
+    EXECUTION
+    dropped_iterations......................................................: 211    0.234328/s
+    iteration_duration......................................................: avg=522.72ms min=306.32ms med=437.73ms max=2.9s  p(90)=701.39ms p(95)=1.41s
+    iterations..............................................................: 192516 213.800852/s
+    vus.....................................................................: 81     min=0           max=254
+    vus_max.................................................................: 537    min=400         max=537
+
+    NETWORK
+    data_received...........................................................: 119 MB 132 kB/s
+    data_sent...............................................................: 342 MB 380 kB/s
+
+
+
+
+running (15m00.4s), 000/537 VUs, 192516 complete and 0 interrupted iterations
+warmup_scenario ✓ [======================================] 00/42 VUs    1m0s   49.99 iters/s
+human_scenario  ✓ [======================================] 200 VUs      2m0s
+robot_scenario  ✓ [======================================] 200 VUs      2m0s
+rps_scenario    ✓ [======================================] 000/205 VUs  10m0s  200.00 iters/
+
+
+
+app log -> is payment-service-0400-pod.log
+also note that prom_10022026:00:50:56.txt is promoteheus snapshots
+
+Dashboards are loaded very slow  in page load.i do want every metric in forst 3 rows to be discussed for [payment=service,
+but for each metric in postgre dashboard, i want to klnow wht they are, and how did we exactly identifiy opur logic was flawed?
+
+I do need comprehensive narrative explaining how certain postgre or app metrics impacting each other
+Then i want hi mto evaluate my work.
+
+
+DO NOT FORGET FAILED MONITORING garanap rpm compoents in kubernetes

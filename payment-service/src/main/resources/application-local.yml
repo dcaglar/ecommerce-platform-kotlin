@@ -30,8 +30,8 @@ app:
       driver-class-name: org.postgresql.Driver
       pool-name: web-pool
       maximum-pool-size: 12   # Reverted as per user preference
-      minimum-idle: 12
-      connection-timeout: 5000 # Keep 5s to allow threads to wait in queue during spikes
+      minimum-idle: 6
+      connection-timeout: 1000 # Keep 5s to allow threads to wait in queue during spikes
       validation-timeout: 1000
       idle-timeout: 600000
       max-lifetime: 1800000
@@ -45,8 +45,8 @@ app:
       pool-name: outbox-pool
       maximum-pool-size: 6
       minimum-idle: 3
-      connection-timeout: 1500
-      validation-timeout: 1500
+      connection-timeout: 1000
+      validation-timeout: 1000
       idle-timeout: 600000
       max-lifetime: 1800000
 
@@ -66,13 +66,14 @@ app:
 server:
   port: 8080
   tomcat:
+    connection-timeout: 130000 # Idle connection timeout
     mbeanregistry:
       enabled: true
     threads:
       # $N = {Requests/sec} *Response Time}$
       # 200 Vus * 0.8(response time of a single request)=160
       #160
-      max: 300
+      max: 200
       # for vus =250 , 0 sleep
       # $$N = \text{Requests per Second} (\lambda) \times \text{Response Time} (W)$$$\lambda$ (Target Load):
       #200 req/s$W$ (Response Time): 0.8 seconds (Derived from your logs for single request: ~800ms).$$N
@@ -84,10 +85,9 @@ server:
       #If Stripe slows down by just 0.1s (to 0.9s total response):$$N_{\text{new}}
       #200 \times 0.9 = 180 \text{ Threads}$$If you had set it to 160, those extra 20 requests would instantly queue, increasing latency.
       #By setting it to 250, you have a "shock absorber" that handles these fluctuations without the user ever noticing.
-      min-spare: 50
-    max-connections: 8192
+      min-spare: 80
+    max-connections: 500
     accept-count: 100
-    connection-timeout: 20000 # Idle connection timeout
 
 
 spring:
@@ -106,7 +106,7 @@ spring:
       session.timeout.ms: 45000
 
 #  datasource:
-#    url: ${SPRING_DATASOURCE_URL}
+#    url: ${SPRING_DATASOURCE_URL} kubectl describe pod -n payment payment-service-0
 #    username: ${SPRING_DATASOURCE_USERNAME}
 #    password: ${SPRING_DATASOURCE_PASSWORD}
 #    hikari:
@@ -241,5 +241,3 @@ payments:
   id:
     epoch-millis: 1735689600000   # 2025-01-01T00:00:00Z
     region-id: 1                  # EU1
-    num-coord-shards: 8
-    num-seller-shards: 32

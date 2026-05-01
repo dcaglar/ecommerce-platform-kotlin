@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: enable-db-extensions-job
+  namespace: {{.Release.Namespace}}
+  labels:
+    app: enable-db-extensions-job
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: enable-extensions
+          image: postgres:16-alpine
+          env:
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-app-config
+                  key: DB_NAME
+            - name: DB_ADMIN_USER
+              value: postgres
+            - name: DB_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: ADMIN_POSTGRES_PASSWORD
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              until pg_isready -h payment-db-postgresql -U postgres -d "$DB_NAME"; do
+                echo "Waiting for Postgres..."
+                sleep 2
+              done
+              
+              echo "🔌 Enabling pg_stat_statements extension..."
+              export PGPASSWORD="${DB_ADMIN_PASSWORD}"
+              
+              # CRITICAL COMMAND FOR MONITORING:
+              psql -h payment-db-postgresql -U postgres -d "$DB_NAME" -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
+              
+              echo "✅ Extension enabled. Postgres Exporter will now see query stats."

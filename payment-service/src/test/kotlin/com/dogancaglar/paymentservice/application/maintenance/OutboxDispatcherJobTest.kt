@@ -4,7 +4,7 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.OutboxEventType
+import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.OutboxEventType
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
@@ -24,7 +24,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
-import java.time.Duration
 
 class OutboxDispatcherJobTest {
 

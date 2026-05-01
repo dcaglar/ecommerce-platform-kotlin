@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
-import com.dogancaglar.paymentservice.ports.inbound.AccountBalanceReadUseCase
+import com.dogancaglar.paymentservice.ports.inbound.usecases.AccountBalanceReadUseCase
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
 import com.dogancaglar.port.out.web.dto.BalanceDto
 import com.dogancaglar.port.out.web.dto.CurrencyEnum

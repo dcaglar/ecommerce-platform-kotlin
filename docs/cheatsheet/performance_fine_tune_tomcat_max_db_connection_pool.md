@@ -1,6 +1,6 @@
 # 📘 Spring Boot Capacity Planning & Load Testing Handbook
 **For Spring Boot + Tomcat + HikariCP + k6**
-
+Numbers represented here are not fixed numbers, but formulation and calculation logic reamains same
 ---
 
 ## 1. Glossary: k6 Terms vs. Server Reality
@@ -118,3 +118,39 @@ spring:
       
       # Fail fast if pool is full. Don't wait 30s.
       connection-timeout: 3000
+
+```
+
+
+## 6. K6 Cheat Sheet (`application.yaml`)
+given k6-generic-test.js
+
+we first check with 50 vus ramping
+
+so this seems like a stable under 50 vus,but 
+
+we are looking for the Maximum Serviceable Load—the highest point where the system still behaves perfectly.
+
+If we only test at 50 VUs and stop, we are leaving performance on the table. Moving to 75 VUs is the "Conscious" next step to see where the system begins to struggle.
+
+1. The "Optimal Baseline" Search 🔍
+   By testing 75 VUs, you are checking if your system has Headroom.
+
+If 75 VUs gives you ~75 RPS at ~515ms: Your system is still in the "Linear Scaling" zone. 75 becomes your new, more accurate baseline.
+
+If 75 VUs gives you ~75 RPS but latency jumps to ~800ms: You have hit Contention. Your app or DB is starting to queue requests, meaning 50 VUs was closer to your true "safe" baseline.
+
+2. Why it might be 100 (or more)
+   You likely haven't hit the limit yet because of your "Wait-to-Work" Ratio:
+
+Wait Time: Your external API simulation is forcing a ~400ms delay. During this time, your Java thread is "parked," and the CPU is doing nothing.
+
+Work Time: Your actual Postgres INSERT and JSON processing likely take less than 20ms.
+
+Because the "Work" is so small compared to the "Wait," your CPU can likely handle many more concurrent users than you think. The only limit will be Connection Pools or Database Disk I/O (the "Red Storm" we discussed).
+
+
+Your $p(95)$ (green line) is practically identical at 50 VUs and 75 VUs, which is a very strong signal that your system is not yet saturated.However, the change in your Max (yellow line) tells the deeper story. Here is how to interpret these results to find your "Optimal Baseline."1. The "Bulk" Stability ($p(95)$)Result: At both 50 and 75 VUs, your $p(95)$ stays rock-steady at roughly 500ms.Interpretation: This means 95% of your users are having the exact same experience regardless of that 50% increase in traffic. The system is handling the "bulk" of the load with ease.2. The "Early Warning" (Max Duration)Result: Your Max jumped from roughly 850ms (at 50 VUs) to 1.1s (at 75 VUs).Interpretation: While the 95th percentile is stable, your "worst-case" outliers are getting slower. This is often a sign of Resource Contention beginning to happen, such as:Thread Pool Queuing: Requests are starting to wait a few milliseconds longer for an available worker thread.Garbage Collection (GC): The JVM is working harder to clear memory, causing slightly longer pauses for a tiny fraction of users.Database Lock Contention: More concurrent users mean a higher chance of two requests waiting on the same row.Is the Optimal Baseline higher than 75? 📈Yes. Because your $p(95)$ hasn't moved, 75 VUs is a safe and healthy "Normal" state for your application. You haven't hit the "Knee of the Curve" yet.Optimal Baseline: The point where $p(95)$ remains stable and error rates are 0%. You are clearly still in this zone at 75 VUs.Saturation Point: The point where $p(95)$ starts to "climb" sharply. You have not reached this point yet.
+
+
+So we can try 100 and 125 and 150 actually

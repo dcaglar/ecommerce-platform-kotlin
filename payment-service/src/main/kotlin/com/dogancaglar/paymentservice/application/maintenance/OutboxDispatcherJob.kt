@@ -3,20 +3,17 @@ package com.dogancaglar.paymentservice.application.maintenance
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.adapter.outbound.persistence.entity.OutboxEventType
-import com.dogancaglar.paymentservice.adapter.outbound.psp.StripePspAuthorizationGatewayAdapter
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.domain.model.OutboxEvent
-import com.dogancaglar.paymentservice.domain.model.PaymentIntent
-import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_DISPATCHED_TOTAL
-import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_DISPATCHER_DURATION
-import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_DISPATCH_FAILED_TOTAL
-import com.dogancaglar.paymentservice.metrics.MetricNames.OUTBOX_EVENT_BACKLOG
+import com.dogancaglar.paymentservice.infra.monitoring.MetricNames.OUTBOX_DISPATCHED_TOTAL
+import com.dogancaglar.paymentservice.infra.monitoring.MetricNames.OUTBOX_DISPATCHER_DURATION
+import com.dogancaglar.paymentservice.infra.monitoring.MetricNames.OUTBOX_DISPATCH_FAILED_TOTAL
+import com.dogancaglar.paymentservice.infra.monitoring.MetricNames.OUTBOX_EVENT_BACKLOG
+import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.OutboxEventType
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import com.dogancaglar.paymentservice.ports.outbound.OutboxEventRepository
-import com.dogancaglar.paymentservice.ports.outbound.PaymentIntentRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
@@ -33,7 +30,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @DependsOn("outboxPartitionCreator")
 class OutboxDispatcherJob(
-    @param:Qualifier("outboxWebAdapter") private val outboxEventRepository: OutboxEventRepository,
+    @param:Qualifier("outboxJobAdapter") private val outboxEventRepository: OutboxEventRepository,
     @param:Qualifier("batchPaymentEventPublisher") private val syncPaymentEventPublisher: EventPublisherPort,
     private val meterRegistry: MeterRegistry,
     private val objectMapper: ObjectMapper,

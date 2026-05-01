@@ -5,6 +5,7 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.GenericLogFields
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
+import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventEntityMapper
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
@@ -12,7 +13,6 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
-import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -20,8 +20,6 @@ import org.slf4j.MDC
 import java.util.UUID
 
 class DomainEventFactoryTest {
-
-    private val mapper = PaymentOrderDomainEventMapper()
 
     @Test
     fun `should create EventEnvelope with generated eventId and traceid from mdc`() {
@@ -40,7 +38,7 @@ class DomainEventFactoryTest {
                 createdAt = now,
                 updatedAt = now
             )
-            val event = mapper.toPaymentOrderCreated(paymentOrder)
+            val event = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(paymentOrder)
             
             // when
             val envelope: EventEnvelope<PaymentOrderCreated> = EventEnvelopeFactory.envelopeFor(
@@ -73,7 +71,7 @@ class DomainEventFactoryTest {
                 createdAt = now,
                 updatedAt = now
             )
-            val event = mapper.toPaymentOrderCreated(paymentOrder)
+            val event = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(paymentOrder)
             
             EventEnvelopeFactory.envelopeFor(
                 data = event,
@@ -99,7 +97,7 @@ class DomainEventFactoryTest {
                 createdAt = now,
                 updatedAt = now
             )
-            val event1Data = mapper.toPaymentOrderCreated(paymentOrder1)
+            val event1Data = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(paymentOrder1)
             val event1 = EventEnvelopeFactory.envelopeFor(
                 data = event1Data,
                 aggregateId = event1Data.paymentOrderId,
@@ -116,7 +114,7 @@ class DomainEventFactoryTest {
                 createdAt = now,
                 updatedAt = now
             )
-            val event2Data = mapper.toPaymentOrderCreated(paymentOrder2)
+            val event2Data = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(paymentOrder2)
             val event2 = EventEnvelopeFactory.envelopeFor(
                 data = event2Data,
                 aggregateId = event2Data.paymentOrderId,
@@ -147,7 +145,7 @@ class DomainEventFactoryTest {
                 createdAt = now,
                 updatedAt = now
             )
-            val event = mapper.toPaymentOrderCreated(paymentOrder)
+            val event = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(paymentOrder)
 
             val envelope = EventEnvelopeFactory.envelopeFor(
                 data = event,
@@ -182,7 +180,7 @@ class DomainEventFactoryTest {
                 createdAt = now,
                 updatedAt = now
             )
-            val event = mapper.toPaymentOrderCreated(paymentOrder)
+            val event = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(paymentOrder)
 
             val envelope = EventEnvelopeFactory.envelopeFor(
                 data = event,

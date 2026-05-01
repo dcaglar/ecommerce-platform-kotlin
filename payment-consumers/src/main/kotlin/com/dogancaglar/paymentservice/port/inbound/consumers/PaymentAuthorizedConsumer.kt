@@ -1,20 +1,16 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ID
-import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ORDER_ID
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.application.commands.LedgerRecordingAuthorizationCommand
+import com.dogancaglar.paymentservice.application.command.LedgerRecordingAuthorizationCommand
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
-import com.dogancaglar.paymentservice.application.events.PaymentIntentAuthorized
-import com.dogancaglar.paymentservice.application.usecases.RecordAuthorizationLedgerEntriesService
-import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
-import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
+import com.dogancaglar.paymentservice.application.service.RecordAuthorizationLedgerEntriesService
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.config.KafkaTxExecutor
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
-import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.consumer.OffsetAndMetadata

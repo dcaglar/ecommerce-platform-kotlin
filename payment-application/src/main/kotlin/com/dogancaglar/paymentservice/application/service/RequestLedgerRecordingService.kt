@@ -1,0 +1,34 @@
+package com.dogancaglar.paymentservice.application.service
+
+import com.dogancaglar.common.time.Utc
+import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.paymentservice.application.command.LedgerRecordingCommand
+import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
+import com.dogancaglar.paymentservice.ports.inbound.usecases.RequestLedgerRecordingUseCase
+import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
+import org.slf4j.LoggerFactory
+
+open class RequestLedgerRecordingService(
+    private val eventPublisherPort: EventPublisherPort) : RequestLedgerRecordingUseCase {
+
+    private val logger = LoggerFactory.getLogger(javaClass)
+
+    override fun requestLedgerRecording(event: PaymentOrderFinalized) {
+        val requested = LedgerRecordingCommand.from(
+            final = event,
+            now = Utc.nowInstant()
+        )
+
+        eventPublisherPort.publishSync(
+            aggregateId = requested.sellerId,
+            data = requested,
+            parentEventId = EventLogContext.getEventId(),
+            traceId = EventLogContext.getTraceId()
+        )
+
+        logger.info(
+            "📘 Published LedgerRecordingCommand for paymentOrderId={} finalStatus={}",
+            event.publicPaymentOrderId, requested.finalStatus
+        )
+    }
+}

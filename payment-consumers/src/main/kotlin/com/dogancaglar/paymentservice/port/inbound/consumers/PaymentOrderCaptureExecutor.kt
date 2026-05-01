@@ -1,18 +1,13 @@
 package com.dogancaglar.paymentservice.port.inbound.consumers
 
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
-import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.adapter.outbound.kafka.metadata.Topics
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ID
 import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ORDER_ID
-import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
-import com.dogancaglar.paymentservice.application.commands.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.config.KafkaTxExecutor
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
-import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventMapper
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.PspCaptureGatewayPort
@@ -27,6 +22,9 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
 import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.Topics
 import java.util.concurrent.TimeUnit
 @Component
 class PaymentOrderCaptureExecutor(
@@ -37,7 +35,6 @@ class PaymentOrderCaptureExecutor(
     @param:Qualifier("syncPaymentEventPublisher")
     private val publisher: EventPublisherPort,
     private val paymentOrderRepository: PaymentOrderRepository,
-    private val mapper: PaymentOrderDomainEventMapper,
     private val dedupe: EventDeduplicationPort
 ) {
 

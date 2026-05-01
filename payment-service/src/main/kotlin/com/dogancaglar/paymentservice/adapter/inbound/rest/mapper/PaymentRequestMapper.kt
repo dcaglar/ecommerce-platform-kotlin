@@ -6,9 +6,9 @@ import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.AuthorizationRequ
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentMethodDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentResponseDTO
+import com.dogancaglar.paymentservice.application.command.AuthorizePaymentIntentCommand
+import com.dogancaglar.paymentservice.application.command.CreatePaymentIntentCommand
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentIntentId
-import com.dogancaglar.paymentservice.domain.commands.AuthorizePaymentIntentCommand
-import com.dogancaglar.paymentservice.domain.commands.CreatePaymentIntentCommand
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentIntent
@@ -64,7 +64,7 @@ object PaymentRequestMapper {
                     cvc = dto.cvc
                 )
         }
-    
+
     fun toPaymentMethodOrNull(dto: PaymentMethodDTO?): PaymentMethod? =
         dto?.let { toPaymentMethod(it) }
 

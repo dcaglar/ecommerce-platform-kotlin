@@ -26,7 +26,17 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
             initialize()
         }
 
-
+    @Bean("resilientExecutor")
+    fun resilientExecutor(decorator: TaskDecorator): ThreadPoolTaskExecutor =
+        ThreadPoolTaskExecutor().apply {
+            corePoolSize = 32
+            maxPoolSize = 32
+            queueCapacity = 500
+            setThreadNamePrefix("resilient-callback-")
+            setTaskDecorator(decorator)
+            setRejectedExecutionHandler(ThreadPoolExecutor.CallerRunsPolicy())
+            initialize()
+        }
 
     @Bean("taskScheduler")
     fun defaultSpringScheduler(): ThreadPoolTaskScheduler =

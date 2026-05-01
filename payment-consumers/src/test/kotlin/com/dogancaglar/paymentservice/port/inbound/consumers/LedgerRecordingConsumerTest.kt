@@ -4,9 +4,9 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.application.commands.LedgerRecordingCommand
+import com.dogancaglar.paymentservice.application.command.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
-import com.dogancaglar.paymentservice.config.kafka.KafkaTxExecutor
+import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.config.KafkaTxExecutor
 import com.dogancaglar.paymentservice.domain.model.Amount
 import com.dogancaglar.paymentservice.domain.model.Currency
 import com.dogancaglar.paymentservice.domain.model.PaymentOrder
@@ -14,7 +14,7 @@ import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
-import com.dogancaglar.paymentservice.ports.inbound.RecordLedgerEntriesUseCase
+import com.dogancaglar.paymentservice.ports.inbound.usecases.RecordLedgerEntriesUseCase
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import io.mockk.every
 import io.mockk.mockk
