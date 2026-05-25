@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.application.service
 
 import com.dogancaglar.paymentservice.application.command.GetPaymentIntentCommand
 import com.dogancaglar.paymentservice.domain.exception.PaymentIntentNotFoundException
-import com.dogancaglar.paymentservice.domain.model.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
 import com.dogancaglar.paymentservice.ports.inbound.usecases.GetPaymentIntentUseCase
 import com.dogancaglar.paymentservice.ports.outbound.PaymentIntentRepository
 import com.dogancaglar.paymentservice.ports.outbound.PspAuthorizationGatewayPort

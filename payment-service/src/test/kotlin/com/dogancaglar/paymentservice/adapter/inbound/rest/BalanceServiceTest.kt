@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
-import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.common.Currency
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountCategory
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountProfile
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountStatus

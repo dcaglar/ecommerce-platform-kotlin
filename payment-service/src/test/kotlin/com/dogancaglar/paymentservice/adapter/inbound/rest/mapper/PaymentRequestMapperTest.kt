@@ -5,9 +5,10 @@ import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentInte
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.AuthorizationRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentMethodDTO
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentIntentId
-import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.Currency
-import com.dogancaglar.paymentservice.domain.model.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Currency
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentMethod
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
@@ -176,8 +177,8 @@ class PaymentRequestMapperTest {
         // Then
         assertNotNull(command.paymentIntentId)
         assertNotNull(command.paymentMethod)
-        assertTrue(command.paymentMethod is com.dogancaglar.paymentservice.domain.model.PaymentMethod.CardToken)
-        val cardToken = command.paymentMethod as com.dogancaglar.paymentservice.domain.model.PaymentMethod.CardToken
+        assertTrue(command.paymentMethod is PaymentMethod.CardToken)
+        val cardToken = command.paymentMethod as PaymentMethod.CardToken
         assertEquals("token-abc-123", cardToken.token)
         assertEquals("123", cardToken.cvc)
     }

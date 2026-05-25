@@ -7,10 +7,10 @@ import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.command.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
 import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.config.KafkaTxExecutor
-import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.Currency
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Currency
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId

@@ -4,8 +4,8 @@ import com.dogancaglar.paymentservice.application.events.LedgerEntryEventData
 import com.dogancaglar.paymentservice.application.events.PostingDirection
 import com.dogancaglar.paymentservice.application.events.PostingEventData
 import com.dogancaglar.paymentservice.application.util.LedgerDomainEventEntityMapper.toDomain
-import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Currency
 import com.dogancaglar.paymentservice.domain.model.ledger.Account
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry

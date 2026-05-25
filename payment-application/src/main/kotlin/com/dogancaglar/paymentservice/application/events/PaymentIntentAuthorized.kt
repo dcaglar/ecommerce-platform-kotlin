@@ -3,8 +3,8 @@ package com.dogancaglar.paymentservice.application.events
 import com.dogancaglar.common.event.Event
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentIntentId
-import com.dogancaglar.paymentservice.domain.model.PaymentIntent
-import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntentStatus
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty

@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.domain.model.ledger
 
-import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.common.Currency
 
 enum class NormalBalance{
     DEBIT,

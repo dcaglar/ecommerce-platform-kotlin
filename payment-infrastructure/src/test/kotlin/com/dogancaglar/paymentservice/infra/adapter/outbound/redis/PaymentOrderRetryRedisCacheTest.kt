@@ -13,18 +13,14 @@ import org.springframework.data.redis.core.ZSetOperations
 import org.springframework.data.redis.connection.zset.Tuple
 import org.springframework.data.redis.core.RedisCallback
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.SerializationFeature
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCommand
-import com.dogancaglar.paymentservice.application.util.RetryItem
-import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.Currency
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Currency
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
@@ -32,7 +28,6 @@ import com.dogancaglar.paymentservice.infra.adapter.outbound.redis.client.Paymen
 import com.dogancaglar.paymentservice.infra.adapter.outbound.serialization.JacksonSerializationAdapter
 import com.dogancaglar.paymentservice.infra.adapter.outbound.serialization.JacksonUtil
 import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
-import com.fasterxml.jackson.core.type.TypeReference
 
 /**
  * Unit tests for PaymentOrderRetryRedisCache using MockK.

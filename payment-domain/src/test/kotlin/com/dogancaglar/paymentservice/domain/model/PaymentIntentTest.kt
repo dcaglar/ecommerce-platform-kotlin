@@ -1,6 +1,10 @@
 package com.dogancaglar.paymentservice.domain.model
 
 import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Currency
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.*
 import kotlin.test.*
 
@@ -26,6 +30,7 @@ class PaymentIntentTest {
 
         assertEquals(PaymentIntentStatus.CREATED_PENDING, intent.status)
         assertEquals(totalAmount.quantity, lines.sumOf { it.amount.quantity })
+        assertEquals(intent.paymentIntentId.value,1)
         assertNull(intent.pspReference)
         assertEquals("", intent.clientSecret)
     }

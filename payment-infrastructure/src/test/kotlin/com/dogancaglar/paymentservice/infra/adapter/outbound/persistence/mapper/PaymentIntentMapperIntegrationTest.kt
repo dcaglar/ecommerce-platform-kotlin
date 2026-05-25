@@ -67,7 +67,7 @@ class PaymentIntentMapperIntegrationTest {
         }
     }
 
-    private fun createTestEntity(id: Long, status: String = "CREATED", pspRef: String? = null): PaymentIntentEntity {
+    private fun createTestEntity(id: Long, status: String = "CREATED_PENDING", pspRef: String? = null): PaymentIntentEntity {
         return PaymentIntentEntity(
             paymentIntentId = id,
             pspReference = pspRef,
@@ -92,20 +92,21 @@ class PaymentIntentMapperIntegrationTest {
         assertNotNull(fetched)
         assertEquals(1001L, fetched?.paymentIntentId)
         assertEquals("buyer-123", fetched?.buyerId)
-        assertEquals("CREATED", fetched?.status)
+        assertEquals("CREATED_PENDING", fetched?.status)
     }
 
     @Test
     fun `should update payment intent`() {
         val entity = createTestEntity(1002L)
-        paymentIntentMapper.insert(entity)
-
-        val updatedEntity = entity.copy(status = "CANCELLED", updatedAt = Utc.nowInstant())
-        val rows = paymentIntentMapper.update(updatedEntity)
+        val rows = paymentIntentMapper.insert(entity)
         assertEquals(1, rows)
-
-        val fetched = paymentIntentMapper.findById(1002L)
-        assertEquals("CANCELLED", fetched?.status)
+        val fetchedInserted = paymentIntentMapper.findById(1002L)
+        assertEquals("CREATED_PENDING", fetchedInserted?.status)
+        val updatedEntity = entity.copy(status = "CREATED", updatedAt = Utc.nowInstant())
+        val updatedRows = paymentIntentMapper.update(updatedEntity)
+        assertEquals(1, updatedRows)
+        val fetchedUpdated = paymentIntentMapper.findById(1002L)
+        assertEquals("CREATED", fetchedUpdated?.status)
     }
 
     @Test

@@ -5,7 +5,9 @@ import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCom
 import com.dogancaglar.paymentservice.application.events.PaymentIntentAuthorized
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
-import com.dogancaglar.paymentservice.domain.model.*
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
 import java.time.LocalDateTime
 
 /**
@@ -46,7 +48,7 @@ object PaymentOrderDomainEventEntityMapper {
     }
 
     /** 🔹 Domain → Event: successful final state */
-    fun toPaymentOrderFinalized(order: PaymentOrder,now: LocalDateTime,status: PaymentOrderStatus): PaymentOrderFinalized =
+    fun toPaymentOrderFinalized(order: PaymentOrder, now: LocalDateTime, status: PaymentOrderStatus): PaymentOrderFinalized =
         PaymentOrderFinalized.from(
            order = order,
             now = Utc.toInstant(now),

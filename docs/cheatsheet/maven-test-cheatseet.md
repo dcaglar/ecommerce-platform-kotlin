@@ -9,7 +9,7 @@ mvn -q test \
 
 
 simple example
-[ERROR] Tests run: 7, Failures: 5, Errors: 0, Skipped: 0, Time elapsed: 2.071 s <<< FAILURE! -- in com.dogancaglar.paymentservice.application.usecases.AccountBalanceServiceTest
+[ERROR] Tests run: 7, Failures: 5, Errors: 0, Skipped: 0, Time elapsed: 2.071 s <<< FAILURE! -- in com.dogancaglar.paymentservice.application.service.AccountBalanceServiceTest
 org.opentest4j.AssertionFailedError: expected: <[7]> but was: <[7, 7, 7, 7]>
 org.opentest4j.AssertionFailedError: expected: <[15]> but was: <[15, 15, 15, 15]>
 org.opentest4j.AssertionFailedError: Expected value to be true.

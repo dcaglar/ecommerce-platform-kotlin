@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.application.events
 
 import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCommand
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty

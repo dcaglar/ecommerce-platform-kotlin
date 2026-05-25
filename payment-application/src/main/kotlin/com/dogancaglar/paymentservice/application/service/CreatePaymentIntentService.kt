@@ -3,7 +3,7 @@ package com.dogancaglar.paymentservice.application.service
 import com.dogancaglar.paymentservice.application.command.CreatePaymentIntentCommand
 import com.dogancaglar.paymentservice.domain.exception.PspPermanentException
 import com.dogancaglar.paymentservice.domain.exception.PspTransientException
-import com.dogancaglar.paymentservice.domain.model.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.paymentservice.ports.inbound.usecases.CreatePaymentIntentUseCase
 import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
@@ -11,11 +11,8 @@ import com.dogancaglar.paymentservice.ports.outbound.PaymentIntentRepository
 import com.dogancaglar.paymentservice.ports.outbound.PspAuthorizationGatewayPort
 import com.dogancaglar.paymentservice.ports.outbound.ResilientExecutionPort
 import org.slf4j.LoggerFactory
-import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
-import java.util.concurrent.Executor
 import java.util.concurrent.RejectedExecutionException
-import java.util.concurrent.TimeoutException
 
 class CreatePaymentIntentService(
     private val paymentIntentRepository: PaymentIntentRepository,

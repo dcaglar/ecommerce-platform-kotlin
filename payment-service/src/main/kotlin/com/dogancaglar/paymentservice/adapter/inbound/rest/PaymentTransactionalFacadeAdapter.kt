@@ -1,9 +1,9 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
-import com.dogancaglar.paymentservice.domain.model.OutboxEvent
-import com.dogancaglar.paymentservice.domain.model.Payment
-import com.dogancaglar.paymentservice.domain.model.PaymentIntent
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
+import com.dogancaglar.paymentservice.domain.model.payment.Payment
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
 import com.dogancaglar.paymentservice.ports.outbound.OutboxEventRepository
 import com.dogancaglar.paymentservice.ports.outbound.PaymentIntentRepository
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository

@@ -26,6 +26,12 @@ class MyBatisFactoriesConfig {
         return sfb.`object`!!
     }
 
+    @Bean("webSqlSessionTemplate")
+    @Primary
+    fun webSqlSessionTemplate(
+        @Qualifier("webSqlSessionFactory") factory: SqlSessionFactory
+    ): SqlSessionTemplate = SqlSessionTemplate(factory, ExecutorType.SIMPLE)
+
     @Bean("outboxSqlSessionFactory")
     fun outboxSqlSessionFactory(
         @Qualifier("outboxDataSource") ds: DataSource

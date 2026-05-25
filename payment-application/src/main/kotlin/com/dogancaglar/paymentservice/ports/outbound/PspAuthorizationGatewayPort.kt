@@ -1,8 +1,7 @@
 package com.dogancaglar.paymentservice.ports.outbound
 
-import com.dogancaglar.paymentservice.domain.model.PaymentIntent
-import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
-import com.dogancaglar.paymentservice.domain.model.PaymentMethod
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentMethod
 import java.util.concurrent.CompletableFuture
 
 //todo remove idempote4ncy keyparam

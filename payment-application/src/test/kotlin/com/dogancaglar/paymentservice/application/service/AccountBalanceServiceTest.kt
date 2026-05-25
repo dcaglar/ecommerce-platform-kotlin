@@ -1,12 +1,11 @@
-package com.dogancaglar.paymentservice.application.usecases
+package com.dogancaglar.paymentservice.application.service
 
-import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Currency
 import com.dogancaglar.paymentservice.domain.model.balance.AccountBalanceSnapshot
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.application.service.AccountBalanceService
 import com.dogancaglar.paymentservice.util.LedgerEntryTestHelper
 import io.mockk.*
 import org.junit.jupiter.api.BeforeEach

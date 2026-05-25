@@ -7,7 +7,12 @@ import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.OutboxEventType
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.model.OutboxEvent
+import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Currency
+import com.dogancaglar.paymentservice.domain.model.payment.Payment
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
@@ -122,9 +127,9 @@ class OutboxDispatcherJobTest {
     @Test
     fun `publishBatch should handle PaymentAuthorized event successfully`() {
         // Create domain objects
-        val currency = com.dogancaglar.paymentservice.domain.model.Currency("EUR")
-        val amount = com.dogancaglar.paymentservice.domain.model.Amount.of(5000L, currency)
-        val paymentIntent = com.dogancaglar.paymentservice.domain.model.PaymentIntent.createNew(
+        val currency = Currency("EUR")
+        val amount = Amount.of(5000L, currency)
+        val paymentIntent = PaymentIntent.createNew(
             paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(1L),
             buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer-1"),
             orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order-1"),
@@ -139,7 +144,7 @@ class OutboxDispatcherJobTest {
             .markAuthorizedPending()
             .markAuthorized()
         
-        val payment = com.dogancaglar.paymentservice.domain.model.Payment.fromAuthorizedIntent(
+        val payment = Payment.fromAuthorizedIntent(
             paymentId = PaymentId(100L),
             intent = paymentIntent
         )
@@ -184,9 +189,9 @@ class OutboxDispatcherJobTest {
     @Test
     fun `publishBatch should handle PaymentOrderCreated event successfully`() {
         // Create domain objects
-        val currency = com.dogancaglar.paymentservice.domain.model.Currency("EUR")
-        val amount = com.dogancaglar.paymentservice.domain.model.Amount.of(2500L, currency)
-        val paymentOrder = com.dogancaglar.paymentservice.domain.model.PaymentOrder.createNew(
+        val currency = Currency("EUR")
+        val amount = Amount.of(2500L, currency)
+        val paymentOrder = PaymentOrder.createNew(
             paymentOrderId = PaymentOrderId(200L),
             paymentId = PaymentId(100L),
             sellerId = com.dogancaglar.paymentservice.domain.model.vo.SellerId("seller-1"),
@@ -233,9 +238,9 @@ class OutboxDispatcherJobTest {
     @Test
     fun `publishBatch should mark event as failed when publish fails`() {
         // Create domain objects
-        val currency = com.dogancaglar.paymentservice.domain.model.Currency("EUR")
-        val amount = com.dogancaglar.paymentservice.domain.model.Amount.of(5000L, currency)
-        val paymentIntent = com.dogancaglar.paymentservice.domain.model.PaymentIntent.createNew(
+        val currency = Currency("EUR")
+        val amount = Amount.of(5000L, currency)
+        val paymentIntent = PaymentIntent.createNew(
             paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(1L),
             buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer-1"),
             orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order-1"),
@@ -250,7 +255,7 @@ class OutboxDispatcherJobTest {
             .markAuthorizedPending()
             .markAuthorized()
         
-        val payment = com.dogancaglar.paymentservice.domain.model.Payment.fromAuthorizedIntent(
+        val payment = Payment.fromAuthorizedIntent(
             paymentId = PaymentId(100L),
             intent = paymentIntent
         )
@@ -329,9 +334,9 @@ class OutboxDispatcherJobTest {
     @Test
     fun `publishBatch should handle multiple events in batch`() {
         // Create domain objects for PaymentAuthorized
-        val currency = com.dogancaglar.paymentservice.domain.model.Currency("EUR")
-        val amount = com.dogancaglar.paymentservice.domain.model.Amount.of(5000L, currency)
-        val paymentIntent = com.dogancaglar.paymentservice.domain.model.PaymentIntent.createNew(
+        val currency = Currency("EUR")
+        val amount = Amount.of(5000L, currency)
+        val paymentIntent = PaymentIntent.createNew(
             paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(1L),
             buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer-1"),
             orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order-1"),
@@ -346,7 +351,7 @@ class OutboxDispatcherJobTest {
             .markAuthorizedPending()
             .markAuthorized()
         
-        val payment = com.dogancaglar.paymentservice.domain.model.Payment.fromAuthorizedIntent(
+        val payment = Payment.fromAuthorizedIntent(
             paymentId = PaymentId(100L),
             intent = paymentIntent
         )
@@ -369,11 +374,11 @@ class OutboxDispatcherJobTest {
         )
 
         // Create domain objects for PaymentOrderCreated
-        val paymentOrder = com.dogancaglar.paymentservice.domain.model.PaymentOrder.createNew(
+        val paymentOrder = PaymentOrder.createNew(
             paymentOrderId = PaymentOrderId(200L),
             paymentId = PaymentId(100L),
             sellerId = com.dogancaglar.paymentservice.domain.model.vo.SellerId("seller-1"),
-            amount = com.dogancaglar.paymentservice.domain.model.Amount.of(2500L, currency)
+            amount = Amount.of(2500L, currency)
         )
         
         val paymentOrderCreatedEvent = PaymentOrderCreated.from(
@@ -483,9 +488,9 @@ class OutboxDispatcherJobTest {
     @Test
     fun `dispatchBatchWorker should process events successfully`() {
         // Create domain objects
-        val currency = com.dogancaglar.paymentservice.domain.model.Currency("EUR")
-        val amount = com.dogancaglar.paymentservice.domain.model.Amount.of(5000L, currency)
-        val paymentIntent = com.dogancaglar.paymentservice.domain.model.PaymentIntent.createNew(
+        val currency = Currency("EUR")
+        val amount = Amount.of(5000L, currency)
+        val paymentIntent = PaymentIntent.createNew(
             paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(1L),
             buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer-1"),
             orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order-1"),
@@ -500,7 +505,7 @@ class OutboxDispatcherJobTest {
             .markAuthorizedPending()
             .markAuthorized()
         
-        val payment = com.dogancaglar.paymentservice.domain.model.Payment.fromAuthorizedIntent(
+        val payment = Payment.fromAuthorizedIntent(
             paymentId = PaymentId(100L),
             intent = paymentIntent
         )

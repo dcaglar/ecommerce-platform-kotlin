@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.domain.model
+package com.dogancaglar.paymentservice.domain.model.payment
 
 import com.dogancaglar.common.time.Utc
 import java.time.LocalDateTime
@@ -37,6 +37,10 @@ class PaymentOrderStatusCheck private constructor(
     ): PaymentOrderStatusCheck = PaymentOrderStatusCheck(
         id, paymentOrderId, scheduledAt, attempt, status, createdAt, updatedAt
     )
+
+    override fun toString(): String {
+        return "PaymentOrderStatusCheck(id=$id, paymentOrderId=$paymentOrderId, scheduledAt=$scheduledAt, attempt=$attempt, status=$status, createdAt=$createdAt, updatedAt=$updatedAt)"
+    }
 
     companion object {
         fun createNew(paymentOrderId: Long, scheduledAt: LocalDateTime): PaymentOrderStatusCheck =

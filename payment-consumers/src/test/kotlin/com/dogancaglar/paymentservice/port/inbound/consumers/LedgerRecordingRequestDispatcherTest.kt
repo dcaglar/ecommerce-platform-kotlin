@@ -18,10 +18,10 @@ import org.apache.kafka.common.TopicPartition
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.Currency
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Currency
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 
 class LedgerRecordingRequestDispatcherTest {
@@ -63,8 +63,8 @@ class LedgerRecordingRequestDispatcherTest {
             paymentOrderId = paymentOrderId,
             paymentId = paymentId,
             sellerId = SellerId("seller-789"),
-            amount = com.dogancaglar.paymentservice.domain.model.Amount.of(10000L, com.dogancaglar.paymentservice.domain.model.Currency("EUR")),
-            status = com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus.CAPTURED,
+            amount = Amount.of(10000L, Currency("EUR")),
+            status = PaymentOrderStatus.CAPTURED,
             retryCount = 0,
             createdAt = now,
             updatedAt = now

@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest.mapper
 
-import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Currency
 import com.dogancaglar.port.out.web.dto.AmountDto
 import com.dogancaglar.port.out.web.dto.CurrencyEnum
 

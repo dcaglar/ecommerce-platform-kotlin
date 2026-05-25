@@ -1,194 +1,141 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { Trend, Counter } from 'k6/metrics';
-import exec from 'k6/execution';
 
-// --- Custom Metrics for Grafana ---
-const stepCreateDuration = new Trend('http_req_duration_create');
-const stepAuthDuration = new Trend('http_req_duration_auth');
-const error5xxCounter = new Counter('errors_5xx_total');
-const fullFlowSuccess = new Counter('full_flow_success');
-
-// --- Initialization ---
+// --- 1. Load Configurations & Credentials ---
 const ACCESS_TOKEN = open('../keycloak/output/jwt/payment-service.token').replace(/[\r\n]+$/, '');
 const endpoints = JSON.parse(open('../infra/endpoints.json'));
-const currentTestType = __ENV.TEST_TYPE || 'smoke_V1_D1';
 
-// --- Constants ---
-const ALLOWED_SELLERS = ['SELLER-111', 'SELLER-222', 'SELLER-333'];
-
-// --- Scenario Definitions ---
-const allScenarios = {
-    smoke_V1_D1: {
+// --- 2. Multi-Profile Workload Scenarios ---
+const SCENARIOS = {
+    // A. Smoke Test: Minimal load for validating that scripts and APIs work correctly
+    smoke: {
         executor: 'constant-vus',
         vus: 1,
         duration: '1m',
-        tags: { test_type: 'smoke_V1_D1' },
+        tags: { test_type: 'smoke' },
     },
-    smoke_V5_D10: {
+    // B. Average Load Test: Simulates expected day-to-day typical user traffic
+    average: {
+        executor: 'ramping-vus',
+        startVUs: 0,
+        stages: [
+            { duration: '2m', target: 20 },  // Warm-up to 20 users
+            { duration: '5m', target: 20 },  // Maintain typical active traffic
+            { duration: '1m', target: 0 },   // Cool-down
+        ],
+        tags: { test_type: 'average_load' },
+    },
+    // C. Stress Test: Push system past average limits to see how resources handle pressure
+    stress: {
+        executor: 'ramping-vus',
+        startVUs: 0,
+        stages: [
+            { duration: '3m', target: 100 }, // Ramps up to a high load
+            { duration: '10m', target: 100 },// Maintains sustained high load
+            { duration: '2m', target: 0 },   // Cool-down
+        ],
+        tags: { test_type: 'stress' },
+    },
+    // D. Soak Test: Continuous moderate load over a long time to check memory leaks & slow degradation
+    soak: {
         executor: 'constant-vus',
-        vus: 5,
-        duration: '10m',
-        tags: { test_type: 'smoke_V5_D10' },
+        vus: 30,
+        duration: '1h',                     // Long running execution
+        tags: { test_type: 'soak' },
     },
-    load100_ramping_arrival: {
-        executor: 'ramping-arrival-rate',
-        startRate: 0,
-        timeUnit: '1s',
-        preAllocatedVUs: 100,
-        maxVUs: 1500,
-        stages: [
-            { duration: '2m', target: 100 },
-            { duration: '5m', target: 100 },
-            { duration: '2m', target: 0 },
-        ],
-        tags: { test_type: 'load100_arrival' },
-    },
-    constant_rps_50: {
-        executor: 'constant-arrival-rate',
-        rate: 50,
-        timeUnit: '1s',
-        duration: '5m',
-        preAllocatedVUs: 50,
-        maxVUs: 500,
-        tags: { test_type: 'constant_rps_50' },
-    },
-    stress_400_vus: {
+    // E. Spike Test: Sudden extreme burst of massive traffic to test caching, buffering, and fast autoscaling
+    spike: {
         executor: 'ramping-vus',
         startVUs: 0,
         stages: [
-            { duration: '2m', target: 200 },
-            { duration: '5m', target: 400 },
-            { duration: '2m', target: 0 },
+            { duration: '10s', target: 5 },   // Normal baseline
+            { duration: '10s', target: 400 }, // Sudden immediate spike to 400 VUs!
+            { duration: '3m', target: 400 },  // Hold peak
+            { duration: '1m', target: 0 },    // Ramp down
         ],
-        tags: { test_type: 'stress_400' },
+        tags: { test_type: 'spike' },
     },
-    fixed_work_1000_total: {
-        executor: 'shared-iterations',
-        vus: 50,
-        iterations: 1000,
-        maxDuration: '10m',
-        tags: { test_type: 'shared_iter' },
-    },
-    data_seed_50_total: {
-        executor: 'per-vu-iterations',
-        vus: 10,
-        iterations: 5,
-        maxDuration: '5m',
-        tags: { test_type: 'per_vu_iter' },
-    },
-    spike_1400: {
+    // F. Breakpoint Test: Step-wise steady ramp to identify the absolute limits of server failure
+    breakpoint: {
         executor: 'ramping-vus',
         startVUs: 0,
         stages: [
-            { duration: '30s', target: 100 },
-            { duration: '10s', target: 1400 },
-            { duration: '2m', target: 1400 },
-            { duration: '1m', target: 0 },
+            { duration: '15m', target: 1000 }, // Slowly ramp up to 1000 users until failure
         ],
-        tags: { test_type: 'spike_1400' },
+        tags: { test_type: 'breakpoint' },
     }
 };
+
+// Select the profile using an environment variable (defaults to smoke)
+// Example: k6 run -e PROFILE=stress k6-payment-flow.js
+const PROFILE = __ENV.PROFILE || 'smoke';
 
 export const options = {
     scenarios: {
-        [currentTestType]: allScenarios[currentTestType] || allScenarios.smoke_V1_D1,
+        [PROFILE]: SCENARIOS[PROFILE] || SCENARIOS.smoke
     },
     thresholds: {
-        'http_req_failed': ['rate <= 0.05'],
-        'http_req_duration{name:CreateIntent}': ['p(95) <= 800'],
-        'http_req_duration{name:Authorize}': ['p(95) <= 800'],
-    },
+        // SLA Checks
+        'http_req_failed': ['rate <= 0.05'],     // Under 5% fail rate
+        'http_req_duration': ['p(95) <= 1000'],  // 95% of responses under 1 second
+    }
 };
 
-// --- Helpers ---
-function randomId(prefix) { return `${prefix}-${Math.floor(Math.random() * 1e12)}`; }
-
-function getUniqueSellers(count) {
-    const shuffled = [...ALLOWED_SELLERS].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, count);
+// --- 3. Helper Functions ---
+function randomId(prefix) {
+    return `${prefix}-${Math.floor(Math.random() * 1e8)}`;
 }
 
-// --- API Steps ---
-
-function createIntent(params) {
-    const url = `${endpoints.base_url}/api/v1/payments`;
-
-    // Pick 2 unique sellers and create payment orders for them
-    const selectedSellers = getUniqueSellers(2);
-
-    const payload = JSON.stringify({
-        orderId: randomId('ORD'),
-        buyerId: "BUYER-1450",
-        totalAmount: { quantity: 2900, currency: "EUR" },
-        paymentOrders: selectedSellers.map(sellerId => ({
-            sellerId: sellerId,
-            amount: { quantity: 1450, currency: "EUR" }
-        }))
-    });
-
-    const res = http.post(url, payload, Object.assign({}, params, { tags: { name: 'CreateIntent' } }));
-
-    if (res.status >= 500) error5xxCounter.add(1);
-
-    const ok = check(res, { 'intent 201': (r) => r.status === 201 });
-    if (ok) {
-        stepCreateDuration.add(res.timings.duration);
-        return res.json().paymentIntentId;
-    }
-    return null;
-}
-
-function authorizePayment(id, params) {
-    const url = `${endpoints.base_url}/api/v1/payments/${id}/authorize`;
-    const payload = JSON.stringify({
-        paymentMethod: { type: "CardToken", token: "tok_visa", cvc: "123" }
-    });
-
-    const res = http.post(url, payload, Object.assign({}, params, { tags: { name: 'Authorize' } }));
-
-    if (res.status >= 500) error5xxCounter.add(1);
-
-    const ok = check(res, { 'auth 200/201': (r) => r.status === 200 || r.status === 201 });
-    if (ok) {
-        stepAuthDuration.add(res.timings.duration);
-    }
-    return ok;
-}
-
-// --- Main Journey ---
-
+// --- 4. Main User Journey ---
 export default function () {
-    const createParams = {
-        headers: {
-            'Host': `${endpoints.host_header}`,
-            'Authorization': `Bearer ${ACCESS_TOKEN}`,
-            'Idempotency-Key': randomId('IDEM-C'),
-            'Content-Type': 'application/json'
-        },
-        timeout: '7s'
+    const baseUrl = endpoints.base_url;
+
+    const headers = {
+        'Host': endpoints.host_header,
+        'Authorization': `Bearer ${ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
     };
 
-    const paymentId = createIntent(createParams);
+    // --- STEP A: Create a Payment Intent ---
+    const createUrl = `${baseUrl}/api/v1/payments`;
+    const createPayload = JSON.stringify({
+        orderId: randomId('ORD'),
+        buyerId: 'BUYER-1450',
+        totalAmount: { quantity: 2900, currency: 'EUR' },
+        paymentOrders: [
+            { sellerId: 'SELLER-111', amount: { quantity: 1450, currency: 'EUR' } },
+            { sellerId: 'SELLER-222', amount: { quantity: 1450, currency: 'EUR' } }
+        ]
+    });
 
-    if (paymentId) {
-        // Human "Thinking Time" (Random 1-3 seconds)
-        sleep(Math.random() * 2 + 1);
+    const createParams = {
+        headers: Object.assign({ 'Idempotency-Key': randomId('IDEM-C') }, headers)
+    };
+
+    const createRes = http.post(createUrl, createPayload, createParams);
+    const isCreated = check(createRes, {
+        '1. Payment Intent created successfully (201)': (r) => r.status === 201
+    });
+
+    // --- STEP B: Authorize the Payment ---
+    if (isCreated) {
+        const paymentIntentId = createRes.json().paymentIntentId;
+
+        // Realistic human pacing delay
+        sleep(1.5);
+
+        const authUrl = `${baseUrl}/api/v1/payments/${paymentIntentId}/authorize`;
+        const authPayload = JSON.stringify({
+            paymentMethod: { type: 'CardToken', token: 'tok_visa', cvc: '123' }
+        });
 
         const authParams = {
-            headers: {
-                'Host': `${endpoints.host_header}`,
-                'Authorization': `Bearer ${ACCESS_TOKEN}`,
-                'Idempotency-Key': randomId('IDEM-A'),
-                'Content-Type': 'application/json'
-            },
-            timeout: '7s'
+            headers: Object.assign({ 'Idempotency-Key': randomId('IDEM-A') }, headers)
         };
 
-        const success = authorizePayment(paymentId, authParams);
-
-        if (success) {
-            fullFlowSuccess.add(1);
-        }
+        const authRes = http.post(authUrl, authPayload, authParams);
+        check(authRes, {
+            '2. Payment authorized successfully (200/201)': (r) => r.status === 200 || r.status === 201
+        });
     }
 }

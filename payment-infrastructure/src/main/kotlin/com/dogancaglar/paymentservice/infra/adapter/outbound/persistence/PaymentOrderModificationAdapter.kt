@@ -3,7 +3,7 @@ package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.converter.PaymentOrderEntityMapper
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentOrderMapper
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
 import org.springframework.stereotype.Repository

@@ -1,8 +1,8 @@
-package com.dogancaglar.paymentservice.application.usecases
+package com.dogancaglar.paymentservice.application.service
 
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
-import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.common.Currency
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountCategory
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountProfile
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountStatus
@@ -24,7 +24,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.command.LedgerRecordingCommand
-import com.dogancaglar.paymentservice.application.service.RecordLedgerEntriesService
 import org.junit.jupiter.api.Test
 import java.util.UUID
 

@@ -1,6 +1,7 @@
-package com.dogancaglar.paymentservice.domain.model
+package com.dogancaglar.paymentservice.domain.model.payment
 
 import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
@@ -186,6 +187,10 @@ class PaymentOrder private constructor(
     // ============================================================================
     // Companion Object - Factory Methods
     // ============================================================================
+
+    override fun toString(): String {
+        return "PaymentOrder(paymentOrderId=${paymentOrderId.value}, paymentId=${paymentId.value}, sellerId=${sellerId.value}, amount=$amount, status=$status, retryCount=$retryCount, createdAt=$createdAt, updatedAt=$updatedAt)"
+    }
 
     companion object {
         /**

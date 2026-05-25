@@ -1,8 +1,8 @@
 package com.dogancaglar.paymentservice.adapter.outbound.psp
 
 import com.dogancaglar.paymentservice.application.util.psp.PSPCaptureStatusMapper
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
 import com.dogancaglar.paymentservice.ports.outbound.PspCaptureGatewayPort
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer

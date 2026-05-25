@@ -1,6 +1,7 @@
-package com.dogancaglar.paymentservice.domain.model
+package com.dogancaglar.paymentservice.domain.model.payment
 
 import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
@@ -34,10 +35,10 @@ class Payment private constructor(
 
     init {
         require(totalAmount.isPositive()) { "Total amount must be positive" }
-        require(capturedAmount >= Amount.zero(totalAmount.currency)) {
+        require(capturedAmount >= Amount.Companion.zero(totalAmount.currency)) {
             "Captured amount cannot be negative"
         }
-        require(refundedAmount >= Amount.zero(totalAmount.currency)) {
+        require(refundedAmount >= Amount.Companion.zero(totalAmount.currency)) {
             "Refunded amount cannot be negative"
         }
         require(capturedAmount <= totalAmount) {
@@ -94,7 +95,7 @@ class Payment private constructor(
         require(newCaptured <= totalAmount) { "Captured amount cannot exceed total amount" }
 
         val newStatus = when {
-            newCaptured == Amount.zero(totalAmount.currency) -> PaymentStatus.NOT_CAPTURED
+            newCaptured == Amount.Companion.zero(totalAmount.currency) -> PaymentStatus.NOT_CAPTURED
             newCaptured < totalAmount                        -> PaymentStatus.PARTIALLY_CAPTURED
             newCaptured == totalAmount                       -> PaymentStatus.CAPTURED
             else                                             -> status
@@ -135,7 +136,7 @@ class Payment private constructor(
         require(refundAmount.currency == totalAmount.currency) {
             "Refund amount currency must match total amount"
         }
-        require(capturedAmount > Amount.zero(totalAmount.currency)) {
+        require(capturedAmount > Amount.Companion.zero(totalAmount.currency)) {
             "Cannot refund a payment with zero captured amount"
         }
         require(status in setOf(
@@ -152,7 +153,7 @@ class Payment private constructor(
         }
 
         val newStatus = when {
-            newRefunded == Amount.zero(totalAmount.currency) -> status // should not happen with positive refund
+            newRefunded == Amount.Companion.zero(totalAmount.currency) -> status // should not happen with positive refund
             newRefunded < capturedAmount                     -> PaymentStatus.PARTIALLY_REFUNDED
             newRefunded == capturedAmount                    -> PaymentStatus.REFUNDED
             else                                             -> status
@@ -192,6 +193,10 @@ class Payment private constructor(
     // FACTORY METHODS
     // ------------------------
 
+    override fun toString(): String {
+        return "Payment(paymentId=${paymentId.value}, paymentIntentId=${paymentIntentId.value}, buyerId=${buyerId.value}, orderId=${orderId.value}, totalAmount=$totalAmount, capturedAmount=$capturedAmount, refundedAmount=$refundedAmount, status=$status, paymentOrderLines=$paymentOrderLines, createdAt=$createdAt, updatedAt=$updatedAt)"
+    }
+
     companion object {
 
         /**
@@ -206,7 +211,7 @@ class Payment private constructor(
                 "Cannot create Payment from non-AUTHORIZED PaymentIntent (current=${intent.status})"
             }
 
-            val zero = Amount.zero(intent.totalAmount.currency)
+            val zero = Amount.Companion.zero(intent.totalAmount.currency)
             val now = Utc.nowLocalDateTime()
             
             return Payment(

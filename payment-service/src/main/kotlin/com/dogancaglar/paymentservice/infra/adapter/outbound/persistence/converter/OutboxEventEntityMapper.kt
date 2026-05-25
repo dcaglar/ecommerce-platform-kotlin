@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.converter
 
-import com.dogancaglar.paymentservice.domain.model.OutboxEvent
+import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.OutboxEventEntity
 import java.time.ZoneOffset
 

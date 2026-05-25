@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.domain.model
+package com.dogancaglar.paymentservice.domain.model.common
 
 /**
  * Represents a monetary amount using the smallest currency unit (e.g., cents, pence).

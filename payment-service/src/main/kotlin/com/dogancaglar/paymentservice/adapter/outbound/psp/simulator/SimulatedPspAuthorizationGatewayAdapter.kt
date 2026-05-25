@@ -2,8 +2,8 @@ package com.dogancaglar.paymentservice.adapter.outbound.psp.simulator
 
 import com.dogancaglar.paymentservice.domain.exception.PspPermanentException
 import com.dogancaglar.paymentservice.domain.exception.PspTransientException
-import com.dogancaglar.paymentservice.domain.model.PaymentIntent
-import com.dogancaglar.paymentservice.domain.model.PaymentMethod
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentMethod
 import com.dogancaglar.paymentservice.ports.outbound.PspAuthorizationGatewayPort
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier

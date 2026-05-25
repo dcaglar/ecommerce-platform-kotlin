@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.domain.model
+package com.dogancaglar.paymentservice.domain.model.payment
 
 //status of PaymentOrder(captures)
 enum class PaymentOrderStatus {

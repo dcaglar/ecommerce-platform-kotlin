@@ -9,11 +9,11 @@ import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventEn
 import com.dogancaglar.paymentservice.domain.exception.PaymentNotReadyException
 import com.dogancaglar.paymentservice.domain.exception.PspPermanentException
 import com.dogancaglar.paymentservice.domain.exception.PspTransientException
-import com.dogancaglar.paymentservice.domain.model.OutboxEvent
-import com.dogancaglar.paymentservice.domain.model.Payment
-import com.dogancaglar.paymentservice.domain.model.PaymentIntent
-import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
+import com.dogancaglar.paymentservice.domain.model.payment.Payment
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntentStatus
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.ports.inbound.usecases.AuthorizePaymentIntentUseCase
@@ -33,10 +33,11 @@ class AuthorizePaymentIntentService(
 
     private val logger = LoggerFactory.getLogger(javaClass)
     override fun authorize(cmd: AuthorizePaymentIntentCommand): PaymentIntent {
-        logger.info("AuthorizePaymentIntentService.authorize  started")
+        logger.info("AuthorizePaymentIntentService.authorize  started for long numeric paymentintentid ,${cmd.paymentIntentId.value}")
         val paymentIntent = paymentIntentRepository.findById(cmd.paymentIntentId)
             ?: error("PaymentIntent ${cmd.paymentIntentId.value} not found")
         // 1) Idempotent behavior first (NO domain transition before this)
+        logger.info("AuthorizePaymentIntentService.findbyId(${cmd.paymentIntentId.value} returned a $paymentIntent)")
         when (paymentIntent.status) {
             PaymentIntentStatus.CREATED_PENDING -> {
                 // Payment not ready for authorization yet
@@ -56,6 +57,7 @@ class AuthorizePaymentIntentService(
         // 2) Concurrency gate: only ONE request may flip CREATED -> PENDING_AUTH
         val now = Utc.nowInstant()
         val won = paymentIntentRepository.tryMarkPendingAuth(cmd.paymentIntentId, now)
+        logger.info("What is win returns $won")
         if (!won) {
             // someone else started authorization; return latest state
             return paymentIntentRepository.findById(cmd.paymentIntentId)
