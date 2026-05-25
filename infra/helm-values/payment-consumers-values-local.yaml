@@ -28,7 +28,7 @@ service:
   port: 8080
 
 autoscaling:
-  enabled: false
+  enabled: true
   minReplicas: 1
   maxReplicas: 6
   metrics:
@@ -55,11 +55,12 @@ autoscaling:
           periodSeconds: 60
 
 serviceMonitor:
-  enabled: false
-  labels:
-    release: prometheus-stack  # must match Prometheus' serviceMonitorSelector
+  enabled: true
   path: /actuator/prometheus
-  interval: 30s
+  interval: 15s
   scrapeTimeout: 10s
+  scheme: http
+  labels:
+    release: prometheus-stack
 
 replicaCount: 1
