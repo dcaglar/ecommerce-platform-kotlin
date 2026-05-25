@@ -1,5 +1,6 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
+import { Trend } from 'k6/metrics';
 
 // --- 1. Load Configurations & Credentials ---
 const ACCESS_TOKEN = open('../keycloak/output/jwt/payment-service.token').replace(/[\r\n]+$/, '');
@@ -19,8 +20,8 @@ const SCENARIOS = {
         executor: 'ramping-vus',
         startVUs: 0,
         stages: [
-            { duration: '2m', target: 20 },  // Warm-up to 20 users
-            { duration: '5m', target: 20 },  // Maintain typical active traffic
+            { duration: '2m', target: 150 },  // Warm-up to 20 users
+            { duration: '5m', target: 150 },  // Maintain typical active traffic
             { duration: '1m', target: 0 },   // Cool-down
         ],
         tags: { test_type: 'average_load' },
@@ -81,6 +82,23 @@ export const options = {
     }
 };
 
+// Custom metrics to show up explicitly in the summary
+const createBlocked = new Trend('create_1_blocked');
+const createConnecting = new Trend('create_2_connecting');
+const createTls = new Trend('create_3_tls_handshaking');
+const createSending = new Trend('create_4_sending');
+const createWaiting = new Trend('create_5_ttfb_backend_processing');
+const createReceiving = new Trend('create_6_receiving_body');
+const createDuration = new Trend('create_7_total_duration');
+
+const authBlocked = new Trend('auth_1_blocked');
+const authConnecting = new Trend('auth_2_connecting');
+const authTls = new Trend('auth_3_tls_handshaking');
+const authSending = new Trend('auth_4_sending');
+const authWaiting = new Trend('auth_5_ttfb_backend_processing');
+const authReceiving = new Trend('auth_6_receiving_body');
+const authDuration = new Trend('auth_7_total_duration');
+
 // --- 3. Helper Functions ---
 function randomId(prefix) {
     return `${prefix}-${Math.floor(Math.random() * 1e8)}`;
@@ -109,10 +127,21 @@ export default function () {
     });
 
     const createParams = {
-        headers: Object.assign({ 'Idempotency-Key': randomId('IDEM-C') }, headers)
+        headers: Object.assign({ 'Idempotency-Key': randomId('IDEM-C') }, headers),
+        tags: { name: 'CreateIntent' }
     };
 
     const createRes = http.post(createUrl, createPayload, createParams);
+    
+    // Detailed metrics for Create
+    createBlocked.add(createRes.timings.blocked);
+    createConnecting.add(createRes.timings.connecting);
+    createTls.add(createRes.timings.tls_handshaking);
+    createSending.add(createRes.timings.sending);
+    createWaiting.add(createRes.timings.waiting);
+    createReceiving.add(createRes.timings.receiving);
+    createDuration.add(createRes.timings.duration);
+
     const isCreated = check(createRes, {
         '1. Payment Intent created successfully (201)': (r) => r.status === 201
     });
@@ -130,10 +159,21 @@ export default function () {
         });
 
         const authParams = {
-            headers: Object.assign({ 'Idempotency-Key': randomId('IDEM-A') }, headers)
+            headers: Object.assign({ 'Idempotency-Key': randomId('IDEM-A') }, headers),
+            tags: { name: 'Authorize' }
         };
 
         const authRes = http.post(authUrl, authPayload, authParams);
+        
+        // Detailed metrics for Auth
+        authBlocked.add(authRes.timings.blocked);
+        authConnecting.add(authRes.timings.connecting);
+        authTls.add(authRes.timings.tls_handshaking);
+        authSending.add(authRes.timings.sending);
+        authWaiting.add(authRes.timings.waiting);
+        authReceiving.add(authRes.timings.receiving);
+        authDuration.add(authRes.timings.duration);
+
         check(authRes, {
             '2. Payment authorized successfully (200/201)': (r) => r.status === 200 || r.status === 201
         });
