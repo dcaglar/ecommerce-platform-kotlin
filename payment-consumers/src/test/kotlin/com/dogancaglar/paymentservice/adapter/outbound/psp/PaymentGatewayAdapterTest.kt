@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.adapter.outbound.psp
 
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer

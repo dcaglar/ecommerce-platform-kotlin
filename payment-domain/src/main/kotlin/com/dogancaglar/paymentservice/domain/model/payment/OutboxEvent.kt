@@ -1,8 +1,7 @@
-package com.dogancaglar.paymentservice.domain.model
+package com.dogancaglar.paymentservice.domain.model.payment
 
 import com.dogancaglar.common.time.Utc
 import java.time.LocalDateTime
-
 
 /**
  * Represents a durable outbox event entry.
@@ -48,6 +47,10 @@ import java.time.LocalDateTime
 
     /** Marker enum for outbox lifecycle */
     enum class Status { NEW, PROCESSING, SENT }
+
+    override fun toString(): String {
+        return "OutboxEvent(oeid=$oeid, eventType='$eventType', aggregateId='$aggregateId', payload='$payload', status=$status, createdAt=$createdAt, updatedAt=$updatedAt)"
+    }
 
     companion object {
 

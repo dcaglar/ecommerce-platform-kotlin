@@ -42,9 +42,22 @@ alertmanager:
       limits:   { cpu: 150m, memory: 128Mi }
 
 grafana:
+  plugins: []
+  readinessProbe:
+    timeoutSeconds: 10
+    periodSeconds: 30
+    failureThreshold: 20
+  livenessProbe:
+    timeoutSeconds: 10
+    periodSeconds: 30
+    failureThreshold: 20
+  grafana.ini:
+    database:
+      query_retries: 5
+      transaction_retries: 5
   resources:
     requests: { cpu: 100m, memory: 256Mi }
-    limits:   { cpu: 400m, memory: 512Mi }
+    limits:   { cpu: 1000m, memory: 512Mi }
   sidecar:
     datasources:
       resources:

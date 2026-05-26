@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.application.service
 
 import com.dogancaglar.paymentservice.application.command.CapturePaymentCommand
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
 import com.dogancaglar.paymentservice.ports.inbound.usecases.CapturePaymentUseCase
 import com.dogancaglar.paymentservice.ports.outbound.*
 import org.slf4j.LoggerFactory

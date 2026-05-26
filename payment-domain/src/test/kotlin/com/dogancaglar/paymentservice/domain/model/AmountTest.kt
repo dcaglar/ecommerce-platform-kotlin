@@ -1,5 +1,7 @@
 package com.dogancaglar.paymentservice.domain.model
 
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Currency
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 

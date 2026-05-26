@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.OutboxEventDispatcherMapper">
+<mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.outboxeventmapper.OutboxEventDispatcherMapper">
 
     <resultMap id="OutboxEventResultMap"
                type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.OutboxEventEntity">

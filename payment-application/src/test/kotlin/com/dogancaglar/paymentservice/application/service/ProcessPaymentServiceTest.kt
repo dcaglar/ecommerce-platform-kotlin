@@ -1,8 +1,7 @@
-package com.dogancaglar.paymentservice.application.usecases
+package com.dogancaglar.paymentservice.application.service
 
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCommand
-import com.dogancaglar.paymentservice.application.service.ProcessPaymentService
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
 import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort

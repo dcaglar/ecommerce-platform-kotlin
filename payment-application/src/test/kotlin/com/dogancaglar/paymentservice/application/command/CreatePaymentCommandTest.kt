@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.application.command
 
-import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Currency
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine

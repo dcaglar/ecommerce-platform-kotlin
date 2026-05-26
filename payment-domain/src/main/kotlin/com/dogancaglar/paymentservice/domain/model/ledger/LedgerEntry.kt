@@ -13,6 +13,10 @@ class  LedgerEntry private constructor (
     val journalEntry: JournalEntry,
     val createdAt: LocalDateTime
 ) {
+    override fun toString(): String {
+        return "LedgerEntry(ledgerEntryId=$ledgerEntryId, journalEntry=$journalEntry, createdAt=$createdAt)"
+    }
+
     companion object {
         /**
          * Creates a LedgerEntry.

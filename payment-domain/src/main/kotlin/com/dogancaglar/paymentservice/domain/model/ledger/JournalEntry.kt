@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.domain.model.ledger
 
-import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Amount
 
 /**
  * Represents one atomic, balanced accounting event.
@@ -35,6 +35,10 @@ class JournalEntry private constructor(
         require(duplicateAccounts.isEmpty()) {
             "JournalEntry contains duplicate accounts: ${duplicateAccounts.joinToString(", ")}"
         }
+    }
+
+    override fun toString(): String {
+        return "JournalEntry(id='$id', txType=$txType, name='$name', postings=$postings, referenceType=$referenceType, referenceId=$referenceId)"
     }
 
     companion object JournalFactory {

@@ -2,8 +2,8 @@ package com.dogancaglar.paymentservice.application.service
 
 import com.dogancaglar.paymentservice.application.command.ProcessPaymentIntentUpdateCommand
 import com.dogancaglar.paymentservice.domain.exception.PaymentIntentNotFoundException
-import com.dogancaglar.paymentservice.domain.model.PaymentIntent
-import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntentStatus
 import com.dogancaglar.paymentservice.ports.inbound.usecases.UpdatePaymentIntentUseCase
 import com.dogancaglar.paymentservice.ports.outbound.PaymentIntentRepository
 import org.slf4j.LoggerFactory

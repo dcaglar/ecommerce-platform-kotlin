@@ -1,8 +1,8 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.converter
 
-import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.Currency
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Currency
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId

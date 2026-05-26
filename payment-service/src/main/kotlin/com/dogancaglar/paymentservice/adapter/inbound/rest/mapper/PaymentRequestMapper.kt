@@ -9,10 +9,10 @@ import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentInte
 import com.dogancaglar.paymentservice.application.command.AuthorizePaymentIntentCommand
 import com.dogancaglar.paymentservice.application.command.CreatePaymentIntentCommand
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentIntentId
-import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.Currency
-import com.dogancaglar.paymentservice.domain.model.PaymentIntent
-import com.dogancaglar.paymentservice.domain.model.PaymentMethod
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Currency
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentMethod
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId

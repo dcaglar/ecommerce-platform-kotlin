@@ -6,7 +6,7 @@ import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ID
 import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ORDER_ID
 import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.config.KafkaTxExecutor
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort

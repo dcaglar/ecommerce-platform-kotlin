@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.application.util.psp
 
-import com.dogancaglar.paymentservice.domain.model.PaymentIntentStatus
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntentStatus
 
 
 /**

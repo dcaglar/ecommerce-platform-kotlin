@@ -1,8 +1,11 @@
 package com.dogancaglar.paymentservice.application.util
 
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.domain.model.*
-import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Currency
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test

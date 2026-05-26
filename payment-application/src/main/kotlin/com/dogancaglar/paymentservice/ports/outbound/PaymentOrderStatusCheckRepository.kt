@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.ports.outbound
 
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatusCheck
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatusCheck
 import java.time.LocalDateTime
 
 interface PaymentOrderStatusCheckRepository {

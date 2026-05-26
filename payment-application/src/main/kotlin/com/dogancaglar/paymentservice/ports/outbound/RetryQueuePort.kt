@@ -1,7 +1,6 @@
 package com.dogancaglar.paymentservice.ports.outbound
 
-import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
 import com.dogancaglar.paymentservice.application.util.RetryItem
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 

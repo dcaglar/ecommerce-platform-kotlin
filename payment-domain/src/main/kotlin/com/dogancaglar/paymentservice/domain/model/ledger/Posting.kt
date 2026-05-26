@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.domain.model.ledger
 
-import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Amount
 sealed class Posting(open val account: Account, open val amount: Amount) {
 
     abstract fun getSignedAmount(): Amount
@@ -12,6 +12,10 @@ sealed class Posting(open val account: Account, open val amount: Amount) {
             } else {
                 return amount.negate()
             }
+        }
+
+        override fun toString(): String {
+            return "Debit(account=$account, amount=$amount)"
         }
 
         companion object{
@@ -29,6 +33,10 @@ sealed class Posting(open val account: Account, open val amount: Amount) {
             } else {
                 return amount.negate()
             }
+        }
+
+        override fun toString(): String {
+            return "Credit(account=$account, amount=$amount)"
         }
 
         companion object{

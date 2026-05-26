@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity
 
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
 import java.time.Instant
 
 data class PaymentOrderEntity(

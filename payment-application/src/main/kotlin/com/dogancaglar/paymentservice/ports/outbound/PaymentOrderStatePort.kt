@@ -1,7 +1,7 @@
 // payment-application
 package com.dogancaglar.paymentservice.ports.outbound
 
-import com.dogancaglar.paymentservice.domain.model.PaymentOrder
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
 
 interface PaymentOrderStatePort {
     fun markPaid(order: PaymentOrder): PaymentOrder

@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.application.util.psp
 
-import com.dogancaglar.paymentservice.domain.model.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
 
 /**
  * Maps PSP capture (seller-level) responses to internal PaymentOrderStatus.

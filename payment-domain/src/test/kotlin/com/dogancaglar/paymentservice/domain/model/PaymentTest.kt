@@ -1,5 +1,11 @@
 package com.dogancaglar.paymentservice.domain.model
 
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Currency
+import com.dogancaglar.paymentservice.domain.model.payment.Payment
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntentStatus
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.*
 import kotlin.test.*
 

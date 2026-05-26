@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.domain.model.ledger
 
-import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Currency
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

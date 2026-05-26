@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.application.command
 
-import com.dogancaglar.paymentservice.domain.model.PaymentMethod
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentMethod
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 
 data class AuthorizePaymentIntentCommand(

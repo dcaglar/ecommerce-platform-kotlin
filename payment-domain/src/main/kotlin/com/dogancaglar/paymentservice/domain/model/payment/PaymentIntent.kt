@@ -1,6 +1,7 @@
-package com.dogancaglar.paymentservice.domain.model
+package com.dogancaglar.paymentservice.domain.model.payment
 
 import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
@@ -175,6 +176,10 @@ class PaymentIntent private constructor(
     // ------------------------
     // FACTORY METHODS
     // ------------------------
+
+    override fun toString(): String {
+        return "PaymentIntent(paymentIntentId=${paymentIntentId.value}, clientSecret=$clientSecret, pspReference=$pspReference, buyerId=${buyerId.value}, orderId=${orderId.value}, totalAmount=$totalAmount, paymentOrderLines=$paymentOrderLines, status=$status, createdAt=$createdAt, updatedAt=$updatedAt)"
+    }
 
     companion object {
         fun createNew(

@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.domain.model.vo
 
-import com.dogancaglar.paymentservice.domain.model.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Amount
 
 
 data class PaymentOrderLine(

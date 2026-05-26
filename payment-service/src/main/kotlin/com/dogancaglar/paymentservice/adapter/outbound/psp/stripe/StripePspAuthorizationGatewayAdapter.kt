@@ -7,8 +7,8 @@ import com.dogancaglar.paymentservice.domain.exception.PspInvalidPaymentExceptio
 import com.dogancaglar.paymentservice.domain.exception.PspPermanentException
 import com.dogancaglar.paymentservice.domain.exception.PspTransientException
 import com.dogancaglar.paymentservice.domain.exception.PspUnknownException
-import com.dogancaglar.paymentservice.domain.model.PaymentIntent
-import com.dogancaglar.paymentservice.domain.model.PaymentMethod
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentMethod
 import com.dogancaglar.paymentservice.ports.outbound.PspAuthorizationGatewayPort
 import com.stripe.StripeClient
 import com.stripe.exception.ApiConnectionException

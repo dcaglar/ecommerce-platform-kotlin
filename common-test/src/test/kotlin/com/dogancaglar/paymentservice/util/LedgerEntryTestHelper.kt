@@ -2,8 +2,8 @@ package com.dogancaglar.paymentservice.util
 
 
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.domain.model.Amount
-import com.dogancaglar.paymentservice.domain.model.Currency
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.common.Currency
 import com.dogancaglar.paymentservice.domain.model.ledger.*
 
 /**

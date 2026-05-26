@@ -5,7 +5,7 @@ import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
-import com.dogancaglar.paymentservice.domain.model.OutboxEvent
+import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
 import com.dogancaglar.paymentservice.infra.monitoring.MetricNames.OUTBOX_DISPATCHED_TOTAL
 import com.dogancaglar.paymentservice.infra.monitoring.MetricNames.OUTBOX_DISPATCHER_DURATION
 import com.dogancaglar.paymentservice.infra.monitoring.MetricNames.OUTBOX_DISPATCH_FAILED_TOTAL
