@@ -12,7 +12,7 @@ set -euo pipefail
 #   FORCE_DELETE_RELEASED_PVS=false # delete leftover PVs stuck in Released for NS
 #
 # Example (full wipe):
-#   DELETE_NS=true DELETE_CRDS=true DELETE_CROSS_NS_SMS=true FORCE_DELETE_RELEASED_PVS=true ./delete-monitoring.sh
+#   DELETE_NS=true DELETE_CRDS=true DELETE_CROSS_NS_SMS=true FORCE_DELETE_RELEASED_PVS=true ./delete-monitoring-stack.sh
 
 NS=${NS:-monitoring}
 DELETE_NS=${DELETE_NS:-false}
