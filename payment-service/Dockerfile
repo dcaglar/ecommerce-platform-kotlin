@@ -12,6 +12,9 @@ COPY common-test/pom.xml common-test/
 COPY payment-infrastructure/pom.xml payment-infrastructure/
 COPY payment-service/pom.xml payment-service/
 COPY payment-consumers/pom.xml payment-consumers/
+COPY payment-edge-workers/pom.xml payment-edge-workers/
+COPY payment-central-relay/pom.xml payment-central-relay/
+
 # Warm the dependency cache
 RUN --mount=type=cache,target=/root/.m2 mvn -B dependency:go-offline
 # Copy all module source directories (required by parent pom.xml)

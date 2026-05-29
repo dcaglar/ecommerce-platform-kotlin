@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "payment-central-relay.fullname" . }}
+  labels:
+    app: {{ include "payment-central-relay.fullname" . }}
+    {{- include "payment-central-relay.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type | default "ClusterIP" }}
+  selector:
+    app: {{ include "payment-central-relay.fullname" . }}
+  ports:
+    - name: {{ .Values.service.portName | default "http" }}
+      port: {{ .Values.service.port | default 8080 }}
+      targetPort: {{ .Values.service.port | default 8080 }}
+      protocol: TCP
+    - name: management
+      port: {{ .Values.service.managementPort | default 9000 }}
+      targetPort: {{ .Values.service.managementPort | default 9000 }}
+      protocol: TCP

@@ -13,7 +13,5 @@ import org.springframework.context.annotation.Import
     RedisConfig::class,
     // etc...
 )
-@MapperScan(
-    basePackages = ["com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper"],
-)
+
 class PaymentInfrastructureAutoConfig

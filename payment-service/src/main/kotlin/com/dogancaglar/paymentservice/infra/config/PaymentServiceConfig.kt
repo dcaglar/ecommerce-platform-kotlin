@@ -1,17 +1,13 @@
 package com.dogancaglar.paymentservice.infra.config
 
-import com.dogancaglar.paymentservice.application.service.AccountBalanceReadService
 import com.dogancaglar.paymentservice.ports.outbound.*
 import com.dogancaglar.paymentservice.application.service.AuthorizePaymentIntentService
 import com.dogancaglar.paymentservice.application.service.CapturePaymentService
 import com.dogancaglar.paymentservice.application.service.CreatePaymentIntentService
 import com.dogancaglar.paymentservice.application.service.GetPaymentIntentService
 import com.dogancaglar.paymentservice.application.service.UpdatePaymentIntentService
-import com.dogancaglar.paymentservice.ports.inbound.usecases.AccountBalanceReadUseCase
 import com.dogancaglar.paymentservice.ports.inbound.usecases.CreatePaymentIntentUseCase
 import com.dogancaglar.paymentservice.ports.inbound.usecases.GetPaymentIntentUseCase
-import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
-import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentTransactionalFacadePort
 import com.dogancaglar.paymentservice.ports.outbound.PspAuthorizationGatewayPort
 import com.dogancaglar.paymentservice.ports.outbound.ResilientExecutionPort
@@ -42,7 +38,7 @@ class PaymentServiceConfig {
     @Bean
     fun capturePaymentService(paymentRepository: PaymentRepository,
                               psp: PspAuthorizationGatewayPort,
-                              @Qualifier("outboxWebAdapter")  outboxWebAdapter: OutboxEventRepository,
+                              @Qualifier("outboxWebAdapter")  outboxWebAdapter: LocalOutboxWriterPort,
                               idGeneratorPort: IdGeneratorPort,
                               serializationPort: SerializationPort): CapturePaymentService {
         return CapturePaymentService(paymentRepository,psp,outboxWebAdapter,idGeneratorPort,serializationPort)
@@ -100,16 +96,5 @@ class PaymentServiceConfig {
             pspAuthGatewayPort = pspAuthGatewayPort,
             resilientExecutionPort = resilientExecutionPort
             )
-    }
-
-    @Bean
-    fun accountBalanceReadService(
-        cachePort: AccountBalanceCachePort,
-        snapshotPort: AccountBalanceSnapshotPort
-    ): AccountBalanceReadUseCase {
-        return AccountBalanceReadService(
-            cachePort = cachePort,
-            snapshotPort = snapshotPort
-        )
     }
 }

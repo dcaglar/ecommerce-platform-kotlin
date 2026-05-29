@@ -19,6 +19,13 @@ chmod +x infra/scripts/*.sh
 
 Recommended order
 
+0) Nuke existing cluster (Optional but recommended)
+- What: Completely destroys the existing minikube cluster to ensure a completely fresh state.
+- Run:
+```bash
+infra/scripts/minikube-nuke-dev.sh
+```
+
 1) Bootstrap a local Kubernetes cluster
 - What: Creates/uses a minikube profile sized from your Docker resources and enables metrics-server.
 - Run:
@@ -33,34 +40,40 @@ infra/scripts/bootstrap-minikube-cluster.sh
 infra/scripts/deploy-all-local.sh
 ```
 
-3) Monitoring stack (Prometheus + Grafana)
+3) Monitoring stack (Prometheus + Grafana) (Optional)
 - What: Installs kube-prometheus-stack into monitoring.
 - Run:
 ```bash
 infra/scripts/deploy-monitoring-stack.sh
 ```
 
-4) Kafka Exporter (Prometheus metrics for Kafka)
+4) Kafka  and Postgresql Exporter (Prometheus metrics for Kafka) (Optional)
 - What: Exposes Kafka consumer lag, offsets, etc. for Prometheus.
 - Run:
 ```bash
 infra/scripts/deploy-kafka-exporter-local.sh
+infra/scripts/deploy-postgresql-exporter-local.sh
 ```
 
-5) Payment Service (Ingress, endpoints.json)
-- What: Deploys the payment-service chart and sets up ingress. Writes infra/endpoints.json.
+4.5) Build Docker Images
+- What: Builds the latest source code and updates the local Minikube docker registry so the pods pull the latest code.
+- Run:
+```bash
+infra/scripts/build-and-push-payment-service-docker-repo.sh
+infra/scripts/build-and-push-payment-edge-workers-docker-repo.sh
+infra/scripts/build-and-push-payment-consumers-docker-repo.sh
+```
+
+5) Payment Edge Cell
+- What: Deploys the complete Atomic Edge Cell (REST API, Local DB, and Local Forwarder) and sets up ingress. Writes infra/endpoints.json.
 - Tip: For a LoadBalancer IP, run in a separate terminal:
 ```bash
-sudo -E minikube -p newprofile tunnel
+tunnel.sh
 ```
 - Then run:
 ```bash
-infra/scripts/deploy-payment-service-local.sh
+infra/scripts/deploy-payment-edge-cell-local.sh
 ```
-
-
-
-
 
 
 6) Payment Consumers
@@ -68,6 +81,7 @@ infra/scripts/deploy-payment-service-local.sh
 - Run:
 ```bash
 infra/scripts/deploy-payment-consumers-local.sh
+
 ```
 
 7) Expose consumer lag as an external metric (for HPA)

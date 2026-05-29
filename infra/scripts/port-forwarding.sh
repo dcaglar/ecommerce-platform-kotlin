@@ -118,8 +118,11 @@ fi
 # Keycloak
 FORWARDS+=("$PAYMENT_NS svc/keycloak 8080 8080")
 
-# Postgres
-FORWARDS+=("$PAYMENT_NS svc/payment-db-postgresql 5432 5432")
+# Postgres (Central)
+FORWARDS+=("$PAYMENT_NS svc/central-db-postgresql 5434 5432")
+
+# Postgres (Edge)
+FORWARDS+=("$PAYMENT_NS svc/payment-edge-cell 5432 5432")
 
 # Postgres Exporter (Added this line)
 # Maps localhost:9187 -> Service Port 80 (standard for this chart)
@@ -133,8 +136,8 @@ FORWARDS+=("$MONITORING_NS svc/prometheus-operated 9090 9090")
 FORWARDS+=("$MONITORING_NS svc/prometheus-stack-grafana 3000 80")
 
 
-#paymetn-service management
-FORWARDS+=("$PAYMENT_NS svc/payment-service 9000 9000")
+#payment-edge-cell management
+FORWARDS+=("$PAYMENT_NS svc/payment-edge-cell 9000 9000")
 
 # Elasticsearch
 FORWARDS+=("$LOGGING_NS svc/elasticsearch-master 9200 9200")
@@ -161,8 +164,9 @@ done
 echo "✅ Port-forwards running:"
 [[ "$PF_INGRESS" == "true" ]] && echo "   - Ingress     → http://127.0.0.1:${INGRESS_LOCAL_PORT} (Host header still required)"
 echo "   - Keycloak    → http://127.0.0.1:8080"
-echo "   - Postgres    → 127.0.0.1:5432"
-echo "   - PG Exporter → http://127.0.0.1:9187/metrics (New!)"
+echo "   - Central DB  → 127.0.0.1:5434"
+echo "   - Edge DB     → 127.0.0.1:5432"
+echo "   - PG Exporter → http://127.0.0.1:9187/metrics"
 echo "   - Grafana     → http://127.0.0.1:3000"
 echo "   - Prometheus    → http://127.0.0.1:9090"
 echo "   - Elasticsearch → https://127.0.0.1:9200 (user: elastic, password: fUNIuW1Kdl3qFUyh%)"

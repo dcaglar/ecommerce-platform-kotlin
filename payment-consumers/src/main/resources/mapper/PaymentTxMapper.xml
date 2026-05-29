@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentTxMapper">
+
+    <resultMap id="PaymentTxResultMap" type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentTxEntity">
+        <id property="txId" column="tx_id"/>
+        <result property="txType" column="tx_type"/>
+        <result property="parentTxId" column="parent_tx_id"/>
+        <result property="paymentId" column="payment_id"/>
+        <result property="paymentOrderId" column="payment_order_id"/>
+        <result property="acquirerReference" column="acquirer_reference"/>
+        <result property="amountValue" column="amount_value"/>
+        <result property="amountCurrency" column="amount_currency"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentTxEntity">
+        INSERT INTO payment_tx (
+            tx_id, tx_type, parent_tx_id, payment_id, payment_order_id,
+            acquirer_reference, amount_value, amount_currency
+        ) VALUES (
+            #{txId}, #{txType}, #{parentTxId}, #{paymentId}, #{paymentOrderId},
+            #{acquirerReference}, #{amountValue}, #{amountCurrency}
+        )
+    </insert>
+
+    <select id="findByPaymentId" resultMap="PaymentTxResultMap">
+        SELECT * FROM payment_tx
+        WHERE payment_id = #{paymentId}
+        ORDER BY created_at ASC
+    </select>
+
+</mapper>

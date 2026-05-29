@@ -201,7 +201,6 @@ class Payment private constructor(
 
         /**
          * Create a Payment AFTER a PaymentIntent has been AUTHORIZED.
-         * Typically called from the application layer when handling PaymentIntentAuthorized.
          */
         fun fromAuthorizedIntent(
             paymentId: PaymentId,

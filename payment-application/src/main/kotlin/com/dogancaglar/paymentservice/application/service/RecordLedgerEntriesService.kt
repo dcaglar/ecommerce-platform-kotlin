@@ -16,13 +16,17 @@ import com.dogancaglar.paymentservice.ports.inbound.usecases.RecordLedgerEntries
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
+import com.dogancaglar.paymentservice.ports.outbound.PaymentTxPort
+import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import org.slf4j.LoggerFactory
 import java.util.UUID
 
 open class RecordLedgerEntriesService(
     private val ledgerWritePort: LedgerEntryPort,
     private val eventPublisherPort: EventPublisherPort,
-    private val accountDirectory: AccountDirectoryPort) : RecordLedgerEntriesUseCase {
+    private val accountDirectory: AccountDirectoryPort,
+    private val paymentTxPort: PaymentTxPort,
+    private val idGeneratorPort: IdGeneratorPort) : RecordLedgerEntriesUseCase {
 
     private val ledgerEntryFactory = LedgerEntryFactory()
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -47,15 +51,28 @@ open class RecordLedgerEntriesService(
         )
 
         val journalEntries: List<JournalEntry> = when (event.finalStatus.uppercase()) {
-            PaymentOrderStatus.CAPTURED.name ->
-                JournalEntry.capture(journalIdentifier = event.paymentOrderId,
+            PaymentOrderStatus.CAPTURED.name -> {
+                val txId = idGeneratorPort.nextPaymentId()
+                val paymentId = event.paymentId.toLongOrNull() ?: 0L
+                val paymentOrderId = event.paymentOrderId.toLongOrNull() ?: 0L
+                val txs = paymentTxPort.findByPaymentId(paymentId)
+                val authTx = txs.find { it.txType == "AUTHORIZATION" }
+                val authTxId = authTx?.txId ?: 0L
+                val captureResult = JournalEntry.capture(
+                    txId = txId,
+                    paymentId = paymentId,
+                    paymentOrderId = paymentOrderId,
+                    authorizationTxId = authTxId,
+                    acquirerReference = "REF-${paymentOrderId}",
+                    journalIdentifier = event.paymentOrderId,
                     capturedAmount = amount,
-                    authReceivable=authReceivable,
-                    authLiability=authLiability,
+                    authReceivable = authReceivable,
+                    authLiability = authLiability,
                     merchantAccount = merchantAccount,
                     pspReceivable = pspReceivable
-                    )
-
+                )
+                captureResult.journalEntries
+            }
 
             "FAILED_FINAL", "FAILED" -> JournalEntry.failedPayment(
                 paymentOrderId = event.paymentOrderId,

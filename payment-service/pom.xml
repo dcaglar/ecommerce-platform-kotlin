@@ -106,6 +106,11 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.mybatis.spring.boot</groupId>
+            <artifactId>mybatis-spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>                                  <!-- Testcontainers core -->
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>

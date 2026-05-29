@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.application.events
 
 import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCommand
+import com.dogancaglar.paymentservice.application.command.PaymentOrderRefundCommand
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
@@ -42,6 +43,27 @@ data class PaymentOrderPspResultUpdated private constructor(
                 "Cannot emit PSP_RESULT_UPDATED for non-terminal or invalid PSP status: $pspStatus"
             }
 
+            return PaymentOrderPspResultUpdated(
+                paymentOrderId = cmd.paymentOrderId,
+                publicPaymentOrderId = cmd.publicPaymentOrderId,
+                paymentId = cmd.paymentId,
+                publicPaymentId = cmd.publicPaymentId,
+                sellerId = cmd.sellerId,
+                amountValue = cmd.amountValue,
+                currency = cmd.currency,
+                pspStatus = pspStatus.name,
+                attempt = cmd.attempt,
+                latencyMs = latencyMs,
+                timestamp = now
+            )
+        }
+
+        fun from(
+            cmd: PaymentOrderRefundCommand,
+            pspStatus: PaymentOrderStatus,
+            latencyMs: Long,
+            now: Instant
+        ): PaymentOrderPspResultUpdated {
             return PaymentOrderPspResultUpdated(
                 paymentOrderId = cmd.paymentOrderId,
                 publicPaymentOrderId = cmd.publicPaymentOrderId,

@@ -28,7 +28,11 @@ open class ProcessPaymentService(
     @param:Qualifier("syncPaymentEventPublisher")
     private val eventPublisher: EventPublisherPort,
     private val retryQueuePort: RetryQueuePort<PaymentOrderCaptureCommand>,
-    private val paymentOrderModificationPort: PaymentOrderModificationPort
+    private val paymentOrderModificationPort: PaymentOrderModificationPort,
+    private val accountDirectory: com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort,
+    private val paymentTxPort: com.dogancaglar.paymentservice.ports.outbound.PaymentTxPort,
+    private val ledgerWritePort: com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort,
+    private val idGeneratorPort: com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 ) : ProcessPspResultUseCase {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -72,8 +76,51 @@ open class ProcessPaymentService(
     }
 
     private fun handleCaptured(order: PaymentOrder) {
+        // 1. Update Payment Order
         val draft = order.markAsCaptured()
         val persisted = paymentOrderModificationPort.updateReturningIdempotent(draft)
+
+        // 2. Ledger & PaymentTx generation
+        val merchantAccount = com.dogancaglar.paymentservice.domain.model.ledger.Account.fromProfile(
+            accountDirectory.getAccountProfile(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MERCHANT_PAYABLE, order.sellerId.value)
+        )
+        val authReceivable = com.dogancaglar.paymentservice.domain.model.ledger.Account.fromProfile(
+            accountDirectory.getAccountProfile(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.AUTH_RECEIVABLE, "GLOBAL")
+        )
+        val authLiability = com.dogancaglar.paymentservice.domain.model.ledger.Account.fromProfile(
+            accountDirectory.getAccountProfile(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.AUTH_LIABILITY, "GLOBAL")
+        )
+        val pspReceivable = com.dogancaglar.paymentservice.domain.model.ledger.Account.fromProfile(
+            accountDirectory.getAccountProfile(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.PSP_RECEIVABLES, "GLOBAL")
+        )
+
+        // Find Auth Tx
+        val txs = paymentTxPort.findByPaymentId(order.paymentId.value)
+        val authTx = txs.find { it.txType == "AUTHORIZATION" }
+        val authTxId = authTx?.txId ?: 0L // Fallback if auth missing
+
+        val operationResult = com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry.capture(
+            txId = idGeneratorPort.nextPaymentId(),
+            paymentId = order.paymentId.value,
+            paymentOrderId = order.paymentOrderId.value,
+            authorizationTxId = authTxId,
+            acquirerReference = "REF-${order.paymentOrderId.value}", // Fallback for PSP reference
+            journalIdentifier = order.paymentOrderId.value.toString(),
+            capturedAmount = order.amount,
+            authReceivable = authReceivable,
+            authLiability = authLiability,
+            merchantAccount = merchantAccount,
+            pspReceivable = pspReceivable
+        )
+
+        // 3. Persist PaymentTx and Ledger Entries
+        paymentTxPort.save(operationResult.transaction)
+        
+        val ledgerEntryFactory = com.dogancaglar.paymentservice.domain.util.LedgerEntryFactory()
+        val ledgerEntries = operationResult.journalEntries.map { ledgerEntryFactory.create(it) }
+        ledgerWritePort.postLedgerEntriesAtomic(ledgerEntries)
+
+        // 4. Publish Event
         val evt = PaymentOrderDomainEventEntityMapper.toPaymentOrderFinalized(persisted, Utc.nowLocalDateTime(),
             PaymentOrderStatus.CAPTURED)
         eventPublisher.publishSync(

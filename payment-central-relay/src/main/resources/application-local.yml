@@ -1,0 +1,8 @@
+app:
+  instance-id: ${POD_NAME:${HOSTNAME:${random.value}}}
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_CENTRAL_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}

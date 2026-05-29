@@ -44,7 +44,7 @@ object MetricTagValues {
     }
 
     object EventTypes {
-        const val PAYMENT_ORDER_CREATED = "payment_order_created"
+        const val PAYMENT_ORDER_CREATED = "payment_order_capture_received"
         const val PAYMENT_ORDER_SUCCEEDED = "payment_order_succeeded"
         const val PAYMENT_ORDER_FAILED = "payment_order_failed"
         // ... add as needed

@@ -87,12 +87,12 @@ class PaymentOrder private constructor(
 
     /**
      * Transitions the payment order to CAPTURE_REQUESTED status.
-     * Only allowed from INITIATED_PENDING status with retryCount = 0.
+     * Only allowed from CAPTURE_RECEIVED status with retryCount = 0.
      */
     fun markCaptureRequested(): PaymentOrder {
-        require(status == PaymentOrderStatus.INITIATED_PENDING) {
+        require(status == PaymentOrderStatus.CAPTURE_RECEIVED) {
             "Invalid transtion Cannot request capture from status '${status.name}'. " +
-                    "Expected status: ${PaymentOrderStatus.INITIATED_PENDING.name}. " +
+                    "Expected status: ${PaymentOrderStatus.CAPTURE_RECEIVED.name}. " +
                     "PaymentOrderId: ${paymentOrderId.value}"
         }
         require(retryCount == 0) {
@@ -220,7 +220,7 @@ class PaymentOrder private constructor(
         )
 
         /**
-         * Creates a new payment order with INITIATED_PENDING status.
+         * Creates a new payment order with CAPTURE_RECEIVED status.
          * Validation is performed by the constructor's init block.
          */
         fun createNew(
@@ -235,7 +235,7 @@ class PaymentOrder private constructor(
                 paymentId = paymentId,
                 sellerId = sellerId,
                 amount = amount,
-                status = PaymentOrderStatus.INITIATED_PENDING,
+                status = PaymentOrderStatus.CAPTURE_RECEIVED,
                 retryCount = 0,
                 createdAt = now,
                 updatedAt = now

@@ -32,7 +32,7 @@ class PaymentOrderTest {
         assertEquals(paymentId, order.paymentId)
         assertEquals(sellerId, order.sellerId)
         assertEquals(amount, order.amount)
-        assertEquals(PaymentOrderStatus.INITIATED_PENDING, order.status)
+        assertEquals(PaymentOrderStatus.CAPTURE_RECEIVED, order.status)
         assertEquals(0, order.retryCount)
         assertNotNull(order.createdAt)
         assertNotNull(order.updatedAt)
@@ -67,7 +67,7 @@ class PaymentOrderTest {
     // --- ✅ State transition tests ---
 
     @Test
-    fun `should transition from INITIATED_PENDING to CAPTURE_REQUESTED`() {
+    fun `should transition from CAPTURE_RECEIVED to CAPTURE_REQUESTED`() {
         val order = PaymentOrder.createNew(
             paymentOrderId,
             paymentId,
@@ -82,7 +82,7 @@ class PaymentOrderTest {
     }
 
     @Test
-    fun `should fail to request capture if not INITIATED_PENDING`() {
+    fun `should fail to request capture if not CAPTURE_RECEIVED`() {
         val order = PaymentOrder.createNew(
             paymentOrderId,
             paymentId,

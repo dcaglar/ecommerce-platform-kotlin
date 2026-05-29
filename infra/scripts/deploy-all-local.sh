@@ -11,8 +11,10 @@ echo "🚀 Deploying payment configmap..."
 echo "🚀 Deploying keycloak..."
 "$SCRIPT_DIR/deploy-keycloak-local.sh"
 
-echo "🚀 Deploying payment-db..."
-"$SCRIPT_DIR/deploy-payment-db-local.sh"
+
+
+echo "🚀 Deploying  central databases..."
+"$SCRIPT_DIR/deploy-central-db-local.sh"
 
 echo "🚀 Deploying redis..."
 "$SCRIPT_DIR/deploy-redis-local.sh"
@@ -22,6 +24,6 @@ echo "🚀 Deploying kafka..."
 
 
 
-echo "✅ All components deployed!"
 
+echo "✅ All components deployed!"
 

@@ -103,11 +103,12 @@ CREATE TABLE payment_orders (
 ALTER TABLE payment_orders
     ADD CONSTRAINT chk_payment_orders_status_valid
     CHECK (status IN (
-        'INITIATED_PENDING',
+        'CAPTURE_RECEIVED',
         'CAPTURE_REQUESTED',
         'CAPTURE_FAILED',
         'CAPTURED',
         'REFUND_REQUESTED',
+        'REFUND_RECEIVED',
         'REFUND_FAILED',
         'REFUNDED',
         'PENDING_CAPTURE',

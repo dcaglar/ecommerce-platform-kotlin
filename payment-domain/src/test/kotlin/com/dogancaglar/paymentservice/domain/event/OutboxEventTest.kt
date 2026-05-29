@@ -234,7 +234,7 @@ class OutboxEventTest {
                 "paymentOrderId": "123",
                 "amount": 10000,
                 "currency": "USD",
-                "status": "INITIATED_PENDING",
+                "status": "CAPTURE_RECEIVED",
                 "sellerId": "seller-789"
             }
         """.trimIndent()

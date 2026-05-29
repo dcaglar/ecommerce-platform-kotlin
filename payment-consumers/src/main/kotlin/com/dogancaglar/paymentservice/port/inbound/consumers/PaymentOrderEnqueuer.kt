@@ -4,12 +4,12 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ID
 import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ORDER_ID
-import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
+import com.dogancaglar.paymentservice.application.events.PaymentOrderCaptureReceived
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventEntityMapper
 import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.config.KafkaTxExecutor
 import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
 import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.Topics
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.MissingPaymentOrderException
+import com.dogancaglar.paymentservice.domain.exception.MissingPaymentOrderException
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
@@ -40,7 +40,7 @@ class PaymentOrderEnqueuer(
         groupId = CONSUMER_GROUPS.PAYMENT_ORDER_ENQUEUER
     )
     fun onCreated(
-        record: ConsumerRecord<String, EventEnvelope<PaymentOrderCreated>>,
+        record: ConsumerRecord<String, EventEnvelope<PaymentOrderCaptureReceived>>,
         consumer: org.apache.kafka.clients.consumer.Consumer<*, *>
     ) {
         val envelope = record.value()

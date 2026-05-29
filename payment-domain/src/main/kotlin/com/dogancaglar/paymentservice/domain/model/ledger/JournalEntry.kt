@@ -45,37 +45,69 @@ class JournalEntry private constructor(
 
         // ==================== Factory Methods ====================
 
-        fun authHold(journalIdentifier:String,
-                     authorizedAmount: Amount,
-                     authReceivable:Account,
-                     authLiability:Account): List<JournalEntry> =
-            listOf(JournalEntry(
-                id = "AUTH:${journalIdentifier}",
-                txType = JournalType.AUTH_HOLD,
-                name = "Authorization Hold",
-                postings = listOf(
-                    Posting.Debit.create(authReceivable, authorizedAmount),
-                    Posting.Credit.create(authLiability, authorizedAmount)
+        fun authHold(
+            txId: Long,
+            paymentId: Long,
+            acquirerReference: String,
+            journalIdentifier: String,
+            authorizedAmount: Amount,
+            authReceivable: Account,
+            authLiability: Account
+        ): LedgerOperationResult = LedgerOperationResult(
+            transaction = PaymentTx.Authorization(
+                txId = txId,
+                paymentId = paymentId,
+                acquirerReference = acquirerReference,
+                amount = authorizedAmount
+            ),
+            journalEntries = listOf(
+                JournalEntry(
+                    id = "AUTH:${journalIdentifier}",
+                    txType = JournalType.AUTH_HOLD,
+                    name = "Authorization Hold",
+                    postings = listOf(
+                        Posting.Debit.create(authReceivable, authorizedAmount),
+                        Posting.Credit.create(authLiability, authorizedAmount)
+                    )
                 )
             )
-            )
+        )
 
-        fun capture(journalIdentifier:String,capturedAmount: Amount,
-                    authReceivable:Account,
-                    authLiability:Account,
-                    merchantAccount: Account,
-                    pspReceivable : Account): List<JournalEntry> =
-            listOf(JournalEntry(
-                id = "CAPTURE:${journalIdentifier}",
-                txType = JournalType.CAPTURE,
-                name = "Payment Capture",
-                postings = listOf(
-                    Posting.Credit.create(authReceivable, capturedAmount),
-                    Posting.Debit.create(authLiability,capturedAmount),
-                    Posting.Credit.create(merchantAccount, capturedAmount),
-                    Posting.Debit.create(pspReceivable, capturedAmount)
+        fun capture(
+            txId: Long,
+            paymentId: Long,
+            paymentOrderId: Long,
+            authorizationTxId: Long,
+            acquirerReference: String,
+            journalIdentifier: String,
+            capturedAmount: Amount,
+            authReceivable: Account,
+            authLiability: Account,
+            merchantAccount: Account,
+            pspReceivable: Account
+        ): LedgerOperationResult = LedgerOperationResult(
+            transaction = PaymentTx.Capture(
+                txId = txId,
+                paymentId = paymentId,
+                paymentOrderId = paymentOrderId,
+                authorizationTxId = authorizationTxId,
+                acquirerReference = acquirerReference,
+                amount = capturedAmount
+            ),
+            journalEntries = listOf(
+                JournalEntry(
+                    id = "CAPTURE:${journalIdentifier}",
+                    txType = JournalType.CAPTURE,
+                    name = "Payment Capture",
+                    postings = listOf(
+                        Posting.Credit.create(authReceivable, capturedAmount),
+                        Posting.Debit.create(authLiability, capturedAmount),
+                        Posting.Credit.create(merchantAccount, capturedAmount),
+                        Posting.Debit.create(pspReceivable, capturedAmount)
+                    )
                 )
-            ))
+            )
+        )
 
 
         fun settlement(

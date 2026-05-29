@@ -2,31 +2,24 @@ package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence
 
 import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.converter.OutboxEventEntityMapper
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.outboxeventmapper.OutboxEventWebMapper
-import com.dogancaglar.paymentservice.ports.outbound.OutboxEventRepository
+import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.OutboxEventMapper
+import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort
 import org.springframework.stereotype.Repository
 
-@Repository
+@Repository("outboxWebAdapter")
 class OutboxWebAdapter(
-    private val outboxEventWebMapper: OutboxEventWebMapper
-) : OutboxEventRepository {
-
+    private val outboxEventMapper: OutboxEventMapper
+) : LocalOutboxWriterPort {
 
     override fun save(event: OutboxEvent): OutboxEvent {
-        outboxEventWebMapper.insertOutboxEvent(OutboxEventEntityMapper.toEntity(event))
+        outboxEventMapper.insertOutboxEvent(OutboxEventEntityMapper.toEntity(event))
         return event
     }
 
     override fun saveAll(events: List<OutboxEvent>): List<OutboxEvent> {
-        if (events.isNotEmpty())
-            outboxEventWebMapper.insertAllOutboxEvents(events.map(OutboxEventEntityMapper::toEntity))
+        if (events.isNotEmpty()) {
+            outboxEventMapper.insertAllOutboxEvents(events.map(OutboxEventEntityMapper::toEntity))
+        }
         return events
     }
-
-    override fun findByStatus(status: String): List<OutboxEvent> = throw UnsupportedOperationException("Use poller repository")
-    override fun findBatchForDispatch(batchSize: Int, workerId: String): List<OutboxEvent> = throw UnsupportedOperationException("Use poller repository")
-    override fun updateAll(events: List<OutboxEvent>): Unit = throw UnsupportedOperationException("Use poller repository")
-    override fun countByStatus(status: String): Long = throw UnsupportedOperationException("Use poller repository")
-    override fun reclaimStuckClaims(olderThanSeconds: Int): Int = throw UnsupportedOperationException("Use poller repository")
-    override fun unclaimSpecific(workerId: String, oeids: List<Long>): Int = throw UnsupportedOperationException("Use poller repository")
 }

@@ -168,7 +168,7 @@ class AuthorizePaymentIntentService(
             }
             //generate outbox<paymentauthorized> + outbox<paymentordercreated>  from payment objefct which is just created,and save it in db
             val outboxEventPaymentAuthorizedEvent = toOutboxPaymentAuthorizedEvent(payment)
-            val outboxEventPaymentOrderCreatedList = paymentOrders.map { toOutboxPaymentOrderCreatedEvent(it) }
+            val outboxEventPaymentOrderCreatedList = paymentOrders.map { toOutboxPaymentOrderCaptureReceivedEvent(it) }
             //persist all changes in on tatomic tranascation
             paymentTransactionalFacadePort.handleAuthorized(confirmedPaymentIntent,payment,paymentOrders,outboxEventPaymentOrderCreatedList+outboxEventPaymentAuthorizedEvent)
         }
@@ -191,12 +191,12 @@ class AuthorizePaymentIntentService(
         )
     }
 
-    private fun toOutboxPaymentOrderCreatedEvent(paymentOrder: PaymentOrder): OutboxEvent {
-        val paymentOrderCreatedEvent = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(paymentOrder)
+    private fun toOutboxPaymentOrderCaptureReceivedEvent(paymentOrder: PaymentOrder): OutboxEvent {
+        val paymentOrderCaptureReceived = PaymentOrderDomainEventEntityMapper.toPaymentOrderCaptureReceived(paymentOrder)
         val envelope = EventEnvelopeFactory.envelopeFor(
             traceId = EventLogContext.getTraceId(),
-            data = paymentOrderCreatedEvent,
-            aggregateId = paymentOrderCreatedEvent.paymentOrderId,
+            data = paymentOrderCaptureReceived,
+            aggregateId = paymentOrderCaptureReceived.paymentOrderId,
             parentEventId = EventLogContext.getEventId()
         )
 
@@ -205,23 +205,6 @@ class AuthorizePaymentIntentService(
             eventType = envelope.eventType,
             aggregateId = envelope.aggregateId,
             payload = serializationPort.toJson(envelope),
-        )
-    }
-
-    private fun toOutboxEvent(paymentIntent: PaymentIntent): OutboxEvent {
-        val event = PaymentOrderDomainEventEntityMapper.toPaymentIntentAuthorizedIntentEvent(paymentIntent)
-
-        val envelope = EventEnvelopeFactory.envelopeFor(
-            traceId = EventLogContext.getTraceId(),
-            data = event,
-            aggregateId = paymentIntent.paymentIntentId.value.toString()
-        )
-
-        return OutboxEvent.createNew(
-            oeid = paymentIntent.paymentIntentId.value,
-            eventType = envelope.eventType,
-            aggregateId = envelope.aggregateId,
-            payload = serializationPort.toJson(envelope)
         )
     }
 }

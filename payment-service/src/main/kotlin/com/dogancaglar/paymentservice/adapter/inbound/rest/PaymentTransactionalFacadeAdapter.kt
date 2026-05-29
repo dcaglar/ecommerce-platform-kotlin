@@ -1,10 +1,11 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest
 
 import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
+import com.dogancaglar.paymentservice.domain.exception.MissingPaymentOrderException
 import com.dogancaglar.paymentservice.domain.model.payment.Payment
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
-import com.dogancaglar.paymentservice.ports.outbound.OutboxEventRepository
+import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentIntentRepository
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
@@ -24,10 +25,10 @@ class PaymentTransactionalFacadeAdapter(
     private val paymentIntentRepository: PaymentIntentRepository,
     private val paymentRepository:  PaymentRepository,
     private val paymentOrderRepository:  PaymentOrderRepository,
-    @param:Qualifier("outboxWebAdapter") private val outboxEventRepository: OutboxEventRepository
+    @param:Qualifier("outboxWebAdapter") private val outboxEventRepository: LocalOutboxWriterPort
 ) : PaymentTransactionalFacadePort {
 
-    @Transactional(transactionManager = "webTxManager", timeout = 2)
+    @Transactional(timeout = 2)
     override fun handleAuthorized(authorizedPaymentIntent: PaymentIntent, payment: Payment, paymentOrderList:List<PaymentOrder>,outboxEventList:List<OutboxEvent>){        // Assumes order is already modified by caller (domain method called in application service)
         paymentIntentRepository.updatePaymentIntent(authorizedPaymentIntent)
         paymentRepository.save(payment)
@@ -37,7 +38,3 @@ class PaymentTransactionalFacadeAdapter(
     }
 }
 
-class MissingPaymentOrderException(
-    val paymentOrderId: Long,
-    message: String = "PaymentOrder row is missing for id=$paymentOrderId"
-) : RuntimeException(message)

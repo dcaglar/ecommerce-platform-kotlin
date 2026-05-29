@@ -28,7 +28,16 @@ class JournalEntryTest {
     @Test
     fun `authHold should create balanced entry with AUTH_RECEIVABLE debit and AUTH_LIABILITY credit`() {
         val amount = Amount.of(10_000, eur)
-        val entryList = JournalEntry.authHold("PAY-1", amount, authReceivableAccount, authLiabilityAccount)
+        val result = JournalEntry.authHold(
+            txId = 1L,
+            paymentId = 100L,
+            acquirerReference = "acq-1",
+            journalIdentifier = "PAY-1",
+            authorizedAmount = amount,
+            authReceivable = authReceivableAccount,
+            authLiability = authLiabilityAccount
+        )
+        val entryList = result.journalEntries
         val entry = entryList.first()
         
         val totalDebitAmount = entry.postings.filterIsInstance<Posting.Debit>().sumOf { it.amount.quantity }
@@ -48,7 +57,20 @@ class JournalEntryTest {
     @Test
     fun `capture should balance and shift from auth to psp receivables, and increase merchant payable`() {
         val amount = Amount.of(10_000, eur)
-        val entryList = JournalEntry.capture("PAY-2", amount, authReceivableAccount, authLiabilityAccount, merchantAccount, pspReceivableAccount)
+        val result = JournalEntry.capture(
+            txId = 2L,
+            paymentId = 100L,
+            paymentOrderId = 200L,
+            authorizationTxId = 1L,
+            acquirerReference = "acq-2",
+            journalIdentifier = "PAY-2",
+            capturedAmount = amount,
+            authReceivable = authReceivableAccount,
+            authLiability = authLiabilityAccount,
+            merchantAccount = merchantAccount,
+            pspReceivable = pspReceivableAccount
+        )
+        val entryList = result.journalEntries
         val entry = entryList.first()
         
         val drAccounts = entry.postings.filterIsInstance<Posting.Debit>().map { it.account.type }
@@ -126,8 +148,21 @@ class JournalEntryTest {
         val commissionFeeRevenue = Amount.of(400, eur) //our commission as reevenue
         val payout = capturedAmount-commissionFeeRevenue
 
+        val captureResult = JournalEntry.capture(
+            txId = 5L,
+            paymentId = 100L,
+            paymentOrderId = 500L,
+            authorizationTxId = 1L,
+            acquirerReference = "acq-5",
+            journalIdentifier = "PAY-5",
+            capturedAmount = capturedAmount,
+            authReceivable = authReceivableAccount,
+            authLiability = authLiabilityAccount,
+            merchantAccount = merchantAccount,
+            pspReceivable = pspReceivableAccount
+        )
         val entryLists = listOf(
-            JournalEntry.capture("PAY-5", capturedAmount, authReceivableAccount, authLiabilityAccount, merchantAccount, pspReceivableAccount),
+            captureResult.journalEntries,
             JournalEntry.settlement("PAY-5", capturedAmount, settledAmount, platformCashAccount,pspFeeExpenseAccount,pspReceivableAccount),
             JournalEntry.commissionFeRegistered("PAY-5", commissionFeeRevenue, commissionRevenueAccount,merchantAccount),
             JournalEntry.payout("MERCHANT-1", capturedAmount-commissionFeeRevenue, merchantAccount, platformCashAccount)

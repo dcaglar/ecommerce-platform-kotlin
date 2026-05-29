@@ -35,7 +35,9 @@ It declares that this module is:
         <module>payment-application</module>
         <module>payment-infrastructure</module>
         <module>payment-service</module>
+        <module>payment-edge-workers</module>
         <module>payment-consumers</module>
+        <module>payment-central-relay</module>
         <module>common-test</module>
     </modules>
 

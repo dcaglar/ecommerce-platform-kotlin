@@ -5,6 +5,10 @@ import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCom
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
 import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
+import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
+import com.dogancaglar.paymentservice.ports.outbound.PaymentTxPort
+import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
+import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import io.mockk.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -14,6 +18,10 @@ class ProcessPaymentServiceTest {
     private lateinit var eventPublisher: EventPublisherPort
     private lateinit var retryQueuePort: RetryQueuePort<PaymentOrderCaptureCommand>
     private lateinit var paymentOrderModificationPort: PaymentOrderModificationPort
+    private lateinit var accountDirectory: AccountDirectoryPort
+    private lateinit var paymentTxPort: PaymentTxPort
+    private lateinit var ledgerWritePort: LedgerEntryPort
+    private lateinit var idGeneratorPort: IdGeneratorPort
     private lateinit var service: ProcessPaymentService
 
     @BeforeEach
@@ -21,6 +29,11 @@ class ProcessPaymentServiceTest {
         eventPublisher = mockk()
         retryQueuePort = mockk(relaxed = true)
         paymentOrderModificationPort = mockk()
+        accountDirectory = mockk(relaxed = true)
+        paymentTxPort = mockk(relaxed = true)
+        ledgerWritePort = mockk(relaxed = true)
+        idGeneratorPort = mockk(relaxed = true)
+        
         mockkObject(EventLogContext)
         every { EventLogContext.getEventId() } returns null
         every { EventLogContext.getTraceId() } returns "test-trace-id"
@@ -30,7 +43,11 @@ class ProcessPaymentServiceTest {
         service = ProcessPaymentService(
             eventPublisher = eventPublisher,
             retryQueuePort = retryQueuePort,
-            paymentOrderModificationPort = paymentOrderModificationPort
+            paymentOrderModificationPort = paymentOrderModificationPort,
+            accountDirectory = accountDirectory,
+            paymentTxPort = paymentTxPort,
+            ledgerWritePort = ledgerWritePort,
+            idGeneratorPort = idGeneratorPort
         )
     }
 

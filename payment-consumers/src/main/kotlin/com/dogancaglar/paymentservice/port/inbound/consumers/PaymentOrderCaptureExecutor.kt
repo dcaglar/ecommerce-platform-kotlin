@@ -10,7 +10,7 @@ import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
-import com.dogancaglar.paymentservice.ports.outbound.PspCaptureGatewayPort
+import com.dogancaglar.paymentservice.ports.outbound.PspModificationGatewayPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderRepository
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
@@ -28,7 +28,7 @@ import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.Topi
 import java.util.concurrent.TimeUnit
 @Component
 class PaymentOrderCaptureExecutor(
-    private val psp: PspCaptureGatewayPort,
+    private val psp: PspModificationGatewayPort,
     private val meterRegistry: MeterRegistry,
     @param:Qualifier("syncPaymentTx")
     private val kafkaTx: KafkaTxExecutor,
@@ -45,9 +45,9 @@ class PaymentOrderCaptureExecutor(
         .register(meterRegistry)
 
     @KafkaListener(
-        topics = [Topics.PAYMENT_ORDER_CAPTURE_REQUEST_QUEUE],
-        containerFactory = "${Topics.PAYMENT_ORDER_CAPTURE_REQUEST_QUEUE}-factory",
-        groupId = CONSUMER_GROUPS.PAYMENT_ORDER_CAPTURE_EXECUTOR
+        topics = [Topics.CAPTURE_QUEUE],
+        containerFactory = "${Topics.CAPTURE_QUEUE}-factory",
+        groupId = CONSUMER_GROUPS.PSP_CAPTURE_EXECUTOR
     )
     fun onPspRequested(
         record: ConsumerRecord<String, EventEnvelope<PaymentOrderCaptureCommand>>,

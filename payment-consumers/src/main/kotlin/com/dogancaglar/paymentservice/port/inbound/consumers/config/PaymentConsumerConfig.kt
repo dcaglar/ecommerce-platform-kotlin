@@ -18,29 +18,39 @@ import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
-import com.dogancaglar.paymentservice.ports.outbound.OutboxEventRepository
 import com.dogancaglar.paymentservice.ports.outbound.PaymentOrderModificationPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
 import com.dogancaglar.paymentservice.ports.outbound.PspAuthorizationGatewayPort
 import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
 import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
+import com.dogancaglar.paymentservice.ports.outbound.PaymentTxPort
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
 @Configuration
-class PaymentConsumerConfig {
+open class PaymentConsumerConfig {
 
 
     @Bean
     fun processPaymentService(
         paymentOrderModificationPort: PaymentOrderModificationPort,
         @Qualifier("syncPaymentEventPublisher") syncPaymentEventPublisher: EventPublisherPort,
-        paymentOrderRetryQueueAdapter:  RetryQueuePort<PaymentOrderCaptureCommand>): ProcessPaymentService {
+        paymentOrderRetryQueueAdapter: RetryQueuePort<PaymentOrderCaptureCommand>,
+        accountDirectoryPort: AccountDirectoryPort,
+        paymentTxPort: com.dogancaglar.paymentservice.ports.outbound.PaymentTxPort,
+        ledgerEntryPort: LedgerEntryPort,
+        idGeneratorPort: IdGeneratorPort
+    ): ProcessPaymentService {
         return ProcessPaymentService(
             paymentOrderModificationPort = paymentOrderModificationPort,
             eventPublisher = syncPaymentEventPublisher,
-            retryQueuePort = paymentOrderRetryQueueAdapter)
+            retryQueuePort = paymentOrderRetryQueueAdapter,
+            accountDirectory = accountDirectoryPort,
+            paymentTxPort = paymentTxPort,
+            ledgerWritePort = ledgerEntryPort,
+            idGeneratorPort = idGeneratorPort
+        )
     }
 
 
@@ -64,9 +74,11 @@ class PaymentConsumerConfig {
         ledgerEntrPort: LedgerEntryPort,
         syncPaymentEventPublisher: EventPublisherPort,
         @Qualifier(
-            "accountDirectoryImpl") accountDirectoryImpl: AccountDirectoryPort): RecordLedgerEntriesService{
+            "accountDirectoryImpl") accountDirectoryImpl: AccountDirectoryPort,
+        paymentTxPort: PaymentTxPort,
+        idGeneratorPort: IdGeneratorPort): RecordLedgerEntriesService{
 
-        return RecordLedgerEntriesService(ledgerEntrPort,syncPaymentEventPublisher,accountDirectoryImpl)
+        return RecordLedgerEntriesService(ledgerEntrPort, syncPaymentEventPublisher, accountDirectoryImpl, paymentTxPort, idGeneratorPort)
     }
 
 

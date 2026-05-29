@@ -1,14 +1,11 @@
 package com.dogancaglar.paymentservice.application.validator
 
 import com.dogancaglar.paymentservice.adapter.inbound.rest.mapper.AmountMapper
-import com.dogancaglar.paymentservice.domain.model.ledger.AccountStatus
-import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
-import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentRequestDTO
 import org.springframework.stereotype.Service
 
 @Service
-class PaymentValidator(private val accountDirectory: AccountDirectoryPort) {
+class PaymentValidator {
     fun validate(request: CreatePaymentIntentRequestDTO) {
         validateUniqueSellers(request)
         validateTotals(request)
@@ -28,6 +25,7 @@ class PaymentValidator(private val accountDirectory: AccountDirectoryPort) {
             "Sum of payment order amounts ($totalOrders) must equal total amount (${request.totalAmount.quantity})"
         }
     }
+
     private fun validateCurrencies(request: CreatePaymentIntentRequestDTO) {
         val paymentCurrency = AmountMapper.toDomain(request.totalAmount).currency
 
@@ -36,15 +34,6 @@ class PaymentValidator(private val accountDirectory: AccountDirectoryPort) {
                 "PaymentOrder for seller ${order.sellerId} has ${order.amount.currency}, " +
                         "but payment currency is $paymentCurrency"
             }
-
-            val profile = accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, order.sellerId)
-            require(profile.currency == paymentCurrency) {
-                "Seller ${order.sellerId} settles in ${profile.currency}, " +
-                        "but payment is in $paymentCurrency"
-            }
-
-            require(profile.status == AccountStatus.ACTIVE) {
-                "Seller ${order.sellerId} is not active"
-            }
         }
-    }}
+    }
+}

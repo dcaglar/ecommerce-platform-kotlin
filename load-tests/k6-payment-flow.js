@@ -20,8 +20,8 @@ const SCENARIOS = {
         executor: 'ramping-vus',
         startVUs: 0,
         stages: [
-            { duration: '2m', target: 150 },  // Warm-up to 20 users
-            { duration: '5m', target: 150 },  // Maintain typical active traffic
+            { duration: '2m', target: 50 },  // Warm-up to 20 users
+            { duration: '5m', target: 50 },  // Maintain typical active traffic
             { duration: '1m', target: 0 },   // Cool-down
         ],
         tags: { test_type: 'average_load' },

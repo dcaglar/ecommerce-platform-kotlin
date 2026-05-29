@@ -1,0 +1,24 @@
+{{- if .Values.serviceMonitor.enabled | default false}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "payment-central-relay.fullname" . }}
+  labels:
+    {{- include "payment-central-relay.labels" . | nindent 4 }}
+      {{- with .Values.serviceMonitor.labels }}
+      {{- toYaml . | nindent 4 }}
+      {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "payment-central-relay.fullname" . }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  endpoints:
+    - port: management
+      path: {{ .Values.serviceMonitor.path | default "/actuator/prometheus" }}
+      interval: {{ .Values.serviceMonitor.interval | default "30s" }}
+      scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout | default "10s" }}
+      scheme: {{ .Values.serviceMonitor.scheme | default "http" }}
+{{- end }}

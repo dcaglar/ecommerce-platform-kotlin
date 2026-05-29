@@ -1,0 +1,117 @@
+app:
+  instance-id: ${POD_NAME:${HOSTNAME:${random.value}}}
+
+  # manual datasource configs for web ourboxdispatcher and parttionen maintencance job
+  datasource:
+    outbox:
+      jdbc-url: ${SPRING_DATASOURCE_EDGE_URL}
+      username: ${SPRING_DATASOURCE_EDGE_USERNAME}
+      password: ${SPRING_DATASOURCE_EDGE_PASSWORD}
+      driver-class-name: org.postgresql.Driver
+      pool-name: edge-outbox-pool
+      maximum-pool-size: 6
+      minimum-idle: 3
+      connection-timeout: 1000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+    maintenance:
+      jdbc-url: ${SPRING_DATASOURCE_EDGE_URL}
+      username: ${SPRING_DATASOURCE_MAINTENANCE_USERNAME}
+      password: ${SPRING_DATASOURCE_MAINTENANCE_PASSWORD}
+      driver-class-name: org.postgresql.Driver
+      pool-name: edge-maint-pool
+      maximum-pool-size: 1
+      minimum-idle: 0
+      connection-timeout: 1500
+      validation-timeout: 1500
+      idle-timeout: 60000
+      max-lifetime: 1800000
+
+    central:
+      jdbc-url: ${SPRING_DATASOURCE_CENTRAL_URL}
+      username: ${SPRING_DATASOURCE_CENTRAL_USERNAME}
+      password: ${SPRING_DATASOURCE_CENTRAL_PASSWORD}
+      driver-class-name: org.postgresql.Driver
+      pool-name: central-writer-pool
+      maximum-pool-size: 6
+      minimum-idle: 3
+      connection-timeout: 1000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: payment-edge-workers
+  data:
+    redis:
+      url: ${SPRING_DATA_REDIS_URL}
+      timeout: 10s               # Increased from 2s to handle snapshot job and retry operations under load
+      lettuce:
+        pool:
+          max-active: 16         # Increased to handle concurrent operations
+          max-idle: 8
+          min-idle: 4            # Pre-warm connections for better performance
+          max-wait: 5000ms       # Wait up to 5s for connection from pool
+  liquibase:
+    enabled: false
+
+spring.jackson.time-zone: UTC
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+
+management:
+  server:
+    port: 9000
+  health:
+    probes:
+      enabled: true
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: "prometheus,metrics,health"
+  endpoint:
+    health:
+      enabled: true
+      show-details: always
+    prometheus.enabled: true
+  metrics:
+    tags:
+      application: payment-edge-workers
+    enable:
+      all: false
+      hikaricp.connections: true
+      hikaricp.connections.acquire: true
+      process.cpu.usage: true
+      jvm.threads.live: true
+      jvm.memory.used: true
+      jvm.memory.max: true
+      jvm.gc.pause: true
+      outbox_dispatched_total: true
+      outbox_dispatch_failed_total: true
+      outbox_event_backlog: true
+      outbox_dispatcher_duration: true
+    distribution:
+      percentiles-histogram:
+        outbox_dispatcher_duration: true
+      percentiles:
+        outbox_dispatcher_duration: 0.5,0.95,0.99
+    export.prometheus.enabled: true
+
+outbox-dispatcher:
+  thread-count: 2
+  batch-size: 300
+  pool-size: 2
+
+db:
+  outbox:
+      statement-timeout-ms: 2000
+      lock-timeout-ms: 200
+      idle-in-tx-timeout-ms: 0

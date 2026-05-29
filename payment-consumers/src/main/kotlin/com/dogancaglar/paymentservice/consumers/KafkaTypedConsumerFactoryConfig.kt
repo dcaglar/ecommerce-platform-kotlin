@@ -7,7 +7,7 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.GenericLogFields
 import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.config.EventEnvelopeKafkaSerializer
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
-import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
+import com.dogancaglar.paymentservice.application.events.PaymentOrderCaptureReceived
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.application.command.LedgerRecordingAuthorizationCommand
 import com.dogancaglar.paymentservice.application.command.LedgerRecordingCommand
@@ -15,7 +15,7 @@ import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCom
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
 import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
 import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.Topics
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.MissingPaymentOrderException
+import com.dogancaglar.paymentservice.domain.exception.MissingPaymentOrderException
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -208,7 +208,7 @@ class KafkaTypedConsumerFactoryConfig(
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
         customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler
-    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderCreated>> {
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderCaptureReceived>> {
         val cfg = cfgFor(PaymentEventMetadataCatalog.PaymentOrderCreatedMetadata.topic, "${Topics.PAYMENT_ORDER_CREATED}-factory")
         return createFactory(
             clientId = cfg.id,

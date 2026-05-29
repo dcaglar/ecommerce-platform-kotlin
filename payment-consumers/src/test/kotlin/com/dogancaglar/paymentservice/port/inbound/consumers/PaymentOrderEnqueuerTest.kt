@@ -5,7 +5,7 @@ import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCommand
-import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
+import com.dogancaglar.paymentservice.application.events.PaymentOrderCaptureReceived
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventEntityMapper
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
@@ -17,7 +17,7 @@ import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.MissingPaymentOrderException
+import com.dogancaglar.paymentservice.domain.exception.MissingPaymentOrderException
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import io.mockk.*
 import org.apache.kafka.clients.consumer.Consumer
@@ -50,7 +50,7 @@ class PaymentOrderEnqueuerTest {
     }
 
     @Test
-    fun `should enqueue payment order for PSP call when status is INITIATED_PENDING`() {
+    fun `should enqueue payment order for PSP call when status is CAPTURE_RECEIVED`() {
         // Given
         val paymentOrderId = PaymentOrderId(123L)
         val paymentId =PaymentId(456L)
@@ -64,12 +64,12 @@ class PaymentOrderEnqueuerTest {
             paymentId = paymentId,
             sellerId = SellerId("seller-123"),
             amount = Amount.of(10000L, Currency("USD")),
-            status = PaymentOrderStatus.INITIATED_PENDING,
+            status = PaymentOrderStatus.CAPTURE_RECEIVED,
             retryCount = 0,
             createdAt = expectedCreatedAt,
             updatedAt = expectedCreatedAt
         )
-        val paymentOrderCreated = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(paymentOrder)
+        val paymentOrderCreated = PaymentOrderDomainEventEntityMapper.toPaymentOrderCaptureReceived(paymentOrder)
         
         // Mock the modification port to return the updated order
         val updatedOrder = paymentOrder.markCaptureRequested()
@@ -135,7 +135,7 @@ class PaymentOrderEnqueuerTest {
         
         // Verify EventLogContext was called with the correct envelope for tracing
         verify(exactly = 1) {
-            EventLogContext.with<PaymentOrderCreated>(
+            EventLogContext.with<PaymentOrderCaptureReceived>(
                 match { env ->
                     env is EventEnvelope<*> &&
                     env.eventId == paymentOrderCreated.deterministicEventId() &&
@@ -150,7 +150,7 @@ class PaymentOrderEnqueuerTest {
     }
 
     @Test
-    fun `should skip enqueue when payment order status is not INITIATED_PENDING`() {
+    fun `should skip enqueue when payment order status is not CAPTURE_RECEIVED`() {
         // Given
         val paymentOrderId = PaymentOrderId(123L)
         val expectedTraceId = "trace-456"
@@ -169,18 +169,18 @@ class PaymentOrderEnqueuerTest {
             createdAt = now,
             updatedAt = now
         )
-        // Create a valid PaymentOrderCreated event (requires INITIATED_PENDING)
+        // Create a valid PaymentOrderCaptureReceived event (requires CAPTURE_RECEIVED)
         val validOrder = PaymentOrder.rehydrate(
             paymentOrderId = paymentOrderId,
             paymentId = paymentId,
             sellerId = SellerId("seller-123"),
             amount = Amount.of(10000L, Currency("USD")),
-            status = PaymentOrderStatus.INITIATED_PENDING, // Must be INITIATED_PENDING for PaymentOrderCreated
+            status = PaymentOrderStatus.CAPTURE_RECEIVED, // Must be CAPTURE_RECEIVED for PaymentOrderCaptureReceived
             retryCount = 0,
             createdAt = now,
             updatedAt = now
         )
-        val paymentOrderCreated = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(validOrder)
+        val paymentOrderCreated = PaymentOrderDomainEventEntityMapper.toPaymentOrderCaptureReceived(validOrder)
         
         // Mock the dedupe and modification ports
         // The test simulates a scenario where markAsCaptureRequested throws MissingPaymentOrderException
@@ -226,7 +226,7 @@ class PaymentOrderEnqueuerTest {
         
         // Verify EventLogContext was called with the correct envelope for tracing
         verify(exactly = 1) {
-            EventLogContext.with<PaymentOrderCreated>(
+            EventLogContext.with<PaymentOrderCaptureReceived>(
                 match { env ->
                     env is EventEnvelope<*> &&
                     env.eventId == paymentOrderCreated.deterministicEventId() &&

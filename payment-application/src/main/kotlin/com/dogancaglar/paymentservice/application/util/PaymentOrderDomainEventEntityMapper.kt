@@ -2,10 +2,8 @@ package com.dogancaglar.paymentservice.application.util
 
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCommand
-import com.dogancaglar.paymentservice.application.events.PaymentIntentAuthorized
-import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
+import com.dogancaglar.paymentservice.application.events.PaymentOrderCaptureReceived
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
-import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
 import java.time.LocalDateTime
@@ -16,20 +14,14 @@ import java.time.LocalDateTime
  */
 object PaymentOrderDomainEventEntityMapper {
 
-    fun toPaymentIntentAuthorizedIntentEvent(updated: PaymentIntent): PaymentIntentAuthorized{
-        return PaymentIntentAuthorized.from(
-            paymentIntent = updated,
-            authorizedAt = Utc.toInstant(updated.createdAt)
-        )
-    }
 
 
 
 
     /** 🔹 Domain → Event: when PaymentOrder is first created */
-    fun toPaymentOrderCreated(order: PaymentOrder): PaymentOrderCreated {
+    fun toPaymentOrderCaptureReceived(order: PaymentOrder): PaymentOrderCaptureReceived {
         val now = Utc.nowInstant()
-        return PaymentOrderCreated.from(
+        return PaymentOrderCaptureReceived.from(
             order = order,
             now = now
         )

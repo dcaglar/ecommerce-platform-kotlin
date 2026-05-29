@@ -11,6 +11,8 @@ import com.dogancaglar.paymentservice.domain.model.ledger.LedgerEntry
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
+import com.dogancaglar.paymentservice.ports.outbound.PaymentTxPort
+import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import io.mockk.Called
 import io.mockk.clearAllMocks
 import io.mockk.every
@@ -32,6 +34,8 @@ class RecordLedgerEntriesServiceTest {
     private lateinit var ledgerWritePort: LedgerEntryPort
     private lateinit var eventPublisherPort: EventPublisherPort
     private lateinit var accountDirectory: AccountDirectoryPort
+    private lateinit var paymentTxPort: PaymentTxPort
+    private lateinit var idGeneratorPort: IdGeneratorPort
     private lateinit var service: RecordLedgerEntriesService
 
     @BeforeEach
@@ -39,11 +43,15 @@ class RecordLedgerEntriesServiceTest {
         ledgerWritePort = mockk()
         eventPublisherPort = mockk()
         accountDirectory = mockk()
+        paymentTxPort = mockk(relaxed = true)
+        idGeneratorPort = mockk(relaxed = true)
 
         service = RecordLedgerEntriesService(
             ledgerWritePort = ledgerWritePort,
             eventPublisherPort = eventPublisherPort,
             accountDirectory = accountDirectory,
+            paymentTxPort = paymentTxPort,
+            idGeneratorPort = idGeneratorPort
         )
 
         stubAccountProfiles()

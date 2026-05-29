@@ -29,12 +29,16 @@ class RecordAuthorizationLedgerEntriesService(
         val authLiability = Account.fromProfile(
             accountDirectoryPort.getAccountProfile(AccountType.AUTH_LIABILITY, "GLOBAL")
         )
-        val journalEntries: List<JournalEntry> =JournalEntry.authHold(
+        val result = JournalEntry.authHold(
+            txId = event.paymentId.toLongOrNull() ?: 0L,
+            paymentId = event.paymentId.toLongOrNull() ?: 0L,
+            acquirerReference = "REF-${event.paymentId}",
             journalIdentifier = event.paymentId,
             authorizedAmount = amount,
             authReceivable = authReceivable,
             authLiability = authLiability
         )
+        val journalEntries = result.journalEntries
 
         if (journalEntries.isEmpty()) return
 

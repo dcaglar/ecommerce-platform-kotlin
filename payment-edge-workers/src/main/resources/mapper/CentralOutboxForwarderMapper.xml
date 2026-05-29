@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.CentralOutboxForwarderMapper">
+
+    <insert id="insertBatch" parameterType="java.util.List">
+        INSERT INTO outbox_event (
+            oeid, event_type, aggregate_id, payload, status, created_at, updated_at
+        ) VALUES
+        <foreach collection="list" item="entry" separator=",">
+            (
+                #{entry.oeid},
+                #{entry.eventType},
+                #{entry.aggregateId},
+                #{entry.payload},
+                #{entry.status},
+                #{entry.createdAt, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.InstantTypeHandler},
+                #{entry.updatedAt, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.InstantTypeHandler}
+            )
+        </foreach>
+        ON CONFLICT (oeid, created_at) DO NOTHING
+    </insert>
+
+</mapper>

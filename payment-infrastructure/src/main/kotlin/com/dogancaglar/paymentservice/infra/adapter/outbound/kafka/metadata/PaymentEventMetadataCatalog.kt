@@ -5,36 +5,33 @@ import com.dogancaglar.common.event.metadata.EventMetadata
 import com.dogancaglar.paymentservice.application.command.LedgerRecordingCommand
 import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCommand
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
-import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
+import com.dogancaglar.paymentservice.application.events.PaymentOrderCaptureReceived
+import com.dogancaglar.paymentservice.application.events.PaymentOrderRefundReceived
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
-import com.dogancaglar.paymentservice.application.events.PaymentIntentAuthorized
 import com.fasterxml.jackson.core.type.TypeReference
 
 object PaymentEventMetadataCatalog {
 
 
-    object PaymentOrderCreatedMetadata : EventMetadata<PaymentOrderCreated> {
-        override val topic = Topics.PAYMENT_ORDER_CREATED
+    object PaymentOrderCreatedMetadata : EventMetadata<PaymentOrderCaptureReceived> {
+        override val topic = Topics.CAPTURE_QUEUE
         override val eventType = EVENT_TYPE.PAYMENT_ORDER_CREATED
-        override val clazz = PaymentOrderCreated::class.java
-        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderCreated>>() {}
-        override val partitionKey = { evt: PaymentOrderCreated ->
+        override val clazz = PaymentOrderCaptureReceived::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderCaptureReceived>>() {}
+        override val partitionKey = { evt: PaymentOrderCaptureReceived ->
             evt.paymentOrderId   // <-- INTERNAL ID string
         }
     }
 
-
-
-
-    object PaymentIntentAuthorizedMetadata : EventMetadata<PaymentIntentAuthorized> {
-        override val topic = Topics.PAYMENT_INTENT_AUTHORIZED
-        override val eventType = EVENT_TYPE.PAYMENT_INTENT_AUTHORIZED
-        override val clazz = PaymentIntentAuthorized::class.java
-        override val typeRef = object : TypeReference<EventEnvelope<PaymentIntentAuthorized>>() {}
-        override val partitionKey = { evt: PaymentIntentAuthorized ->
-            evt.paymentIntentId   // <-- INTERNAL ID string
+    object PaymentOrderRefundReceivedMetadata : EventMetadata<PaymentOrderRefundReceived> {
+        override val topic = Topics.REFUND_QUEUE
+        override val eventType = "payment_order_refund_received"
+        override val clazz = PaymentOrderRefundReceived::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderRefundReceived>>() {}
+        override val partitionKey = { evt: PaymentOrderRefundReceived ->
+            evt.paymentOrderId
         }
     }
 
@@ -60,7 +57,7 @@ object PaymentEventMetadataCatalog {
     }
 
     object PaymentOrderPspResultUpdatedMetadata : EventMetadata<PaymentOrderPspResultUpdated> {
-        override val topic = Topics.PAYMENT_ORDER_PSP_RESULT_UPDATED
+        override val topic = Topics.PSP_RESULT
         override val eventType = EVENT_TYPE.PAYMENT_ORDER_PSP_RESULT_UPDATED
         override val clazz = PaymentOrderPspResultUpdated::class.java
         override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderPspResultUpdated>>() {}
@@ -104,8 +101,8 @@ object PaymentEventMetadataCatalog {
 
     val all: List<EventMetadata<*>> = listOf(
         PaymentAuthorizedMetadata,
-        PaymentIntentAuthorizedMetadata,
         PaymentOrderCreatedMetadata,
+        PaymentOrderRefundReceivedMetadata,
         PaymentOrderCaptureCommandMetadata,
         PaymentOrderFinalizedMetadata,
         PaymentOrderPspResultUpdatedMetadata,

@@ -30,36 +30,6 @@ class PaymentOrderDomainEventEntityMapperTest {
             amount = amount
         )
 
-    // ---------------------------------------------------------
-    // 1. PAYMENT AUTHORIZED
-    // ---------------------------------------------------------
-    @Test
-    fun `toPaymentAuthorized maps payment and lines correctly`() {
-        val lines = listOf(
-            PaymentOrderLine(SellerId("seller-1"), amount)
-        )
-        val payment = PaymentIntent.createNew(
-            paymentIntentId = PaymentIntentId(1L),
-            buyerId = BuyerId("buyer-1"),
-            orderId = OrderId("order-1"),
-            totalAmount = Amount.of(5000L, currency),
-            paymentOrderLines = lines
-        ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
-            .markAuthorizedPending()
-            .markAuthorized()
-
-
-
-        val event = PaymentOrderDomainEventEntityMapper.toPaymentIntentAuthorizedIntentEvent(payment)
-
-        assertEquals("1", event.paymentIntentId)
-        assertEquals(payment.paymentIntentId.toPublicPaymentIntentId(), event.publicPaymentIntentId)
-        assertEquals("buyer-1", event.buyerId)
-        assertEquals("order-1", event.orderId)
-        assertEquals(5000L, event.totalAmountValue)
-        assertEquals("EUR", event.currency)
-        assertEquals(1, event.paymentLines.size)
-    }
 
     // ---------------------------------------------------------
     // 2. CREATED
@@ -68,7 +38,7 @@ class PaymentOrderDomainEventEntityMapperTest {
     fun `toPaymentOrderCreated maps all fields correctly`() {
         val order = sampleOrder()
 
-        val event = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(order)
+        val event = PaymentOrderDomainEventEntityMapper.toPaymentOrderCaptureReceived(order)
 
         assertEquals("10", event.paymentOrderId)
         assertEquals(order.paymentOrderId.toPublicPaymentOrderId(), event.publicPaymentOrderId)

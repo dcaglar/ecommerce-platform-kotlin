@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "payment-central-relay.fullname" . }}
+  labels:
+    {{- include "payment-central-relay.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ include "payment-central-relay.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "payment-central-relay.fullname" . }}
+        {{- include "payment-central-relay.labels" . | nindent 8 }}
+    spec:
+      terminationGracePeriodSeconds: 60
+      # Anti-affinity rule to ensure payment-central-relay and payment-consumers are not co-located on the same physical node
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - payment-consumers
+                topologyKey: "kubernetes.io/hostname"
+      containers:
+        - name: payment-central-relay
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 9000
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "{{ .Values.jvmOpts }}"
+            - name: SPRING_PROFILES_ACTIVE
+              value: "{{ .Values.spring.profile }}"
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: kafka.payment.svc.cluster.local:9092
+            - name: SPRING_DATASOURCE_URL
+              valueFrom: { configMapKeyRef: { name: payment-platform-config, key: CENTRAL_DB_URL } }
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: central-db-credentials
+                  key: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: central-db-credentials
+                  key: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_PASSWORD
+          startupProbe:
+            httpGet: { path: /actuator/health/liveness, port: management }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 60
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: management }
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: management }
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
