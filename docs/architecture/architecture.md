@@ -372,16 +372,28 @@ graph TD
     classDef order fill:#e3f2fd,stroke:#64b5f6,stroke-width:2px,color:#333
     classDef consumer fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#333
     classDef psp fill:#fce4ec,stroke:#f06292,stroke-width:2px,color:#333
+    classDef idem fill:#e0f7fa,stroke:#00bcd4,stroke-width:2px,color:#333
 
-    Start([Checkout Service<br/>Creates Payment]) --> PI1[PaymentIntent<br/>Status: CREATED<br/>Total: 2900 EUR]
+    Start([Checkout Service<br/>Initiates Payment]) --> IdemCheck{Idempotency<br/>Key Exists?}
     
-    subgraph IntentPhase ["Authorization Phase (Synchronous)"]
+    IdemCheck -->|Yes| ReturnStored[Return Stored<br/>PaymentIntent]
+    
+    IdemCheck -->|No| PI0[PaymentIntent<br/>Status: CREATED_PENDING<br/>Total: 2900 EUR]
+    
+    subgraph IntentPhase ["Payment Intent Phase (Synchronous)"]
+        direction TB
+        PI0 -->|POST /api/v1/payments| PSP_Create{PSP Create<br/>Intent}
+        PSP_Create -->|SUCCESS| PI1[PaymentIntent<br/>Status: CREATED]
+        PSP_Create -.->|TIMEOUT| PI0
+    end
+    
+    subgraph AuthPhase ["Authorization Phase (Synchronous)"]
         direction TB
         PI1 -->|POST /authorize| PI2[PaymentIntent<br/>Status: PENDING_AUTH]
-        PI2 -->|PSP Call| PSP{PSP Response}
-        PSP -->|AUTHORIZED| PI3[PaymentIntent<br/>Status: AUTHORIZED]
-        PSP -->|DECLINED| PI4[PaymentIntent<br/>Status: DECLINED<br/>END]
-        PSP -.->|TIMEOUT| PI2
+        PI2 -->|PSP Confirm| PSP_Auth{PSP Response}
+        PSP_Auth -->|AUTHORIZED| PI3[PaymentIntent<br/>Status: AUTHORIZED]
+        PSP_Auth -->|DECLINED| PI4[PaymentIntent<br/>Status: DECLINED<br/>END]
+        PSP_Auth -.->|TIMEOUT| PI2
     end
 
     subgraph PaymentPhase ["Order Fulfillment Phase (Asynchronous)"]
@@ -417,21 +429,30 @@ graph TD
     REF3 -->|Relayed| REF4("PspResultConsumer")
     REF4 -->|Updates Ledger| P4[Payment<br/>Status: PARTIALLY_REFUNDED]
 
-    class PI1,PI2 intentPending
+    class IdemCheck,ReturnStored idem
+    class PI0,PI1,PI2 intentPending
     class PI3 intentSuccess
     class PI4 intentFailed
     class P1,P2,P3,P4 payment
     class PO1,PO2,REF1,PO1B,PO2B,REF3 order
     class PO1A,PO2A,PO1C,PO2C,REF2,REF4 consumer
-    class PSP,PSP1,PSP2,PSP3 psp
+    class PSP_Create,PSP_Auth,PSP1,PSP2,PSP3 psp
 ```
 
 ### Simplified Consumer Architecture
 
-A new simplified Kafka consumer architecture has been introduced to streamline PSP operations and double-entry bookkeeping:
+A new simplified Kafka consumer architecture has been introduced to streamline PSP operations and double-entry bookkeeping.
+
+**Why we moved away from the "Consume-Process-Publish" pattern:**
+Historically, consumers would read an event, process it (e.g. call a PSP), and then immediately publish a new event using Kafka Transactions. This attempted to achieve "exactly-once" delivery semantics but caused significant issues:
+- **Abusing Kafka as a Database**: Relying on Kafka transactions to guarantee state consistency across external API calls and database commits led to fragile, blocking architectures.
+- **Blocking Calls in Transactions**: External PSP calls (which can be slow) held open Kafka transactions, reducing throughput and risking transaction timeouts.
+- **Unrealistic Exactly-Once Guarantees**: Achieving true exactly-once semantics across a database, an external HTTP API, and Kafka is impossible without distributed locks or 2PC (Two-Phase Commit).
+
+**The New Pattern (Outbox-Driven Consumers):**
 1. **Intents (Capture/Refund Received)**: `payment_order_capture_received` and `payment_order_refund_received` events denote that an intent to capture or refund has been recorded in the database.
-2. **Executors (`PspCaptureExecutorConsumer` / `PspRefundExecutorConsumer`)**: These components listen to `capture_topic` and `refund_topic` respectively. They perform the actual synchronous call to the external PSP Gateway. Upon receiving a terminal or retryable result, they write a `PaymentOrderPspResultUpdated` event into the Central Outbox.
-3. **Outbox Relay**: The `OutboxRelayJob` reads these results from the database outbox and publishes them to the `psp_result_topic`.
+2. **Executors (`PspCaptureExecutorConsumer` / `PspRefundExecutorConsumer`)**: These components listen to `capture_topic` and `refund_topic` respectively. They perform the synchronous call to the external PSP Gateway. Upon receiving a terminal or retryable result, they **do not publish back to Kafka directly**. Instead, they write a `PaymentOrderPspResultUpdated` event into the Central Database Outbox.
+3. **Outbox Relay**: The `OutboxRelayJob` reads these results from the database outbox and publishes them asynchronously to the `psp_result_topic`.
 4. **Result Processing (`PspResultConsumer`)**: Listens to the `psp_result_topic` to apply the results to the central database, finalize payment statuses, and trigger internal double-entry ledger bookkeeping.
 
 ### Authorization/Idempotency Sequence Diagram
@@ -643,11 +664,17 @@ The platform follows a **Hexagonal (Ports & Adapters)** pattern to separate busi
 - **Components**: Inbound Ports (Use Cases), Outbound Ports (Database/Kafka interfaces), and Core Domain Services.
 - **Logic**: Manages internal fund distribution, platform fees, and retry policies for PSP operations.
 
-### **3. `payment-infrastructure` (Shared Technical Adapters)**
-- **Role**: Shared infrastructure adapters implementing Outbound Ports.
-- **Persistence**: Shared MyBatis mappers, persistence entities, and database configuration templates.
-- **Messaging**: Shared event envelope definitions, Jackson serialization adapters, and Kafka configuration.
-- **Services**: Shared utility implementations like the Snowflake ID Generator.
+### **3. `common-db` (Shared Database Infrastructure)**
+- **Role**: Reusable MyBatis utilities, JSON typehandlers, and base configuration templates.
+- **Traits**: Provides `mybatis-config-template.xml` and standard JSONb handling across the platform.
+
+### **4. `common-kafka` (Shared Messaging Infrastructure)**
+- **Role**: Reusable Kafka utilities, generic event envelopes, and Jackson ser/deser configurations.
+- **Traits**: Ensures type safety and consistent payload formatting for all Kafka producers and consumers.
+
+### **5. `payment-infrastructure` (Shared Technical Adapters)**
+- **Role**: General utility implementations like the Snowflake ID Generator.
+- **Traits**: Contains only truly common infrastructure utilities, completely decoupled from database entities or Kafka topics.
 
 ### **4. `payment-service` (API & Edge Cell Inbound Adapter)**
 - **Role**: Composition root and API gateway for the Edge Cell Pod.

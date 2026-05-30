@@ -13,9 +13,9 @@
         <result property="paymentIntentId"      column="payment_intent_id"/>
         <result property="responsePayload" column="response_payload"/>
         <result property="status"         column="status"
-                typeHandler="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.IdempotencyStatusTypeHandler"/>
+                typeHandler="com.dogancaglar.common.db.typehandler.IdempotencyStatusTypeHandler"/>
         <result property="createdAt"      column="created_at"
-                typeHandler="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.InstantTypeHandler"/>
+                typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
     </resultMap>
 
     <select id="insertPending"

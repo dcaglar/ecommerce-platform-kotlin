@@ -12,7 +12,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.paymentservice.infra.adapter.outbound.redis.client.PaymentOrderRetryRedisCache
 import com.dogancaglar.paymentservice.infra.adapter.outbound.serialization.JacksonSerializationAdapter
-import com.dogancaglar.paymentservice.infra.config.JacksonConfig
+import com.dogancaglar.paymentservice.infra.adapter.outbound.serialization.JacksonConfig
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule

@@ -35,20 +35,20 @@ paymentService:
     -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication -XX:MaxRAMPercentage=45 -XX:InitialRAMPercentage=45 -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
   resources:
     requests:
-      cpu: 1
-      memory: 1Gi
+      cpu: 250m
+      memory: 512Mi
     limits:
-      cpu: 1
-      memory: 1Gi
+      cpu: 500m
+      memory: 768Mi
 edgeWorker:
   resources:
-    requests: {cpu: "1", memory: "896Mi"}
-    limits: {cpu: "1", memory: "896Mi"}
+    requests: {cpu: "250m", memory: "512Mi"}
+    limits: {cpu: "500m", memory: "768Mi"}
   jvmOpts: >-
     -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication -XX:MaxRAMPercentage=45 -XX:InitialRAMPercentage=45 -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
 edgeDb:
   resources:
-    requests: {cpu: "500m", memory: "512Mi"}
+    requests: {cpu: "150m", memory: "256Mi"}
     limits: {cpu: "500m", memory: "512Mi"}
 ingress:
   enabled: true

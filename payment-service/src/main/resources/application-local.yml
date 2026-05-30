@@ -1,134 +1,27 @@
 app:
   instance-id: ${POD_NAME:${HOSTNAME:${random.value}}}
-  cache:
-    ttl-seconds: 3600
   payment-service:
     api-key: secretpaymentapikey12345
-  account-balance:
-    delta-ttl-seconds: 300  # 5 minutes - Redis delta TTL
-    idempotency-ttl-seconds: 86400  # 24 hours - Redis idempotency key TTL
-    snapshot-interval: PT1M  # 1 minute - Snapshot job frequency
-
-
-  # manual datasource configs for web ourboxdispatcher and parttionen maintencance job
   datasource:
     web:
       jdbc-url: ${SPRING_DATASOURCE_URL}
       username: ${SPRING_DATASOURCE_USERNAME}
       password: ${SPRING_DATASOURCE_PASSWORD}
-      driver-class-name: org.postgresql.Driver
-      pool-name: web-pool
-      maximum-pool-size: 12   # Reverted as per user preference
-      minimum-idle: 6
-      connection-timeout: 1000 # Keep 5s to allow threads to wait in queue during spikes
-      validation-timeout: 1000
-      idle-timeout: 600000
-      max-lifetime: 1800000
-      leak-detection-threshold: 60000
-      connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
-
-
 
 spring:
-  application:
-    name: payment-service
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}
-  jackson:
-    time-zone: UTC
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
   data:
     redis:
-      url: ${SPRING_DATA_REDIS_URL}
-      timeout: 10s               # Increased from 2s to handle snapshot job and retry operations under load
-      lettuce:
-        pool:
-          max-active: 16         # Increased to handle concurrent operations
-          max-idle: 8
-          min-idle: 4            # Pre-warm connections for better performance
-          max-wait: 5000ms       # Wait up to 5s for connection from pool
-  liquibase:
-    enabled: true
-    change-log: classpath:db/changelog/changelog.edge.xml
-
-mybatis:
-  mapper-locations: classpath*:mapper/**/*.xml
-  type-aliases-package: com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity
-  type-handlers-package: com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler
-
-management:
-  server:
-    port: 9000
-  health:
-    probes:
-      enabled: true
-  endpoints:
-    web:
-      base-path: /actuator
-      exposure:
-        include: "prometheus,metrics,health"
-  endpoint:
-    health:
-      enabled: true
-      show-details: always
-    prometheus.enabled: true
-  metrics:
-    tags:
-      application: payment-service
-    enable:
-      all: false
-      tomcat.threads.current: true      # current thread count
-      tomcat.threads.busy: true         # threads handling requests
-      tomcat.threads.config.max: true
-      http.server.requests: true
-      tomcat.threads: true
-      hikaricp.connections: true
-      hikaricp.connections.acquire: true
-      kafka.producer.topic.record.send: true
-      process.cpu.usage: true
-      jvm.threads.live: true
-      jvm.memory.used: true
-      jvm.memory.max: true
-      jvm.gc.pause: true
-      # YOUR custom meters (exact names with underscores)
-      outbox_dispatched_total: true
-      outbox_dispatch_failed_total: true
-      outbox_event_backlog: true
-      outbox_dispatcher_duration: true
-    binders:
-      tomcat:
-        enabled: true
-    distribution:
-      percentiles-histogram:
-        http.server.requests: true
-        outbox_dispatcher_duration: true
-      percentiles:
-        http.server.requests: 0.5,0.95,0.99
-        outbox_dispatcher_duration: 0.5,0.95,0.99
-    export.prometheus.enabled: true
-
-outbox-dispatcher:
-  thread-count: 2
-  batch-size: 300
-  pool-size: 2
-
-db:
-  web:
-    statement-timeout-ms: 500
-    lock-timeout-ms: 250
-    idle-in-tx-timeout-ms: 0
+      url: ${SPRING_DATA_REDIS_URL:redis://localhost:6379}
 
 stripe:
   api:
-    api-key: sk_test_51ShA8HEAJKUKtoJwTALvrfMadP0eoKwyggnasHkqgY6y6jLoSjg9YqewkxiYrRw54TnZ7tVFX5Xreg3qaHm5wWAX00tupdpr6y
-    connect-timeout: 5000
-    read-timeout: 30000
+    api-key: ${STRIPE_API_KEY:sk_test_51ShA8HEAJKUKtoJwTALvrfMadP0eoKwyggnasHkqgY6y6jLoSjg9YqewkxiYrRw54TnZ7tVFX5Xreg3qaHm5wWAX00tupdpr6y}
 
 psp:
-  gateway:
-    type: SIMULATED   # Options: STRIPE, SIMULATED
   authorization:
     simulation:
       currentScenario: NORMAL
@@ -136,18 +29,18 @@ psp:
         NORMAL:
           timeouts:
             enabled: true
-            probability: 0       # 0% of total requests time out
+            probability: 0
           latency:
             fast:
-              probability: 0    # 40% are fast (150–300ms)
+              probability: 0
               minMs: 100
               maxMs: 300
             moderate:
-              probability: 100    # 40% are moderate (400–500ms)
+              probability: 100
               minMs: 300
               maxMs: 500
             slow:
-              probability: 0     # 40% are slow (300–600ms)
+              probability: 0
               minMs: 500
               maxMs: 900
           response:
@@ -155,8 +48,9 @@ psp:
             retryable: 0
             statusCheck: 0
             nonRetryable: 0
-
-payments:
-  id:
-    epoch-millis: 1735689600000   # 2025-01-01T00:00:00Z
-    region-id: 1                  # EU1
+  refund:
+    simulation:
+      currentScenario: NORMAL
+  capture:
+    simulation:
+      currentScenario: NORMAL

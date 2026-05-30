@@ -29,6 +29,11 @@
             <groupId>com.dogancaglar</groupId>
             <artifactId>payment-infrastructure</artifactId>
         </dependency>
+        <!-- Shared DB infrastructure (TypeHandlers, PostgreSQL driver) -->
+        <dependency>
+            <groupId>com.dogancaglar</groupId>
+            <artifactId>common-db</artifactId>
+        </dependency>
 
         <!-- Spring Boot dependencies without Web MVC! -->
         <dependency>

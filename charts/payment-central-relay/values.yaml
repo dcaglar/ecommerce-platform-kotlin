@@ -29,16 +29,17 @@ service:
   managementPort: 9000
 
 autoscaling:
-  enabled: true
+  enabled: false
   minReplicas: 3
   maxReplicas: 5
   metrics:
-    - type: Resource
-      resource:
-        name: cpu
+    - type: External
+      external:
+        metric:
+          name: central_outbox_backlog_external
         target:
-          type: Utilization
-          averageUtilization: 80
+          type: Value
+          value: "5000"
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 120
@@ -62,4 +63,4 @@ serviceMonitor:
   interval: 30s
   scrapeTimeout: 10s
 
-replicaCount: 3
+replicaCount: 1

@@ -27,6 +27,7 @@ import kotlin.random.Random
 open class ProcessPaymentService(
     @param:Qualifier("syncPaymentEventPublisher")
     private val eventPublisher: EventPublisherPort,
+
     private val retryQueuePort: RetryQueuePort<PaymentOrderCaptureCommand>,
     private val paymentOrderModificationPort: PaymentOrderModificationPort,
     private val accountDirectory: com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort,

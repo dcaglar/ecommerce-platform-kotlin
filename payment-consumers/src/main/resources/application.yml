@@ -15,47 +15,47 @@ app:
       - id: psp-capture-executor
         topic: capture_topic
         group-id: psp-capture-executor-consumer-group
-        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderCaptureExecutor
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PaymentOrderCaptureExecutor
         concurrency: 8
       - id: psp-refund-executor
         topic: refund_topic
         group-id: psp-refund-executor-consumer-group
-        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PspRefundExecutorConsumer
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PspRefundExecutorConsumer
         concurrency: 8
       - id: psp-result-consumer
         topic: psp_result_topic
         group-id: psp-result-consumer-group
-        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PspResultConsumer
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PspResultConsumer
         concurrency: 8
       - id: payment-authorized-processor
         topic: payment_authorized_topic
         group-id: payment-authorized-processor-consumer-group
-        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentAuthorizedConsumer
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PaymentAuthorizedConsumer
         concurrency: 2
       - id: payment-order-enqueuer
         topic: payment_order_created_topic
         group-id: payment-order-enqueuer-consumer-group
-        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderEnqueuer
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PaymentOrderEnqueuer
         concurrency: 8
       - id: payment-order-psp-result-applier
         topic: payment_order_psp_result_updated_topic
         group-id: payment-order-psp-result-updated-consumer-group
-        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.PaymentOrderPspResultApplier
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PaymentOrderPspResultApplier
         concurrency: 8
       - id: ledger-recording-request-dispatcher
         topic: payment_order_finalized_topic
         group-id: ledger-recording-request-dispatcher-consumer-group
-        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.LedgerRecordingRequestDispatcher
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.LedgerRecordingRequestDispatcher
         concurrency: 4
       - id: ledger-recording-consumer
         topic: ledger_record_request_queue_topic
         group-id: ledger-recording-consumer-group
-        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.LedgerRecordingConsumer
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.LedgerRecordingConsumer
         concurrency: 4
       - id: account-balance-consumer
         topic: ledger_entries_recorded_topic
         group-id: account-balance-consumer-group
-        class-name: com.dogancaglar.paymentservice.port.inbound.consumers.AccountBalanceConsumer
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.AccountBalanceConsumer
         concurrency: 4
 
 server:
@@ -77,6 +77,9 @@ spring:
   jackson:
     time-zone: UTC
   datasource:
+    url: ${SPRING_DATASOURCE_CENTRAL_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
       maximum-pool-size: 5
       minimum-idle: 1
@@ -99,13 +102,14 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
-        spring.deserializer.value.delegate.class: com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.config.EventEnvelopeKafkaDeserializer
+        spring.deserializer.value.delegate.class: com.dogancaglar.common.kafka.serde.EventEnvelopeKafkaDeserializer
         partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
     properties:
       security.protocol: PLAINTEXT
       session.timeout.ms: 45000
   data:
     redis:
+      url: ${SPRING_DATA_REDIS_URL:redis://localhost:6379}
       timeout: 10s
       lettuce:
         pool:
@@ -192,7 +196,7 @@ management:
 mybatis:
   mapper-locations: classpath*:mapper/**/*.xml
   type-aliases-package: com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity
-  type-handlers-package: com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler
+  type-handlers-package: com.dogancaglar.common.db.typehandler
 
 psp:
   refund:

@@ -13,7 +13,7 @@
         <result property="referenceType" column="reference_type"/>
         <result property="referenceId" column="reference_id"/>
         <result property="createdAt" column="created_at"
-                typeHandler="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.InstantTypeHandler"/>
+                typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
     </resultMap>
 
     <resultMap id="LedgerEntryResultMap"
@@ -21,7 +21,7 @@
         <id property="id" column="id"/>
         <result property="journalId" column="journal_id"/>
         <result property="createdAt" column="created_at"
-                typeHandler="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.InstantTypeHandler"/>
+                typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
     </resultMap>
 
     <resultMap id="PostingResultMap"
@@ -34,7 +34,7 @@
         <result property="direction" column="direction"/>
         <result property="currency" column="currency"/>
         <result property="createdAt" column="created_at"
-                typeHandler="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.InstantTypeHandler"/>
+                typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
     </resultMap>
 
     <insert id="insertJournalEntry" parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.JournalEntryEntity">

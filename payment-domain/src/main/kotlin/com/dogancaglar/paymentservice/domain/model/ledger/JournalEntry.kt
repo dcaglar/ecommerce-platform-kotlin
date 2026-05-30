@@ -108,7 +108,41 @@ class JournalEntry private constructor(
                 )
             )
         )
-
+        fun refund(
+            txId: Long,
+            paymentId: Long,
+            paymentOrderId: Long,
+            captureTxId: Long,
+            acquirerReference: String,
+            journalIdentifier: String,
+            refundedAmount: Amount,
+            authReceivable: Account,
+            authLiability: Account,
+            merchantAccount: Account,
+            pspReceivable: Account
+        ): LedgerOperationResult = LedgerOperationResult(
+            transaction = PaymentTx.Refund(
+                txId = txId,
+                paymentId = paymentId,
+                paymentOrderId = paymentOrderId,
+                captureTxId = captureTxId,
+                acquirerReference = acquirerReference,
+                amount = refundedAmount
+            ),
+            journalEntries = listOf(
+                JournalEntry(
+                    id = "REFUND:${journalIdentifier}",
+                    txType = JournalType.REFUND,
+                    name = "Payment Refund",
+                    postings = listOf(
+                        Posting.Debit.create(authReceivable, refundedAmount),
+                        Posting.Credit.create(authLiability, refundedAmount),
+                        Posting.Debit.create(merchantAccount, refundedAmount),
+                        Posting.Credit.create(pspReceivable, refundedAmount)
+                    )
+                )
+            )
+        )
 
         fun settlement(
             journalIdentifier:String,

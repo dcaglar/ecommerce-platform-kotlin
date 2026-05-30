@@ -10,6 +10,8 @@ import com.dogancaglar.paymentservice.application.events.PaymentOrderRefundRecei
 import com.dogancaglar.paymentservice.application.events.PaymentOrderPspResultUpdated
 import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
+import com.dogancaglar.paymentservice.application.events.PaymentOrderCaptured
+import com.dogancaglar.paymentservice.application.events.PaymentOrderRefunded
 import com.fasterxml.jackson.core.type.TypeReference
 
 object PaymentEventMetadataCatalog {
@@ -31,6 +33,26 @@ object PaymentEventMetadataCatalog {
         override val clazz = PaymentOrderRefundReceived::class.java
         override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderRefundReceived>>() {}
         override val partitionKey = { evt: PaymentOrderRefundReceived ->
+            evt.paymentOrderId
+        }
+    }
+
+    object PaymentOrderCapturedMetadata : EventMetadata<PaymentOrderCaptured> {
+        override val topic = Topics.PAYMENT_ORDER_CAPTURED_TOPIC
+        override val eventType = EVENT_TYPE.PAYMENT_ORDER_CAPTURED
+        override val clazz = PaymentOrderCaptured::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderCaptured>>() {}
+        override val partitionKey = { evt: PaymentOrderCaptured ->
+            evt.paymentOrderId
+        }
+    }
+
+    object PaymentOrderRefundedMetadata : EventMetadata<PaymentOrderRefunded> {
+        override val topic = Topics.PAYMENT_ORDER_REFUNDED_TOPIC
+        override val eventType = EVENT_TYPE.PAYMENT_ORDER_REFUNDED
+        override val clazz = PaymentOrderRefunded::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<PaymentOrderRefunded>>() {}
+        override val partitionKey = { evt: PaymentOrderRefunded ->
             evt.paymentOrderId
         }
     }
@@ -106,6 +128,8 @@ object PaymentEventMetadataCatalog {
         PaymentOrderCaptureCommandMetadata,
         PaymentOrderFinalizedMetadata,
         PaymentOrderPspResultUpdatedMetadata,
+        PaymentOrderCapturedMetadata,
+        PaymentOrderRefundedMetadata,
         LedgerRecordingCommandMetadata,
         LedgerEntriesRecordedMetadata
     )

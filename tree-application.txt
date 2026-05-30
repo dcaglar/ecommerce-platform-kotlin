@@ -1,0 +1,103 @@
+payment-application/src/main/kotlin
+└── com
+    └── dogancaglar
+        └── paymentservice
+            ├── application
+            │   ├── command
+            │   │   ├── AuthorizePaymentIntentCommand.kt
+            │   │   ├── CapturePaymentCommand.kt
+            │   │   ├── CreatePaymentIntentCommand.kt
+            │   │   ├── GetPaymentIntentCommand.kt
+            │   │   ├── LedgerRecordingAuthorizationCommand.kt
+            │   │   ├── LedgerRecordingCommand.kt
+            │   │   ├── PaymentOrderCaptureCommand.kt
+            │   │   ├── PaymentOrderRefundCommand.kt
+            │   │   └── ProcessPaymentIntentUpdateCommand.kt
+            │   ├── constants
+            │   │   ├── IdNamespaces.kt
+            │   │   └── PaymentLogFields.kt
+            │   ├── events
+            │   │   ├── LedgerEntriesRecorded.kt
+            │   │   ├── LedgerEntryEventData.kt
+            │   │   ├── PaymentAuthorized.kt
+            │   │   ├── PaymentBaseEvent.kt
+            │   │   ├── PaymentCommand.kt
+            │   │   ├── PaymentIntentAuthorized.kt
+            │   │   ├── PaymentOrderBaseEvent.kt
+            │   │   ├── PaymentOrderCaptured.kt
+            │   │   ├── PaymentOrderCaptureReceived.kt
+            │   │   ├── PaymentOrderCommand.kt
+            │   │   ├── PaymentOrderEvent.kt
+            │   │   ├── PaymentOrderFinalized.kt
+            │   │   ├── PaymentOrderPspResultUpdated.kt
+            │   │   ├── PaymentOrderRefunded.kt
+            │   │   ├── PaymentOrderRefundReceived.kt
+            │   │   └── PostingEventData.kt
+            │   ├── maintenance
+            │   ├── service
+            │   │   ├── AccountBalanceReadService.kt
+            │   │   ├── AccountBalanceService.kt
+            │   │   ├── AuthorizePaymentIntentService.kt
+            │   │   ├── CapturePaymentService.kt
+            │   │   ├── CreatePaymentIntentService.kt
+            │   │   ├── GetPaymentIntentService.kt
+            │   │   ├── IdempotencyService.kt
+            │   │   ├── ProcessPaymentService.kt
+            │   │   ├── PspResultProcessingService.kt
+            │   │   ├── RequestLedgerRecordingService.kt
+            │   │   └── UpdatePaymentIntentService.kt
+            │   └── util
+            │       ├── LedgerDomainEventEntityMapper.kt
+            │       ├── PaymentOrderDomainEventEntityMapper.kt
+            │       ├── psp
+            │       │   ├── PSPAuthorizationStatusMapper.kt
+            │       │   └── PSPCaptureStatusMapper.kt
+            │       ├── PublicIdExtension.kt
+            │       └── RetryItem.kt
+            └── ports
+                ├── inbound
+                │   └── usecases
+                │       ├── AccountBalanceReadUseCase.kt
+                │       ├── AccountBalanceUseCase.kt
+                │       ├── AuthorizePaymentIntentUseCase.kt
+                │       ├── CapturePaymentUseCase.kt
+                │       ├── CreatePaymentIntentUseCase.kt
+                │       ├── GetPaymentIntentUseCase.kt
+                │       ├── ProcessPspResultUseCase.kt
+                │       ├── RecordAuthorizationLedgerEntriesUseCase.kt
+                │       ├── RecordLedgerEntriesUseCase.kt
+                │       ├── RequestLedgerRecordingUseCase.kt
+                │       └── UpdatePaymentIntentUseCase.kt
+                └── outbound
+                    ├── AccountBalanceCachePort.kt
+                    ├── AccountBalanceSnapshotPort.kt
+                    ├── AccountDirectoryPort.kt
+                    ├── BalanceIdempotencyPort.kt
+                    ├── CentralOutboxEdgePort.kt
+                    ├── CentralOutboxRelayPort.kt
+                    ├── EventDeduplicationPort.kt
+                    ├── EventPublisherPort.kt
+                    ├── ExternalIdGeneratorPort.kt
+                    ├── HasherPort.kt
+                    ├── IdempotencyRecord.kt
+                    ├── IdempotencyStorePort.kt
+                    ├── IdGeneratorPort.kt
+                    ├── LedgerEntryPort.kt
+                    ├── LocalOutboxEdgePort.kt
+                    ├── LocalOutboxWriterPort.kt
+                    ├── PaymentIntentRepository.kt
+                    ├── PaymentOrderModificationPort.kt
+                    ├── PaymentOrderRepository.kt
+                    ├── PaymentOrderStatePort.kt
+                    ├── PaymentOrderStatusCheckRepository.kt
+                    ├── PaymentRepository.kt
+                    ├── PaymentTransactionalFacadePort.kt
+                    ├── PaymentTxPort.kt
+                    ├── PspAuthorizationGatewayPort.kt
+                    ├── PspModificationGatewayPort.kt
+                    ├── PspResultCachePort.kt
+                    ├── ResilientExecutionPort.kt
+                    ├── RetryQueuePort.kt
+                    └── SerializationPort.kt
+
+16 directories, 85 files

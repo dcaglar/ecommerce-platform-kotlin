@@ -1,0 +1,33 @@
+payment-edge-workers/src/main/kotlin
+└── com
+    └── dogancaglar
+        └── paymentservice
+            ├── application
+            │   └── maintenance
+            │       ├── config
+            │       ├── LocalOutboxForwarderJob.kt
+            │       └── OutboxPartitionCreator.kt
+            ├── edgeworkers
+            │   └── config
+            │       ├── DBWriterTxManager.kt
+            │       ├── MultiDataSourceConfig.kt
+            │       ├── MyBatisFactoriesConfig.kt
+            │       └── ThreadPoolConfig.kt
+            ├── infra
+            │   └── adapter
+            │       └── outbound
+            │           └── persistence
+            │               ├── CentralOutboxForwarderAdapter.kt
+            │               ├── converter
+            │               │   └── OutboxEventEntityMapper.kt
+            │               ├── entity
+            │               │   ├── EdgeWatermarkEntity.kt
+            │               │   ├── OutboxEventEntity.kt
+            │               │   └── OutboxEventType.kt
+            │               ├── mapper
+            │               │   ├── CentralOutboxForwarderMapper.kt
+            │               │   └── OutboxEventDispatcherMapper.kt
+            │               └── OutboxJobAdapter.kt
+            └── PaymentEdgeWorkersApplication.kt
+
+16 directories, 15 files

@@ -11,11 +11,11 @@
         <result property="amountValue" column="amount_value"/>
         <result property="amountCurrency" column="amount_currency"/>
         <result property="status" column="status"
-                typeHandler="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.PaymentOrderStatusTypeHandler"/>
+                typeHandler="com.dogancaglar.common.db.typehandler.PaymentOrderStatusTypeHandler"/>
         <result property="createdAt" column="created_at"
-                typeHandler="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.InstantTypeHandler"/>
+                typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
         <result property="updatedAt" column="updated_at"
-                typeHandler="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.InstantTypeHandler"/>
+                typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
         <result property="retryCount" column="retry_count"/>
     </resultMap>
 
@@ -95,7 +95,7 @@
             #{po.sellerId},
             #{po.amountValue},
             #{po.amountCurrency},
-            #{po.status, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.PaymentOrderStatusTypeHandler},
+            #{po.status, typeHandler=com.dogancaglar.common.db.typehandler.PaymentOrderStatusTypeHandler},
             #{po.createdAt},
             #{po.updatedAt},
             #{po.retryCount})
@@ -122,7 +122,7 @@
         #{sellerId},
         #{amountValue},
         #{amountCurrency},
-        #{status, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.PaymentOrderStatusTypeHandler},
+        #{status, typeHandler=com.dogancaglar.common.db.typehandler.PaymentOrderStatusTypeHandler},
         #{createdAt},
         #{updatedAt},
         #{retryCount}
@@ -144,15 +144,15 @@
 
         -- CAPTURE_RECEIVED → only allow CAPTURE_REQUESTED (first PSP call)
         WHEN p.status = 'CAPTURE_RECEIVED'
-        AND #{status, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.PaymentOrderStatusTypeHandler}
+        AND #{status, typeHandler=com.dogancaglar.common.db.typehandler.PaymentOrderStatusTypeHandler}
         = 'CAPTURE_REQUESTED'
-        THEN #{status, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.PaymentOrderStatusTypeHandler}
+        THEN #{status, typeHandler=com.dogancaglar.common.db.typehandler.PaymentOrderStatusTypeHandler}
 
         -- CAPTURE_REQUESTED / PENDING_CAPTURE → can go to PENDING_CAPTURE, CAPTURED, CAPTURE_FAILED
         WHEN p.status IN ('CAPTURE_REQUESTED', 'PENDING_CAPTURE')
-        AND #{status, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.PaymentOrderStatusTypeHandler}
+        AND #{status, typeHandler=com.dogancaglar.common.db.typehandler.PaymentOrderStatusTypeHandler}
         IN ('PENDING_CAPTURE', 'CAPTURED', 'CAPTURE_FAILED')
-        THEN #{status, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.PaymentOrderStatusTypeHandler}
+        THEN #{status, typeHandler=com.dogancaglar.common.db.typehandler.PaymentOrderStatusTypeHandler}
 
         -- any other combination = ignore (no downgrade / weird jump)
         ELSE p.status
@@ -164,7 +164,7 @@
         WHEN p.status IN ('CAPTURED', 'CAPTURE_FAILED')
         THEN p.retry_count
         -- Freeze if NEW status is terminal (correct logic for transitions to terminal)
-        WHEN #{status, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.PaymentOrderStatusTypeHandler}
+        WHEN #{status, typeHandler=com.dogancaglar.common.db.typehandler.PaymentOrderStatusTypeHandler}
         IN ('CAPTURED', 'CAPTURE_FAILED')
         THEN p.retry_count
         -- Otherwise, monotonic increase
@@ -174,7 +174,7 @@
         -- 🕒 3. UPDATED_AT: always take the max
         updated_at = GREATEST(
         p.updated_at,
-        #{updatedAt, typeHandler=com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler.InstantTypeHandler}
+        #{updatedAt, typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
         )
 
         WHERE p.payment_order_id = #{paymentOrderId}

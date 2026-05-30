@@ -50,4 +50,49 @@ sealed class PaymentTx {
         override val txType = "REFUND"
         override val parentTxId: Long = captureTxId
     }
+    companion object {
+        fun createAuthTx(
+            txId: Long,
+            paymentId: Long,
+            acquirerReference: String,
+            amount: Amount
+        ): Authorization = Authorization(
+            txId = txId,
+            paymentId = paymentId,
+            acquirerReference = acquirerReference,
+            amount = amount
+        )
+
+        fun createCaptureTx(
+            txId: Long,
+            paymentId: Long,
+            paymentOrderId: Long,
+            authorizationTxId: Long,
+            acquirerReference: String,
+            amount: Amount
+        ): Capture = Capture(
+            txId = txId,
+            paymentId = paymentId,
+            paymentOrderId = paymentOrderId,
+            authorizationTxId = authorizationTxId,
+            acquirerReference = acquirerReference,
+            amount = amount
+        )
+
+        fun createRefundTx(
+            txId: Long,
+            paymentId: Long,
+            paymentOrderId: Long,
+            captureTxId: Long,
+            acquirerReference: String,
+            amount: Amount
+        ): Refund = Refund(
+            txId = txId,
+            paymentId = paymentId,
+            paymentOrderId = paymentOrderId,
+            captureTxId = captureTxId,
+            acquirerReference = acquirerReference,
+            amount = amount
+        )
+    }
 }

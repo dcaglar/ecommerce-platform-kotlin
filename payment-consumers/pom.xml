@@ -30,6 +30,15 @@
             <groupId>com.dogancaglar</groupId>
             <artifactId>payment-infrastructure</artifactId>
         </dependency>
+        <!-- Shared infrastructure modules -->
+        <dependency>
+            <groupId>com.dogancaglar</groupId>
+            <artifactId>common-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.dogancaglar</groupId>
+            <artifactId>common-db</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.liquibase</groupId>
             <artifactId>liquibase-core</artifactId>
@@ -67,11 +76,7 @@
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
         </dependency>
-        <!-- Infrastructure dependencies that were extracted from payment-infrastructure -->
-        <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
-        </dependency>
+        <!-- spring-kafka is provided transitively via common-kafka -->
 
         <!-- Test dependencies -->
         <dependency>

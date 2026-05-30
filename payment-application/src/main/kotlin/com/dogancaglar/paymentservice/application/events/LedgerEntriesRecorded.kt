@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.application.events
 
 import com.dogancaglar.paymentservice.application.command.LedgerRecordingCommand
+import com.dogancaglar.paymentservice.application.events.PaymentOrderEvent
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -40,7 +41,7 @@ data class LedgerEntriesRecorded private constructor(
          * Factory for use by RecordLedgerEntriesService.
          */
         fun from(
-            cmd: LedgerRecordingCommand,
+            cmd: PaymentOrderEvent,
             batchId: String,
             entries: List<LedgerEntryEventData>,
             now: Instant

@@ -20,11 +20,10 @@ interface EventPublisherPort {
     ): EventEnvelope<T>
 
     /**
-     * Publish a batch inside one Kafka transaction (exactly-once).
+     * Publish an envelope asynchronously.
      */
-    fun <T : Event> publishBatchAtomically(
-        envelopes: List<EventEnvelope<T>>,
-        timeout: Duration = Duration.ofSeconds(30)
-    ): Boolean
+    fun <T : Event> publishAsync(
+        envelope: EventEnvelope<T>
+    ): java.util.concurrent.CompletableFuture<EventEnvelope<T>>
 }
 

@@ -1,0 +1,411 @@
+payment-domain/src/main/kotlin
+└── com
+    └── dogancaglar
+        └── paymentservice
+            └── domain
+                ├── exception
+                │   ├── PaymentDomainExceptions.kt
+                │   ├── PaymentIntentNotFoundException.kt
+                │   ├── PaymentValidationException.kt
+                │   ├── PspCreateIntentException.kt
+                │   ├── PspUnavailableException.kt
+                │   └── PspUnknownException.kt
+                ├── model
+                │   ├── balance
+                │   │   └── AccountBalanceSnapshot.kt
+                │   ├── common
+                │   │   └── Amount.kt
+                │   ├── ledger
+                │   │   ├── Account.kt
+                │   │   ├── AccountProfile.kt
+                │   │   ├── JournalEntry.kt
+                │   │   ├── JournalType.kt
+                │   │   ├── LedgerEntry.kt
+                │   │   ├── LedgerOperationResult.kt
+                │   │   ├── PaymentTx.kt
+                │   │   └── Posting.kt
+                │   ├── payment
+                │   │   ├── OutboxEvent.kt
+                │   │   ├── Payment.kt
+                │   │   ├── PaymentIntent.kt
+                │   │   ├── PaymentIntentStatus.kt
+                │   │   ├── PaymentMethod.kt
+                │   │   ├── PaymentOrder.kt
+                │   │   ├── PaymentOrderStatus.kt
+                │   │   ├── PaymentOrderStatusCheck.kt
+                │   │   └── PaymentStatus.kt
+                │   ├── tx
+                │   └── vo
+                │       ├── BuyerId.kt
+                │       ├── OrderId.kt
+                │       ├── PaymentId.kt
+                │       ├── PaymentIntentId.kt
+                │       ├── PaymentOrderId.kt
+                │       ├── PaymentOrderLine.kt
+                │       └── SellerId.kt
+                └── util
+                    └── LedgerEntryFactory.kt
+
+14 directories, 33 files
+payment-application/src/main/kotlin
+└── com
+    └── dogancaglar
+        └── paymentservice
+            ├── application
+            │   ├── command
+            │   │   ├── AuthorizePaymentIntentCommand.kt
+            │   │   ├── CapturePaymentCommand.kt
+            │   │   ├── CreatePaymentIntentCommand.kt
+            │   │   ├── GetPaymentIntentCommand.kt
+            │   │   ├── LedgerRecordingAuthorizationCommand.kt
+            │   │   ├── LedgerRecordingCommand.kt
+            │   │   ├── PaymentOrderCaptureCommand.kt
+            │   │   ├── PaymentOrderRefundCommand.kt
+            │   │   └── ProcessPaymentIntentUpdateCommand.kt
+            │   ├── constants
+            │   │   ├── IdNamespaces.kt
+            │   │   └── PaymentLogFields.kt
+            │   ├── events
+            │   │   ├── LedgerEntriesRecorded.kt
+            │   │   ├── LedgerEntryEventData.kt
+            │   │   ├── PaymentAuthorized.kt
+            │   │   ├── PaymentBaseEvent.kt
+            │   │   ├── PaymentCommand.kt
+            │   │   ├── PaymentIntentAuthorized.kt
+            │   │   ├── PaymentOrderBaseEvent.kt
+            │   │   ├── PaymentOrderCaptured.kt
+            │   │   ├── PaymentOrderCaptureReceived.kt
+            │   │   ├── PaymentOrderCommand.kt
+            │   │   ├── PaymentOrderEvent.kt
+            │   │   ├── PaymentOrderFinalized.kt
+            │   │   ├── PaymentOrderPspResultUpdated.kt
+            │   │   ├── PaymentOrderRefunded.kt
+            │   │   ├── PaymentOrderRefundReceived.kt
+            │   │   └── PostingEventData.kt
+            │   ├── maintenance
+            │   ├── service
+            │   │   ├── AccountBalanceReadService.kt
+            │   │   ├── AccountBalanceService.kt
+            │   │   ├── AuthorizePaymentIntentService.kt
+            │   │   ├── CapturePaymentService.kt
+            │   │   ├── CreatePaymentIntentService.kt
+            │   │   ├── GetPaymentIntentService.kt
+            │   │   ├── IdempotencyService.kt
+            │   │   ├── ProcessPaymentService.kt
+            │   │   ├── PspResultProcessingService.kt
+            │   │   ├── RequestLedgerRecordingService.kt
+            │   │   └── UpdatePaymentIntentService.kt
+            │   └── util
+            │       ├── LedgerDomainEventEntityMapper.kt
+            │       ├── PaymentOrderDomainEventEntityMapper.kt
+            │       ├── psp
+            │       │   ├── PSPAuthorizationStatusMapper.kt
+            │       │   └── PSPCaptureStatusMapper.kt
+            │       ├── PublicIdExtension.kt
+            │       └── RetryItem.kt
+            └── ports
+                ├── inbound
+                │   └── usecases
+                │       ├── AccountBalanceReadUseCase.kt
+                │       ├── AccountBalanceUseCase.kt
+                │       ├── AuthorizePaymentIntentUseCase.kt
+                │       ├── CapturePaymentUseCase.kt
+                │       ├── CreatePaymentIntentUseCase.kt
+                │       ├── GetPaymentIntentUseCase.kt
+                │       ├── ProcessPspResultUseCase.kt
+                │       ├── RecordAuthorizationLedgerEntriesUseCase.kt
+                │       ├── RecordLedgerEntriesUseCase.kt
+                │       ├── RequestLedgerRecordingUseCase.kt
+                │       └── UpdatePaymentIntentUseCase.kt
+                └── outbound
+                    ├── AccountBalanceCachePort.kt
+                    ├── AccountBalanceSnapshotPort.kt
+                    ├── AccountDirectoryPort.kt
+                    ├── BalanceIdempotencyPort.kt
+                    ├── CentralOutboxEdgePort.kt
+                    ├── CentralOutboxRelayPort.kt
+                    ├── EventDeduplicationPort.kt
+                    ├── EventPublisherPort.kt
+                    ├── ExternalIdGeneratorPort.kt
+                    ├── HasherPort.kt
+                    ├── IdempotencyRecord.kt
+                    ├── IdempotencyStorePort.kt
+                    ├── IdGeneratorPort.kt
+                    ├── LedgerEntryPort.kt
+                    ├── LocalOutboxEdgePort.kt
+                    ├── LocalOutboxWriterPort.kt
+                    ├── PaymentIntentRepository.kt
+                    ├── PaymentOrderModificationPort.kt
+                    ├── PaymentOrderRepository.kt
+                    ├── PaymentOrderStatePort.kt
+                    ├── PaymentOrderStatusCheckRepository.kt
+                    ├── PaymentRepository.kt
+                    ├── PaymentTransactionalFacadePort.kt
+                    ├── PaymentTxPort.kt
+                    ├── PspAuthorizationGatewayPort.kt
+                    ├── PspModificationGatewayPort.kt
+                    ├── PspResultCachePort.kt
+                    ├── ResilientExecutionPort.kt
+                    ├── RetryQueuePort.kt
+                    └── SerializationPort.kt
+
+16 directories, 85 files
+payment-infrastructure/src/main/kotlin
+└── com
+    └── dogancaglar
+        ├── paymentinfra
+        │   └── PaymentInfrastructureAutoConfig.kt
+        └── paymentservice
+            └── infra
+                ├── adapter
+                │   └── outbound
+                │       ├── concurrency
+                │       │   └── ResilientExecutionAdapter.kt
+                │       ├── hash
+                │       │   └── CanonicalJsonHasher.kt
+                │       ├── id
+                │       │   ├── config
+                │       │   │   ├── IdGenerationProperties.kt
+                │       │   │   └── SnowflakeCore.kt
+                │       │   └── SnowflakeIdGeneratorAdapter.kt
+                │       ├── kafka
+                │       │   └── metadata
+                │       │       ├── PaymentEventMetadataCatalog.kt
+                │       │       └── Topics.kt
+                │       ├── persistence
+                │       │   ├── mapper
+                │       │   └── typehandler
+                │       ├── redis
+                │       │   ├── AccountBalanceRedisCacheAdapter.kt
+                │       │   ├── client
+                │       │   │   └── PaymentOrderRetryRedisCache.kt
+                │       │   ├── config
+                │       │   │   └── RedisConfig.kt
+                │       │   ├── PaymentOrderRetryQueueAdapter.kt
+                │       │   ├── RedisEventDedupAdapter.kt
+                │       │   └── RedisIdGeneratorPortAdapter.kt
+                │       └── serialization
+                │           ├── JacksonSerializationAdapter.kt
+                │           └── JacksonUtil.kt
+                ├── config
+                │   └── JacksonConfig.kt
+                └── monitoring
+                    ├── JobMetrics.kt
+                    ├── KafkaMetrics.kt
+                    ├── MetricHelper.kt
+                    ├── MetricNames.kt
+                    └── RedisMetrics.kt
+
+23 directories, 22 files
+payment-consumers/src/main/kotlin
+└── com
+    └── dogancaglar
+        └── paymentservice
+            ├── adapter
+            │   ├── inbound
+            │   │   └── rest
+            │   │       ├── BalanceController.kt
+            │   │       ├── BalanceService.kt
+            │   │       └── dto
+            │   │           └── BalanceDto.kt
+            │   └── outbound
+            │       └── psp
+            │           ├── CaptureNetworkSimulator.kt
+            │           ├── CapturePspResponse.kt
+            │           ├── CaptureSimulationProperties.kt
+            │           ├── PspModificationGatewayAdapter.kt
+            │           ├── RefundNetworkSimulator.kt
+            │           └── RefundSimulationProperties.kt
+            ├── application
+            │   └── maintenance
+            │       └── AccountBalanceSnapshotJob.kt
+            ├── consumers
+            │   ├── DynamicKafkaConsumersProperties.kt
+            │   └── KafkaTypedConsumerFactoryConfig.kt
+            ├── infra
+            │   ├── adapter
+            │   │   └── outbound
+            │   │       ├── kafka
+            │   │       │   └── config
+            │   │       └── persistence
+            │   │           ├── AccountBalanceSnapshotAdapter.kt
+            │   │           ├── AccountDirectoryImpl.kt
+            │   │           ├── converter
+            │   │           │   └── LedgerEntitiyMapper.kt
+            │   │           ├── entity
+            │   │           │   ├── AccountBalanceEntity.kt
+            │   │           │   ├── JournalEntryEntity.kt
+            │   │           │   ├── LedgerEntryEntity.kt
+            │   │           │   ├── PaymentTxEntity.kt
+            │   │           │   └── PostingEntity.kt
+            │   │           ├── LedgerEntryTxAdapter.kt
+            │   │           ├── mapper
+            │   │           │   ├── AccountBalanceMapper.kt
+            │   │           │   ├── AccountDirectoryMapper.kt
+            │   │           │   ├── LedgerMapper.kt
+            │   │           │   └── PaymentTxMapper.kt
+            │   │           └── PaymentTxAdapter.kt
+            │   └── config
+            │       └── KafkaTopicsConfig.kt
+            ├── PaymentConsumersApplication.kt
+            ├── port
+            │   └── inbound
+            │       └── consumers
+            │           ├── AccountBalanceConsumer.kt
+            │           ├── base
+            │           │   ├── AbstractKafkaConsumer.kt
+            │           │   ├── BaseBatchKafkaConsumer.kt
+            │           │   └── BaseSingleKafkaConsumer.kt
+            │           ├── config
+            │           │   ├── ConsumerThreadPoolConfig.kt
+            │           │   └── PaymentConsumerConfig.kt
+            │           ├── LedgerRecordingRequestDispatcher.kt
+            │           ├── PaymentOrderCaptureExecutor.kt
+            │           ├── PaymentOrderEnqueuer.kt
+            │           ├── PspRefundExecutorConsumer.kt
+            │           └── PspResultConsumer.kt
+            └── service
+                └── RetryDispatcherScheduler.kt
+
+29 directories, 40 files
+payment-service/src/main/kotlin
+└── com
+    └── dogancaglar
+        └── paymentservice
+            ├── adapter
+            │   ├── inbound
+            │   │   └── rest
+            │   │       ├── dto
+            │   │       │   ├── AmountDto.kt
+            │   │       │   ├── AuthorizationRequestDTO.kt
+            │   │       │   ├── BalanceDto.kt
+            │   │       │   ├── CaptureRequestDTO.kt
+            │   │       │   ├── CaptureResponseDTO.kt
+            │   │       │   ├── CreatePaymentIntentRequestDTO.kt
+            │   │       │   ├── CreatePaymentIntentResponseDTO.kt
+            │   │       │   ├── PaymentMethodDTO.kt
+            │   │       │   └── PaymentOrderLineDTO.kt
+            │   │       ├── mapper
+            │   │       │   ├── AmountMapper.kt
+            │   │       │   ├── CaptureRequestMapper.kt
+            │   │       │   └── PaymentRequestMapper.kt
+            │   │       ├── PaymentApiOrchestrator.kt
+            │   │       ├── PaymentController.kt
+            │   │       ├── PaymentTransactionalFacadeAdapter.kt
+            │   │       ├── webconfig
+            │   │       │   ├── PaymentControllerWebExceptionHandler.kt
+            │   │       │   ├── SecurityConfig.kt
+            │   │       │   └── TraceFilter.kt
+            │   │       └── WebhookController.kt
+            │   └── outbound
+            │       └── psp
+            │           ├── simulator
+            │           │   ├── AuthorizationNetworkSimulator.kt
+            │           │   ├── AuthorizationPspResponse.kt
+            │           │   ├── AuthorizationSimulationProperties.kt
+            │           │   └── SimulatedPspAuthorizationGatewayAdapter.kt
+            │           └── stripe
+            │               └── StripePspAuthorizationGatewayAdapter.kt
+            ├── application
+            │   ├── config
+            │   ├── maintenance
+            │   └── validator
+            │       └── PaymentValidator.kt
+            ├── infra
+            │   ├── adapter
+            │   │   └── outbound
+            │   │       └── persistence
+            │   │           ├── converter
+            │   │           │   ├── OutboxEventEntityMapper.kt
+            │   │           │   ├── PaymentEntityMapper.kt
+            │   │           │   ├── PaymentIntentEntityMapper.kt
+            │   │           │   └── PaymentOrderEntityMapper.kt
+            │   │           ├── entity
+            │   │           │   ├── EdgeWatermarkEntity.kt
+            │   │           │   ├── OutboxEventEntity.kt
+            │   │           │   ├── OutboxEventType.kt
+            │   │           │   ├── PaymentEntity.kt
+            │   │           │   ├── PaymentIntentEntity.kt
+            │   │           │   └── PaymentOrderEntity.kt
+            │   │           ├── IdempotencyStoreAdapter.kt
+            │   │           ├── mapper
+            │   │           │   ├── IdempotencyKeyMapper.kt
+            │   │           │   ├── OutboxEventMapper.kt
+            │   │           │   ├── PaymentIntentMapper.kt
+            │   │           │   ├── PaymentMapper.kt
+            │   │           │   └── PaymentOrderMapper.kt
+            │   │           ├── outboxeventmapper
+            │   │           ├── OutboxWebAdapter.kt
+            │   │           ├── PaymentIntentOutboundAdapter.kt
+            │   │           ├── PaymentOrderModificationAdapter.kt
+            │   │           ├── PaymentOrderOutboundAdapter.kt
+            │   │           └── PaymentOutboundAdapter.kt
+            │   └── config
+            │       ├── DataSourceConfig.kt
+            │       ├── IdempotencyConfig.kt
+            │       ├── PaymentServiceConfig.kt
+            │       └── ThreadPoolConfig.kt
+            └── PaymentServiceApplication.kt
+
+27 directories, 51 files
+payment-edge-workers/src/main/kotlin
+└── com
+    └── dogancaglar
+        └── paymentservice
+            ├── application
+            │   └── maintenance
+            │       ├── config
+            │       ├── LocalOutboxForwarderJob.kt
+            │       └── OutboxPartitionCreator.kt
+            ├── edgeworkers
+            │   └── config
+            │       ├── DBWriterTxManager.kt
+            │       ├── MultiDataSourceConfig.kt
+            │       ├── MyBatisFactoriesConfig.kt
+            │       └── ThreadPoolConfig.kt
+            ├── infra
+            │   └── adapter
+            │       └── outbound
+            │           └── persistence
+            │               ├── CentralOutboxForwarderAdapter.kt
+            │               ├── converter
+            │               │   └── OutboxEventEntityMapper.kt
+            │               ├── entity
+            │               │   ├── EdgeWatermarkEntity.kt
+            │               │   ├── OutboxEventEntity.kt
+            │               │   └── OutboxEventType.kt
+            │               ├── mapper
+            │               │   ├── CentralOutboxForwarderMapper.kt
+            │               │   └── OutboxEventDispatcherMapper.kt
+            │               └── OutboxJobAdapter.kt
+            └── PaymentEdgeWorkersApplication.kt
+
+16 directories, 15 files
+payment-central-relay/src/main/kotlin
+└── com
+    └── dogancaglar
+        └── paymentservice
+            ├── infra
+            │   └── adapter
+            │       └── outbound
+            │           ├── kafka
+            │           │   └── config
+            │           └── persistence
+            │               ├── CentralOutboxRelayAdapter.kt
+            │               ├── converter
+            │               │   └── OutboxEventEntityMapper.kt
+            │               ├── entity
+            │               │   ├── EdgeWatermarkEntity.kt
+            │               │   ├── OutboxEventEntity.kt
+            │               │   └── OutboxEventType.kt
+            │               └── mapper
+            │                   └── CentralOutboxRelayMapper.kt
+            ├── PaymentCentralRelayApplication.kt
+            └── port
+                └── inbound
+                    └── consumers
+                        ├── config
+                        │   └── ThreadPoolConfig.kt
+                        └── OutboxRelayJob.kt
+
+17 directories, 9 files

@@ -128,6 +128,24 @@ class PaymentOrder private constructor(
         }
         return copy(status = PaymentOrderStatus.CAPTURE_FAILED)
     }
+
+    fun markAsRefunded(): PaymentOrder {
+        require(status in ALLOWED_STATUSES_FOR_REFUND) {
+            "Invalid transtion Cannot mark as refunded from status '${status.name}'. " +
+                    "Allowed statuses: ${ALLOWED_STATUSES_FOR_REFUND.joinToString { it.name }}. " +
+                    "PaymentOrderId: ${paymentOrderId.value}"
+        }
+        return copy(status = PaymentOrderStatus.REFUNDED)
+    }
+
+    fun markRefundDeclined(): PaymentOrder {
+        require(status in ALLOWED_STATUSES_FOR_REFUND) {
+            "Invalid transtion Cannot mark refund as declined from status '${status.name}'. " +
+                    "Allowed statuses: ${ALLOWED_STATUSES_FOR_REFUND.joinToString { it.name }}. " +
+                    "PaymentOrderId: ${paymentOrderId.value}"
+        }
+        return copy(status = PaymentOrderStatus.REFUND_FAILED)
+    }
     fun markCapturePendingAndIncrementRetry(): PaymentOrder {
         require(status in ALLOWED_STATUSES_FOR_PENDING_CAPTURE) {
             "Invalid transition Cannot mark as pending capture from status '${status.name}'. " +
@@ -199,6 +217,11 @@ class PaymentOrder private constructor(
         private val ALLOWED_STATUSES_FOR_CAPTURE = setOf(
             PaymentOrderStatus.CAPTURE_REQUESTED,
             PaymentOrderStatus.PENDING_CAPTURE
+        )
+
+        private val ALLOWED_STATUSES_FOR_REFUND = setOf(
+            PaymentOrderStatus.REFUND_REQUESTED,
+            PaymentOrderStatus.PENDING_REFUND
         )
 
         /**

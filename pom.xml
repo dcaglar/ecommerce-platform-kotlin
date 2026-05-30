@@ -34,6 +34,10 @@ It declares that this module is:
         <module>payment-domain</module>
         <module>payment-application</module>
         <module>payment-infrastructure</module>
+        <!-- Shared infrastructure modules (must come before runtime modules) -->
+        <module>common-db</module>
+        <module>common-kafka</module>
+        <!-- Runtime application modules -->
         <module>payment-service</module>
         <module>payment-edge-workers</module>
         <module>payment-consumers</module>
@@ -94,6 +98,16 @@ It declares that this module is:
             <dependency>
                 <groupId>com.dogancaglar</groupId>
                 <artifactId>common-test</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>com.dogancaglar</groupId>
+                <artifactId>common-db</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>com.dogancaglar</groupId>
+                <artifactId>common-kafka</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
             </dependency>
             <dependency>

@@ -1,0 +1,28 @@
+payment-central-relay/src/main/kotlin
+└── com
+    └── dogancaglar
+        └── paymentservice
+            ├── infra
+            │   └── adapter
+            │       └── outbound
+            │           ├── kafka
+            │           │   └── config
+            │           └── persistence
+            │               ├── CentralOutboxRelayAdapter.kt
+            │               ├── converter
+            │               │   └── OutboxEventEntityMapper.kt
+            │               ├── entity
+            │               │   ├── EdgeWatermarkEntity.kt
+            │               │   ├── OutboxEventEntity.kt
+            │               │   └── OutboxEventType.kt
+            │               └── mapper
+            │                   └── CentralOutboxRelayMapper.kt
+            ├── PaymentCentralRelayApplication.kt
+            └── port
+                └── inbound
+                    └── consumers
+                        ├── config
+                        │   └── ThreadPoolConfig.kt
+                        └── OutboxRelayJob.kt
+
+17 directories, 9 files

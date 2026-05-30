@@ -6,12 +6,11 @@ app:
 spring:
   datasource:
     url: ${SPRING_DATASOURCE_CENTRAL_URL}
-    username: ${SPRING_DATASOURCE_USERNAME} # This will be injected from a Kubernetes Secret
+    username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
-
   data:
     redis:
-      url: redis://redis-master:6379
+      url: ${SPRING_DATA_REDIS_URL:redis://localhost:6379}
 
 psp:
   refund:

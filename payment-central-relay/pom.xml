@@ -29,6 +29,15 @@
             <groupId>com.dogancaglar</groupId>
             <artifactId>payment-infrastructure</artifactId>
         </dependency>
+        <!-- Shared infrastructure modules -->
+        <dependency>
+            <groupId>com.dogancaglar</groupId>
+            <artifactId>common-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.dogancaglar</groupId>
+            <artifactId>common-db</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
@@ -37,18 +46,8 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.mybatis.spring.boot</groupId>
-            <artifactId>mybatis-spring-boot-starter</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
-        </dependency>
+        <!-- spring-kafka is provided transitively via common-kafka -->
+        <!-- mybatis-spring-boot-starter and postgresql are provided transitively via common-db -->
         <dependency>
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>

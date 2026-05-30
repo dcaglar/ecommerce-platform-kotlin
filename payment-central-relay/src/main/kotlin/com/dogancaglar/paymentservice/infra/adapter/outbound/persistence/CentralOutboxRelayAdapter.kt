@@ -30,4 +30,16 @@ class CentralOutboxRelayAdapter(
     override fun markDispatched(oeid: Long) {
         mapper.markDispatched(oeid)
     }
+
+    override fun countEligible(tSafe: Instant): Long {
+        return mapper.countEligible(tSafe)
+    }
+
+    override fun computeTSafe(): Instant? {
+        return mapper.computeTSafe()
+    }
+
+    override fun deleteWatermark(edgeNodeId: String) {
+        mapper.deleteWatermark(edgeNodeId)
+    }
 }

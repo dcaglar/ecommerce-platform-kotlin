@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.id
 
-import com.dogancaglar.paymentservice.infra.adapter.outbound.id.config.IdGenerationProperties
-import com.dogancaglar.paymentservice.infra.adapter.outbound.id.config.SnowflakeCore
+import com.dogancaglar.paymentservice.infra.adapter.outbound.id.IdGenerationProperties
+import com.dogancaglar.paymentservice.infra.adapter.outbound.id.SnowflakeCore
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertTrue
 

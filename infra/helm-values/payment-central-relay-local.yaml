@@ -5,8 +5,8 @@ image:
   tag: latest
   pullPolicy: Always
 resources:
-  requests: {cpu: "400m", memory: "512Mi"}
-  limits: {cpu: "800m", memory: "796Mi"}
+  requests: {cpu: "100m", memory: "256Mi"}
+  limits: {cpu: "500m", memory: "768Mi"}
 jvmOpts: >-
   -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication -XX:MaxRAMPercentage=45 -XX:InitialRAMPercentage=45 -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
 service:

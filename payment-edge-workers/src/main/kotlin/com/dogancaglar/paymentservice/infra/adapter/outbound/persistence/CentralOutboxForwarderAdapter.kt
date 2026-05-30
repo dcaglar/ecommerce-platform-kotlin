@@ -2,10 +2,13 @@ package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence
 
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.OutboxEventEntity
+import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.EdgeWatermarkEntity
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.CentralOutboxForwarderMapper
 import com.dogancaglar.paymentservice.ports.outbound.CentralOutboxEdgePort
 import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
 import org.springframework.stereotype.Repository
+
+import java.time.Instant
 
 @Repository
 class CentralOutboxForwarderAdapter(
@@ -26,5 +29,13 @@ class CentralOutboxForwarderAdapter(
             )
         }
         mapper.insertBatch(entities)
+    }
+
+    override fun updateWatermark(edgeNodeId: String, forwardedUpTo: Instant) {
+        mapper.upsert(EdgeWatermarkEntity(edgeNodeId, forwardedUpTo))
+    }
+
+    override fun deleteWatermark(edgeNodeId: String) {
+        mapper.deleteWatermark(edgeNodeId)
     }
 }
