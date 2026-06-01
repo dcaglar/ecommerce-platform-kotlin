@@ -274,7 +274,7 @@ graph TD
         
         subgraph Edge1["Edge Cell 1"]
             direction TB
-            API1("Payment Acceptance Service<br/>(Authorization / Capture / Refund)")
+            API1["Payment Acceptance Service<br/>(Authorization / Capture / Refund)"]
             IdemDB1[("Idempotency DB<br/>IdempotencyRecord")]
             EdgeDB1[("Edge Local DB<br/>PaymentIntent<br/>OutboxEvents")]
             Fwd1[["Local Outbox Forwarder"]]
@@ -397,22 +397,22 @@ graph TD
 
     subgraph ExecutionPhase ["Execution & Relay"]
         direction TB
-        CAP1 -->|Relayed by OutboxRelayJob| CAP2("CaptureCommandExecutor")
+        CAP1 -->|Relayed by OutboxRelayJob| CAP2["CaptureCommandExecutor"]
         
         CAP2 -->|PSP Capture Call| PSP1{PSP Result}
         
         PSP1 -->|Append to Central Outbox| PSP2[OutboxEvent: ExternalAsyncCaptureToPspPerformed]
-        PSP2 -->|Relayed to psp-result-queue| PSP3("PspResultConsumer")
+        PSP2 -->|Relayed to psp-result-queue| PSP3["PspResultConsumer"]
         
         PSP3 -->|Wait for Webhook| WEB1[Edge DB Outbox<br/>CaptureSuccessful]
-        WEB1 -->|Relayed to psp-result-queue| WEB2("PspResultConsumer")
+        WEB1 -->|Relayed to psp-result-queue| WEB2["PspResultConsumer"]
     end
 
     WEB2 -->|Updates Ledger| P3[Payment<br/>Status: CAPTURED<br/>MERCHANT_GROSS_POOL updated]
-    WEB2 -->|Creates| P1[Payment<br/>Status: AUTHORIZED] (If first webhook)
+    WEB2 -->|Creates| P1[Payment<br/>Status: AUTHORIZED<br/>If first webhook]
     
     P3 -.->|If MARKETPLACE| SPLIT1[OutboxEvent: InternalTransferRequest]
-    SPLIT1 -->|Relayed to internal-transfer-queue| SPLIT2("InternalTransferConsumer")
+    SPLIT1 -->|Relayed to internal-transfer-queue| SPLIT2["InternalTransferConsumer"]
     SPLIT2 -->|Sub-Seller Distribution| SPLIT3[JournalType.INTERNAL_TRANSFER]
 
     class IdemCheck,ReturnStored idem
