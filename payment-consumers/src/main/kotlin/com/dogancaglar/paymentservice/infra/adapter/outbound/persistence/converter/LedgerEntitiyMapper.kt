@@ -21,8 +21,8 @@ internal object LedgerEntitiyMapper {
             id = entry.journalEntry.id,
             txType = entry.journalEntry.txType.name,
             name = entry.journalEntry.name,
-            referenceType = entry.journalEntry.referenceType,
-            referenceId = entry.journalEntry.referenceId,
+            referenceType = entry.journalEntry.paymentId.value.toString(),
+            referenceId = entry.journalEntry.txId.value.toString(),
             createdAt = entry.createdAt.toInstant(ZoneOffset.UTC),
         )
 

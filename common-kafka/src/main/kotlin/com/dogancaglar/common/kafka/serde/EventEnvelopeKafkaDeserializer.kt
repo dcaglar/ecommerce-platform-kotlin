@@ -1,7 +1,7 @@
 package com.dogancaglar.common.kafka.serde
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
+import com.dogancaglar.common.kafka.metadata.PaymentEventMetadataCatalog
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature

@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.Instant
+import com.dogancaglar.paymentservice.application.events.PaymentCommand
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class CapturePaymentCommand private constructor(
@@ -20,7 +21,7 @@ data class CapturePaymentCommand private constructor(
     override val currency: String,
     val attempt: Int,
     override val timestamp: Instant
-) : com.dogancaglar.paymentservice.application.events.PaymentCommand() {
+) : PaymentCommand() {
 
     override val eventType = EVENT_TYPE
 

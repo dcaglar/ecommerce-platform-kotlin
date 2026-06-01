@@ -10,6 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.datasource.DataSourceTransactionManager
 import javax.sql.DataSource
 import org.springframework.boot.autoconfigure.liquibase.LiquibaseDataSource
+import org.springframework.beans.factory.annotation.Value
 
 @Configuration
 class MultiDataSourceConfig {
@@ -36,9 +37,9 @@ class MultiDataSourceConfig {
     @Primary
     fun outboxTxManager(
         @Qualifier("outboxDataSource") ds: DataSource,
-        @org.springframework.beans.factory.annotation.Value("\${db.outbox.statement-timeout-ms:2000}") stmtMs: Long,
-        @org.springframework.beans.factory.annotation.Value("\${db.outbox.lock-timeout-ms:200}") lockMs: Long,
-        @org.springframework.beans.factory.annotation.Value("\${db.outbox.idle-in-tx-timeout-ms:0}") idleMs: Long
+        @Value("\${db.outbox.statement-timeout-ms:2000}") stmtMs: Long,
+        @Value("\${db.outbox.lock-timeout-ms:200}") lockMs: Long,
+        @Value("\${db.outbox.idle-in-tx-timeout-ms:0}") idleMs: Long
     ) = DBWriterTxManager(ds, stmtMs, lockMs, idleMs).apply {
         setDefaultTimeout(60)
     }

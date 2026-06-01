@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import jakarta.servlet.http.HttpServletRequest
+import com.dogancaglar.common.event.EventEnvelopeFactory
+import com.dogancaglar.common.logging.EventLogContext
 
 data class AdyenWebhookPayload(
     val eventCode: String,
@@ -56,11 +58,11 @@ class AdyenWebhookController(
                 now = Utc.nowInstant()
             )
 
-            val envelope = com.dogancaglar.common.event.EventEnvelopeFactory.envelopeFor(
-                traceId = com.dogancaglar.common.logging.EventLogContext.getTraceId(),
+            val envelope = EventEnvelopeFactory.envelopeFor(
+                traceId = EventLogContext.getTraceId(),
                 data = captureSuccessful,
                 aggregateId = captureSuccessful.publicPaymentIntentId,
-                parentEventId = com.dogancaglar.common.logging.EventLogContext.getEventId()
+                parentEventId = EventLogContext.getEventId()
             )
 
             val outboxEvent = OutboxEvent.createNew(

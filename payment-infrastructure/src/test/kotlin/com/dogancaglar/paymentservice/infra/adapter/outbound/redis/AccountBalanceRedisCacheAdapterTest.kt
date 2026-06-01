@@ -9,6 +9,7 @@ import org.springframework.data.redis.core.HashOperations
 import org.springframework.data.redis.core.SetOperations
 import org.springframework.data.redis.core.StringRedisTemplate
 import java.util.concurrent.TimeUnit
+import org.springframework.data.redis.core.RedisCallback
 
 /**
  * Unit tests for AccountBalanceRedisCacheAdapter using MockK.
@@ -51,8 +52,8 @@ class AccountBalanceRedisCacheAdapterTest {
         val delta = 10000L
         val upToEntryId = 100L
         
-        every { redisTemplate.execute<Any?>(any<org.springframework.data.redis.core.RedisCallback<Any?>>()) } answers {
-            val callback = firstArg<org.springframework.data.redis.core.RedisCallback<Any?>>()
+        every { redisTemplate.execute<Any?>(any<RedisCallback<Any?>>()) } answers {
+            val callback = firstArg<RedisCallback<Any?>>()
             callback.doInRedis(redisConnection)
             listOf<Any>(15000L, upToEntryId) // Return value from Lua script
         }
@@ -61,7 +62,7 @@ class AccountBalanceRedisCacheAdapterTest {
         adapter.addDeltaAndWatermark(accountCode, delta, upToEntryId)
 
         // Then - Verify execute was called (Lua script execution)
-        verify(exactly = 1) { redisTemplate.execute<Any?>(any<org.springframework.data.redis.core.RedisCallback<Any?>>()) }
+        verify(exactly = 1) { redisTemplate.execute<Any?>(any<RedisCallback<Any?>>()) }
     }
 
     @Test
@@ -71,8 +72,8 @@ class AccountBalanceRedisCacheAdapterTest {
         val expectedDelta = 5000L
         val expectedWatermark = 150L
         
-        every { redisTemplate.execute<Any?>(any<org.springframework.data.redis.core.RedisCallback<Any?>>()) } answers {
-            val callback = firstArg<org.springframework.data.redis.core.RedisCallback<Any?>>()
+        every { redisTemplate.execute<Any?>(any<RedisCallback<Any?>>()) } answers {
+            val callback = firstArg<RedisCallback<Any?>>()
             callback.doInRedis(redisConnection)
             listOf<Any>(expectedDelta, expectedWatermark) // Return value from Lua script
         }
@@ -83,7 +84,7 @@ class AccountBalanceRedisCacheAdapterTest {
         // Then
         assertEquals(expectedDelta, result.first)
         assertEquals(expectedWatermark, result.second)
-        verify(exactly = 1) { redisTemplate.execute<Any?>(any<org.springframework.data.redis.core.RedisCallback<Any?>>()) }
+        verify(exactly = 1) { redisTemplate.execute<Any?>(any<RedisCallback<Any?>>()) }
     }
 
     @Test
@@ -91,7 +92,7 @@ class AccountBalanceRedisCacheAdapterTest {
         // Given
         val accountCode = "MERCHANT_PAYABLE.MERCHANT-456"
         
-        every { redisTemplate.execute<Any?>(any<org.springframework.data.redis.core.RedisCallback<Any?>>()) } returns null
+        every { redisTemplate.execute<Any?>(any<RedisCallback<Any?>>()) } returns null
 
         // When
         val result = adapter.getAndResetDeltaWithWatermark(accountCode)
@@ -106,7 +107,7 @@ class AccountBalanceRedisCacheAdapterTest {
         // Given
         val accountCode = "MERCHANT_PAYABLE.MERCHANT-456"
         
-        every { redisTemplate.execute<Any?>(any<org.springframework.data.redis.core.RedisCallback<Any?>>()) } returns "invalid-result"
+        every { redisTemplate.execute<Any?>(any<RedisCallback<Any?>>()) } returns "invalid-result"
 
         // When
         val result = adapter.getAndResetDeltaWithWatermark(accountCode)

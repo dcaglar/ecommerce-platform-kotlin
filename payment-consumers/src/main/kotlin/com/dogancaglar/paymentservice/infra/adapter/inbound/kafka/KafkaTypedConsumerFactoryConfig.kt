@@ -7,8 +7,8 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.GenericLogFields
 import com.dogancaglar.common.kafka.serde.EventEnvelopeKafkaSerializer
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
-import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
-import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.Topics
+import com.dogancaglar.common.kafka.metadata.PaymentEventMetadataCatalog
+import com.dogancaglar.common.kafka.metadata.Topics
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -29,6 +29,28 @@ import org.springframework.kafka.listener.RecordInterceptor
 import org.springframework.kafka.listener.adapter.RecordFilterStrategy
 import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries
 import org.springframework.messaging.handler.annotation.support.DefaultMessageHandlerMethodFactory
+import java.io.PrintWriter
+import java.lang.ClassCastException
+import java.lang.IllegalArgumentException
+import java.lang.NullPointerException
+import java.sql.SQLTransientException
+import org.apache.kafka.clients.consumer.CommitFailedException
+import org.apache.kafka.clients.consumer.ConsumerConfig.CLIENT_ID_CONFIG
+import org.apache.kafka.common.errors.RetriableException
+import org.apache.kafka.common.errors.SerializationException
+import org.apache.kafka.common.header.internals.RecordHeaders
+import org.apache.kafka.common.serialization.ByteArraySerializer
+import org.apache.kafka.common.serialization.StringSerializer
+import org.springframework.core.convert.ConversionException
+import org.springframework.dao.CannotAcquireLockException
+import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.dao.DuplicateKeyException
+import org.springframework.dao.NonTransientDataAccessException
+import org.springframework.dao.TransientDataAccessException
+import org.springframework.kafka.support.KafkaHeaders.GROUP_ID
+import org.springframework.kafka.support.serializer.DeserializationException
+import org.springframework.messaging.handler.annotation.support.MethodArgumentNotValidException
+import java.io.StringWriter
 
 @Configuration
 class KafkaTypedConsumerFactoryConfig(
@@ -59,9 +81,9 @@ class KafkaTypedConsumerFactoryConfig(
         cfg.remove(ProducerConfig.TRANSACTIONAL_ID_CONFIG)
         cfg[ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG] = false
         cfg[ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG] =
-            org.apache.kafka.common.serialization.StringSerializer::class.java
+            StringSerializer::class.java
         cfg[ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG] =
-            org.apache.kafka.common.serialization.ByteArraySerializer::class.java
+            ByteArraySerializer::class.java
 
         val factory = DefaultKafkaProducerFactory<String, ByteArray>(cfg)
         factory.addListener(MicrometerProducerListener<String, ByteArray>(meterRegistry))
@@ -93,14 +115,14 @@ class KafkaTypedConsumerFactoryConfig(
                     EventEnvelopeKafkaSerializer().serialize(rec.topic(), env) ?: ByteArray(0)
                 } ?: ByteArray(0)
             // Copy headers and add error diagnostics
-            val headers = org.apache.kafka.common.header.internals.RecordHeaders(rec.headers().toArray()).apply {
+            val headers = RecordHeaders(rec.headers().toArray()).apply {
                 add("x-error-class", (ex?.javaClass?.name ?: "n/a").toByteArray())
                 add("x-error-message", ((ex?.message ?: "")
                     .take(8_000)).toByteArray()) // cap to avoid jumbo headers
                 add("x-error-stacktrace", stackTraceString(ex, 16_000).toByteArray())
                 add("x-recovered-at", Utc.nowInstant().toString().toByteArray())
                 add("x-consumer-group", (rec.headers()
-                    .lastHeader(org.springframework.kafka.support.KafkaHeaders.GROUP_ID)?.let { String(it.value()) }
+                    .lastHeader(GROUP_ID)?.let { String(it.value()) }
                     ?: "unknown").toByteArray())
             }
 
@@ -122,31 +144,31 @@ class KafkaTypedConsumerFactoryConfig(
 
             // keep your exception policy
             addRetryableExceptions(
-                org.apache.kafka.common.errors.RetriableException::class.java,
-                org.springframework.dao.TransientDataAccessException::class.java,
-                org.springframework.dao.CannotAcquireLockException::class.java,
-                java.sql.SQLTransientException::class.java,
-                org.apache.kafka.clients.consumer.CommitFailedException::class.java,
+                RetriableException::class.java,
+                TransientDataAccessException::class.java,
+                CannotAcquireLockException::class.java,
+                SQLTransientException::class.java,
+                CommitFailedException::class.java,
             )
             addNotRetryableExceptions(
-                java.lang.IllegalArgumentException::class.java,
-                java.lang.NullPointerException::class.java,
-                java.lang.ClassCastException::class.java,
-                org.springframework.core.convert.ConversionException::class.java,
-                org.springframework.kafka.support.serializer.DeserializationException::class.java,
-                org.apache.kafka.common.errors.SerializationException::class.java,
-                org.springframework.messaging.handler.annotation.support.MethodArgumentNotValidException::class.java,
-                org.springframework.dao.DuplicateKeyException::class.java,
-                org.springframework.dao.DataIntegrityViolationException::class.java,
-                org.springframework.dao.NonTransientDataAccessException::class.java,
+                IllegalArgumentException::class.java,
+                NullPointerException::class.java,
+                ClassCastException::class.java,
+                ConversionException::class.java,
+                DeserializationException::class.java,
+                SerializationException::class.java,
+                MethodArgumentNotValidException::class.java,
+                DuplicateKeyException::class.java,
+                DataIntegrityViolationException::class.java,
+                NonTransientDataAccessException::class.java,
             )
         }
     }
 
 
     private fun stackTraceString(ex: Throwable?, max: Int): String =
-        if (ex == null) "" else java.io.StringWriter().use { sw ->
-            ex.printStackTrace(java.io.PrintWriter(sw))
+        if (ex == null) "" else StringWriter().use { sw ->
+            ex.printStackTrace(PrintWriter(sw))
             sw.toString().take(max)
         }
 
@@ -174,7 +196,7 @@ class KafkaTypedConsumerFactoryConfig(
             this.consumerFactory = consumerFactory
             containerProperties.clientId = clientId
             consumerFactory.updateConfigs(
-                mapOf(org.apache.kafka.clients.consumer.ConsumerConfig.CLIENT_ID_CONFIG to clientId)
+                mapOf(CLIENT_ID_CONFIG to clientId)
             )
             containerProperties.pollTimeout = 1000           // block up to 1s waiting for data
             containerProperties.isMicrometerEnabled = true

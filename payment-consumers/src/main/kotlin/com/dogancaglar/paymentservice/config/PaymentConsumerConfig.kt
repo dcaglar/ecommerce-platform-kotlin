@@ -20,6 +20,7 @@ import com.dogancaglar.paymentservice.ports.outbound.PaymentTxPort
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort
 
 @Configuration
 open class PaymentConsumerConfig {
@@ -42,9 +43,9 @@ open class PaymentConsumerConfig {
         @Qualifier("accountDirectoryImpl") accountDirectoryImpl: AccountDirectoryPort,
         paymentTxPort: PaymentTxPort,
         idGeneratorPort: IdGeneratorPort,
-        paymentRepository: com.dogancaglar.paymentservice.ports.outbound.PaymentRepository,
-        localOutboxWriterPort: com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort,
-        serializationPort: com.dogancaglar.paymentservice.ports.outbound.SerializationPort
+        paymentRepository: PaymentRepository,
+        localOutboxWriterPort: LocalOutboxWriterPort,
+        serializationPort: SerializationPort
     ): PspResultProcessingService {
         return PspResultProcessingService(
             ledgerWritePort = ledgerEntryPort,

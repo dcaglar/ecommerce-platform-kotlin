@@ -4,8 +4,8 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.application.events.CaptureReceived
 import com.dogancaglar.paymentservice.application.events.ExternalAsyncCaptureToPspPerformed
 import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
-import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
-import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.Topics
+import com.dogancaglar.common.kafka.metadata.CONSUMER_GROUPS
+import com.dogancaglar.common.kafka.metadata.Topics
 import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort
 import com.dogancaglar.common.time.Utc
@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
+import com.dogancaglar.common.event.EventEnvelopeFactory
 
 @Component
 class CaptureCommandExecutor(
@@ -47,7 +48,7 @@ class CaptureCommandExecutor(
             now = Utc.nowInstant()
         )
 
-        val outboxEnvelope = com.dogancaglar.common.event.EventEnvelopeFactory.envelopeFor(
+        val outboxEnvelope = EventEnvelopeFactory.envelopeFor(
             traceId = envelope.traceId, // Keep traceId for observability
             data = performedEvent,
             aggregateId = performedEvent.publicPaymentIntentId,

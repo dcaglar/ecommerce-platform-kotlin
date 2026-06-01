@@ -21,6 +21,9 @@ import org.junit.jupiter.api.Test
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import java.time.Duration
 import java.time.Instant
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import java.util.concurrent.CompletableFuture
 
 class OutboxRelayJobTest {
 
@@ -29,7 +32,7 @@ class OutboxRelayJobTest {
     private lateinit var executor: ThreadPoolTaskExecutor
     private lateinit var objectMapper: ObjectMapper
     private lateinit var serializationPort: SerializationPort
-    private lateinit var meterRegistry: io.micrometer.core.instrument.MeterRegistry
+    private lateinit var meterRegistry: MeterRegistry
     private lateinit var outboxRelayJob: OutboxRelayJob
 
     @BeforeEach
@@ -50,7 +53,7 @@ class OutboxRelayJobTest {
             }
         }
 
-        meterRegistry = io.micrometer.core.instrument.simple.SimpleMeterRegistry()
+        meterRegistry = SimpleMeterRegistry()
 
         outboxRelayJob = OutboxRelayJob(
             centralOutboxRepository = centralOutboxRepository,
@@ -144,9 +147,9 @@ class OutboxRelayJobTest {
         every { objectMapper.readValue<Any>(event2.payload, mockJavaType) } returns envelope2
         every { objectMapper.readValue<Any>(event3.payload, mockJavaType) } returns envelope3
 
-        every { kafkaPublisher.publishAsync(envelope1) } returns java.util.concurrent.CompletableFuture.completedFuture(envelope1)
-        every { kafkaPublisher.publishAsync(envelope2) } returns java.util.concurrent.CompletableFuture.completedFuture(envelope2)
-        every { kafkaPublisher.publishAsync(envelope3) } returns java.util.concurrent.CompletableFuture.completedFuture(envelope3)
+        every { kafkaPublisher.publishAsync(envelope1) } returns CompletableFuture.completedFuture(envelope1)
+        every { kafkaPublisher.publishAsync(envelope2) } returns CompletableFuture.completedFuture(envelope2)
+        every { kafkaPublisher.publishAsync(envelope3) } returns CompletableFuture.completedFuture(envelope3)
 
         // When
         outboxRelayJob.poll()
@@ -194,7 +197,7 @@ class OutboxRelayJobTest {
         val envelope = mockk<EventEnvelope<PaymentAuthorized>>()
         every { objectMapper.readValue<Any>(event.payload, mockJavaType) } returns envelope
 
-        val failedFuture = java.util.concurrent.CompletableFuture<EventEnvelope<PaymentAuthorized>>()
+        val failedFuture = CompletableFuture<EventEnvelope<PaymentAuthorized>>()
         failedFuture.completeExceptionally(RuntimeException("Kafka error"))
         every { kafkaPublisher.publishAsync(envelope) } returns failedFuture
 
@@ -243,7 +246,7 @@ class OutboxRelayJobTest {
         val envelope2 = mockk<EventEnvelope<PaymentAuthorized>>()
         every { objectMapper.readValue<Any>(event2.payload, mockJavaType) } returns envelope2
 
-        every { kafkaPublisher.publishAsync(envelope2) } returns java.util.concurrent.CompletableFuture.completedFuture(envelope2)
+        every { kafkaPublisher.publishAsync(envelope2) } returns CompletableFuture.completedFuture(envelope2)
 
         // When
         outboxRelayJob.poll()

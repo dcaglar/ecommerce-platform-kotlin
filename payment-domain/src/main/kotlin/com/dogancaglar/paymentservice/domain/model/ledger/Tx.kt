@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.domain.model.ledger
 import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.TxId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import java.time.Instant
 
 /**
@@ -34,7 +35,7 @@ sealed class Tx {
     abstract val txId: TxId
     abstract val txType: String
     abstract val paymentId: PaymentId
-    abstract val paymentIntentId: com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
+    abstract val paymentIntentId: PaymentIntentId
     abstract val status: TxStatus
     abstract val amount: Amount
     abstract val createdAt: Instant
@@ -46,7 +47,7 @@ sealed class Tx {
     data class AuthorizationTx(
         override val txId: TxId,
         override val paymentId: PaymentId,
-        override val paymentIntentId: com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId,
+        override val paymentIntentId: PaymentIntentId,
         val acquirerReference: String,
         override val amount: Amount,
         override val status: TxStatus = TxStatus.SUCCESS,
@@ -62,7 +63,7 @@ sealed class Tx {
     data class CaptureTx(
         override val txId: TxId,
         override val paymentId: PaymentId,
-        override val paymentIntentId: com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId,
+        override val paymentIntentId: PaymentIntentId,
         val authorizationTxId: TxId,
         val acquirerReference: String,
         override val amount: Amount,
@@ -80,7 +81,7 @@ sealed class Tx {
     data class RefundTx(
         override val txId: TxId,
         override val paymentId: PaymentId,
-        override val paymentIntentId: com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId,
+        override val paymentIntentId: PaymentIntentId,
         val captureTxId: TxId,
         val acquirerReference: String,
         override val amount: Amount,
@@ -97,7 +98,7 @@ sealed class Tx {
     data class SettleTx(
         override val txId: TxId,
         override val paymentId: PaymentId,
-        override val paymentIntentId: com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId,
+        override val paymentIntentId: PaymentIntentId,
         val captureTxId: TxId,
         val acquirerBatchReference: String,
         val settledAmount: Amount,
@@ -124,7 +125,7 @@ sealed class Tx {
         fun createAuthTx(
             txId: TxId,
             paymentId: PaymentId,
-            paymentIntentId: com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId,
+            paymentIntentId: PaymentIntentId,
             acquirerReference: String,
             amount: Amount,
             status: TxStatus = TxStatus.SUCCESS
@@ -140,7 +141,7 @@ sealed class Tx {
         fun createCaptureTx(
             txId: TxId,
             paymentId: PaymentId,
-            paymentIntentId: com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId,
+            paymentIntentId: PaymentIntentId,
             authorizationTxId: TxId,
             acquirerReference: String,
             amount: Amount,
@@ -158,7 +159,7 @@ sealed class Tx {
         fun createRefundTx(
             txId: TxId,
             paymentId: PaymentId,
-            paymentIntentId: com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId,
+            paymentIntentId: PaymentIntentId,
             captureTxId: TxId,
             acquirerReference: String,
             amount: Amount,
@@ -176,7 +177,7 @@ sealed class Tx {
         fun createSettleTx(
             txId: TxId,
             paymentId: PaymentId,
-            paymentIntentId: com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId,
+            paymentIntentId: PaymentIntentId,
             captureTxId: TxId,
             acquirerBatchReference: String,
             settledAmount: Amount,

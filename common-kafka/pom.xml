@@ -32,11 +32,7 @@
             <artifactId>payment-application</artifactId>
         </dependency>
 
-        <!-- Topic names, PaymentEventMetadataCatalog -->
-        <dependency>
-            <groupId>com.dogancaglar</groupId>
-            <artifactId>payment-infrastructure</artifactId>
-        </dependency>
+
 
         <!-- Kafka transport -->
         <dependency>

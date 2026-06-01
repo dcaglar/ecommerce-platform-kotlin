@@ -3,8 +3,8 @@ package com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.application.events.InternalTransferRequest
 import com.dogancaglar.paymentservice.application.service.PspResultProcessingService
-import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
-import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.Topics
+import com.dogancaglar.common.kafka.metadata.CONSUMER_GROUPS
+import com.dogancaglar.common.kafka.metadata.Topics
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -12,6 +12,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
+import org.apache.kafka.clients.consumer.Consumer
 
 /**
  * InternalTransferConsumer
@@ -33,7 +34,7 @@ class InternalTransferConsumer(
     )
     fun onInternalTransferRequest(
         record: ConsumerRecord<String, String>,
-        consumer: org.apache.kafka.clients.consumer.Consumer<*, *>
+        consumer: Consumer<*, *>
     ) {
         val typeRef = object : TypeReference<EventEnvelope<InternalTransferRequest>>() {}
         val envelope = try {

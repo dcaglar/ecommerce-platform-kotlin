@@ -3,8 +3,8 @@ package com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
 import com.dogancaglar.paymentservice.application.util.LedgerDomainEventEntityMapper
-import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
-import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.Topics
+import com.dogancaglar.common.kafka.metadata.CONSUMER_GROUPS
+import com.dogancaglar.common.kafka.metadata.Topics
 import com.dogancaglar.paymentservice.ports.inbound.usecases.AccountBalanceUseCase
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
+import org.apache.kafka.clients.consumer.Consumer
 
 /**
  * Batch consumer for updating account balances from ledger entries.
@@ -36,7 +37,7 @@ class AccountBalanceConsumer(
     )
     fun onLedgerEntriesRecorded(
         records: List<ConsumerRecord<String, EventEnvelope<LedgerEntriesRecorded>>>,
-        consumer: org.apache.kafka.clients.consumer.Consumer<*, *>
+        consumer: Consumer<*, *>
     ) {
         // Deduplication: Filter out already-processed events and log duplicates
         val newRecords = records.filter { record ->

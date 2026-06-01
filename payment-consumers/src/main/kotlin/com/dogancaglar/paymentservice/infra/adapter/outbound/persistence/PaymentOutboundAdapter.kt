@@ -6,6 +6,7 @@ import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.convert
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentMapper
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
 import org.springframework.stereotype.Repository
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 
 /**
  * PaymentOutboundAdapter
@@ -36,7 +37,7 @@ class PaymentOutboundAdapter(
         return entityMapper.toDomain(entity)
     }
 
-    override fun findByPaymentIntentId(paymentIntentId: com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId): Payment? {
+    override fun findByPaymentIntentId(paymentIntentId: PaymentIntentId): Payment? {
         val entity = paymentMapper.findByPaymentIntentId(paymentIntentId.value)
         return entity?.let { entityMapper.toDomain(it) }
     }

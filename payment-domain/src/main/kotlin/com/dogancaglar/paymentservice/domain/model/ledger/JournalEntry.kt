@@ -55,9 +55,9 @@ class JournalEntry private constructor(
     val id: String,
     val txType: JournalType,
     val name: String,
-    val postings: List<Posting>,
-    val referenceType: String? = null,
-    val referenceId: String? = null
+    val paymentId: PaymentId, // 🛡️ Strict Domain Primitive
+    val txId: TxId,           // 🛡️ Strict Domain Primitive
+    val postings: List<Posting>
 ) {
 
     init {
@@ -81,7 +81,7 @@ class JournalEntry private constructor(
 
     override fun toString(): String =
         "JournalEntry(id='$id', txType=$txType, name='$name', " +
-        "postings=$postings, referenceType=$referenceType, referenceId=$referenceId)"
+        "postings=$postings)"
 
     companion object JournalFactory {
 
@@ -89,31 +89,21 @@ class JournalEntry private constructor(
         // AUTH_HOLD
         // =====================================================================
 
-        /**
-         * authHold
-         *
-         * Records the PSP authorization hold on the shopper's instrument.
-         *
-         * Postings:
-         *   DR PSP_RECEIVABLE (AUTH_RECEIVABLE account)
-         *   CR AUTH_LIABILITY
-         *
-         * Called by: PspResultConsumer, phase 1 (PaymentAuthorized event processing).
-         */
         fun authHold(
             paymentId: PaymentId,
+            txId: TxId, // <-- Added! (This is the ID of the AuthorizationTx)
             journalIdentifier: String,
             authorizedAmount: Amount,
             authReceivable: Account,
             authLiability: Account
         ): List<JournalEntry> = listOf(
             JournalEntry(
-                id            = "AUTH:$journalIdentifier",
-                txType        = JournalType.AUTH_HOLD,
-                name          = "AuthorizationTx Hold",
-                referenceType = "payment",
-                referenceId   = paymentId.value.toString(),
-                postings      = listOf(
+                id        = "AUTH:$journalIdentifier",
+                txType    = JournalType.AUTH_HOLD,
+                name      = "AuthorizationTx Hold",
+                paymentId = paymentId,
+                txId      = txId,
+                postings  = listOf(
                     Posting.Debit.create(authReceivable, authorizedAmount),
                     Posting.Credit.create(authLiability, authorizedAmount)
                 )
@@ -121,36 +111,11 @@ class JournalEntry private constructor(
         )
 
         // =====================================================================
-        // CAPTURE — Gross Asset Settlement (RENAMED from capture())
+        // CAPTURE — Gross Asset Settlement
         // =====================================================================
-
-        /**
-         * captureGrossAsset
-         *
-         * Clears the authorization hold and books 100% of the captured amount
-         * into the primary merchant's MERCHANT_GROSS_POOL. This applies to both
-         * DIRECT_MERCHANT and MARKETPLACE payments — the split distribution
-         * happens separately via [executeSubSellerSplit].
-         *
-         * Postings:
-         *   DR AUTH_LIABILITY              (releases the hold)
-         *   CR AUTH_RECEIVABLE             (clears the receivable)
-         *   DR PSP_RECEIVABLE              (records money inbound from PSP)
-         *   CR MERCHANT_GROSS_POOL         (primary merchant's holding pool)
-         *
-         * Called by: PspResultConsumer, phase 3 (CaptureSuccessful webhook event).
-         *
-         * @param txId              ID of the CaptureTx record being created.
-         * @param journalIdentifier Human-readable label for the journal ID (e.g., paymentId + timestamp).
-         * @param capturedAmount    Amount confirmed by the PSP webhook. Must be positive.
-         * @param authReceivable    AUTH_RECEIVABLE account for this payment.
-         * @param authLiability     AUTH_LIABILITY account for this payment.
-         * @param merchantGrossPool MERCHANT_GROSS_POOL account for the primary merchant.
-         * @param pspReceivable     PSP_RECEIVABLES account (money inbound from PSP).
-         * @return                  A List of JournalEntry for the CAPTURE.
-         */
         fun captureGrossAsset(
-            txId: TxId,
+            paymentId: PaymentId, // <-- Added!
+            txId: TxId,           // (This is the ID of the CaptureTx)
             journalIdentifier: String,
             capturedAmount: Amount,
             authReceivable: Account,
@@ -159,16 +124,16 @@ class JournalEntry private constructor(
             pspReceivable: Account
         ): List<JournalEntry> = listOf(
             JournalEntry(
-                id            = "CAPTURE:$journalIdentifier",
-                txType        = JournalType.CAPTURE,
-                name          = "Gross Asset CaptureTx — Primary Merchant Pool",
-                referenceType = "capture",
-                referenceId   = txId.value.toString(),
-                postings      = listOf(
-                    Posting.Debit.create(authLiability, capturedAmount),    // release the hold
-                    Posting.Credit.create(authReceivable, capturedAmount),  // clear the receivable
-                    Posting.Debit.create(pspReceivable, capturedAmount),    // money arriving from PSP
-                    Posting.Credit.create(merchantGrossPool, capturedAmount) // land in gross pool
+                id        = "CAPTURE:$journalIdentifier",
+                txType    = JournalType.CAPTURE,
+                name      = "Gross Asset CaptureTx — Primary Merchant Pool",
+                paymentId = paymentId,
+                txId      = txId,
+                postings  = listOf(
+                    Posting.Debit.create(authLiability, capturedAmount),
+                    Posting.Credit.create(authReceivable, capturedAmount),
+                    Posting.Debit.create(pspReceivable, capturedAmount),
+                    Posting.Credit.create(merchantGrossPool, capturedAmount)
                 )
             )
         )
@@ -212,6 +177,8 @@ class JournalEntry private constructor(
          * @return                     One [JournalEntry] per split instruction.
          */
         fun executeSubSellerSplit(
+            paymentId: PaymentId, // <-- Added!
+            txId: TxId,           // <-- Added! (Points back to the CaptureTx that triggered the split)
             journalIdentifier: String,
             merchantGrossPool: Account,
             splits: List<PaymentSplit>,
@@ -223,14 +190,14 @@ class JournalEntry private constructor(
             return splits.mapIndexed { index, split ->
                 val targetAccount = resolveTargetAccount(split.targetAccountType, split.targetEntityId)
                 JournalEntry(
-                    id            = "INTERNAL_TRANSFER:${journalIdentifier}:$index",
-                    txType        = JournalType.INTERNAL_TRANSFER,
-                    name          = "Sub-Seller Split — ${split.targetAccountType} / ${split.targetEntityId}",
-                    referenceType = "split",
-                    referenceId   = split.targetEntityId,
-                    postings      = listOf(
-                        Posting.Debit.create(merchantGrossPool, split.amount),  // drain merchant pool
-                        Posting.Credit.create(targetAccount, split.amount)       // credit sub-seller
+                    id        = "INTERNAL_TRANSFER:${journalIdentifier}:$index",
+                    txType    = JournalType.INTERNAL_TRANSFER,
+                    name      = "Sub-Seller Split — ${split.targetAccountType} / ${split.targetEntityId}",
+                    paymentId = paymentId,
+                    txId      = txId,
+                    postings  = listOf(
+                        Posting.Debit.create(merchantGrossPool, split.amount),
+                        Posting.Credit.create(targetAccount, split.amount)
                     )
                 )
             }
@@ -255,6 +222,7 @@ class JournalEntry private constructor(
          * Called by: PspResultConsumer, processing a PaymentRefunded webhook event.
          */
         fun refund(
+            paymentId: PaymentId, // <-- Added!
             txId: TxId,
             journalIdentifier: String,
             refundedAmount: Amount,
@@ -267,8 +235,8 @@ class JournalEntry private constructor(
                 id            = "REFUND:$journalIdentifier",
                 txType        = JournalType.REFUND,
                 name          = "Payment RefundTx",
-                referenceType = "refund",
-                referenceId   = txId.value.toString(),
+                paymentId = paymentId,
+                txId= txId,
                 postings      = listOf(
                     Posting.Debit.create(authLiability, refundedAmount),
                     Posting.Credit.create(authReceivable, refundedAmount),
@@ -294,6 +262,8 @@ class JournalEntry private constructor(
          *   CR PSP_RECEIVABLE    (clears the receivable)
          */
         fun settlement(
+            paymentId: PaymentId,
+            txId: TxId,
             journalIdentifier: String,
             capturedAmount: Amount,
             settledAmount: Amount,
@@ -305,6 +275,8 @@ class JournalEntry private constructor(
                 id            = "SETTLEMENT:$journalIdentifier",
                 txType        = JournalType.SETTLEMENT,
                 name          = "Acquirer Funds Settlement",
+                paymentId     = paymentId,
+                txId          = txId,
                 postings      = listOf(
                     Posting.Debit.create(pspFeeExpenseAccount, capturedAmount - settledAmount),
                     Posting.Debit.create(platformCashAccount, settledAmount),
@@ -327,6 +299,8 @@ class JournalEntry private constructor(
          *   CR PLATFORM_COMMISSION_ESCROW  (records the commission receivable)
          */
         fun commissionFeeRegistered(
+            paymentId: PaymentId,
+            txId: TxId,
             journalIdentifier: String,
             commissionFee: Amount,
             commissionFeeAccount: Account,
@@ -336,6 +310,8 @@ class JournalEntry private constructor(
                 id       = "COMMISSION_FEE:$journalIdentifier",
                 txType   = JournalType.COMMISSION_FEE,
                 name     = "Platform Commission Fee",
+                paymentId = paymentId,
+                txId     = txId,
                 postings = listOf(
                     Posting.Debit.create(merchantAccount, commissionFee),
                     Posting.Credit.create(commissionFeeAccount, commissionFee)
@@ -357,6 +333,8 @@ class JournalEntry private constructor(
          *   CR PLATFORM_CASH        (reduces platform's cash holding)
          */
         fun payout(
+            paymentId: PaymentId,
+            txId: TxId,
             journalIdentifier: String,
             payoutAmount: Amount,
             merchantAccount: Account,
@@ -366,6 +344,8 @@ class JournalEntry private constructor(
                 id       = "PAYOUT:$journalIdentifier",
                 txType   = JournalType.PAYOUT,
                 name     = "Merchant Payout Disbursement",
+                paymentId = paymentId,
+                txId     = txId,
                 postings = listOf(
                     Posting.Debit.create(merchantAccount, payoutAmount),
                     Posting.Credit.create(platformCashAccount, payoutAmount)
@@ -388,16 +368,16 @@ class JournalEntry private constructor(
             id: String,
             txType: JournalType,
             name: String,
-            postings: List<Posting>,
-            referenceType: String? = null,
-            referenceId: String? = null
+            paymentId: PaymentId,
+            txId: TxId,
+            postings: List<Posting>
         ): JournalEntry = JournalEntry(
             id            = id,
             txType        = txType,
             name          = name,
-            postings      = postings,
-            referenceType = referenceType,
-            referenceId   = referenceId
+            paymentId     = paymentId,
+            txId          = txId,
+            postings      = postings
         )
     }
 }

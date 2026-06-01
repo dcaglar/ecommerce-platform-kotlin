@@ -2,17 +2,20 @@ package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence
 
 
 import org.springframework.jdbc.datasource.DataSourceTransactionManager
+import java.sql.Connection
+import javax.sql.DataSource
+import org.springframework.transaction.TransactionDefinition
 
 class DBWriterTxManager(
-    dataSource: javax.sql.DataSource,
+    dataSource: DataSource,
     private val stmtMs: Long,
     private val lockMs: Long,
     private val idleMs: Long?=0
 ) : DataSourceTransactionManager(dataSource) {
 
     override fun prepareTransactionalConnection(
-        con: java.sql.Connection,
-        definition: org.springframework.transaction.TransactionDefinition
+        con: Connection,
+        definition: TransactionDefinition
     ) {
         // keep Spring’s default prep (isolation, read-only, etc.)
         super.prepareTransactionalConnection(con, definition)

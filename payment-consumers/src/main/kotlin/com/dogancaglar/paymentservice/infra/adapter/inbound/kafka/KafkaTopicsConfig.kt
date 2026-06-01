@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.infra.adapter.inbound.kafka
 
-import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.Topics
+import com.dogancaglar.common.kafka.metadata.Topics
 import org.apache.kafka.clients.admin.NewTopic
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties

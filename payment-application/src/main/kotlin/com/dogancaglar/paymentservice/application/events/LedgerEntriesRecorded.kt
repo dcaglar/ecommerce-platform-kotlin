@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.Instant
+import com.dogancaglar.paymentservice.application.events.PaymentBaseEvent
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class LedgerEntriesRecorded private constructor(
@@ -19,7 +20,7 @@ data class LedgerEntriesRecorded private constructor(
     @JsonProperty("ledgerEntries") val ledgerEntries: List<LedgerEntryEventData>,
 
     @JsonProperty("timestamp") override val timestamp: Instant
-) : com.dogancaglar.paymentservice.application.events.PaymentBaseEvent() {
+) : PaymentBaseEvent() {
 
     override val eventType: String = EVENT_TYPE
 
@@ -39,7 +40,7 @@ data class LedgerEntriesRecorded private constructor(
          * Factory for use by RecordLedgerEntriesService.
          */
         fun from(
-            cmd: com.dogancaglar.paymentservice.application.events.PaymentBaseEvent,
+            cmd: PaymentBaseEvent,
             batchId: String,
             entries: List<LedgerEntryEventData>,
             now: Instant

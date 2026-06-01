@@ -4,7 +4,7 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.metadata.EventMetaDataRegistry
 import com.dogancaglar.common.kafka.publisher.PaymentEventPublisher
 import com.dogancaglar.common.kafka.serde.EventEnvelopeKafkaSerializer
-import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
+import com.dogancaglar.common.kafka.metadata.PaymentEventMetadataCatalog
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.serialization.StringSerializer

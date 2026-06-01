@@ -30,6 +30,23 @@ import com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit
 import com.dogancaglar.paymentservice.domain.model.payment.BalanceAccountType
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
+import com.dogancaglar.common.event.EventEnvelopeFactory
+import com.dogancaglar.common.id.PublicIdFactory
+import com.dogancaglar.paymentservice.application.events.CaptureSuccessful
+import com.dogancaglar.paymentservice.application.events.ExternalAsyncCaptureToPspPerformed
+import com.dogancaglar.paymentservice.application.events.InternalTransferRequest
+import com.dogancaglar.paymentservice.domain.model.ledger.Tx
+import com.dogancaglar.paymentservice.domain.model.ledger.Tx.CaptureTx
+import com.dogancaglar.paymentservice.domain.model.ledger.TxStatus.PENDING
+import com.dogancaglar.paymentservice.domain.model.ledger.TxStatus.SUCCESS
+import com.dogancaglar.paymentservice.domain.model.payment.BalanceAccountType.MARKETPLACE_SUB_SELLER
+import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentStatus.SENT_FOR_SETTLE
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
+import com.dogancaglar.paymentservice.domain.model.vo.TxId
+import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort
+import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 
 open class PspResultProcessingService(
     private val ledgerWritePort: LedgerEntryPort,
@@ -37,8 +54,8 @@ open class PspResultProcessingService(
     private val paymentTxPort: PaymentTxPort,
     private val idGeneratorPort: IdGeneratorPort,
     private val paymentRepository: PaymentRepository,
-    private val localOutboxWriterPort: com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort,
-    private val serializationPort: com.dogancaglar.paymentservice.ports.outbound.SerializationPort
+    private val localOutboxWriterPort: LocalOutboxWriterPort,
+    private val serializationPort: SerializationPort
 ) {
 
     private val ledgerEntryFactory = LedgerEntryFactory()
@@ -60,8 +77,8 @@ open class PspResultProcessingService(
         // 1. Generate Payment
         val splits = event.splits.map { it.toDomain() }
         val payment = Payment.initializeFromAuthEvent(
-            paymentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentId(paymentIdValue),
-            paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(event.paymentIntentId.toLongOrNull() ?: 0L),
+            paymentId = PaymentId(paymentIdValue),
+            paymentIntentId = PaymentIntentId(event.paymentIntentId.toLongOrNull() ?: 0L),
             buyerId = BuyerId(event.buyerId),
             merchantAccountId = event.merchantAccountId,
             processingModel = ProcessingModel.valueOf(event.processingModel),
@@ -70,18 +87,19 @@ open class PspResultProcessingService(
         )
 
         // 2. Generate AuthorizationTx
-        val transaction = com.dogancaglar.paymentservice.domain.model.ledger.Tx.createAuthTx(
-            txId = com.dogancaglar.paymentservice.domain.model.vo.TxId(txIdValue),
-            paymentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentId(paymentIdValue),
-            paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(event.paymentIntentId.toLongOrNull() ?: 0L),
+        val transaction = Tx.createAuthTx(
+            txId = TxId(txIdValue),
+            paymentId = PaymentId(paymentIdValue),
+            paymentIntentId = PaymentIntentId(event.paymentIntentId.toLongOrNull() ?: 0L),
             acquirerReference = "",
             amount = amount,
-            status = com.dogancaglar.paymentservice.domain.model.ledger.TxStatus.SUCCESS
+            status = SUCCESS
         )
 
         // 3. Generate JournalEntries
         val journalEntries = JournalEntry.authHold(
-            paymentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentId(paymentIdValue),
+            paymentId = PaymentId(paymentIdValue),
+            txId = TxId(txIdValue),
             journalIdentifier = event.paymentIntentId,
             authorizedAmount = amount,
             authReceivable = authReceivable,
@@ -113,20 +131,21 @@ open class PspResultProcessingService(
         val txIdValue = idGeneratorPort.nextPaymentId()
         val txs = paymentTxPort.findByPaymentId(paymentIdValue)
         val authTx = txs.find { it.txType == "AUTHORIZATION" }
-        val authTxIdValue = authTx?.txId ?: com.dogancaglar.paymentservice.domain.model.vo.TxId(0L)
+        val authTxIdValue = authTx?.txId ?: TxId(0L)
         
-        val transaction = com.dogancaglar.paymentservice.domain.model.ledger.Tx.createCaptureTx(
-            txId = com.dogancaglar.paymentservice.domain.model.vo.TxId(txIdValue),
-            paymentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentId(paymentIdValue),
-            paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(event.paymentIntentId.toLongOrNull() ?: 0L),
+        val transaction = Tx.createCaptureTx(
+            txId = TxId(txIdValue),
+            paymentId = PaymentId(paymentIdValue),
+            paymentIntentId = PaymentIntentId(event.paymentIntentId.toLongOrNull() ?: 0L),
             authorizationTxId = authTxIdValue,
             acquirerReference = "",
             amount = amount,
-            status = com.dogancaglar.paymentservice.domain.model.ledger.TxStatus.PENDING
+            status = PENDING
         )
 
         val journalEntries = JournalEntry.captureGrossAsset(
-            txId = com.dogancaglar.paymentservice.domain.model.vo.TxId(txIdValue),
+            paymentId = PaymentId(paymentIdValue),
+            txId = TxId(txIdValue),
             journalIdentifier = event.publicPaymentIntentId,
             capturedAmount = amount,
             authReceivable = authReceivable,
@@ -157,20 +176,21 @@ open class PspResultProcessingService(
         val txIdValue = idGeneratorPort.nextPaymentId()
         val txs = paymentTxPort.findByPaymentId(paymentIdValue)
         val captureTx = txs.find { it.txType == "CAPTURE" }
-        val captureTxIdValue = captureTx?.txId ?: com.dogancaglar.paymentservice.domain.model.vo.TxId(0L)
+        val captureTxIdValue = captureTx?.txId ?: TxId(0L)
         
-        val transaction = com.dogancaglar.paymentservice.domain.model.ledger.Tx.createRefundTx(
-            txId = com.dogancaglar.paymentservice.domain.model.vo.TxId(txIdValue),
-            paymentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentId(paymentIdValue),
-            paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(event.paymentIntentId.toLongOrNull() ?: 0L),
+        val transaction = Tx.createRefundTx(
+            txId = TxId(txIdValue),
+            paymentId = PaymentId(paymentIdValue),
+            paymentIntentId = PaymentIntentId(event.paymentIntentId.toLongOrNull() ?: 0L),
             captureTxId = captureTxIdValue,
             acquirerReference = "",
             amount = amount,
-            status = com.dogancaglar.paymentservice.domain.model.ledger.TxStatus.PENDING
+            status = PENDING
         )
 
         val journalEntries = JournalEntry.refund(
-            txId = com.dogancaglar.paymentservice.domain.model.vo.TxId(txIdValue),
+            paymentId = PaymentId(paymentIdValue),
+            txId = TxId(txIdValue),
             journalIdentifier = event.paymentOrderId,
             refundedAmount = amount,
             authReceivable = authReceivable,
@@ -183,8 +203,8 @@ open class PspResultProcessingService(
     }
 
     @Transactional
-    fun processCapturePspPerformed(event: com.dogancaglar.paymentservice.application.events.ExternalAsyncCaptureToPspPerformed) {
-        val paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(event.paymentIntentId.toLongOrNull() ?: 0L)
+    fun processCapturePspPerformed(event: ExternalAsyncCaptureToPspPerformed) {
+        val paymentIntentId = PaymentIntentId(event.paymentIntentId.toLongOrNull() ?: 0L)
         val payment = paymentRepository.findByPaymentIntentId(paymentIntentId)
             ?: throw IllegalStateException("Payment not found for paymentIntentId=\${event.paymentIntentId}")
 
@@ -195,33 +215,33 @@ open class PspResultProcessingService(
         // Find existing Auth TX to link
         val txs = paymentTxPort.findByPaymentId(payment.paymentId.value)
         val authTx = txs.find { it.txType == "AUTHORIZATION" }
-        val authTxIdValue = authTx?.txId ?: com.dogancaglar.paymentservice.domain.model.vo.TxId(0L)
+        val authTxIdValue = authTx?.txId ?: TxId(0L)
 
         // Insert CaptureTx as PENDING
         val txIdValue = idGeneratorPort.nextPaymentId()
         val amount = Amount.of(event.amountValue, Currency(event.currency))
 
-        val captureTx = com.dogancaglar.paymentservice.domain.model.ledger.Tx.createCaptureTx(
-            txId = com.dogancaglar.paymentservice.domain.model.vo.TxId(txIdValue),
+        val captureTx = Tx.createCaptureTx(
+            txId = TxId(txIdValue),
             paymentId = payment.paymentId,
             paymentIntentId = paymentIntentId,
             authorizationTxId = authTxIdValue,
             acquirerReference = "", // Not needed for pure outbox yet
             amount = amount,
-            status = com.dogancaglar.paymentservice.domain.model.ledger.TxStatus.PENDING
+            status = PENDING
         )
 
         paymentTxPort.save(captureTx)
     }
 
     @Transactional
-    fun processCaptureSuccessful(event: com.dogancaglar.paymentservice.application.events.CaptureSuccessful) {
-        val paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(com.dogancaglar.common.id.PublicIdFactory.toInternalId(event.publicPaymentIntentId))
+    fun processCaptureSuccessful(event: CaptureSuccessful) {
+        val paymentIntentId = PaymentIntentId(PublicIdFactory.toInternalId(event.publicPaymentIntentId))
         val payment = paymentRepository.findByPaymentIntentId(paymentIntentId)
             ?: throw IllegalStateException("Payment not found for paymentIntentId=\${event.publicPaymentIntentId}")
 
         // Invariant check: ensure it was sent for settle
-        require(payment.status == com.dogancaglar.paymentservice.domain.model.payment.PaymentStatus.SENT_FOR_SETTLE) {
+        require(payment.status == SENT_FOR_SETTLE) {
             "Payment must be in SENT_FOR_SETTLE status, but was \${payment.status}"
         }
 
@@ -232,11 +252,11 @@ open class PspResultProcessingService(
 
         // Find pending Capture Tx and mark success
         val txs = paymentTxPort.findByPaymentId(payment.paymentId.value)
-        val captureTx = txs.find { it.txType == "CAPTURE" && it.status == com.dogancaglar.paymentservice.domain.model.ledger.TxStatus.PENDING }
+        val captureTx = txs.find { it.txType == "CAPTURE" && it.status == PENDING }
             ?: throw IllegalStateException("Pending CaptureTx not found for paymentId=\${payment.paymentId.value}")
 
-        val updatedTx = (captureTx as com.dogancaglar.paymentservice.domain.model.ledger.Tx.CaptureTx).copy(
-            status = com.dogancaglar.paymentservice.domain.model.ledger.TxStatus.SUCCESS
+        val updatedTx = (captureTx as CaptureTx).copy(
+            status = SUCCESS
         )
         paymentTxPort.save(updatedTx)
 
@@ -247,6 +267,7 @@ open class PspResultProcessingService(
         val pspReceivable = Account.fromProfile(accountDirectory.getAccountProfile(AccountType.PSP_RECEIVABLES, "GLOBAL"))
 
         val journalEntries = JournalEntry.captureGrossAsset(
+            paymentId = payment.paymentId,
             txId = captureTx.txId,
             journalIdentifier = event.publicPaymentIntentId,
             capturedAmount = amount,
@@ -264,9 +285,9 @@ open class PspResultProcessingService(
         }
 
         logger.info("MARKETPLACE transaction, staging internal transfers for \${payment.splits.size} splits")
-        val outboxEvents = mutableListOf<com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent>()
+        val outboxEvents = mutableListOf<OutboxEvent>()
         for (split in payment.splits) {
-            val transferRequest = com.dogancaglar.paymentservice.application.events.InternalTransferRequest.from(
+            val transferRequest = InternalTransferRequest.from(
                 paymentIntentId = payment.paymentIntentId.value.toString(),
                 publicPaymentIntentId = event.publicPaymentIntentId,
                 sourceAccountId = event.merchantAccountId,
@@ -276,14 +297,14 @@ open class PspResultProcessingService(
                 now = Utc.nowInstant()
             )
 
-            val envelope = com.dogancaglar.common.event.EventEnvelopeFactory.envelopeFor(
+            val envelope = EventEnvelopeFactory.envelopeFor(
                 traceId = EventLogContext.getTraceId(),
                 data = transferRequest,
                 aggregateId = transferRequest.publicPaymentIntentId,
                 parentEventId = EventLogContext.getEventId()
             )
 
-            val outboxEvent = com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent.createNew(
+            val outboxEvent = OutboxEvent.createNew(
                 oeid = idGeneratorPort.nextPaymentId(),
                 eventType = envelope.eventType,
                 aggregateId = envelope.aggregateId,
@@ -296,21 +317,31 @@ open class PspResultProcessingService(
     }
 
     @Transactional
-    fun processInternalTransferRequest(event: com.dogancaglar.paymentservice.application.events.InternalTransferRequest) {
+    fun processInternalTransferRequest(event: InternalTransferRequest) {
+        val paymentIntentId = PaymentIntentId(PublicIdFactory.toInternalId(event.publicPaymentIntentId))
+        val payment = paymentRepository.findByPaymentIntentId(paymentIntentId)
+            ?: throw IllegalStateException("Payment not found for paymentIntentId=${event.publicPaymentIntentId}")
+            
+        val txs = paymentTxPort.findByPaymentId(payment.paymentId.value)
+        val captureTx = txs.find { it.txType == "CAPTURE" && it.status == SUCCESS }
+            ?: throw IllegalStateException("Successful CaptureTx not found for paymentId=${payment.paymentId.value}")
+
         val merchantGrossPool = Account.fromProfile(accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, event.sourceAccountId))
         
         val splitAmount = Amount.of(event.amountValue, Currency(event.currency))
         val targetAccount = Account.fromProfile(accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, event.targetAccountId))
         
-        val journalIdentifier = "\${event.publicPaymentIntentId}-\${event.targetAccountId}"
+        val journalIdentifier = "${event.publicPaymentIntentId}-${event.targetAccountId}"
         
-        val journalEntry = com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry.executeSubSellerSplit(
+        val journalEntry = JournalEntry.executeSubSellerSplit(
+            paymentId = payment.paymentId,
+            txId = captureTx.txId,
             journalIdentifier = journalIdentifier,
             merchantGrossPool = merchantGrossPool,
             splits = listOf(
-                com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(
+                PaymentSplit.of(
                     amount = splitAmount,
-                    targetAccountType = com.dogancaglar.paymentservice.domain.model.payment.BalanceAccountType.MARKETPLACE_SUB_SELLER,
+                    targetAccountType = MARKETPLACE_SUB_SELLER,
                     targetEntityId = event.targetAccountId
                 )
             ),
@@ -324,7 +355,7 @@ open class PspResultProcessingService(
         }
     }
 
-    private fun saveOnly(transaction: com.dogancaglar.paymentservice.domain.model.ledger.Tx, journalEntries: List<JournalEntry>) {
+    private fun saveOnly(transaction: Tx, journalEntries: List<JournalEntry>) {
         if (journalEntries.isEmpty()) return
         paymentTxPort.save(transaction)
         val ledgerEntries = journalEntries.map { ledgerEntryFactory.create(it) }

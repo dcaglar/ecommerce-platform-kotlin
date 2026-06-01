@@ -45,6 +45,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import io.micrometer.core.instrument.MeterRegistry
 
 /**
  * Integration tests for Payment Order Retry Queue (Adapter + Cache) with real Redis.
@@ -81,7 +82,7 @@ class PaymentOrderRetryIntegrationTest {
     )
     class TestConfig {
         @Bean
-        fun meterRegistry(): io.micrometer.core.instrument.MeterRegistry {
+        fun meterRegistry(): MeterRegistry {
             return SimpleMeterRegistry()
         }
     }

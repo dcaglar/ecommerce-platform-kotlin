@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.Instant
+import com.dogancaglar.paymentservice.application.events.PaymentBaseEvent
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class InternalTransferRequest private constructor(
@@ -14,7 +15,7 @@ data class InternalTransferRequest private constructor(
     override val amountValue: Long,
     override val currency: String,
     override val timestamp: Instant
-) : com.dogancaglar.paymentservice.application.events.PaymentBaseEvent() {
+) : PaymentBaseEvent() {
 
     override val eventType = EVENT_TYPE
 

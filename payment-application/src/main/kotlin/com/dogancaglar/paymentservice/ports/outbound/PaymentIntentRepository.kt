@@ -2,6 +2,7 @@ package com.dogancaglar.paymentservice.ports.outbound
 
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
+import java.time.Instant
 
 
 
@@ -10,6 +11,6 @@ interface PaymentIntentRepository {
     fun findById(paymentIntentId: PaymentIntentId): PaymentIntent
     fun getMaxPaymentIntentId(): PaymentIntentId
     fun updatePaymentIntent(paymentIntent: PaymentIntent)
-    fun tryMarkPendingAuth(id: PaymentIntentId, now: java.time.Instant): Boolean
-    fun updatePspReference(paymentIntentId: Long, pspReference: String, now: java.time.Instant)
+    fun tryMarkPendingAuth(id: PaymentIntentId, now: Instant): Boolean
+    fun updatePspReference(paymentIntentId: Long, pspReference: String, now: Instant)
 }

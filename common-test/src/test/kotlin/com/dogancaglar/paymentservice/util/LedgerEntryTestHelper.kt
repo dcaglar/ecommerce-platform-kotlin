@@ -33,15 +33,14 @@ object LedgerEntryTestHelper {
         val authLiability = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
         val pId = paymentId.filter { it.isDigit() }.toLongOrNull() ?: 100L
         val result = JournalEntry.authHold(
-            txId = TxId(ledgerEntryId),
             paymentId = PaymentId(pId),
-            acquirerReference = "REF-$paymentId",
+            txId = TxId(ledgerEntryId),
             journalIdentifier = paymentId,
             authorizedAmount = amount,
             authReceivable = authReceivable,
             authLiability = authLiability
         )
-        val journal = result.journalEntries.first()
+        val journal = result.first()
         return LedgerEntry.create(ledgerEntryId, journal, Utc.nowLocalDateTime())
     }
 
@@ -61,10 +60,8 @@ object LedgerEntryTestHelper {
         val pspReceivable = Account.create(AccountType.PSP_RECEIVABLES, "GLOBAL")
         val poId = paymentOrderId.filter { it.isDigit() }.toLongOrNull() ?: 200L
         val result = JournalEntry.captureGrossAsset(
-            txId = TxId(ledgerEntryId),
             paymentId = PaymentId(100L),
-            authorizationTxId = TxId(1L),
-            acquirerReference = "REF-$paymentOrderId",
+            txId = TxId(ledgerEntryId),
             journalIdentifier = paymentOrderId,
             capturedAmount = amount,
             authReceivable = authReceivable,
@@ -72,7 +69,7 @@ object LedgerEntryTestHelper {
             merchantGrossPool = merchantGrossPool,
             pspReceivable = pspReceivable
         )
-        val journal = result.journalEntries.first()
+        val journal = result.first()
         return LedgerEntry.create(ledgerEntryId, journal, Utc.nowLocalDateTime())
     }
 

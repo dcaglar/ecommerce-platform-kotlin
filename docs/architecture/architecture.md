@@ -55,8 +55,8 @@ Separating PaymentIntent from Payment lets our system handle user interaction sa
 
 ## **For Internal Services (Checkout / Order / Finance / Payouts)**
 
-### **FR5 — Checkout/Order Service should be able to create a Payment.**
-- It must be possible for the Order Service to create a PaymentIntent and obtain the generated Payment along with its seller-level PaymentSplits.
+### **FR5 — Checkout/Order Service should be able to create a PaymentIntent.**
+- It must be possible for the Order Service to create a PaymentIntent and obtain the generated Intent along with its seller-level PaymentSplits.
 
 ### **FR6 — Checkout/Order Service should be able to trigger authorization via PSP.**
 - The system must allow Checkout to authorize the total payment amount through an external PSP.
@@ -159,7 +159,7 @@ Represents the **shopper's intent to pay** for a multi-seller basket.
 Represents the **actual financial transaction** created after authorization succeeds
 
 **When it's created:**
-- when psp authorization response is authorized.
+- Created centrally by the `PspResultConsumer` when the PSP authorization response is `AUTHORIZED`.
 
 **Why it exists:**
 - Models actual money movement (vs. PaymentIntent which is just "intent")
@@ -203,7 +203,7 @@ Contains:
 - Credit postings
 - JournalId
 - Timestamp
-- Business context (paymentOrderId, sellerId, etc.)
+- Business context (paymentIntentId, txId, sellerId, etc.)
 
 **Why it exists:**  
 Ensures financial correctness, auditability, and immutable accounting history.
@@ -276,7 +276,7 @@ graph TD
             direction TB
             API1("Payment Acceptance Service<br/>(Authorization / Capture / Refund)")
             IdemDB1[("Idempotency DB<br/>IdempotencyRecord")]
-            EdgeDB1[("Edge Local DB<br/>PaymentIntent<br/>Payment<br/>OutboxEvents")]
+            EdgeDB1[("Edge Local DB<br/>PaymentIntent<br/>OutboxEvents")]
             Fwd1[["Local Outbox Forwarder"]]
             
             API1 -.-> IdemDB1
@@ -288,7 +288,7 @@ graph TD
             direction TB
             API2("Payment Acceptance Service<br/>(Authorization / Capture / Refund)")
             IdemDB2[("Idempotency DB<br/>IdempotencyRecord")]
-            EdgeDB2[("Edge Local DB<br/>PaymentIntent<br/>Payment<br/>OutboxEvents")]
+            EdgeDB2[("Edge Local DB<br/>PaymentIntent<br/>OutboxEvents")]
             Fwd2[["Local Outbox Forwarder"]]
             
             API2 -.-> IdemDB2
@@ -300,7 +300,7 @@ graph TD
     subgraph InternalLayer["INTERNAL HOST (Central Cluster)"]
         direction TB
         
-        CentralDB[("Central DB<br/>OutboxEvent, AuthorizationTx,<br/>CaptureTx, RefundTx,<br/>LedgerEntry, JournalEntry, Postings")]
+        CentralDB[("Central DB<br/>OutboxEvent, Payment, PaymentTx,<br/>LedgerEntry, JournalEntry, Postings")]
         
         Relay[["OutboxRelayJob<br/>(payment-central-relay)"]]
         
@@ -392,9 +392,7 @@ graph TD
 
     subgraph PaymentPhase ["Edge Ingestion Phase (Asynchronous)"]
         direction TB
-        PI3 -->|Create Payment| P1[Payment<br/>Status: AUTHORIZED<br/>Captured: 0 EUR]
-        
-        P1 -->|POST /captures| CAP1[Edge DB Outbox<br/>CaptureReceived]
+        PI3 -->|POST /captures| CAP1[Edge DB Outbox<br/>CaptureReceived]
     end
 
     subgraph ExecutionPhase ["Execution & Relay"]
@@ -411,6 +409,7 @@ graph TD
     end
 
     WEB2 -->|Updates Ledger| P3[Payment<br/>Status: CAPTURED<br/>MERCHANT_GROSS_POOL updated]
+    WEB2 -->|Creates| P1[Payment<br/>Status: AUTHORIZED] (If first webhook)
     
     P3 -.->|If MARKETPLACE| SPLIT1[OutboxEvent: InternalTransferRequest]
     SPLIT1 -->|Relayed to internal-transfer-queue| SPLIT2("InternalTransferConsumer")
@@ -549,8 +548,7 @@ sequenceDiagram
     rect rgb(230, 240, 255)
         note over PaymentSvc: @Transactional
         PaymentSvc->>PaymentSvc: Update PaymentIntent status to AUTHORIZED
-        PaymentSvc->>PaymentSvc: Create Payment & PaymentOrder entities
-        PaymentSvc->>PaymentSvc: Save PaymentAuthorizedEvent to Outbox table
+        PaymentSvc->>PaymentSvc: Save PaymentAuthorized to Outbox table
     end
 
     PaymentSvc-->>Proxy: 200 OK { status: 'AUTHORIZED' }
@@ -832,7 +830,7 @@ In early iterations, generic event envelopes were sometimes cast to a raw `Event
 
 To harden this, the system strictly implements **concrete type preservation** across both publication and consumption:
 1. **At Publication (`OutboxRelayJob` & `PaymentEventPublisher`)**:
-   Instead of calling `publishBatchAtomically<Event>`, the relay job parses the internal outbox event type and casts the envelope to its exact, concrete compile-time generic class (e.g. `EventEnvelope<PaymentAuthorized>`, `EventEnvelope<PaymentOrderCaptureReceived>`, or `EventEnvelope<PaymentOrderRefundReceived>`).
+   Instead of calling `publishBatchAtomically<Event>`, the relay job parses the internal outbox event type and casts the envelope to its exact, concrete compile-time generic class (e.g. `EventEnvelope<PaymentAuthorized>`, `EventEnvelope<CaptureReceived>`, or `EventEnvelope<RefundReceived>`).
 2. **At Serialization (`JacksonSerializationAdapter` & `EventEnvelopeKafkaSerializer`)**:
    The serialization adapter preserves the complete generic structure, appending the event's fully-qualified class details and type metadata into the JSON payload and Kafka headers (e.g., `traceId`, `eventId`, `eventType`).
 
@@ -841,7 +839,7 @@ Kafka messages are consumed using Spring Kafka's `ErrorHandlingDeserializer` del
 - **The Metadata Catalog (`PaymentEventMetadataCatalog`)**:
   Maintains a registry mapping each event class to a specific `TypeReference<EventEnvelope<T>>`.
 - **Deserializer Resolution**:
-  When a byte array is pulled from a topic, the deserializer resolves the topic's corresponding `TypeReference` from the catalog and calls `objectMapper.readValue(data, typeRef)`. This forces Jackson to reconstruct the exact nested type (e.g. `PaymentOrderCaptureCommand`) instead of falling back to a raw map or base class.
+  When a byte array is pulled from a topic, the deserializer resolves the topic's corresponding `TypeReference` from the catalog and calls `objectMapper.readValue(data, typeRef)`. This forces Jackson to reconstruct the exact nested type (e.g. `CaptureReceived`) instead of falling back to a raw map or base class.
 - **Type Filtering**:
   At the container listener level (`KafkaTypedConsumerFactoryConfig`), the container factory is registered with a `RecordFilterStrategy` matching the class's exact expected event type. This ensures that any malformed or unexpected events are filtered or routed to the DLQ immediately without crashing the consumer.
 

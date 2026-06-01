@@ -18,6 +18,8 @@ import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import kotlin.test.assertEquals
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.vo.TxId
 
 class LedgerDomainEventEntityMapperTest {
 
@@ -34,7 +36,8 @@ class LedgerDomainEventEntityMapperTest {
             id = "journal-123",
             txType = JournalType.CAPTURE,
             name = "capture",
-
+            paymentId = PaymentId(555L),
+            txId = TxId(666L),
             postings = listOf(debitPosting, creditPosting)
         )
 
@@ -66,6 +69,8 @@ class LedgerDomainEventEntityMapperTest {
             journalEntryId = "journal-9876",
             journalType = JournalType.CAPTURE,
             journalName = "capture",
+            paymentId = 555L,
+            txId = 666L,
             createdAt = fixedInstant.plusSeconds(2400),
             postings = listOf(debitEvent, creditEvent)
         )

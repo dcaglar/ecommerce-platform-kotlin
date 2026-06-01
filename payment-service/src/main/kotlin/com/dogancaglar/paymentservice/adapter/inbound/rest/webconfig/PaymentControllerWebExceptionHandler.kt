@@ -25,6 +25,7 @@ import org.springframework.web.context.request.ServletWebRequest
 import org.springframework.web.context.request.WebRequest
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler
 import java.util.concurrent.TimeoutException
+import java.lang.Exception
 
 @RestControllerAdvice
 class PaymentControllerWebExceptionHandler : ResponseEntityExceptionHandler() {
@@ -46,7 +47,7 @@ class PaymentControllerWebExceptionHandler : ResponseEntityExceptionHandler() {
     // --- Standard Spring Override ---
 
     override fun handleExceptionInternal(
-        ex: java.lang.Exception,
+        ex: Exception,
         body: Any?,
         headers: HttpHeaders,
         status: HttpStatusCode,

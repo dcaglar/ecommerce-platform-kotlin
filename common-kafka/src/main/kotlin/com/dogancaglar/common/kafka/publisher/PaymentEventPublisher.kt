@@ -15,6 +15,8 @@ import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.CompletableFuture
+import org.apache.kafka.common.header.Headers
 
 class PaymentEventPublisher(
     private val kafkaTemplate: KafkaTemplate<String, EventEnvelope<*>>,
@@ -66,11 +68,11 @@ class PaymentEventPublisher(
     // ======================================================================
     override fun <T : Event> publishAsync(
         envelope: EventEnvelope<T>
-    ): java.util.concurrent.CompletableFuture<EventEnvelope<T>> {
+    ): CompletableFuture<EventEnvelope<T>> {
         val eventMetaData = eventMetaDataRegistry.metadataForEvent(envelope.data)
         val record = buildRecord(eventMetaData, envelope)
 
-        val future = java.util.concurrent.CompletableFuture<EventEnvelope<T>>()
+        val future = CompletableFuture<EventEnvelope<T>>()
 
         kafkaTemplate.send(record).whenComplete { result, ex ->
             if (ex == null) {
@@ -117,7 +119,7 @@ class PaymentEventPublisher(
     }
 
     // Helper for adding string headers safely
-    private fun org.apache.kafka.common.header.Headers.addString(key: String, value: String) {
+    private fun Headers.addString(key: String, value: String) {
         add(RecordHeader(key, value.toByteArray(StandardCharsets.UTF_8)))
     }
 }

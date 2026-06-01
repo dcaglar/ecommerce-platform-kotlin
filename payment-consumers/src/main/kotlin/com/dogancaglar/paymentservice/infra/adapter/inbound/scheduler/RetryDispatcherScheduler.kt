@@ -3,7 +3,7 @@ package com.dogancaglar.paymentservice.infra.adapter.inbound.scheduler
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCommand
 import com.dogancaglar.common.kafka.publisher.PaymentEventPublisher
-import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
+import com.dogancaglar.common.kafka.metadata.PaymentEventMetadataCatalog
 import com.dogancaglar.paymentservice.infra.adapter.outbound.redis.PaymentOrderRetryQueueAdapter
 import io.micrometer.core.instrument.*
 import org.slf4j.LoggerFactory
@@ -13,6 +13,9 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.stereotype.Component
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.min
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit.SECONDS
+import java.util.concurrent.atomic.AtomicBoolean
 
 @Component
 class RetryDispatcherScheduler(
@@ -28,7 +31,7 @@ class RetryDispatcherScheduler(
     private val chunkSize = 300     // how many to send per Kafka transaction (atomic)
 
     private val batchSize = AtomicInteger(0)
-    private val running = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val running = AtomicBoolean(false)
 
     // Static tag for your topic (so dashboards can filter/group)
     private val topicTag = Tag.of("topic", PaymentEventMetadataCatalog.PaymentOrderCaptureCommandMetadata.topic)
@@ -110,8 +113,8 @@ class RetryDispatcherScheduler(
                 }
 
                 val futures = envs.map { publisher.publishAsync(it) }
-                java.util.concurrent.CompletableFuture.allOf(*futures.toTypedArray())
-                    .get(30, java.util.concurrent.TimeUnit.SECONDS)
+                CompletableFuture.allOf(*futures.toTypedArray())
+                    .get(30, SECONDS)
 
                 // If get() succeeds, it's safe to remove from inflight
                 for (item in chunk) retryQueue.removeFromInflight(item.raw)

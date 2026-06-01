@@ -6,6 +6,7 @@ import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.paymentservice.ports.outbound.PaymentIntentRepository
 import org.springframework.stereotype.Repository
+import java.time.Instant
 
 @Repository
 class PaymentIntentOutboundAdapter(
@@ -16,12 +17,12 @@ class PaymentIntentOutboundAdapter(
 
 
 
-    override fun tryMarkPendingAuth(id: PaymentIntentId, now: java.time.Instant): Boolean {
+    override fun tryMarkPendingAuth(id: PaymentIntentId, now: Instant): Boolean {
         return paymentIntentMapper.tryMarkPendingAuth(id.value, now) == 1
 
     }
 
-    override fun updatePspReference(paymentIntentId: Long, pspReference: String, now: java.time.Instant){
+    override fun updatePspReference(paymentIntentId: Long, pspReference: String, now: Instant){
         paymentIntentMapper.updatePspReference(paymentIntentId, pspReference, now)
     }
 

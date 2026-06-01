@@ -22,6 +22,11 @@ import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
 import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CaptureRequestDTO
+import com.dogancaglar.common.event.EventEnvelopeFactory
+import com.dogancaglar.common.id.PublicIdFactory
+import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
+import com.fasterxml.jackson.databind.ObjectMapper
 
 @RestController
 @RequestMapping("/api/v1")
@@ -29,8 +34,8 @@ class PaymentController(
     private val paymentApiOrchestrator: PaymentApiOrchestrator,
     private val idempotencyService: IdempotencyService,
     private val outboxWriterPort: LocalOutboxWriterPort,
-    private val idGeneratorPort: com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort,
-    private val objectMapper: com.fasterxml.jackson.databind.ObjectMapper
+    private val idGeneratorPort: IdGeneratorPort,
+    private val objectMapper: ObjectMapper
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -59,7 +64,7 @@ class PaymentController(
             responseClass = CreatePaymentIntentResponseDTO::class.java, // Arg 3: The type
             idExtractor = { response ->
                 // Arg 4: The lambda to get the internal ID for DB storage
-                com.dogancaglar.common.id.PublicIdFactory.toInternalId(response.paymentIntentId!!)
+                PublicIdFactory.toInternalId(response.paymentIntentId!!)
             },
             block = {
                 // Arg 5: The business logic block
@@ -142,11 +147,11 @@ class PaymentController(
             now = Utc.nowInstant()
         )
 
-        val envelope = com.dogancaglar.common.event.EventEnvelopeFactory.envelopeFor(
-            traceId = com.dogancaglar.common.logging.EventLogContext.getTraceId(),
+        val envelope = EventEnvelopeFactory.envelopeFor(
+            traceId = EventLogContext.getTraceId(),
             data = captureEvent,
             aggregateId = captureEvent.publicPaymentIntentId,
-            parentEventId = com.dogancaglar.common.logging.EventLogContext.getEventId()
+            parentEventId = EventLogContext.getEventId()
         )
 
         val payload = objectMapper.writeValueAsString(envelope)

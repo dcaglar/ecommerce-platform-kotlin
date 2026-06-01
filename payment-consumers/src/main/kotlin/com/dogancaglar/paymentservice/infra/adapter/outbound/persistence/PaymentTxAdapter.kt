@@ -12,6 +12,7 @@ import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.
 import com.dogancaglar.paymentservice.ports.outbound.PaymentTxPort
 import org.springframework.stereotype.Repository
 import java.time.Instant
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 
 /**
  * PaymentTxAdapter
@@ -129,7 +130,7 @@ class PaymentTxAdapter(
         val amount    = Amount.of(entity.amountValue, Currency(entity.amountCurrency))
         val createdAt = entity.createdAt ?: Instant.now()
         val status    = TxStatus.valueOf(entity.status)
-        val paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(entity.paymentIntentId)
+        val paymentIntentId = PaymentIntentId(entity.paymentIntentId)
 
         return when (entity.txType) {
 

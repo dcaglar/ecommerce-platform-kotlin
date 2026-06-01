@@ -5,6 +5,7 @@ import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.OutboxEventMapper
 import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort
 import org.springframework.stereotype.Component
+import java.time.ZoneOffset.UTC
 
 @Component
 class CentralOutboxWriterAdapter(
@@ -31,8 +32,8 @@ class CentralOutboxWriterAdapter(
             aggregateId = event.aggregateId,
             payload = event.payload,
             status = event.status.name,
-            createdAt = event.createdAt.toInstant(java.time.ZoneOffset.UTC),
-            updatedAt = event.updatedAt.toInstant(java.time.ZoneOffset.UTC)
+            createdAt = event.createdAt.toInstant(UTC),
+            updatedAt = event.updatedAt.toInstant(UTC)
         )
     }
 }
