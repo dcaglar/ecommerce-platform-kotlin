@@ -40,9 +40,10 @@ CREATE TABLE payments (
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
     CONSTRAINT chk_payments_status_valid CHECK (status IN (
-        'NOT_CAPTURED',
-        'PARTIALLY_CAPTURED',
+        'AUTHORIZED',
+        'SENT_FOR_SETTLE',
         'CAPTURED',
+        'PARTIALLY_CAPTURED',
         'PARTIALLY_REFUNDED',
         'REFUNDED',
         'VOIDED'
@@ -103,11 +104,12 @@ CREATE TABLE payment_orders (
 ALTER TABLE payment_orders
     ADD CONSTRAINT chk_payment_orders_status_valid
     CHECK (status IN (
-        'INITIATED_PENDING',
+        'CAPTURE_RECEIVED',
         'CAPTURE_REQUESTED',
         'CAPTURE_FAILED',
-        'CAPTURED',
+        'AUTHORIZED', 'SENT_FOR_SETTLE', 'CAPTURED',
         'REFUND_REQUESTED',
+        'REFUND_RECEIVED',
         'REFUND_FAILED',
         'REFUNDED',
         'PENDING_CAPTURE',

@@ -1,8 +1,8 @@
 spring.test.database.replace: none
 mybatis:
   mapper-locations: classpath:mapper/**/*.xml
-  type-aliases-package: com.dogancaglar.paymentservice.adapter.outbound.persistence.entity
-  type-handlers-package: com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler
+  type-aliases-package: com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity
+  type-handlers-package: com.dogancaglar.common.db.typehandler
 spring:
   liquibase:
     enabled: false

@@ -38,5 +38,11 @@ docker image prune -af || true
 echo "🧰  Removing any kind/minikube networks..."
 docker network ls -q | grep -E 'minikube|kind|kube' | xargs -r docker network rm || true
 
+echo "🎛️  Toggling ServiceMonitors back to 'false' in application Helm values..."
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+yq -i '.controller.metrics.serviceMonitor.enabled = false' "$REPO_ROOT/infra/helm-values/ingress-values.yaml"
+yq -i '.serviceMonitor.enabled = false' "$REPO_ROOT/infra/helm-values/payment-edge-cell-values-local.yaml"
+yq -i '.serviceMonitor.enabled = false' "$REPO_ROOT/infra/helm-values/payment-consumers-values-local.yaml"
+
 echo "✅  System fully nuked. All Kubernetes and Docker data wiped."
 echo "🧘  Next step: re-run your ./deploy-all.sh to start fresh."

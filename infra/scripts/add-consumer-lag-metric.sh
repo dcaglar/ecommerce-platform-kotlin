@@ -37,13 +37,22 @@ rules:
               avg_over_time(
                 kafka_consumergroup_lag{
                   <<.LabelMatchers>>,
-                  consumergroup=~"payment-order-psp-call-executor-consumer-group|payment-order-psp-result-updated-consumer-group"
+                  consumergroup=~"psp-capture-executor-consumer-group|psp-refund-executor-consumer-group|psp-result-consumer-group"
                 }[1m]
               ),
               0
             )
           )
         )
+    - seriesQuery: 'central_outbox_backlog_size{namespace!=""}'
+      resources:
+        overrides:
+          namespace:
+            resource: namespace
+      name:
+        as: central_outbox_backlog_external
+      metricsQuery: |
+        max(central_outbox_backlog_size{<<.LabelMatchers>>})
 EOF
 
 echo "⏳ Waiting for prometheus-adapter rollout..."

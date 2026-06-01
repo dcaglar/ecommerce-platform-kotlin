@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.dogancaglar</groupId>
+        <artifactId>ecommerce-platform-kotlin</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>common-kafka</artifactId>
+    <packaging>jar</packaging>
+    <name>common-kafka</name>
+    <description>
+        Shared Kafka producer infrastructure: EventEnvelopeKafkaSerializer/Deserializer,
+        KafkaTxExecutor, PaymentEventPublisher, and dual (sync/batch) KafkaProducerFactory
+        auto-configuration. No @KafkaListener, no NewTopic beans, no domain event schemas.
+    </description>
+
+    <dependencies>
+        <!-- Shared event contract (EventEnvelope, EventMetaDataRegistry, etc.) -->
+        <dependency>
+            <groupId>com.dogancaglar</groupId>
+            <artifactId>common</artifactId>
+        </dependency>
+
+        <!-- Domain port interface (EventPublisherPort) and event catalog -->
+        <dependency>
+            <groupId>com.dogancaglar</groupId>
+            <artifactId>payment-application</artifactId>
+        </dependency>
+
+
+
+        <!-- Kafka transport -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
+        <!-- KafkaProperties for building producer config from spring.kafka.* -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <!-- MicrometerProducerListener metrics -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+        </dependency>
+
+        <!-- Jackson for Serializer/Deserializer -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.module</groupId>
+            <artifactId>jackson-module-kotlin</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <sourceDirectory>src/main/kotlin</sourceDirectory>
+        <testSourceDirectory>src/test/kotlin</testSourceDirectory>
+        <plugins>
+            <plugin>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>compile</id>
+                        <phase>compile</phase>
+                        <goals><goal>compile</goal></goals>
+                    </execution>
+                    <execution>
+                        <id>test-compile</id>
+                        <phase>test-compile</phase>
+                        <goals><goal>test-compile</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Not a Spring Boot app — no spring-boot-maven-plugin repackage -->
+        </plugins>
+    </build>
+
+</project>

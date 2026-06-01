@@ -1,0 +1,26 @@
+# templates/servicemonitor.yaml
+  {{- if .Values.serviceMonitor.enabled | default false}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "payment-edge-cell.fullname" . }}
+  labels:
+    {{- include "payment-edge-cell.labels" . | nindent 4 }}
+      {{- with .Values.serviceMonitor.labels }}
+      {{- toYaml . | nindent 4 }}
+      {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "payment-edge-cell.fullname" . }}   # must match Service.metadata.labels
+  endpoints:
+    - port: mgmt
+      path: {{.Values.serviceMonitor.path | default "/actuator/prometheus"}}
+      interval: {{.Values.serviceMonitor.interval | default "30s"}}
+      scrapeTimeout: {{.Values.serviceMonitor.scrapeTimeout | default "10s"}}
+      scheme: {{.Values.serviceMonitor.scheme | default "http"}}
+  # optional: only needed if the Service is in another namespace than this SM
+  # namespaceSelector:
+  #   matchNames:
+  #     - {{ .Release.Namespace }}
+        {{- end }}

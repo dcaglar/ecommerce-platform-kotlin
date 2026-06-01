@@ -25,3 +25,9 @@ kubectl -n monitoring rollout status statefulset/prometheus-prometheus-stack-kub
 # Sanity: show the Prometheus service we will use for the adapter later
 kubectl -n monitoring get svc prometheus-stack-kube-prom-prometheus
 echo "✅ kube-prometheus-stack is up."
+
+echo "🚀 Toggling ServiceMonitors to 'true' in application Helm values..."
+yq -i '.controller.metrics.serviceMonitor.enabled = true' "$REPO_ROOT/infra/helm-values/ingress-values.yaml"
+yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/infra/helm-values/payment-edge-cell-values-local.yaml"
+yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/infra/helm-values/payment-consumers-values-local.yaml"
+echo "✅ Monitoring switched ON! Applications will now deploy with metrics enabled."

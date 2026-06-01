@@ -31,8 +31,10 @@ class CreatePaymentIntentService(
             paymentIntentId = paymentIntentId,
             buyerId = cmd.buyerId,
             orderId = cmd.orderId,
+            merchantAccountId = cmd.merchantAccountId,
+            processingModel = cmd.processingModel,
             totalAmount = cmd.totalAmount,
-            paymentOrderLines = cmd.paymentOrderLines
+            splits = cmd.paymentSplits
         )
 
         // 2. Save to database

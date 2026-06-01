@@ -23,16 +23,9 @@ helm uninstall -n payment  redis  --ignore-not-found
 
 
 
-echo "🚀 Helm uninstall payment-db..."
-helm uninstall -n payment  payment-db --ignore-not-found
 
 
 
-echo "🚀 Deleting create-app-db-credentials-job resource"
-kubectl -n payment delete jobs.batch create-app-db-credentials-job || true
-
-echo "🚀 Deleting grant-app-db-privileges-job resource"
-kubectl -n payment delete jobs.batch grant-app-db-privileges-job || true
 
 
 echo "🚀deleting   payment-platform-config"

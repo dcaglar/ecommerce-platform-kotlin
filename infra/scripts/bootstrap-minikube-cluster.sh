@@ -88,6 +88,9 @@ fi
 minikube profile "${PROFILE}" >/dev/null
 kubectl config use-context "${PROFILE}" >/dev/null
 
+echo ">> Labeling the Minikube node with a default zone to satisfy TopologySpreadConstraints..."
+kubectl label node "${PROFILE}" topology.kubernetes.io/zone=local --overwrite || true
+
 echo ">> Enabling metrics-server addon"
 minikube addons enable metrics-server -p "${PROFILE}" >/dev/null || true
 

@@ -1,0 +1,21 @@
+app:
+  instance-id: ${POD_NAME:${HOSTNAME:${random.value}}}
+
+  datasource:
+    outbox:
+      jdbc-url: ${SPRING_DATASOURCE_EDGE_URL}
+      username: ${SPRING_DATASOURCE_EDGE_USERNAME}
+      password: ${SPRING_DATASOURCE_EDGE_PASSWORD}
+    maintenance:
+      jdbc-url: ${SPRING_DATASOURCE_EDGE_URL}
+      username: ${SPRING_DATASOURCE_MAINTENANCE_USERNAME}
+      password: ${SPRING_DATASOURCE_MAINTENANCE_PASSWORD}
+    central:
+      jdbc-url: ${SPRING_DATASOURCE_CENTRAL_URL}
+      username: ${SPRING_DATASOURCE_CENTRAL_USERNAME}
+      password: ${SPRING_DATASOURCE_CENTRAL_PASSWORD}
+
+spring:
+  data:
+    redis:
+      url: ${SPRING_DATA_REDIS_URL}

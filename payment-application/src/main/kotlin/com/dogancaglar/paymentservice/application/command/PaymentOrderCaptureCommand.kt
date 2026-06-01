@@ -1,6 +1,5 @@
 package com.dogancaglar.paymentservice.application.command
 
-import com.dogancaglar.paymentservice.application.events.PaymentOrderCommand
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
@@ -9,19 +8,20 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.Instant
+import com.dogancaglar.paymentservice.application.events.PaymentCommand
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class PaymentOrderCaptureCommand private constructor(
-    override val paymentOrderId: String,
-    override val publicPaymentOrderId: String,
-    override val paymentId: String,
-    override val publicPaymentId: String,
-    override val sellerId: String,
+    val paymentOrderId: String,
+    val publicPaymentOrderId: String,
+    override val paymentIntentId: String,
+    override val publicPaymentIntentId: String,
+    val sellerId: String,
     override val amountValue: Long,
     override val currency: String,
     val attempt: Int,
     override val timestamp: Instant
-) : PaymentOrderCommand() {
+) : PaymentCommand() {
 
     override val eventType = EVENT_TYPE
 
@@ -38,8 +38,8 @@ data class PaymentOrderCaptureCommand private constructor(
             return PaymentOrderCaptureCommand(
                 paymentOrderId = order.paymentOrderId.value.toString(),
                 publicPaymentOrderId = order.paymentOrderId.toPublicPaymentOrderId(),
-                paymentId = order.paymentId.value.toString(),
-                publicPaymentId = order.paymentId.toPublicPaymentId(),
+                paymentIntentId = order.paymentId.value.toString(),
+                publicPaymentIntentId = order.paymentId.toPublicPaymentId(),
                 sellerId = order.sellerId.value,
                 amountValue = order.amount.quantity,
                 currency = order.amount.currency.currencyCode,

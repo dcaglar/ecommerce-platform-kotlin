@@ -3,172 +3,265 @@ package com.dogancaglar.paymentservice.domain.model.payment
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
-import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
 import java.time.LocalDateTime
 
 /**
- * Payment
+ * Payment — Central DDD Aggregate Root
  *
- * Represents the financial transaction created AFTER a PaymentIntent is authorized.
- * Tracks captures and refunds at an aggregate level across all PaymentOrders.
+ * The absolute source of truth for the financial state machine of a single
+ * payment within the Mor-DC platform. It enforces all mathematical invariants
+ * and state-machine transition rules for the capture/refund lifecycle.
  *
- * Lifecycle (at Payment level):
- *  NOT_CAPTURED -> PARTIALLY_CAPTURED -> CAPTURED
- *  CAPTURED/PARTIALLY_CAPTURED -> PARTIALLY_REFUNDED -> REFUNDED
+ * ============================================================
+ * KEY DESIGN DECISIONS (DO NOT VIOLATE)
+ * ============================================================
+ *
+ * 1. COMPLETE DECOUPLING FROM PaymentIntent:
+ *    This aggregate does NOT reference the PaymentIntent class. It is
+ *    instantiated from a [PaymentAuthorizedEvent] payload via
+ *    [initializeFromAuthEvent], so the domain remains purely fintech-focused
+ *    and does not couple Central DB models to Edge Cell models.
+ *
+ * 2. SPLIT ROUTING MATRIX IS LOCKED AT BIRTH:
+ *    The [splits] array is written to the Central DB once — at the moment
+ *    [initializeFromAuthEvent] is called — and is thereafter immutable.
+ *    This ensures the MARKETPLACE distribution logic in the CAPTURE webhook
+ *    path reads a consistent, deterministic routing table.
+ *
+ * 3. NO GHOST STATES (Golden Rule 4):
+ *    The aggregate MUST NOT transition to [PaymentStatus.SENT_FOR_SETTLE]
+ *    until [markSentForSettle] is called by CapturePspPerformedConsumer,
+ *    which only fires after the outbox acknowledgment of the gateway 202 ACK
+ *    has been persisted. No optimistic pre-transition is allowed.
+ *
+ * 4. MATHEMATICAL SAFETY:
+ *    All invariants (capturedAmount ≤ totalAmount, refundedAmount ≤ capturedAmount,
+ *    currency consistency) are enforced at both init-time and in each mutation
+ *    method, making it impossible to create an inconsistent Payment via any code path.
+ *
+ * 5. NO E-COMMERCE CONCEPTS:
+ *    The aggregate carries no cart items, product lines, or seller-level order IDs.
+ *    Financial distribution is expressed solely through the [splits] array.
+ *
+ * @param paymentId         Snowflake-generated identifier for this Payment record.
+ * @param paymentIntentId   Reference to the originating PaymentIntent (for traceability).
+ * @param buyerId           Identifier of the purchasing party.
+ * @param merchantAccountId Primary merchant-of-record entity identifier.
+ * @param processingModel   Routing model locked in at authorization time.
+ * @param totalAmount       Total authorized amount. Immutable after creation.
+ * @param capturedAmount    Running total of confirmed captures. Starts at zero.
+ * @param refundedAmount    Running total of confirmed refunds. Starts at zero.
+ * @param status            Current lifecycle state of this payment.
+ * @param splits            Immutable routing instructions locked in at auth time.
+ * @param createdAt         Timestamp of aggregate creation (UTC).
+ * @param updatedAt         Timestamp of last state mutation (UTC).
  */
 class Payment private constructor(
     val paymentId: PaymentId,
     val paymentIntentId: PaymentIntentId,
     val buyerId: BuyerId,
-    val orderId: OrderId,
+    val merchantAccountId: String,
+    val processingModel: ProcessingModel,
     val totalAmount: Amount,
     val capturedAmount: Amount,
     val refundedAmount: Amount,
     val status: PaymentStatus,
-    val paymentOrderLines: List<PaymentOrderLine>,
+    val splits: List<PaymentSplit>,
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime
 ) {
 
+    // =========================================================================
+    // Aggregate Invariants (enforced on every construction path)
+    // =========================================================================
+
     init {
-        require(totalAmount.isPositive()) { "Total amount must be positive" }
-        require(capturedAmount >= Amount.Companion.zero(totalAmount.currency)) {
-            "Captured amount cannot be negative"
+        require(merchantAccountId.isNotBlank()) {
+            "merchantAccountId must not be blank"
         }
-        require(refundedAmount >= Amount.Companion.zero(totalAmount.currency)) {
-            "Refunded amount cannot be negative"
+        require(totalAmount.isPositive()) {
+            "totalAmount must be positive, but was ${totalAmount.quantity}"
+        }
+        require(capturedAmount >= Amount.zero(totalAmount.currency)) {
+            "capturedAmount cannot be negative, but was ${capturedAmount.quantity}"
+        }
+        require(refundedAmount >= Amount.zero(totalAmount.currency)) {
+            "refundedAmount cannot be negative, but was ${refundedAmount.quantity}"
         }
         require(capturedAmount <= totalAmount) {
-            "Captured amount cannot exceed total amount"
+            "capturedAmount (${capturedAmount.quantity}) cannot exceed totalAmount (${totalAmount.quantity})"
         }
         require(refundedAmount <= capturedAmount) {
-            "Refunded amount cannot exceed captured amount"
+            "refundedAmount (${refundedAmount.quantity}) cannot exceed capturedAmount (${capturedAmount.quantity})"
         }
-
-        // Currency consistency
         require(capturedAmount.currency == totalAmount.currency) {
-            "Captured amount currency must match total amount"
+            "capturedAmount currency (${capturedAmount.currency}) must match totalAmount currency (${totalAmount.currency})"
         }
         require(refundedAmount.currency == totalAmount.currency) {
-            "Refunded amount currency must match total amount"
+            "refundedAmount currency (${refundedAmount.currency}) must match totalAmount currency (${totalAmount.currency})"
         }
 
-        // PaymentLines invariants (same as PaymentIntent)
-        require(paymentOrderLines.isNotEmpty()) { "Payment must have at least one payment line" }
-        val lineCurrencies = paymentOrderLines.map { it.amount.currency }.distinct()
-        require(lineCurrencies.size == 1 && lineCurrencies.first() == totalAmount.currency) {
-            "All payment lines must use the same currency as total amount"
-        }
-        val sum = paymentOrderLines.sumOf { it.amount.quantity }
-        require(sum == totalAmount.quantity) {
-            "Total amount (${totalAmount.quantity}) must equal sum of payment lines ($sum)"
+        // For MARKETPLACE payments, splits must be present and sum to totalAmount.
+        if (processingModel == ProcessingModel.MARKETPLACE) {
+            require(splits.isNotEmpty()) {
+                "MARKETPLACE payment must have at least one PaymentSplit"
+            }
+            val splitCurrencies = splits.map { it.amount.currency }.distinct()
+            require(splitCurrencies.size == 1 && splitCurrencies.first() == totalAmount.currency) {
+                "All PaymentSplit amounts must share the same currency as totalAmount"
+            }
+            val splitSum = splits.sumOf { it.amount.quantity }
+            require(splitSum == totalAmount.quantity) {
+                "Sum of PaymentSplit amounts ($splitSum) must equal totalAmount (${totalAmount.quantity})"
+            }
         }
     }
 
-    // ------------------------
-    // CAPTURE LOGIC
-    // ------------------------
+    // =========================================================================
+    // State Machine: CaptureTx Path
+    // =========================================================================
 
     /**
-     * Apply a successful capture (sum of one or more PaymentOrders).
-     * Updates capturedAmount and PaymentStatus.
+     * markSentForSettle
+     *
+     * Transitions the aggregate from [PaymentStatus.AUTHORIZED] to
+     * [PaymentStatus.SENT_FOR_SETTLE].
+     *
+     * GOLDEN RULE ENFORCEMENT:
+     * This method MUST only be called by CapturePspPerformedConsumer after
+     * the OutboxRelayJob has confirmed that an OutboxEvent<ExternalAsyncCaptureToPspPerformed>
+     * row was successfully published to Kafka. This guarantees the "No Ghost States"
+     * rule: the aggregate's in-flight state is only set after an explicit
+     * outbox acknowledgment, never optimistically.
+     *
+     * @param now  UTC timestamp of the transition (injectable for testing).
+     * @return     A new Payment instance with status=SENT_FOR_SETTLE.
+     */
+    fun markSentForSettle(now: LocalDateTime = Utc.nowLocalDateTime()): Payment {
+        require(status == PaymentStatus.AUTHORIZED) {
+            "Can only mark SENT_FOR_SETTLE from AUTHORIZED (current=$status)"
+        }
+        return copy(status = PaymentStatus.SENT_FOR_SETTLE, updatedAt = now)
+    }
+
+    /**
+     * applyCapture
+     *
+     * Applies a confirmed capture amount to the aggregate after a successful
+     * PSP webhook confirmation. Updates [capturedAmount] and derives the
+     * new [PaymentStatus] from the updated totals.
+     *
+     * Allowed source states: [PaymentStatus.SENT_FOR_SETTLE], [PaymentStatus.PARTIALLY_CAPTURED].
+     *
+     * @param captureAmount  The amount confirmed by the PSP webhook. Must be positive
+     *                       and share the same currency as [totalAmount].
+     * @param now            UTC timestamp of the transition.
+     * @return               A new Payment instance with updated amounts and status.
      */
     fun applyCapture(
         captureAmount: Amount,
         now: LocalDateTime = Utc.nowLocalDateTime()
     ): Payment {
-        require(captureAmount.isPositive()) { "Capture amount must be positive" }
-        require(captureAmount.currency == totalAmount.currency) {
-            "Capture amount currency must match total amount"
+        require(captureAmount.isPositive()) {
+            "captureAmount must be positive, but was ${captureAmount.quantity}"
         }
-        require(status in setOf(
-            PaymentStatus.NOT_CAPTURED,
-            PaymentStatus.PARTIALLY_CAPTURED
-        )) {
-            "Can only capture from NOT_CAPTURED or PARTIALLY_CAPTURED (current=$status)"
+        require(captureAmount.currency == totalAmount.currency) {
+            "captureAmount currency (${captureAmount.currency}) must match totalAmount currency (${totalAmount.currency})"
+        }
+        require(status in setOf(PaymentStatus.SENT_FOR_SETTLE, PaymentStatus.PARTIALLY_CAPTURED)) {
+            "Can only apply capture from SENT_FOR_SETTLE or PARTIALLY_CAPTURED (current=$status)"
         }
 
         val newCaptured = capturedAmount + captureAmount
-        require(newCaptured <= totalAmount) { "Captured amount cannot exceed total amount" }
+        require(newCaptured <= totalAmount) {
+            "New capturedAmount ($newCaptured) would exceed totalAmount ($totalAmount)"
+        }
 
         val newStatus = when {
-            newCaptured == Amount.Companion.zero(totalAmount.currency) -> PaymentStatus.NOT_CAPTURED
-            newCaptured < totalAmount                        -> PaymentStatus.PARTIALLY_CAPTURED
-            newCaptured == totalAmount                       -> PaymentStatus.CAPTURED
-            else                                             -> status
+            newCaptured < totalAmount  -> PaymentStatus.PARTIALLY_CAPTURED
+            newCaptured == totalAmount -> PaymentStatus.CAPTURED
+            else                       -> status // unreachable after guard above
         }
 
-        return copy(
-            capturedAmount = newCaptured,
-            status = newStatus,
-            updatedAt = now
-        )
+        return copy(capturedAmount = newCaptured, status = newStatus, updatedAt = now)
     }
-
-    fun voidAuthorization(now: LocalDateTime = Utc.nowLocalDateTime()): Payment {
-        require(status == PaymentStatus.NOT_CAPTURED) {
-            "Can only void when NOT_CAPTURED (current=$status)"
-        }
-
-        return copy(
-            status = PaymentStatus.VOIDED,
-            updatedAt = now
-        )
-    }
-
-
-    // ------------------------
-    // REFUND LOGIC
-    // ------------------------
 
     /**
-     * Apply a refund (sum of one or more PaymentOrder refunds).
-     * Updates refundedAmount and PaymentStatus.
+     * voidAuthorization
+     *
+     * Releases the authorization hold without capturing any funds.
+     * Only allowed from [PaymentStatus.AUTHORIZED] (no capture has been sent).
+     *
+     * @param now  UTC timestamp of the transition.
+     * @return     A new Payment instance with status=VOIDED.
+     */
+    fun voidAuthorization(now: LocalDateTime = Utc.nowLocalDateTime()): Payment {
+        require(status == PaymentStatus.AUTHORIZED) {
+            "Can only void from AUTHORIZED (current=$status). " +
+            "A payment in SENT_FOR_SETTLE or later cannot be voided."
+        }
+        return copy(status = PaymentStatus.VOIDED, updatedAt = now)
+    }
+
+    // =========================================================================
+    // State Machine: RefundTx Path
+    // =========================================================================
+
+    /**
+     * applyRefund
+     *
+     * Applies a confirmed refund amount to the aggregate after a successful
+     * PSP webhook confirmation. Updates [refundedAmount] and derives the
+     * new [PaymentStatus] from the updated totals.
+     *
+     * Allowed source states: [PaymentStatus.CAPTURED], [PaymentStatus.PARTIALLY_CAPTURED],
+     * [PaymentStatus.PARTIALLY_REFUNDED].
+     *
+     * @param refundAmount  The amount confirmed by the PSP webhook. Must be positive,
+     *                      same currency, and not cause refundedAmount to exceed capturedAmount.
+     * @param now           UTC timestamp of the transition.
+     * @return              A new Payment instance with updated amounts and status.
      */
     fun applyRefund(
         refundAmount: Amount,
         now: LocalDateTime = Utc.nowLocalDateTime()
     ): Payment {
-        require(refundAmount.isPositive()) { "Refund amount must be positive" }
-        require(refundAmount.currency == totalAmount.currency) {
-            "Refund amount currency must match total amount"
+        require(refundAmount.isPositive()) {
+            "refundAmount must be positive, but was ${refundAmount.quantity}"
         }
-        require(capturedAmount > Amount.Companion.zero(totalAmount.currency)) {
-            "Cannot refund a payment with zero captured amount"
+        require(refundAmount.currency == totalAmount.currency) {
+            "refundAmount currency (${refundAmount.currency}) must match totalAmount currency (${totalAmount.currency})"
+        }
+        require(capturedAmount > Amount.zero(totalAmount.currency)) {
+            "Cannot refund a payment with zero capturedAmount"
         }
         require(status in setOf(
-            PaymentStatus.PARTIALLY_CAPTURED,
             PaymentStatus.CAPTURED,
+            PaymentStatus.PARTIALLY_CAPTURED,
             PaymentStatus.PARTIALLY_REFUNDED
         )) {
-            "Can only refund from CAPTURED / PARTIALLY_CAPTURED / PARTIALLY_REFUNDED (current=$status)"
+            "Can only apply refund from CAPTURED, PARTIALLY_CAPTURED, or PARTIALLY_REFUNDED (current=$status)"
         }
 
         val newRefunded = refundedAmount + refundAmount
         require(newRefunded <= capturedAmount) {
-            "Refunded amount ($newRefunded) cannot exceed captured amount ($capturedAmount)"
+            "New refundedAmount ($newRefunded) would exceed capturedAmount ($capturedAmount)"
         }
 
         val newStatus = when {
-            newRefunded == Amount.Companion.zero(totalAmount.currency) -> status // should not happen with positive refund
-            newRefunded < capturedAmount                     -> PaymentStatus.PARTIALLY_REFUNDED
-            newRefunded == capturedAmount                    -> PaymentStatus.REFUNDED
-            else                                             -> status
+            newRefunded < capturedAmount  -> PaymentStatus.PARTIALLY_REFUNDED
+            newRefunded == capturedAmount -> PaymentStatus.REFUNDED
+            else                          -> status // unreachable after guard above
         }
 
-        return copy(
-            refundedAmount = newRefunded,
-            status = newStatus,
-            updatedAt = now
-        )
+        return copy(refundedAmount = newRefunded, status = newStatus, updatedAt = now)
     }
 
-    // ------------------------
-    // INTERNAL COPY
-    // ------------------------
+    // =========================================================================
+    // Internal Immutable Copy
+    // =========================================================================
 
     private fun copy(
         capturedAmount: Amount = this.capturedAmount,
@@ -176,83 +269,127 @@ class Payment private constructor(
         status: PaymentStatus = this.status,
         updatedAt: LocalDateTime = Utc.nowLocalDateTime()
     ): Payment = Payment(
-        paymentId = paymentId,
-        paymentIntentId = paymentIntentId,
-        buyerId = buyerId,
-        orderId = orderId,
-        totalAmount = totalAmount,
-        capturedAmount = capturedAmount,
-        refundedAmount = refundedAmount,
-        status = status,
-        paymentOrderLines = paymentOrderLines,
-        createdAt = createdAt,
-        updatedAt = updatedAt
+        paymentId         = paymentId,
+        paymentIntentId   = paymentIntentId,
+        buyerId           = buyerId,
+        merchantAccountId = merchantAccountId,
+        processingModel   = processingModel,
+        totalAmount       = totalAmount,
+        capturedAmount    = capturedAmount,
+        refundedAmount    = refundedAmount,
+        status            = status,
+        splits            = splits,
+        createdAt         = createdAt,
+        updatedAt         = updatedAt
     )
 
-    // ------------------------
-    // FACTORY METHODS
-    // ------------------------
+    // =========================================================================
+    // Display
+    // =========================================================================
 
-    override fun toString(): String {
-        return "Payment(paymentId=${paymentId.value}, paymentIntentId=${paymentIntentId.value}, buyerId=${buyerId.value}, orderId=${orderId.value}, totalAmount=$totalAmount, capturedAmount=$capturedAmount, refundedAmount=$refundedAmount, status=$status, paymentOrderLines=$paymentOrderLines, createdAt=$createdAt, updatedAt=$updatedAt)"
-    }
+    override fun toString(): String =
+        "Payment(paymentId=${paymentId.value}, paymentIntentId=${paymentIntentId.value}, " +
+        "buyerId=${buyerId.value}, merchantAccountId=$merchantAccountId, " +
+        "processingModel=$processingModel, totalAmount=$totalAmount, " +
+        "capturedAmount=$capturedAmount, refundedAmount=$refundedAmount, " +
+        "status=$status, splits=${splits.size}, createdAt=$createdAt, updatedAt=$updatedAt)"
+
+    // =========================================================================
+    // Factory Methods
+    // =========================================================================
 
     companion object {
 
         /**
-         * Create a Payment AFTER a PaymentIntent has been AUTHORIZED.
-         * Typically called from the application layer when handling PaymentIntentAuthorized.
+         * initializeFromAuthEvent
+         *
+         * The canonical factory method for creating a Payment aggregate in the
+         * Central Core Cluster. Called exclusively by PspResultConsumer when
+         * it processes a [PaymentAuthorized] event.
+         *
+         * This method:
+         *  1. Instantiates the aggregate with status=AUTHORIZED.
+         *  2. Locks the [splits] routing matrix into the Central DB at the same
+         *     time (via the enclosing DB transaction in PspResultConsumer).
+         *  3. Sets capturedAmount and refundedAmount to zero.
+         *
+         * Because the Payment aggregate is decoupled from PaymentIntent, this
+         * factory does not reference the PaymentIntent class. All required data
+         * is sourced from the [PaymentAuthorized] event payload which was
+         * forwarded by the OutboxRelayJob.
+         *
+         * @param paymentId           Snowflake ID assigned by the Edge Cell.
+         * @param paymentIntentId     ID of the originating PaymentIntent.
+         * @param buyerId             Purchasing party identifier.
+         * @param merchantAccountId   Primary MoR merchant entity identifier.
+         * @param processingModel     Routing model (DIRECT_MERCHANT or MARKETPLACE).
+         * @param totalAmount         Total authorized amount.
+         * @param splits              Routing instructions from the PaymentAuthorized event.
+         * @param now                 UTC timestamp (injectable for deterministic testing).
+         * @return                    A new Payment in AUTHORIZED state.
          */
-        fun fromAuthorizedIntent(
+        fun initializeFromAuthEvent(
             paymentId: PaymentId,
-            intent: PaymentIntent
+            paymentIntentId: PaymentIntentId,
+            buyerId: BuyerId,
+            merchantAccountId: String,
+            processingModel: ProcessingModel,
+            totalAmount: Amount,
+            splits: List<PaymentSplit>,
+            now: LocalDateTime = Utc.nowLocalDateTime()
         ): Payment {
-            require(intent.status == PaymentIntentStatus.AUTHORIZED) {
-                "Cannot create Payment from non-AUTHORIZED PaymentIntent (current=${intent.status})"
+            require(merchantAccountId.isNotBlank()) {
+                "merchantAccountId must not be blank when initializing a Payment"
             }
-
-            val zero = Amount.Companion.zero(intent.totalAmount.currency)
-            val now = Utc.nowLocalDateTime()
-            
             return Payment(
-                paymentId = paymentId,
-                paymentIntentId = intent.paymentIntentId,
-                buyerId = intent.buyerId,
-                orderId = intent.orderId,
-                totalAmount = intent.totalAmount,
-                capturedAmount = zero,
-                refundedAmount = zero,
-                status = PaymentStatus.NOT_CAPTURED,
-                paymentOrderLines = intent.paymentOrderLines,
-                createdAt = now,
-                updatedAt = now
+                paymentId         = paymentId,
+                paymentIntentId   = paymentIntentId,
+                buyerId           = buyerId,
+                merchantAccountId = merchantAccountId,
+                processingModel   = processingModel,
+                totalAmount       = totalAmount,
+                capturedAmount    = Amount.zero(totalAmount.currency),
+                refundedAmount    = Amount.zero(totalAmount.currency),
+                status            = PaymentStatus.AUTHORIZED,
+                splits            = splits,
+                createdAt         = now,
+                updatedAt         = now
             )
         }
 
+        /**
+         * rehydrate
+         *
+         * Reconstructs a Payment aggregate from persisted database columns.
+         * Used exclusively by the repository layer (e.g., PaymentRepository MyBatis mapper).
+         * No business logic runs here — all validation runs in init{}.
+         */
         fun rehydrate(
             paymentId: PaymentId,
             paymentIntentId: PaymentIntentId,
             buyerId: BuyerId,
-            orderId: OrderId,
+            merchantAccountId: String,
+            processingModel: ProcessingModel,
             totalAmount: Amount,
             capturedAmount: Amount,
             refundedAmount: Amount,
             status: PaymentStatus,
-            paymentOrderLines: List<PaymentOrderLine>,
+            splits: List<PaymentSplit>,
             createdAt: LocalDateTime,
             updatedAt: LocalDateTime
         ): Payment = Payment(
-            paymentId = paymentId,
-            paymentIntentId = paymentIntentId,
-            buyerId = buyerId,
-            orderId = orderId,
-            totalAmount = totalAmount,
-            capturedAmount = capturedAmount,
-            refundedAmount = refundedAmount,
-            status = status,
-            paymentOrderLines = paymentOrderLines,
-            createdAt = createdAt,
-            updatedAt = updatedAt
+            paymentId         = paymentId,
+            paymentIntentId   = paymentIntentId,
+            buyerId           = buyerId,
+            merchantAccountId = merchantAccountId,
+            processingModel   = processingModel,
+            totalAmount       = totalAmount,
+            capturedAmount    = capturedAmount,
+            refundedAmount    = refundedAmount,
+            status            = status,
+            splits            = splits,
+            createdAt         = createdAt,
+            updatedAt         = updatedAt
         )
     }
 }

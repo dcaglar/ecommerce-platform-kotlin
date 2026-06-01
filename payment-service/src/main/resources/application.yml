@@ -1,3 +1,130 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: payment-service
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  jackson:
+    time-zone: UTC
+  data:
+    redis:
+      timeout: 10s
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+          max-wait: 5000ms
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/changelog.edge.xml
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI:http://localhost:8180/realms/payment}
+
 mybatis:
-  type-handlers-package: com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.typehandler
-spring.jackson.time-zone: UTC
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity
+  type-handlers-package: com.dogancaglar.common.db.typehandler
+
+management:
+  server:
+    port: 9000
+  health:
+    probes:
+      enabled: true
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: "prometheus,metrics,health"
+  endpoint:
+    health:
+      enabled: true
+      show-details: always
+    prometheus.enabled: true
+  metrics:
+    tags:
+      application: payment-service
+    enable:
+      all: false
+      tomcat.threads.current: true
+      tomcat.threads.busy: true
+      tomcat.threads.config.max: true
+      http.server.requests: true
+      tomcat.threads: true
+      hikaricp.connections: true
+      hikaricp.connections.acquire: true
+      kafka.producer.topic.record.send: true
+      process.cpu.usage: true
+      jvm.threads.live: true
+      jvm.memory.used: true
+      jvm.memory.max: true
+      jvm.gc.pause: true
+      outbox_dispatched_total: true
+      outbox_dispatch_failed_total: true
+      outbox_event_backlog: true
+      outbox_dispatcher_duration: true
+    binders:
+      tomcat:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        outbox_dispatcher_duration: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+        outbox_dispatcher_duration: 0.5,0.95,0.99
+    export.prometheus.enabled: true
+
+# Pool defaults for the web datasource — overrideable per environment
+# These are production-safe defaults; tune in application-{profile}.yml if needed
+app:
+  datasource:
+    web:
+      driver-class-name: org.postgresql.Driver
+      pool-name: web-pool
+      maximum-pool-size: 12
+      minimum-idle: 6
+      connection-timeout: 1000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+      connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
+  cache:
+    ttl-seconds: 3600
+  account-balance:
+    delta-ttl-seconds: 300
+    idempotency-ttl-seconds: 86400
+    snapshot-interval: PT1M
+
+outbox-dispatcher:
+  thread-count: 2
+  batch-size: 300
+  pool-size: 2
+
+db:
+  web:
+    statement-timeout-ms: 500
+    lock-timeout-ms: 250
+    idle-in-tx-timeout-ms: 0
+
+stripe:
+  api:
+    connect-timeout: 5000
+    read-timeout: 30000
+
+payments:
+  id:
+    epoch-millis: 1735689600000   # 2025-01-01T00:00:00Z
+    region-id: 1                  # EU1
+
+psp:
+  gateway:
+    type: SIMULATED               # Options: STRIPE, SIMULATED — override per environment

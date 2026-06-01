@@ -1,6 +1,5 @@
 package com.dogancaglar.paymentservice.adapter.inbound.rest.mapper
 
-
 import com.dogancaglar.common.id.PublicIdFactory
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.AuthorizationRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentRequestDTO
@@ -13,11 +12,12 @@ import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.common.Currency
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentMethod
+import com.dogancaglar.paymentservice.domain.model.payment.ProcessingModel
+import com.dogancaglar.paymentservice.domain.model.payment.BalanceAccountType
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
-import com.dogancaglar.paymentservice.domain.model.vo.SellerId
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit
 import java.time.format.DateTimeFormatter
 
 object PaymentRequestMapper {
@@ -25,13 +25,16 @@ object PaymentRequestMapper {
         CreatePaymentIntentCommand(
             orderId = OrderId(dto.orderId),
             buyerId = BuyerId(dto.buyerId),
+            merchantAccountId = dto.merchantAccountId,
+            processingModel = ProcessingModel.valueOf(dto.processingModel.name),
             totalAmount = Amount.of(dto.totalAmount.quantity, Currency(dto.totalAmount.currency.name)),
-            paymentOrderLines = dto.paymentOrders.map {
-                PaymentOrderLine(
-                    SellerId(it.sellerId),
-                    Amount.of(it.amount.quantity, Currency(it.amount.currency.name))
+            paymentSplits = dto.splits?.map {
+                PaymentSplit.of(
+                    targetAccountType = BalanceAccountType.valueOf(it.targetAccountType.name),
+                    targetEntityId = it.targetEntityId,
+                    amount = Amount.of(it.amount.quantity, Currency(it.amount.currency.name))
                 )
-            }
+            } ?: emptyList()
         )
 
     fun toAuthorizePaymentIntentCommand(publicPaymentIntentId:String, dto: AuthorizationRequestDTO): AuthorizePaymentIntentCommand =

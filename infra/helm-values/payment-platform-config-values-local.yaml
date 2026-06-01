@@ -1,4 +1,6 @@
 # Non-secret config
 KEYCLOAK_ISSUER_URL: "http://keycloak:8080/realms/ecommerce-platform"
-PAYMENT_DB_URL: "jdbc:postgresql://payment-db-postgresql:5432/payment_db?options=-c%20timezone=UTC"
-DB_NAME: "payment_db"
+EDGE_DB_URL: "jdbc:postgresql://localhost:5432/edge-db?options=-c%20timezone=UTC"
+CENTRAL_DB_URL: "jdbc:postgresql://central-db-postgresql:5432/central-db?options=-c%20timezone=UTC"
+EDGE_DB_NAME: "edge-db"
+CENTRAL_DB_NAME: "central-db"

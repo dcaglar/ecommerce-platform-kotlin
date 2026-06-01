@@ -1,0 +1,224 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "payment-edge-cell.fullname" . }}
+  labels:
+    {{- include "payment-edge-cell.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "payment-edge-cell.fullname" . }}-headless
+  updateStrategy:
+    type: RollingUpdate
+  replicas: {{ .Values.replicaCount }}
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: {{ include "payment-edge-cell.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "payment-edge-cell.fullname" . }}
+    spec:
+      {{- if .Values.serviceAccount }}
+      serviceAccountName: {{ .Values.serviceAccount.name | default "default" }}
+      {{- end }}
+      terminationGracePeriodSeconds: 120
+      {{- if .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml .Values.topologySpreadConstraints | nindent 8 }}
+      {{- end }}
+      containers:
+        # 1. THE WEB API (Accepts Traffic)
+        - name: payment-service
+          image: "{{ .Values.paymentService.image.repository }}:{{ .Values.paymentService.image.tag }}"
+          imagePullPolicy: {{ .Values.paymentService.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: mgmt
+              containerPort: 9000
+              protocol: TCP
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: JAVA_TOOL_OPTIONS
+              value: "{{ .Values.paymentService.jvmOpts }}"
+            - name: SPRING_PROFILES_ACTIVE
+              value: "local"
+            - name: SPRING_DATA_REDIS_URL
+              value: redis://redis-master:6379
+            - name: EDGE_DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_NAME
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_URL
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_SERVICE_USERNAME
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: kafka.payment.svc.cluster.local:9092
+            - name: SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: KEYCLOAK_ISSUER_URL
+          startupProbe:
+            httpGet: {path: /actuator/health/liveness, port: 9000}
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: 9000}
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: 9000}
+            periodSeconds: 15
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.paymentService.resources | nindent 12}}
+
+        # 2. THE LOCAL WORKER (Forwards to Central)
+        - name: payment-edge-workers
+          image: "{{ .Values.edgeWorker.image.repository }}:{{ .Values.edgeWorker.image.tag }}"
+          imagePullPolicy: {{ .Values.edgeWorker.image.pullPolicy }}
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "local"
+            - name: SPRING_DATA_REDIS_URL
+              value: redis://redis-master:6379
+            - name: EDGE_DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_NAME
+            - name: SPRING_DATASOURCE_EDGE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_URL
+            - name: SPRING_DATASOURCE_EDGE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
+            - name: SPRING_DATASOURCE_EDGE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+            - name: SPRING_DATASOURCE_MAINTENANCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_DUTY_USERNAME
+            - name: SPRING_DATASOURCE_MAINTENANCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_DUTY_PASSWORD
+            - name: SPRING_DATASOURCE_CENTRAL_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: CENTRAL_DB_URL
+            - name: SPRING_DATASOURCE_CENTRAL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: central-db-credentials
+                  key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
+            - name: SPRING_DATASOURCE_CENTRAL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: central-db-credentials
+                  key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+          resources:
+            {{- toYaml .Values.resources | nindent 12}}
+
+        # 3. THE LOCAL DATABASE (Edge NVMe Storage)
+        - name: local-edge-db
+          image: "{{ .Values.edgeDb.image.repository }}:{{ .Values.edgeDb.image.tag }}"
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_NAME
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_POSTGRES_PASSWORD
+            - name: EDGE_DB_PAYMENT_SERVICE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_SERVICE_USERNAME
+            - name: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+            - name: EDGE_DB_DUTY_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_DUTY_USERNAME
+            - name: EDGE_DB_DUTY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_DUTY_PASSWORD
+          volumeMounts:
+            - name: edge-db-data
+              mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d/init-edge-db.sh
+              subPath: init-edge-db.sh
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: {{ include "payment-edge-cell.fullname" . }}-init-db
+            defaultMode: 0755
+  volumeClaimTemplates:
+    - metadata:
+        name: edge-db-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 20Gi

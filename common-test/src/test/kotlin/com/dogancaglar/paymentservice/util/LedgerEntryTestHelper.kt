@@ -1,10 +1,11 @@
 package com.dogancaglar.paymentservice.util
 
-
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.common.Currency
 import com.dogancaglar.paymentservice.domain.model.ledger.*
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.vo.TxId
 
 /**
  * Domain-consistent factory for creating valid LedgerEntry test data.
@@ -20,7 +21,7 @@ import com.dogancaglar.paymentservice.domain.model.ledger.*
 object LedgerEntryTestHelper {
 
     /**
-     * Create an Authorization Hold entry.
+     * Create an AuthorizationTx Hold entry.
      * AUTH_RECEIVABLE ↑ (debit) and AUTH_LIABILITY ↓ (credit)
      */
     fun createAuthHoldLedgerEntry(
@@ -30,17 +31,21 @@ object LedgerEntryTestHelper {
     ): LedgerEntry {
         val authReceivable = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
         val authLiability = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
-        val journal = JournalEntry.authHold(
+        val pId = paymentId.filter { it.isDigit() }.toLongOrNull() ?: 100L
+        val result = JournalEntry.authHold(
+            paymentId = PaymentId(pId),
+            txId = TxId(ledgerEntryId),
             journalIdentifier = paymentId,
             authorizedAmount = amount,
             authReceivable = authReceivable,
             authLiability = authLiability
-        ).first()
+        )
+        val journal = result.first()
         return LedgerEntry.create(ledgerEntryId, journal, Utc.nowLocalDateTime())
     }
 
     /**
-     * Create a Capture entry.
+     * Create a CaptureTx entry.
      * Moves funds from auth accounts to merchant + PSP receivables.
      */
     fun createCaptureLedgerEntry(
@@ -51,16 +56,20 @@ object LedgerEntryTestHelper {
     ): LedgerEntry {
         val authReceivable = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
         val authLiability = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
-        val merchantAccount = Account.create(AccountType.MERCHANT_PAYABLE, merchantId)
+        val merchantGrossPool = Account.create(AccountType.MERCHANT_PAYABLE, merchantId)
         val pspReceivable = Account.create(AccountType.PSP_RECEIVABLES, "GLOBAL")
-        val journal = JournalEntry.capture(
+        val poId = paymentOrderId.filter { it.isDigit() }.toLongOrNull() ?: 200L
+        val result = JournalEntry.captureGrossAsset(
+            paymentId = PaymentId(100L),
+            txId = TxId(ledgerEntryId),
             journalIdentifier = paymentOrderId,
             capturedAmount = amount,
             authReceivable = authReceivable,
             authLiability = authLiability,
-            merchantAccount = merchantAccount,
+            merchantGrossPool = merchantGrossPool,
             pspReceivable = pspReceivable
-        ).first()
+        )
+        val journal = result.first()
         return LedgerEntry.create(ledgerEntryId, journal, Utc.nowLocalDateTime())
     }
 

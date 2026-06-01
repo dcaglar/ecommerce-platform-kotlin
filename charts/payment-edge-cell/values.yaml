@@ -1,0 +1,33 @@
+paymentService:
+  image:
+    repository: dcaglar1987/payment-service
+    tag: "latest"
+    pullPolicy: Always
+
+serviceMonitor:
+  enabled: false
+
+
+runPrivilegeGrantJob: true
+
+edgeWorker:
+  image:
+    repository: dcaglar1987/payment-edge-workers
+    tag: "latest"
+    pullPolicy: Always
+
+edgeDb:
+  image:
+    repository: postgres
+    tag: "15-alpine"
+    pullPolicy: IfNotPresent
+  storage:
+    size: 20Gi
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: "topology.kubernetes.io/zone"
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app: payment-edge-cell

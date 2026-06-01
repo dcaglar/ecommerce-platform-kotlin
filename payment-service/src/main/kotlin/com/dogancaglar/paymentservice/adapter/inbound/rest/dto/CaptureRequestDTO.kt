@@ -7,9 +7,8 @@ import jakarta.validation.constraints.NotEmpty
 import jakarta.validation.constraints.NotNull
 
 data class CaptureRequestDTO(
-    val paymentId: String,
     @field:NotBlank
-    val sellerId: String,
+    val merchantAccountId: String,
     @field:NotNull
     @field:Valid
     val amount: AmountDto,

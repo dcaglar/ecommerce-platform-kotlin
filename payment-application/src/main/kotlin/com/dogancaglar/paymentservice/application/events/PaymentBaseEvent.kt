@@ -9,8 +9,6 @@ abstract class PaymentBaseEvent : Event {
     abstract val paymentIntentId: String
     abstract val publicPaymentIntentId: String
 
-    abstract val paymentId: String
-    abstract val publicPaymentId: String
 
 
     abstract val amountValue: Long

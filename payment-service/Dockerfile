@@ -6,16 +6,23 @@ WORKDIR /app
 # Copy root and all module pom.xml files for dependency resolution
 COPY pom.xml ./
 COPY common/pom.xml common/
+COPY common-db/pom.xml common-db/
+COPY common-kafka/pom.xml common-kafka/
 COPY payment-domain/pom.xml payment-domain/
 COPY payment-application/pom.xml payment-application/
 COPY common-test/pom.xml common-test/
 COPY payment-infrastructure/pom.xml payment-infrastructure/
 COPY payment-service/pom.xml payment-service/
 COPY payment-consumers/pom.xml payment-consumers/
+COPY payment-edge-workers/pom.xml payment-edge-workers/
+COPY payment-central-relay/pom.xml payment-central-relay/
+
 # Warm the dependency cache
 RUN --mount=type=cache,target=/root/.m2 mvn -B dependency:go-offline
 # Copy all module source directories (required by parent pom.xml)
 COPY common/ common/
+COPY common-db/ common-db/
+COPY common-kafka/ common-kafka/
 COPY payment-domain/ payment-domain/
 COPY common-test/ common-test/
 COPY payment-application/ payment-application/

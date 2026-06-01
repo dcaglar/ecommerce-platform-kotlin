@@ -109,7 +109,7 @@ class JacksonSerializationAdapterTest {
     private fun createTestPaymentOrder(
         id: Long = 123L,
         retryCount: Int = 0,
-        status: PaymentOrderStatus = PaymentOrderStatus.INITIATED_PENDING
+        status: PaymentOrderStatus = PaymentOrderStatus.CAPTURE_RECEIVED
     ): PaymentOrder =
         PaymentOrder.rehydrate(
             paymentOrderId = PaymentOrderId(id),

@@ -15,6 +15,8 @@ data class LedgerEntryEventData private constructor(
     val journalEntryId: String, // e.g., "AUTH:paymentorder-123"
     val journalType: JournalType,
     val journalName: String?,
+    val paymentId: Long,
+    val txId: Long,
     val createdAt: Instant,
     val postings: List<PostingEventData>
 ) {
@@ -35,6 +37,8 @@ data class LedgerEntryEventData private constructor(
             journalEntryId: String,
             journalType: JournalType,
             journalName: String?,
+            paymentId: Long,
+            txId: Long,
             createdAt: Instant,
             postings: List<PostingEventData>
         ): LedgerEntryEventData {
@@ -43,6 +47,8 @@ data class LedgerEntryEventData private constructor(
                 journalEntryId = journalEntryId,
                 journalType = journalType,
                 journalName = journalName,
+                paymentId = paymentId,
+                txId = txId,
                 createdAt = createdAt,
                 postings = postings
             )

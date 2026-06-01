@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.CentralOutboxRelayMapper">
+
+    <resultMap id="CentralOutboxResultMap" type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.OutboxEventEntity">
+        <id property="oeid" column="oeid"/>
+        <result property="eventType" column="event_type"/>
+        <result property="aggregateId" column="aggregate_id"/>
+        <result property="payload" column="payload"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"
+                typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
+        <result property="updatedAt" column="updated_at"
+                typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
+        <result property="claimedAt" column="claimed_at"
+                typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
+        <result property="claimedBy" column="claimed_by"/>
+    </resultMap>
+
+    <select id="findEligible" resultMap="CentralOutboxResultMap">
+        SELECT * FROM outbox_event
+        WHERE status = 'NEW'
+          AND created_at &lt;= #{tSafe, typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
+        ORDER BY created_at
+        LIMIT #{batchSize}
+    </select>
+
+    <select id="countEligible" resultType="long">
+        SELECT COUNT(*) FROM outbox_event
+        WHERE status = 'NEW'
+          AND created_at &lt;= #{tSafe, typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
+    </select>
+
+    <update id="markDispatched">
+        UPDATE outbox_event
+        SET status = 'SENT', updated_at = now() AT TIME ZONE 'UTC'
+        WHERE oeid = #{oeid}
+    </update>
+
+    <!-- Edge Watermark Operations -->
+    <insert id="upsert" parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.EdgeWatermarkEntity">
+        INSERT INTO edge_watermarks (edge_node_id, forwarded_up_to)
+        VALUES (#{edgeNodeId}, #{forwardedUpTo})
+        ON CONFLICT (edge_node_id) DO UPDATE
+        SET forwarded_up_to = EXCLUDED.forwarded_up_to
+    </insert>
+
+    <select id="computeTSafe" resultType="java.time.Instant">
+        SELECT MIN(forwarded_up_to) FROM edge_watermarks
+    </select>
+
+    <delete id="deleteWatermark" parameterType="string">
+        DELETE FROM edge_watermarks WHERE edge_node_id = #{edgeNodeId}
+    </delete>
+
+</mapper>

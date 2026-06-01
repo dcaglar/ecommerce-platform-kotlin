@@ -12,7 +12,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.domain.model.vo.SellerId
 import com.dogancaglar.paymentservice.infra.adapter.outbound.redis.client.PaymentOrderRetryRedisCache
 import com.dogancaglar.paymentservice.infra.adapter.outbound.serialization.JacksonSerializationAdapter
-import com.dogancaglar.paymentservice.infra.config.JacksonConfig
+import com.dogancaglar.paymentservice.infra.adapter.outbound.serialization.JacksonConfig
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
@@ -45,6 +45,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import io.micrometer.core.instrument.MeterRegistry
 
 /**
  * Integration tests for Payment Order Retry Queue (Adapter + Cache) with real Redis.
@@ -81,7 +82,7 @@ class PaymentOrderRetryIntegrationTest {
     )
     class TestConfig {
         @Bean
-        fun meterRegistry(): io.micrometer.core.instrument.MeterRegistry {
+        fun meterRegistry(): MeterRegistry {
             return SimpleMeterRegistry()
         }
     }

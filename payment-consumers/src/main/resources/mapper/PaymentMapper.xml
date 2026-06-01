@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    PaymentMapper — Central DB (payment-consumers module)
+    ============================================================
+    The Payment aggregate is a Central Core concern, persisted in the
+    central DB and owned by PspResultConsumer / payment-consumers.
+
+    Column mapping reflects the Epic 1 schema:
+      - merchant_account_id  replaces order_id
+      - processing_model     new column (DIRECT_MERCHANT | MARKETPLACE)
+      - splits_json          replaces payment_lines (stores PaymentSplit routing matrix)
+-->
+<mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentMapper">
+
+    <resultMap id="PaymentResultMap"
+               type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentEntity">
+        <id  property="paymentId"           column="payment_id"/>
+        <result property="paymentIntentId"   column="payment_intent_id"/>
+        <result property="buyerId"           column="buyer_id"/>
+        <result property="merchantAccountId" column="merchant_account_id"/>
+        <result property="processingModel"   column="processing_model"/>
+        <result property="totalAmountValue"  column="total_amount_value"/>
+        <result property="currency"          column="currency"/>
+        <result property="capturedAmountValue" column="captured_amount_value"/>
+        <result property="refundedAmountValue" column="refunded_amount_value"/>
+        <result property="status"            column="status"/>
+        <result property="splitsJson"        column="splits_json" jdbcType="VARCHAR"/>
+        <result property="createdAt"         column="created_at"
+                typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
+        <result property="updatedAt"         column="updated_at"
+                typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
+    </resultMap>
+
+    <!-- ================================================================
+         READ
+         ================================================================ -->
+
+    <select id="getMaxPaymentId" resultType="long">
+        SELECT COALESCE(MAX(payment_id), 0) FROM payments
+    </select>
+
+    <select id="findById" resultMap="PaymentResultMap">
+        SELECT payment_id,
+               payment_intent_id,
+               buyer_id,
+               merchant_account_id,
+               processing_model,
+               total_amount_value,
+               currency,
+               captured_amount_value,
+               refunded_amount_value,
+               status,
+               splits_json::text AS splits_json,
+               created_at,
+               updated_at
+        FROM payments
+        WHERE payment_id = #{id}
+    </select>
+
+    <select id="findByPaymentIntentId" resultMap="PaymentResultMap">
+        SELECT payment_id,
+               payment_intent_id,
+               buyer_id,
+               merchant_account_id,
+               processing_model,
+               total_amount_value,
+               currency,
+               captured_amount_value,
+               refunded_amount_value,
+               status,
+               splits_json::text AS splits_json,
+               created_at,
+               updated_at
+        FROM payments
+        WHERE payment_intent_id = #{paymentIntentId}
+    </select>
+
+    <!-- ================================================================
+         WRITE
+         ================================================================ -->
+
+    <insert id="insert"
+            parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentEntity">
+        INSERT INTO payments (
+            payment_id,
+            payment_intent_id,
+            buyer_id,
+            merchant_account_id,
+            processing_model,
+            total_amount_value,
+            captured_amount_value,
+            refunded_amount_value,
+            currency,
+            status,
+            splits_json,
+            created_at,
+            updated_at
+        ) VALUES (
+            #{paymentId},
+            #{paymentIntentId},
+            #{buyerId},
+            #{merchantAccountId},
+            #{processingModel},
+            #{totalAmountValue},
+            #{capturedAmountValue},
+            #{refundedAmountValue},
+            #{currency},
+            #{status},
+            CAST(#{splitsJson} AS jsonb),
+            #{createdAt,typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler},
+            #{updatedAt,typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
+        )
+    </insert>
+
+    <!--
+        UPDATE: only mutable state fields are included.
+        payment_id, payment_intent_id, buyer_id, merchant_account_id,
+        processing_model, total_amount_value, currency, splits_json are
+        immutable after creation and must NOT appear in UPDATE statements.
+    -->
+    <update id="update"
+            parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentEntity">
+        UPDATE payments SET
+            captured_amount_value = #{capturedAmountValue},
+            refunded_amount_value = #{refundedAmountValue},
+            status                = #{status},
+            updated_at            = #{updatedAt,typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
+        WHERE payment_id = #{paymentId}
+    </update>
+
+    <!-- ================================================================
+         DELETE (test / admin use only)
+         ================================================================ -->
+
+    <delete id="deleteAll">
+        DELETE FROM payments
+    </delete>
+
+    <delete id="deleteById">
+        DELETE FROM payments WHERE payment_id = #{id}
+    </delete>
+
+</mapper>

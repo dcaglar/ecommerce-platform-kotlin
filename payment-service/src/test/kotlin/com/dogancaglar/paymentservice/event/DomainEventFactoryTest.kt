@@ -4,7 +4,7 @@ import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.GenericLogFields
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.application.events.PaymentOrderCreated
+import com.dogancaglar.paymentservice.application.events.PaymentOrderCaptureReceived
 import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventEntityMapper
 import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.common.Currency
@@ -33,15 +33,15 @@ class DomainEventFactoryTest {
                 paymentId = PaymentId(123L),
                 sellerId = SellerId("seller-1"),
                 amount = Amount.of(25000L, Currency("EUR")),
-                status = PaymentOrderStatus.INITIATED_PENDING,
+                status = PaymentOrderStatus.CAPTURE_RECEIVED,
                 retryCount = 0,
                 createdAt = now,
                 updatedAt = now
             )
-            val event = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(paymentOrder)
+            val event = PaymentOrderDomainEventEntityMapper.toPaymentOrderCaptureReceived(paymentOrder)
             
             // when
-            val envelope: EventEnvelope<PaymentOrderCreated> = EventEnvelopeFactory.envelopeFor(
+            val envelope: EventEnvelope<PaymentOrderCaptureReceived> = EventEnvelopeFactory.envelopeFor(
                 data = event,
                 aggregateId = event.paymentOrderId,
                 traceId = traceIdFromMDC
@@ -50,7 +50,7 @@ class DomainEventFactoryTest {
             // then
             Assertions.assertThat(envelope.eventId).isNotNull
             Assertions.assertThat(envelope.traceId).isEqualTo(traceIdFromMDC)
-            Assertions.assertThat(envelope.eventType).isEqualTo("payment_order_created")
+            Assertions.assertThat(envelope.eventType).isEqualTo("payment_order_capture_received")
         } finally {
             MDC.clear()
         }
@@ -66,12 +66,12 @@ class DomainEventFactoryTest {
                 paymentId = PaymentId(1L),
                 sellerId = SellerId("s-1"),
                 amount = Amount.of(1000L, Currency("EUR")),
-                status = PaymentOrderStatus.INITIATED_PENDING,
+                status = PaymentOrderStatus.CAPTURE_RECEIVED,
                 retryCount = 0,
                 createdAt = now,
                 updatedAt = now
             )
-            val event = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(paymentOrder)
+            val event = PaymentOrderDomainEventEntityMapper.toPaymentOrderCaptureReceived(paymentOrder)
             
             EventEnvelopeFactory.envelopeFor(
                 data = event,
@@ -92,12 +92,12 @@ class DomainEventFactoryTest {
                 paymentId = PaymentId(2L),
                 sellerId = SellerId("s-1"),
                 amount = Amount.of(1000L, Currency("EUR")),
-                status = PaymentOrderStatus.INITIATED_PENDING,
+                status = PaymentOrderStatus.CAPTURE_RECEIVED,
                 retryCount = 0,
                 createdAt = now,
                 updatedAt = now
             )
-            val event1Data = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(paymentOrder1)
+            val event1Data = PaymentOrderDomainEventEntityMapper.toPaymentOrderCaptureReceived(paymentOrder1)
             val event1 = EventEnvelopeFactory.envelopeFor(
                 data = event1Data,
                 aggregateId = event1Data.paymentOrderId,
@@ -109,12 +109,12 @@ class DomainEventFactoryTest {
                 paymentId = PaymentId(2L),
                 sellerId = SellerId("s-1"),
                 amount = Amount.of(1000L, Currency("EUR")),
-                status = PaymentOrderStatus.INITIATED_PENDING,
+                status = PaymentOrderStatus.CAPTURE_RECEIVED,
                 retryCount = 0,
                 createdAt = now,
                 updatedAt = now
             )
-            val event2Data = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(paymentOrder2)
+            val event2Data = PaymentOrderDomainEventEntityMapper.toPaymentOrderCaptureReceived(paymentOrder2)
             val event2 = EventEnvelopeFactory.envelopeFor(
                 data = event2Data,
                 aggregateId = event2Data.paymentOrderId,
@@ -140,12 +140,12 @@ class DomainEventFactoryTest {
                 paymentId = PaymentId(123L),
                 sellerId = SellerId("seller-1"),
                 amount = Amount.of(25000L, Currency("EUR")),
-                status = PaymentOrderStatus.INITIATED_PENDING,
+                status = PaymentOrderStatus.CAPTURE_RECEIVED,
                 retryCount = 0,
                 createdAt = now,
                 updatedAt = now
             )
-            val event = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(paymentOrder)
+            val event = PaymentOrderDomainEventEntityMapper.toPaymentOrderCaptureReceived(paymentOrder)
 
             val envelope = EventEnvelopeFactory.envelopeFor(
                 data = event,
@@ -155,7 +155,7 @@ class DomainEventFactoryTest {
 
             Assertions.assertThat(envelope.traceId).isNotBlank
             Assertions.assertThat(envelope.eventId).isNotNull
-            Assertions.assertThat(envelope.eventType).isEqualTo("payment_order_created")
+            Assertions.assertThat(envelope.eventType).isEqualTo("payment_order_capture_received")
             Assertions.assertThat(envelope.aggregateId).isEqualTo(event.publicPaymentOrderId)
             Assertions.assertThat(envelope.data).isEqualTo(event)
         } finally {
@@ -175,12 +175,12 @@ class DomainEventFactoryTest {
                 paymentId = PaymentId(123L),
                 sellerId = SellerId("seller-1"),
                 amount = Amount.of(25000L, Currency("EUR")),
-                status = PaymentOrderStatus.INITIATED_PENDING,
+                status = PaymentOrderStatus.CAPTURE_RECEIVED,
                 retryCount = 0,
                 createdAt = now,
                 updatedAt = now
             )
-            val event = PaymentOrderDomainEventEntityMapper.toPaymentOrderCreated(paymentOrder)
+            val event = PaymentOrderDomainEventEntityMapper.toPaymentOrderCaptureReceived(paymentOrder)
 
             val envelope = EventEnvelopeFactory.envelopeFor(
                 data = event,

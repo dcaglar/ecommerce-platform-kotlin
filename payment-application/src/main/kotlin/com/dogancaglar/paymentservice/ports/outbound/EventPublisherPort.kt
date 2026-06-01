@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.ports.outbound
 import com.dogancaglar.common.event.Event
 import com.dogancaglar.common.event.EventEnvelope
 import java.time.Duration
+import java.util.concurrent.CompletableFuture
 
 
 interface EventPublisherPort {
@@ -20,11 +21,10 @@ interface EventPublisherPort {
     ): EventEnvelope<T>
 
     /**
-     * Publish a batch inside one Kafka transaction (exactly-once).
+     * Publish an envelope asynchronously.
      */
-    fun <T : Event> publishBatchAtomically(
-        envelopes: List<EventEnvelope<T>>,
-        timeout: Duration = Duration.ofSeconds(30)
-    ): Boolean
+    fun <T : Event> publishAsync(
+        envelope: EventEnvelope<T>
+    ): CompletableFuture<EventEnvelope<T>>
 }
 

@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.adapter.inbound.rest
+package com.dogancaglar.paymentservice.adapter.inbound.rest.webconfig
 
 import com.dogancaglar.common.time.Utc
 import org.springframework.context.annotation.Bean
@@ -13,7 +13,6 @@ import org.springframework.security.core.GrantedAuthority
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter
 import org.springframework.security.web.SecurityFilterChain
 
 @Configuration

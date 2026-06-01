@@ -11,6 +11,8 @@ import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
 import com.dogancaglar.paymentservice.domain.model.ledger.LedgerEntry
 import com.dogancaglar.paymentservice.domain.model.ledger.Posting
 import com.dogancaglar.paymentservice.domain.util.LedgerEntryFactory
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.vo.TxId
 
 object LedgerDomainEventEntityMapper {
 
@@ -26,6 +28,8 @@ object LedgerDomainEventEntityMapper {
             journalEntryId = journal.id,
             journalType = journal.txType,
             journalName = journal.name,
+            paymentId = journal.paymentId.value,
+            txId = journal.txId.value,
             createdAt = Utc.toInstant(ledgerEntry.createdAt),
             postings = journal.postings.map { toPostingEventData(it) }
         )
@@ -39,6 +43,8 @@ object LedgerDomainEventEntityMapper {
             id = ledgerEntryEvent.journalEntryId,
             txType = ledgerEntryEvent.journalType,
             name = ledgerEntryEvent.journalName ?: "Ledger Entry",
+            paymentId = PaymentId(ledgerEntryEvent.paymentId),
+            txId = TxId(ledgerEntryEvent.txId),
             postings = postingsDomain
         )
 

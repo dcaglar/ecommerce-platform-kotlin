@@ -8,6 +8,8 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
 import org.springframework.stereotype.Component
+import com.dogancaglar.common.kafka.metadata.PaymentEventMetadataCatalog
+import com.fasterxml.jackson.databind.jsontype.NamedType
 
 @Component
 class JacksonSerializationAdapter(
@@ -15,8 +17,8 @@ class JacksonSerializationAdapter(
 ) : SerializationPort {
 
     init {
-        com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog.all.forEach {
-            objectMapper.registerSubtypes(com.fasterxml.jackson.databind.jsontype.NamedType(it.clazz, it.eventType))
+        PaymentEventMetadataCatalog.all.forEach {
+            objectMapper.registerSubtypes(NamedType(it.clazz, it.eventType))
         }
     }
 

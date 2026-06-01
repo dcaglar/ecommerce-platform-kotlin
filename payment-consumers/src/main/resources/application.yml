@@ -1,21 +1,130 @@
+app:
+  cache:
+    ttl-seconds: 3600  # 1 hour redis TTL for PSP result cache
+  kafka: # Kafka configuration for dynamic consumers
+    specs:
+      payment_order_created_topic:                { partitions: 48, replicas: 1, createDlq: true }
+      payment_order_capture_request_queue_topic:  { partitions: 48, replicas: 1, createDlq: true }
+      payment_order_succeeded_topic:              { partitions: 48, replicas: 1, createDlq: true }
+      payment_order_psp_result_updated_topic:     { partitions: 48, replicas: 1, createDlq: true }
+      payment_order_finalized_topic:              { partitions: 48, replicas: 1, createDlq: true }
+      payment_authorized_topic:                   { partitions: 12, replicas: 1, createDlq: true }
+      ledger_record_request_queue_topic:          { partitions: 24, replicas: 1, createDlq: true }
+      ledger_entries_recorded_topic:              { partitions: 24, replicas: 1, createDlq: true }
+    dynamic-consumers:
+      - id: psp-capture-executor
+        topic: capture_topic
+        group-id: psp-capture-executor-consumer-group
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PaymentOrderCaptureExecutor
+        concurrency: 8
+      - id: psp-refund-executor
+        topic: refund_topic
+        group-id: psp-refund-executor-consumer-group
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PspRefundExecutorConsumer
+        concurrency: 8
+      - id: psp-result-consumer
+        topic: psp_result_topic
+        group-id: psp-result-consumer-group
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PspResultConsumer
+        concurrency: 8
+      - id: payment-authorized-processor
+        topic: payment_authorized_topic
+        group-id: payment-authorized-processor-consumer-group
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PaymentAuthorizedConsumer
+        concurrency: 2
+      - id: payment-order-enqueuer
+        topic: payment_order_created_topic
+        group-id: payment-order-enqueuer-consumer-group
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PaymentOrderEnqueuer
+        concurrency: 8
+      - id: payment-order-psp-result-applier
+        topic: payment_order_psp_result_updated_topic
+        group-id: payment-order-psp-result-updated-consumer-group
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PaymentOrderPspResultApplier
+        concurrency: 8
+      - id: ledger-recording-request-dispatcher
+        topic: payment_order_finalized_topic
+        group-id: ledger-recording-request-dispatcher-consumer-group
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.LedgerRecordingRequestDispatcher
+        concurrency: 4
+      - id: ledger-recording-consumer
+        topic: ledger_record_request_queue_topic
+        group-id: ledger-recording-consumer-group
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.LedgerRecordingConsumer
+        concurrency: 4
+      - id: account-balance-consumer
+        topic: ledger_entries_recorded_topic
+        group-id: account-balance-consumer-group
+        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.AccountBalanceConsumer
+        concurrency: 4
+
 server:
   port: 8080
+  tomcat:
+    accesslog:
+      enabled: true
+      directory: /var/log/tomcat
+      prefix: access_log
+      suffix: .log
+      pattern: '%h %l %u %t "%r" %s %b %D'
+      buffered: true
 
+spring:
+  application:
+    name: payment-consumers
+  lifecycle:
+    timeout-per-shutdown-phase: 45s
+  jackson:
+    time-zone: UTC
+  datasource:
+    url: ${SPRING_DATASOURCE_CENTRAL_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 1500
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1740000
+      keepalive-time: 300000
+      leak-detection-threshold: 60000
+  kafka:
+    consumer:
+      isolation-level: read_committed
+      enable-auto-commit: false
+      max-poll-records: 120
+      max-poll-interval: 240000
+      fetch-min-bytes: 131072
+      fetch-max-wait: 25ms
+      max-partition-fetch-bytes: 1048576
+      fetch-max-bytes: 33554432
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: com.dogancaglar.common.kafka.serde.EventEnvelopeKafkaDeserializer
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+    properties:
+      security.protocol: PLAINTEXT
+      session.timeout.ms: 45000
   data:
     redis:
+      url: ${SPRING_DATA_REDIS_URL:redis://localhost:6379}
+      timeout: 10s
       lettuce:
         pool:
-          max-active: 64
-          max-idle: 64
-          min-idle: 8
-          max-wait: 2000ms
-    # Only the url should be
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+          max-wait: 5000ms
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/changelog.central.xml
 
-
-
-mybatis:
-  mapper-locations: classpath*:mapper/*.xml
 management:
+  health:
+    probes:
+      enabled: true
   endpoints:
     web:
       exposure:
@@ -27,37 +136,246 @@ management:
     prometheus:
       enabled: true
   metrics:
-    distribution:
-      percentiles-histogram:
-        http.server.requests: true
-      percentiles:
-        http.server.requests: 0.5,0.95,0.99
-    export:
-      prometheus:
-        enabled: true
+    tags:
+      application: payment-consumers
     enable:
       all: false
-      http.server.requests: true
-      tomcat.threads: true
       hikaricp.connections: true
       hikaricp.connections.acquire: true
-      outbox.event.backlog: true
-      outbox.dispatched: true
-      outbox.dispatcher.duration: true
-      kafka.consumer.fetch.manager.records.lag: true
-      kafka.producer.topic.record.send: true
       process.cpu.usage: true
       jvm.threads.live: true
       jvm.memory.used: true
       jvm.memory.max: true
       jvm.gc.pause: true
-      scheduler.outbox.active.threads: true
-      scheduler.outbox.pool.size.threads: true
-      scheduler.outbox.queue.size: true
+      kafka.consumer.fetch.manager.records.lag: true
       kafka.consumer.fetch.manager.records.consumed: true
       kafka.consumer.fetch.manager.fetch.latency: true
       kafka.consumer.io.time: true
-spring:
-  application:
-    name: payment-consumers
-  jackson.time-zone: UTC
+      kafka.consumer.records.lag.max: true
+      kafka.consumer.fetch.latency.avg: true
+      kafka.consumer.fetch.latency.max: true
+      kafka.producer.batch.size.avg: true
+      kafka.producer.batch.size.max: true
+      kafka.producer.request.latency.avg: true
+      kafka.producer.topic.record.send: true
+      kafka.producer.request.latency.max: true
+      kafka.producer.compression.rate.avg: true
+      kafka.producer.record.send.total: true
+      kafka.producer.record.error.total: true
+      kafka.producer.record.retry.total: true
+      kafka.producer.outgoing.byte.total: true
+      kafka.producer.io.wait.time.total: true
+      kafka.producer.bufferpool.wait.ratio: true
+      kafka.producer.bufferpool.wait.time.total: true
+      psp_calls_total: true
+      psp_call_latency: true
+      psp_queue_delay: true
+      psp_exec_duration: true
+      redis_retry_zset_size: true
+      redis_retry_batch_size: true
+      redis_retry_events_total: true
+      redis_retry_dispatch_batch_seconds: true
+      redis_retry_dispatch_event_seconds: true
+      http.server.requests: true
+      tomcat.threads: true
+    distribution:
+      percentiles-histogram:
+        psp_call_latency: true
+        redis_retry_dispatch_batch_seconds: true
+        redis_retry_dispatch_event_seconds: true
+        http.server.requests: true
+      percentiles:
+        psp_call_latency: 0.5,0.95,0.99
+        redis_retry_dispatch_batch_seconds: 0.5,0.95,0.99
+        redis_retry_dispatch_event_seconds: 0.5,0.95,0.99
+        http.server.requests: 0.5,0.95,0.99
+    export:
+      prometheus:
+        enabled: true
+
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity
+  type-handlers-package: com.dogancaglar.common.db.typehandler
+
+psp:
+  refund:
+    simulation:
+      scenarios:
+        NORMAL:
+          timeouts:
+            enabled: true
+            probability: 0
+          latency:
+            fast:
+              probability: 100
+              minMs: 50
+              maxMs: 150
+            moderate:
+              probability: 0
+              minMs: 150
+              maxMs: 300
+            slow:
+              probability: 0
+              minMs: 300
+              maxMs: 600
+          response:
+            successful: 50
+            retryable: 40
+            nonRetryable: 10
+        PEAK:
+          timeouts:
+            enabled: true
+            probability: 25
+          latency:
+            fast:
+              probability: 30
+              minMs: 250
+              maxMs: 500
+            moderate:
+              probability: 50
+              minMs: 501
+              maxMs: 1500
+            slow:
+              probability: 20
+              minMs: 1501
+              maxMs: 2500
+          response:
+            successful: 50
+            retryable: 45
+            statusCheck: 0
+            nonRetryable: 5
+        DEGRADED:
+          timeouts:
+            enabled: true
+            probability: 30
+          latency:
+            fast:
+              probability: 20
+              minMs: 2000
+              maxMs: 2200
+            moderate:
+              probability: 20
+              minMs: 2201
+              maxMs: 2600
+            slow:
+              probability: 60
+              minMs: 2601
+              maxMs: 2990
+          response:
+            successful: 50
+            retryable: 40
+            statusCheck: 0
+            nonRetryable: 10
+        BEST_PSP_EVER:
+          timeouts:
+            enabled: false
+            probability: 0
+          latency:
+            fast:
+              probability: 100
+              minMs: 1
+              maxMs: 2
+            moderate:
+              probability: 0
+              minMs: 0
+              maxMs: 0
+            slow:
+              probability: 0
+              minMs: 0
+              maxMs: 0
+          response:
+            successful: 100
+            retryable: 0
+            statusCheck: 0
+            nonRetryable: 0
+  capture:
+    simulation:
+      scenarios:
+        NORMAL:
+          timeouts:
+            enabled: true
+            probability: 0
+          latency:
+            fast:
+              probability: 100
+              minMs: 50
+              maxMs: 150
+            moderate:
+              probability: 0
+              minMs: 150
+              maxMs: 300
+            slow:
+              probability: 0
+              minMs: 300
+              maxMs: 600
+          response:
+            successful: 50
+            retryable: 40
+            nonRetryable: 10
+        PEAK:
+          timeouts:
+            enabled: true
+            probability: 25
+          latency:
+            fast:
+              probability: 30
+              minMs: 250
+              maxMs: 500
+            moderate:
+              probability: 50
+              minMs: 501
+              maxMs: 1500
+            slow:
+              probability: 20
+              minMs: 1501
+              maxMs: 2500
+          response:
+            successful: 50
+            retryable: 45
+            statusCheck: 0
+            nonRetryable: 5
+        DEGRADED:
+          timeouts:
+            enabled: true
+            probability: 30
+          latency:
+            fast:
+              probability: 20
+              minMs: 2000
+              maxMs: 2200
+            moderate:
+              probability: 20
+              minMs: 2201
+              maxMs: 2600
+            slow:
+              probability: 60
+              minMs: 2601
+              maxMs: 2990
+          response:
+            successful: 50
+            retryable: 40
+            statusCheck: 0
+            nonRetryable: 10
+        BEST_PSP_EVER:
+          timeouts:
+            enabled: false
+            probability: 0
+          latency:
+            fast:
+              probability: 100
+              minMs: 1
+              maxMs: 2
+            moderate:
+              probability: 0
+              minMs: 0
+              maxMs: 0
+            slow:
+              probability: 0
+              minMs: 0
+              maxMs: 0
+          response:
+            successful: 100
+            retryable: 0
+            statusCheck: 0
+            nonRetryable: 0

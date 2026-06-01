@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentIntentMapper">
+    <resultMap id="PaymentIntentResultMap"
+               type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentIntentEntity">
+        <id property="paymentIntentId" column="payment_intent_id"/>
+        <result property="pspReference" column="psp_reference"/>
+        <result property="buyerId" column="buyer_id"/>
+        <result property="orderId" column="order_id"/>
+        <result property="totalAmountValue" column="total_amount_value"/>
+        <result property="currency" column="currency"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"
+                typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
+        <result property="updatedAt" column="updated_at"
+                typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
+        <result property="splitsJson"        column="splits_json" jdbcType="VARCHAR"/>
+        <result property="merchantAccountId" column="merchant_account_id"/>
+        <result property="processingModel" column="processing_model"/>
+    </resultMap>
+
+    <select id="getMaxPaymentIntentId" resultType="long">
+        SELECT COALESCE(MAX(payment_intent_id), 0) FROM payment_intents
+    </select>
+
+
+    <insert id="insert"
+            parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentIntentEntity"
+    >
+        INSERT INTO payment_intents (
+        payment_intent_id,
+        psp_reference,
+        buyer_id,
+        order_id,
+        merchant_account_id,
+        processing_model,
+        total_amount_value,
+        currency,
+        status,
+        splits_json,
+        created_at,
+        updated_at
+        ) VALUES (
+        #{paymentIntentId},
+        #{pspReference},
+        #{buyerId},
+        #{orderId},
+        #{merchantAccountId},
+        #{processingModel},
+        #{totalAmountValue},
+        #{currency},
+        #{status},
+        CAST(#{splitsJson} AS jsonb),
+        #{createdAt},
+        #{updatedAt}
+        )
+    </insert>
+
+    <select id="findById" resultMap="PaymentIntentResultMap">
+        SELECT payment_intent_id,
+        psp_reference,
+        buyer_id,
+        order_id,
+        merchant_account_id,
+        processing_model,
+        total_amount_value,
+        currency,
+        status,
+        created_at,
+        updated_at,
+        splits_json::text AS splits_json
+        FROM payment_intents
+        WHERE payment_intent_id = #{id}
+    </select>
+
+    <delete id="deleteAll">
+        DELETE FROM payment_intents
+    </delete>
+
+    <update id="update"
+            parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentIntentEntity">
+        UPDATE payment_intents SET
+        psp_reference = #{pspReference},
+        order_id = #{orderId},
+        buyer_id = #{buyerId},
+        merchant_account_id = #{merchantAccountId},
+        processing_model = #{processingModel},
+        total_amount_value = #{totalAmountValue},
+        currency = #{currency},
+        status = #{status},
+        splits_json = CAST(#{splitsJson} AS jsonb),
+        created_at = #{createdAt},
+        updated_at = #{updatedAt}
+        WHERE payment_intent_id = #{paymentIntentId}
+    </update>
+
+    <update id="tryMarkPendingAuth" parameterType="map">
+        UPDATE payment_intents
+        SET status = 'PENDING_AUTH',
+        updated_at = #{now}
+        WHERE payment_intent_id = #{id}
+        AND status = 'CREATED'
+    </update>
+
+    <update id="updatePspReference" parameterType="map">
+        UPDATE payment_intents
+        SET psp_reference = #{pspReference},
+        updated_at = #{now, typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
+        WHERE payment_intent_id = #{paymentIntentId}
+    </update>
+
+
+
+    <delete id="deleteById">
+        DELETE FROM payment_intents WHERE payment_intent_id = #{id}
+    </delete>
+</mapper>

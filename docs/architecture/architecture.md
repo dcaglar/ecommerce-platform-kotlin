@@ -1,6 +1,6 @@
 # 🟦 Event-Driven Payments & Ledger Infrastructure for Multi-Seller Platforms
 
-This project represents a backend **payment platform for a Merchant-of-Record (MoR) environment**.  
+This project represents a backend **payment platform for  Merchant-of-Record (MoR) environment**.  
 Think of a multi-seller e-commerce marketplace where shoppers can buy items from different sellers in a single checkout.  
 The platform manages the **full payment lifecycle**: synchronous authorization, multi-seller decomposition, seller-level operations, and internal financial accounting.
 
@@ -8,15 +8,15 @@ The platform manages the **full payment lifecycle**: synchronous authorization, 
 
 # 🟩 Key Clarifications (MoR Model)
 
+
 ### **1. Is the payment platform internal?**
-Yes. The payment platform is an **internal backend domain service**, not exposed to shoppers directly.  
-Checkout / Order Service calls it to create payments, decompose them into seller-specific PaymentOrders, and initiate payment authorization.
+Yes. The payment platform is an **internal backend domain service**, not exposed to shoppers directly. While it provides endpoints like `POST /api/v1/payments/{paymentId}/authorize`, these are meant to be called by your own internal proxies or checkout services, never directly by the shopper's browser.
 
 ---
 
-### **2. Do we perform authorization ourselves?**
-No. We delegate authorization, capture, refund, and cancel operations to an external PSP via our gateway.  
-From the PSP’s perspective, we appear as a **single merchant-of-record**; seller details remain internal.
+### **2. Do we perform the actual financial authorization ourselves?**
+No. Even though we expose an `/authorize` endpoint to orchestrate the flow, we do not perform the actual financial authorization. We simply act as a gateway to trigger and record the authorization happening at an external PSP (like Stripe).  
+From the PSP’s perspective, we appear as a **single merchant-of-record**; seller details remain completely internal to our ledger.
 
 ---
 
@@ -26,13 +26,8 @@ The PSP simply transfers funds into the MoR account.
 
 ---
 
-### **4. Why authorize once but capture/refund per PaymentOrder?**
-Authorization happens **once for the entire basket**, matching shopper intent.  
-Captures, cancels, and refunds happen **per PaymentOrder**, since each seller’s fulfillment lifecycle is independent.
-
-### **5. Why do we have payment intent, and payment seperately**
-
-Separating PaymentIntent from Payment lets our system handle user interaction safely,money movement correctly,retry safely.
+### **4. Why separate PaymentIntent and Payment?**
+Separating PaymentIntent from Payment lets our system handle user interaction safely, money movement correctly, and retry safely without creating duplicate financial records.
 
 
 # 🟧 Functional Requirements
@@ -60,14 +55,14 @@ Separating PaymentIntent from Payment lets our system handle user interaction sa
 
 ## **For Internal Services (Checkout / Order / Finance / Payouts)**
 
-### **FR5 — Checkout/Order Service should be able to create a Payment.**
-- It must be possible for the Order Service to create a Payment and obtain the generated Payment along with its seller-level PaymentOrders.
+### **FR5 — Checkout/Order Service should be able to create a PaymentIntent.**
+- It must be possible for the Order Service to create a PaymentIntent and obtain the generated Intent along with its seller-level PaymentSplits.
 
 ### **FR6 — Checkout/Order Service should be able to trigger authorization via PSP.**
 - The system must allow Checkout to authorize the total payment amount through an external PSP.
 
-### **FR7 — Internal services should be able to perform seller-level operations.**
-- Internal services must be able to request captures, cancellations, and refunds *per PaymentOrder*.
+### **FR7 — Internal services should be able to perform operations.**
+- Internal services must be able to request captures, cancellations, and refunds *per Payment*.
 
 ### **FR8 — The system must maintain internal fund distribution for reporting and payouts.**
 - Internal components (Finance, Payouts) must be able to retrieve seller payables, platform fees, and other financial allocations.
@@ -106,8 +101,8 @@ Even under retries, restarts, and network issues, financial outcomes must remain
 # 🟦 Architecture Summary (Non-Functional / Implementation Section)
 
 The platform internally uses:
-- **Event-driven architecture** for asynchronous flows for payment order and ledger
-- **Kafka topics** for PaymentOrder creation, PSP calls, and ledger events
+- **Event-driven architecture** for asynchronous flows for payments and the ledger
+- **Kafka topics** for execution queuing and PSP results
 - **Idempotent state transitions** to ensure correctness under retries
 - **Double-entry ledger** for immutable financial history
 - **PSP gateway client** for authorization, capture, refund, and cancel operations
@@ -115,9 +110,9 @@ The platform internally uses:
 
 ---
 
-🟦 Core Entities (Domain-Level)
+# 🟦 Core Entities (Domain-Level)
 
-These represent the nouns your system uses to satisfy the functional requirements.  
+These represent the nouns our system uses to satisfy the functional requirements.  
 They define the **data model**, the **API vocabulary**, and the **business language** of the Merchant-of-Record payment platform.
 
 ---
@@ -139,7 +134,7 @@ These actors perform operations on payments, orders, balances, and payouts.
 ---
 
 # 🟩 Core Business Entities
-These are the fundamental nouns of out Merchant-of-Record payment platform.
+These are the fundamental nouns of our Merchant-of-Record payment platform.
 
 ---
 
@@ -150,7 +145,7 @@ Represents the **shopper's intent to pay** for a multi-seller basket.
 **When it's created:**
 - Step 1: Shopper initiates checkout → `POST /api/v1/payments` endpoint
 - Created with status `CREATED_PENDING` (initially), then transitions to `CREATED` once Stripe ID is obtained.
-- Contains: `buyerId`, `orderId`, `totalAmount`, `paymentOrderLines` (seller breakdown)
+- Contains: `buyerId`, `orderId`, `totalAmount`, `paymentSplits` (seller breakdown)
 
 **Why it exists:**
 - Separates "intent to pay" from "actual payment transaction"
@@ -164,7 +159,7 @@ Represents the **shopper's intent to pay** for a multi-seller basket.
 Represents the **actual financial transaction** created after authorization succeeds
 
 **When it's created:**
-- when psp authorization response is authorized.
+- Created centrally by the `PspResultConsumer` when the PSP authorization response is `AUTHORIZED`.
 
 **Why it exists:**
 - Models actual money movement (vs. PaymentIntent which is just "intent")
@@ -175,24 +170,31 @@ Represents the **actual financial transaction** created after authorization succ
 
 
 
-## **3. PaymentOrder**
-Represents the **per-seller financial component** of a Payment.
+## **3. OutboxEvent**
+Represents **immutable integration events** stored locally on edge or centrally.
 
 **When it's created:**
-  When `Payment` is created
-- One `PaymentOrder` per seller (from `Payment.paymentOrderLines`)
-- Initial status: `INITIATED_PENDING`
+  When intent mutations or external network results are received.
 
 **Why it exists:**
-- Each seller has independent fulfillment lifecycle
-- Sellers can be captured, refunded, or cancelled independently
-- Enables per-seller financial tracking and payouts
-- Supports retry logic per seller (if one seller's capture fails, others continue)
-- Maps directly to seller-level accounting entries
+- Guarantees exactly-once publishing through the database transaction.
+- Eliminates dual-write vulnerabilities between DB and Kafka.
 
 ---
 
-## **4. LedgerEntry**
+## **4. Payment Transaction (Tx)**
+
+Represents an **individual financial operation** executed against a Payment (e.g., `AuthorizationTx`, `CaptureTx`, `RefundTx`, `SettleTx`). 
+
+**When it's created:**
+  - Whenever an operation is requested and executed against the PSP (e.g., when we successfully capture funds, a `CaptureTx` is recorded).
+
+**Why it exists:**
+  - **Audit & History:** While the `Payment` aggregate tracks the *cumulative total* (e.g., "This payment has 100 EUR captured"), the `Tx` tracks the *individual actions* ("We captured 50 EUR on Monday, and 50 EUR on Tuesday").
+  - **External PSP Linking:** It stores the external network identifiers (like the PSP's acquirer reference) to trace exactly which network call caused the balance change.
+  - **Ledger Bridging:** It acts as the business-level parent for double-entry accounting. Each successful `Tx` generates exactly one `JournalEntry` to balance the MoR's books.
+
+## **5. LedgerEntry**
 
 Represents a **single double-entry journal entry**.
 
@@ -201,14 +203,14 @@ Contains:
 - Credit postings
 - JournalId
 - Timestamp
-- Business context (paymentOrderId, sellerId, etc.)
+- Business context (paymentIntentId, txId, sellerId, etc.)
 
 **Why it exists:**  
 Ensures financial correctness, auditability, and immutable accounting history.
 
 ---
 
-## **5. Posting (Debit / Credit)**
+## **6. Posting (Debit / Credit)**
 
 A component of a LedgerEntry.
 
@@ -221,7 +223,7 @@ LedgerEntries consist of multiple postings — always balanced.
 
 ---
 
-## **6. Account**
+## **7. Account**
 
 Represents a **financial account** in the internal ledger, such as:
 
@@ -236,7 +238,7 @@ Money moves internally between accounts, not as free-form variables.
 
 ---
 
-## **7. Balance**
+## **8. Balance**
 
 Represents the **current financial standing** of an account (e.g., seller’s accrued revenue).  
 Derived from applied LedgerEntries.
@@ -257,131 +259,187 @@ This document contains C4 model diagrams for the payment service system at diffe
 The System Context diagram shows the payment service system in its environment, illustrating users and external systems it interacts with.
 
 ```mermaid
-graph TB
-    subgraph "Users"
-        Shopper[👤 Shopper<br/>End-user making purchases<br/>across multiple sellers]
-        Seller[👤 Seller<br/>Marketplace participant<br/>receiving payments]
+graph TD
+    %% Styles
+    classDef edgeCell fill:#fff0f0,stroke:#ffbaba,stroke-width:2px,color:#333
+    classDef internalHost fill:#f0f8ff,stroke:#baddff,stroke-width:2px,color:#333
+    classDef db fill:#e2f0d9,stroke:#70ad47,stroke-width:2px,color:#333
+    classDef service fill:#fff2cc,stroke:#ffc000,stroke-width:2px,color:#333
+    classDef job fill:#e1dfdd,stroke:#a6a6a6,stroke-width:2px,color:#333
+    classDef topic fill:#e8d1ff,stroke:#b160ff,stroke-width:2px,color:#333
+    classDef consumer fill:#ffe6cc,stroke:#f4b183,stroke-width:2px,color:#333
+
+    subgraph ExternalLayer["EXTERNAL HOSTS (Edge Layer)"]
+        direction LR
+        
+        subgraph Edge1["Edge Cell 1"]
+            direction TB
+            API1("Payment Acceptance Service<br/>(Authorization / Capture / Refund)")
+            IdemDB1[("Idempotency DB<br/>IdempotencyRecord")]
+            EdgeDB1[("Edge Local DB<br/>PaymentIntent<br/>OutboxEvents")]
+            Fwd1[["Local Outbox Forwarder"]]
+            
+            API1 -.-> IdemDB1
+            API1 --> EdgeDB1
+            EdgeDB1 --> Fwd1
+        end
+
+        subgraph Edge2["Edge Cell 2"]
+            direction TB
+            API2("Payment Acceptance Service<br/>(Authorization / Capture / Refund)")
+            IdemDB2[("Idempotency DB<br/>IdempotencyRecord")]
+            EdgeDB2[("Edge Local DB<br/>PaymentIntent<br/>OutboxEvents")]
+            Fwd2[["Local Outbox Forwarder"]]
+            
+            API2 -.-> IdemDB2
+            API2 --> EdgeDB2
+            EdgeDB2 --> Fwd2
+        end
     end
 
-    subgraph "Internal Systems"
-        CheckoutService[Checkout Service<br/>Handles shopper checkout flow]
-        OrderService[Order Service<br/>Manages order lifecycle]
-        FinanceService[Finance Service<br/>Financial reporting & payouts]
+    subgraph InternalLayer["INTERNAL HOST (Central Cluster)"]
+        direction TB
+        
+        CentralDB[("Central DB<br/>OutboxEvent, Payment, PaymentTx,<br/>LedgerEntry, JournalEntry, Postings")]
+        
+        Relay[["OutboxRelayJob<br/>(payment-central-relay)"]]
+        
+        subgraph Topics["Kafka Topics"]
+            direction LR
+            CapTopic>"capture-execution-queue"]
+            TransTopic>"internal-transfer-queue"]
+            ResTopic>"psp-result-queue<br/>(Accepted: PaymentAuthorized,<br/>CaptureSuccessful)"]
+        end
+        
+        CentralDB -->|Polls OutboxEvents| Relay
+        
+        Relay -->|OutboxEvent&lt;CaptureReceived&gt;| CapTopic
+        Relay -->|OutboxEvent&lt;InternalTransferRequest&gt;| TransTopic
+        Relay -->|OutboxEvent&lt;PaymentAuthorized&gt;<br/>OutboxEvent&lt;CaptureSuccessful&gt;| ResTopic
+        
+        subgraph Consumers["Payment Consumers (payment-consumers)"]
+            direction TB
+            CapCons("CAPTURE COMMAND EXECUTOR<br/>Calls psp.capture()<br/>Stores OutboxEvent&lt;CapturePspPerformed&gt;")
+            TransCons("INTERNAL TRANSFER CONSUMER<br/>Records Internal Ledger Splits")
+            
+            ResCons("PSP RESULT CONSUMER<br/><b>PaymentAuthorized</b> -> createAuthTx, createAuthJournal<br/><b>CaptureSuccessful</b> -> createCaptureTx, createCaptureJournals<br/><i>*Appends OutboxEvent&lt;InternalTransferRequest&gt;*</i>")
+        end
+        
+        CapTopic --> CapCons
+        TransTopic --> TransCons
+        ResTopic --> ResCons
+        
+        CapCons -->|Writes Result| CentralDB
+        TransCons -->|Writes Result| CentralDB
+        ResCons -->|Stores Txs & Journals| CentralDB
     end
 
-    subgraph "Payment Platform"
-        PaymentService[Payment Service<br/>REST API Application<br/>Manages payment lifecycle:<br/>authorization, payment intent creation,<br/>seller balance tracking]
-        PaymentConsumers[Payment Consumers<br/>Kafka Consumer Application<br/>Asynchronous payment processing:<br/>capture operations, event handling,<br/>retry logic]
-    end
+    %% Network Links
+    Fwd1 ===>|Forwards OutboxEvents| CentralDB
+    Fwd2 ===>|Forwards OutboxEvents| CentralDB
 
-    subgraph "External Systems"
-        PSPGateway[PSP Gateway<br/>Payment Service Provider<br/>Authorization & Capture]
-    end
-
-    %% User interactions
-    Shopper -->|Initiates checkout| CheckoutService
-    
-    %% Internal system interactions
-    CheckoutService -->|Creates payment intents<br/>Authorizes payments<br/>REST API| PaymentService
-    OrderService -->|Queries payment status<br/>REST API| PaymentService
-    FinanceService -->|Queries seller balances<br/>REST API| PaymentService
-    
-    %% Payment Platform internal interactions
-    PaymentService -.->|Publishes events<br/>Kafka| PaymentConsumers
-    
-    %% External system interactions
-    PaymentService -->|Authorizes payments<br/>HTTPS| PSPGateway
-    PaymentConsumers -->|Captures payments<br/>HTTPS| PSPGateway
-    
-    %% Indirect user interactions
-    FinanceService -.->|Provides balance info| Seller
-
-    %% Styling
-    style Shopper fill:#e1f5ff,stroke:#1976D2,stroke-width:2px
-    style Seller fill:#e1f5ff,stroke:#1976D2,stroke-width:2px
-    style PaymentService fill:#fff4e1,stroke:#FF9800,stroke-width:3px
-    style PaymentConsumers fill:#fff4e1,stroke:#FF9800,stroke-width:3px
-    style CheckoutService fill:#f0e1ff,stroke:#8E24AA,stroke-width:2px
-    style OrderService fill:#f0e1ff,stroke:#8E24AA,stroke-width:2px
-    style FinanceService fill:#f0e1ff,stroke:#8E24AA,stroke-width:2px
-    style PSPGateway fill:#ffe1e1,stroke:#C62828,stroke-width:2px
+    %% Assign Classes
+    class Edge1,Edge2 edgeCell
+    class InternalLayer internalHost
+    class IdemDB1,EdgeDB1,IdemDB2,EdgeDB2,CentralDB db
+    class API1,API2 service
+    class Fwd1,Fwd2,Relay job
+    class CapTopic,TransTopic,ResTopic topic
+    class CapCons,TransCons,ResCons consumer
 ```
 
-### System Context Description
+**Payment Platform** is an internal backend domain service that manages the complete payment lifecycle for a multi-seller marketplace platform. It operates as a Merchant-of-Record (MoR), handling all financial transactions between shoppers, sellers, and the platform. The platform is divided into three highly available tiers:
 
-**Payment Platform** is an internal backend domain service that manages the complete payment lifecycle for a multi-seller marketplace platform. It operates as a Merchant-of-Record (MoR), handling all financial transactions between shoppers, sellers, and the platform. The platform consists of two main applications:
-
-- **Payment Service**: REST API application that handles synchronous operations (payment intent creation, authorization, queries)
-- **Payment Consumers**: Kafka consumer application that handles asynchronous operations (capture operations, event processing, retry logic)
+- **The Edge Cell (Payment Service Pod)**: A strictly coupled Kubernetes Sidecar pattern that acts as an atomic "Machine". Each Pod contains the REST API for synchronous operations (authorization, intent creation), an isolated local Postgres database for zero-latency outbox commits, and a background worker (`payment-edge-workers`) for async forwarding to the Central DB. These containers must run on the exact same host to share storage and local networking loopback.
+- **Payment Central Relay (Central Node)**: A dedicated, non-blocking scheduler service (`payment-central-relay`) hosting the `OutboxRelayJob`. It polls the Central DB via `CentralOutboxRelayPort` up to the globally safe `T_Safe` watermark and publishes outbox events in-order to Kafka. **This workload does NOT apply the sidecar pattern** and is physically isolated from the consumers to ensure independent uptime; if the relay job fails, consumers continue running unaffected.
+- **Payment Consumers (Central Node)**: Purely asynchronous consumer application (`payment-consumers`) that handles global asynchronous operations (capture/refund execution, event processing, retry logic, and double-entry ledger bookkeeping). **This workload does NOT apply the sidecar pattern** and is scheduled on separate, independent physical hosts/pods to preserve asynchronous isolation and independent scaling.
 
 
 ### End to End payment flow
 
 ```mermaid
 graph TD
-    Start([Checkout Service<br/>Creates Payment]) --> PI1[PaymentIntent<br/>Status: CREATED<br/>Total: 2900 EUR<br/>Lines: SELLER-111: 1450<br/>SELLER-222: 1450]
+    classDef intentPending fill:#fff4e1,stroke:#ffb74d,stroke-width:2px,color:#333
+    classDef intentSuccess fill:#e8f5e9,stroke:#81c784,stroke-width:2px,color:#333
+    classDef intentFailed fill:#ffebee,stroke:#e57373,stroke-width:2px,color:#333
+    classDef payment fill:#f3e5f5,stroke:#ba68c8,stroke-width:2px,color:#333
+    classDef order fill:#e3f2fd,stroke:#64b5f6,stroke-width:2px,color:#333
+    classDef consumer fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#333
+    classDef psp fill:#fce4ec,stroke:#f06292,stroke-width:2px,color:#333
+    classDef idem fill:#e0f7fa,stroke:#00bcd4,stroke-width:2px,color:#333
 
-    PI1 -->|POST /authorize| PI2[PaymentIntent<br/>Status: PENDING_AUTH<br/>Authorization in progress]
-
-    PI2 -->|PSP Call| PSP{PSP Response}
+    Start([Checkout Service<br/>Initiates Payment]) --> IdemCheck{Idempotency<br/>Key Exists?}
     
-    PSP -->|AUTHORIZED| PI3[PaymentIntent<br/>Status: AUTHORIZED]
-    PSP -->|DECLINED| PI4[PaymentIntent<br/>Status: DECLINED<br/>END]
-    PSP -->|TIMEOUT| PI2
+    IdemCheck -->|Yes| ReturnStored[Return Stored<br/>PaymentIntent]
+    
+    IdemCheck -->|No| PI0[PaymentIntent<br/>Status: CREATED_PENDING<br/>Total: 2900 EUR]
+    
+    subgraph IntentPhase ["Payment Intent Phase (Synchronous)"]
+        direction TB
+        PI0 -->|POST /api/v1/payments| PSP_Create{PSP Create<br/>Intent}
+        PSP_Create -->|SUCCESS| PI1[PaymentIntent<br/>Status: CREATED]
+        PSP_Create -.->|TIMEOUT| PI0
+    end
+    
+    subgraph AuthPhase ["Authorization Phase (Synchronous)"]
+        direction TB
+        PI1 -->|POST /authorize| PI2[PaymentIntent<br/>Status: PENDING_AUTH]
+        PI2 -->|PSP Confirm| PSP_Auth{PSP Response}
+        PSP_Auth -->|AUTHORIZED| PI3[PaymentIntent<br/>Status: AUTHORIZED]
+        PSP_Auth -->|DECLINED| PI4[PaymentIntent<br/>Status: DECLINED<br/>END]
+        PSP_Auth -.->|TIMEOUT| PI2
+    end
 
-    PI3 -->|Create Payment| P1[Payment<br/>Status: NOT_CAPTURED<br/>Total: 2900 EUR<br/>Captured: 0 EUR<br/>Refunded: 0 EUR]
+    subgraph PaymentPhase ["Edge Ingestion Phase (Asynchronous)"]
+        direction TB
+        PI3 -->|POST /captures| CAP1[Edge DB Outbox<br/>CaptureReceived]
+    end
 
-    P1 -->|Fork into N Orders| PO1[PaymentOrder 1<br/>SELLER-111<br/>Status: INITIATED_PENDING<br/>Amount: 1450 EUR<br/>Retry: 0]
-    P1 -->|Fork into N Orders| PO2[PaymentOrder 2<br/>SELLER-222<br/>Status: INITIATED_PENDING<br/>Amount: 1450 EUR<br/>Retry: 0]
+    subgraph ExecutionPhase ["Execution & Relay"]
+        direction TB
+        CAP1 -->|Relayed by OutboxRelayJob| CAP2("CaptureCommandExecutor")
+        
+        CAP2 -->|PSP Capture Call| PSP1{PSP Result}
+        
+        PSP1 -->|Append to Central Outbox| PSP2[OutboxEvent: ExternalAsyncCaptureToPspPerformed]
+        PSP2 -->|Relayed to psp-result-queue| PSP3("PspResultConsumer")
+        
+        PSP3 -->|Wait for Webhook| WEB1[Edge DB Outbox<br/>CaptureSuccessful]
+        WEB1 -->|Relayed to psp-result-queue| WEB2("PspResultConsumer")
+    end
 
-    %% PaymentOrder 1 State Machine
-    PO1 -->|Enqueued| PO1A[PaymentOrder 1<br/>Status: CAPTURE_REQUESTED<br/>Retry: 0]
-    PO1A -->|PSP Capture Call| PSP1{PSP Result}
-    PSP1 -->|SUCCESS| PO1B[PaymentOrder 1<br/>Status: CAPTURED<br/>TERMINAL]
-    PSP1 -->|FAILED| PO1C[PaymentOrder 1<br/>Status: CAPTURE_FAILED<br/>TERMINAL]
-    PSP1 -->|TIMEOUT| PO1D[PaymentOrder 1<br/>Status: PENDING_CAPTURE<br/>Retry: 1]
-    PO1D -->|Retry| PO1A
+    WEB2 -->|Updates Ledger| P3[Payment<br/>Status: CAPTURED<br/>MERCHANT_GROSS_POOL updated]
+    WEB2 -->|Creates| P1[Payment<br/>Status: AUTHORIZED] (If first webhook)
+    
+    P3 -.->|If MARKETPLACE| SPLIT1[OutboxEvent: InternalTransferRequest]
+    SPLIT1 -->|Relayed to internal-transfer-queue| SPLIT2("InternalTransferConsumer")
+    SPLIT2 -->|Sub-Seller Distribution| SPLIT3[JournalType.INTERNAL_TRANSFER]
 
-    %% PaymentOrder 2 State Machine
-    PO2 -->|Enqueued| PO2A[PaymentOrder 2<br/>Status: CAPTURE_REQUESTED<br/>Retry: 0]
-    PO2A -->|PSP Capture Call| PSP2{PSP Result}
-    PSP2 -->|SUCCESS| PO2B[PaymentOrder 2<br/>Status: CAPTURED<br/>TERMINAL]
-    PSP2 -->|FAILED| PO2C[PaymentOrder 2<br/>Status: CAPTURE_FAILED<br/>TERMINAL]
-    PSP2 -->|TIMEOUT| PO2D[PaymentOrder 2<br/>Status: PENDING_CAPTURE<br/>Retry: 1]
-    PO2D -->|Retry| PO2A
-
-    %% Payment Status Updates
-    PO1B -->|Update Payment| P2[Payment<br/>Status: PARTIALLY_CAPTURED<br/>Captured: 1450 EUR]
-    PO2B -->|Update Payment| P3[Payment<br/>Status: CAPTURED<br/>Captured: 2900 EUR]
-
-    %% Refund Flow (optional)
-    PO1B -.->|Refund Request| PO1E[PaymentOrder 1<br/>Status: REFUNDED]
-    PO1E -->|Update Payment| P4[Payment<br/>Status: PARTIALLY_REFUNDED<br/>Refunded: 1450 EUR]
-
-    %% Styling
-    style PI1 fill:#e1f5ff,stroke:#1976D2,stroke-width:2px
-    style PI2 fill:#fff4e1,stroke:#FF9800,stroke-width:2px
-    style PI3 fill:#e1ffe1,stroke:#388E3C,stroke-width:2px
-    style PI4 fill:#ffe1e1,stroke:#C62828,stroke-width:2px
-    style P1 fill:#f0e1ff,stroke:#8E24AA,stroke-width:2px
-    style P2 fill:#f0e1ff,stroke:#8E24AA,stroke-width:2px
-    style P3 fill:#e1ffe1,stroke:#388E3C,stroke-width:2px
-    style P4 fill:#fff4e1,stroke:#FF9800,stroke-width:2px
-    style PO1 fill:#fff4e1,stroke:#FF9800,stroke-width:2px
-    style PO1A fill:#fff4e1,stroke:#FF9800,stroke-width:2px
-    style PO1B fill:#e1ffe1,stroke:#388E3C,stroke-width:2px
-    style PO1C fill:#ffe1e1,stroke:#C62828,stroke-width:2px
-    style PO1D fill:#fff4e1,stroke:#FF9800,stroke-width:2px
-    style PO1E fill:#ffe1e1,stroke:#C62828,stroke-width:2px
-    style PO2 fill:#fff4e1,stroke:#FF9800,stroke-width:2px
-    style PO2A fill:#fff4e1,stroke:#FF9800,stroke-width:2px
-    style PO2B fill:#e1ffe1,stroke:#388E3C,stroke-width:2px
-    style PO2C fill:#ffe1e1,stroke:#C62828,stroke-width:2px
-    style PO2D fill:#fff4e1,stroke:#FF9800,stroke-width:2px
-    style PSP fill:#ffebee,stroke:#C62828,stroke-width:2px
-    style PSP1 fill:#ffebee,stroke:#C62828,stroke-width:2px
-    style PSP2 fill:#ffebee,stroke:#C62828,stroke-width:2px
+    class IdemCheck,ReturnStored idem
+    class PI0,PI1,PI2 intentPending
+    class PI3 intentSuccess
+    class PI4 intentFailed
+    class P1,P3 payment
+    class CAP1,WEB1,SPLIT1 order
+    class CAP2,PSP3,WEB2,SPLIT2 consumer
+    class PSP_Create,PSP_Auth,PSP1 psp
 ```
+
+### Simplified Consumer Architecture
+
+A new simplified Kafka consumer architecture has been introduced to streamline PSP operations and double-entry bookkeeping.
+
+**Why we moved away from the "Consume-Process-Publish" pattern:**
+Historically, consumers would read an event, process it (e.g. call a PSP), and then immediately publish a new event using Kafka Transactions. This attempted to achieve "exactly-once" delivery semantics but caused significant issues:
+- **Abusing Kafka as a Database**: Relying on Kafka transactions to guarantee state consistency across external API calls and database commits led to fragile, blocking architectures.
+- **Blocking Calls in Transactions**: External PSP calls (which can be slow) held open Kafka transactions, reducing throughput and risking transaction timeouts.
+- **Unrealistic Exactly-Once Guarantees**: Achieving true exactly-once semantics across a database, an external HTTP API, and Kafka is impossible without distributed locks or 2PC (Two-Phase Commit).
+
+**The New Pattern (Outbox-Driven Consumers):**
+1. **Intents (Capture/Refund Received)**: `CaptureReceived` events denote that an intent to capture has been recorded in the database edge outbox.
+2. **Executors (`CaptureCommandExecutor`)**: These components listen to `capture-execution-queue`. They perform the synchronous call to the external PSP Gateway. Upon receiving a terminal or retryable result, they **do not publish back to Kafka directly**. Instead, they write a `ExternalAsyncCaptureToPspPerformed` event into the Central Database Outbox.
+3. **Outbox Relay**: The `OutboxRelayJob` reads these results from the database outbox and publishes them asynchronously to the `psp-result-queue`.
+4. **Result Processing (`PspResultConsumer`)**: Listens to the `psp-result-queue` to apply the results to the central database, finalize payment statuses, trigger internal double-entry ledger bookkeeping, and schedule any required internal transfers.
 
 ### Authorization/Idempotency Sequence Diagram
 
@@ -389,14 +447,24 @@ graph TD
 sequenceDiagram
     autonumber
 
-    actor Shopper
+    box rgb(240, 248, 255) "Client Layer"
+        actor Shopper
+        participant Browser as Shopper's Browser<br/>(React App)
+    end
 
-    participant Browser as Shopper's Browser<br/>(React App @ :3000)
-    participant Proxy as Backend Proxy<br/>(Node.js @ :3001)
-    participant Keycloak
-    participant PaymentSvc as payment-service<br/>(REST API)
-    participant IdemSvc as IdempotencyService
-    participant Stripe
+    box rgb(255, 240, 245) "Gateway Layer"
+        participant Proxy as Backend Proxy<br/>(Node.js)
+        participant Keycloak
+    end
+
+    box rgb(255, 244, 225) "Payment Edge Cell"
+        participant PaymentSvc as payment-service<br/>(REST API)
+        participant IdemSvc as IdempotencyService
+    end
+
+    box rgb(255, 235, 238) "External Systems"
+        participant Stripe
+    end
 
     %% Step 1: Create Payment Intent
     Note over Shopper, Stripe: Phase 1: Create Payment Intent & Prepare Checkout Form
@@ -480,8 +548,7 @@ sequenceDiagram
     rect rgb(230, 240, 255)
         note over PaymentSvc: @Transactional
         PaymentSvc->>PaymentSvc: Update PaymentIntent status to AUTHORIZED
-        PaymentSvc->>PaymentSvc: Create Payment & PaymentOrder entities
-        PaymentSvc->>PaymentSvc: Save PaymentAuthorizedEvent to Outbox table
+        PaymentSvc->>PaymentSvc: Save PaymentAuthorized to Outbox table
     end
 
     PaymentSvc-->>Proxy: 200 OK { status: 'AUTHORIZED' }
@@ -489,23 +556,54 @@ sequenceDiagram
     Browser->>Shopper: Display "Payment Successful" message
 ```
 
-#### Ledger Record Sequence Flow
+#### Ledger Finalization & Split Execution Flow
 
 ```mermaid
 sequenceDiagram
-    participant Kafka
-    participant Dispatcher as LedgerRecordingRequestDispatcher
-    participant Command as LedgerRecordingCommand
-    participant Consumer as LedgerRecordingConsumer
-    participant Service as RecordLedgerEntriesService
-    participant LedgerDB as Ledger Table
+    autonumber
+    
+    box rgb(230, 230, 250) "Message Broker (Kafka)"
+        participant psp_result as Topic: psp-result-queue
+        participant transfer_topic as Topic: internal-transfer
+    end
 
-    Kafka->>Dispatcher: Consume PaymentOrderFinalized
-    Dispatcher->>Kafka: Publish LedgerRecordingCommand
-    Kafka->>Consumer: Consume LedgerRecordingCommand
-    Consumer->>Service: recordLedgerEntries()
-    Service->>LedgerDB: Append JournalEntries
-    Service->>Kafka: Publish LedgerEntriesRecorded
+    box rgb(255, 250, 240) "Payment Consumers"
+        participant PspResult as PspResultConsumer
+        participant Transfer as InternalTransferConsumer
+    end
+
+    box rgb(245, 245, 245) "Central Relay Node"
+        participant Relay as OutboxRelayJob
+    end
+
+    box rgb(240, 255, 240) "Database"
+        participant DB as Central Database
+    end
+
+    %% Step 1: Gross Capture
+    psp_result->>PspResult: 1. Consume: CaptureSuccessful (from Edge Webhook)
+    
+    Note over PspResult, DB: --- Phase A: Gross Settlement ---
+    PspResult->>DB: 2. Update Payment Status to CAPTURED
+    PspResult->>DB: 3. Insert JournalEntry (Gross Asset Capture)
+    
+    %% Step 2: Staging Splits
+    Note over PspResult, DB: --- Phase B: Atomic Split Staging ---
+    PspResult->>DB: 4. Check PaymentSplits (Marketplace Logic)
+    PspResult->>DB: 5. Insert OutboxEvent<InternalTransferRequest> (One per seller)
+    PspResult-->>psp_result: 6. ACK Kafka Message
+    
+    %% Step 3: Relay Sweeping
+    Note over Relay, DB: --- Phase C: Outbox Sweep ---
+    Relay->>DB: 7. Polls Outbox table
+    DB-->>Relay: Returns new InternalTransferRequest events
+    Relay->>transfer_topic: 8. Publish to internal-transfer-queue
+    
+    %% Step 4: Split Execution
+    Note over Transfer, DB: --- Phase D: Split Ledger Execution ---
+    transfer_topic->>Transfer: 9. Consume: InternalTransferRequest
+    Transfer->>DB: 10. Insert JournalEntry (INTERNAL_TRANSFER)<br/>Credits Seller, Debits Gross Pool
+    Transfer-->>transfer_topic: 11. ACK Kafka Message
 ```
 
 #### Balance Flow Sequence
@@ -513,13 +611,24 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant Ledger as LedgerRecordingConsumer
-    participant Kafka as ledger_entries_recorded_topic
-    participant Consumer as AccountBalanceConsumer
-    participant Service as AccountBalanceService
-    participant Redis as Redis (Deltas)
-    participant Job as AccountBalanceSnapshotJob
-    participant DB as PostgreSQL (Snapshots)
+    box rgb(255, 250, 240) "Payment Consumers (Central)"
+        participant Ledger as LedgerRecordingConsumer
+        participant Consumer as AccountBalanceConsumer
+        participant Service as AccountBalanceService
+        participant Job as AccountBalanceSnapshotJob
+    end
+
+    box rgb(230, 230, 250) "Message Broker"
+        participant Kafka as ledger_entries_recorded_topic
+    end
+
+    box rgb(255, 228, 225) "In-Memory Store"
+        participant Redis as Redis (Deltas)
+    end
+
+    box rgb(240, 255, 240) "Database"
+        participant DB as PostgreSQL (Snapshots)
+    end
 
     Ledger->>Kafka: Publish LedgerEntriesRecorded (sellerId key)
     Kafka->>Consumer: Consume batch (100-500 events)
@@ -558,58 +667,179 @@ The platform follows a **Hexagonal (Ports & Adapters)** pattern to separate busi
 - **Components**: Entities (`Payment`, `PaymentIntent`), Value Objects, and Domain Events.
 - **Traits**: Zero dependencies on Spring or MyBatis. Implements **Double-entry ledger** logic and **Idempotent state transitions**.
 
-### **2. `payment-application` (Orchestration)**
-- **Role**: Implements Use Cases and coordinates data flow.
-- **Components**: Inbound/Outbound Ports and Services.
+### **2. `payment-application` (Orchestration & Ports)**
+- **Role**: Implements Use Cases, coordinates business flows, and defines Ports.
+- **Components**: Inbound Ports (Use Cases), Outbound Ports (Database/Kafka interfaces), and Core Domain Services.
 - **Logic**: Manages internal fund distribution, platform fees, and retry policies for PSP operations.
 
-### **3. `payment-infrastructure` (Adapters)**
-- **Role**: Concrete implementations of Outbound Ports.
-- **Persistence**: **MyBatis** with PostgreSQL using the Data Mapper pattern.
-- **Messaging**: **Apache Kafka** for asynchronous PaymentOrder and Ledger events.
-- **Identity**: Distributed **Snowflake** algorithm for time-ordered, unique IDs.
-- **Performance**: Redis-backed balance caching and idempotency storage.
+### **3. `common-db` (Shared Database Infrastructure)**
+- **Role**: Reusable MyBatis utilities, JSON typehandlers, and base configuration templates.
+- **Traits**: Provides `mybatis-config-template.xml` and standard JSONb handling across the platform.
 
-### **4. `payment-service` (Composition Root)**
-- **Role**: System Entry Point and Inbound Adapter.
-- **REST API**: Spring Web MVC controllers exposed to internal checkout services.
-- **Reliability**: Implements the **Transactional Outbox Pattern** via the `OutboxDispatcherJob` for guaranteed event delivery.
-- **Wiring**: Manages global lifecycle, thread pools, and multi-datasource transaction coordination.
+### **4. `common-kafka` (Shared Messaging Infrastructure)**
+- **Role**: Reusable Kafka utilities, generic event envelopes, and Jackson ser/deser configurations.
+- **Traits**: Ensures type safety and consistent payload formatting for all Kafka producers and consumers.
+
+### **5. `payment-infrastructure` (Shared Technical Adapters)**
+- **Role**: General utility implementations like the Snowflake ID Generator.
+- **Traits**: Contains only truly common infrastructure utilities, completely decoupled from database entities or Kafka topics.
+
+### **4. `payment-service` (API & Edge Cell Inbound Adapter)**
+- **Role**: Composition root and API gateway for the Edge Cell Pod.
+- **REST API**: Spring Web MVC controllers exposed to internal checkout/order services for synchronous payments and intents.
+- **Ports & Adapters**: Implements local database storage using `LocalOutboxWriterPort` to guarantee transaction safety.
+- **Wiring**: Manages local Edge Cell lifecycle, thread pools, and local database connection.
+
+### **5. `payment-edge-workers` (Local Sidecar Forwarder)**
+- **Role**: Background sidecar runner that bridges the Edge Cell to the Central Node.
+- **Outbox Forwarding**: Runs `LocalOutboxForwarderJob` asynchronously to claim local outbox events using `LocalOutboxEdgePort` and forward them to the Central consolidated DB using `CentralOutboxEdgePort`.
+- **Fault Isolation**: Runs in its own container within the Edge Cell Pod, ensuring that outbox forwarding never steals API resources or gets blocked by network latency.
+
+### **6. `payment-central-relay` (Central Outbox Publisher)**
+- **Role**: Centralized high-performance scheduler that publishes events to Kafka.
+- **Resilient Relaying**: Hosts the global `OutboxRelayJob` which queries eligible events from the Central DB outbox using `CentralOutboxRelayPort` and a safe watermark (`T_Safe`).
+- **Kafka Publishing**: Uses an isolated thread pool and `PaymentEventPublisher` to publish events strictly in-order to Kafka with guaranteed at-least-once delivery.
+
+### **7. `payment-consumers` (Asynchronous Workers & Ledger Processors)**
+- **Role**: Central asynchronous consumer engine.
+- **Kafka Listeners**: Hosts all `@KafkaListener` components for capture, refund, PSP results, ledger recording, and balance updates.
+- **Workloads**: Coordinates heavy asynchronous tasks like calling external PSP Gateways and executing double-entry ledger bookkeeping.
 
 
-## 🟦 Outbox Pattern Implementation
+## 🟦 Outbox Pattern Implementation (Two-Stage Edge-to-Central)
 
-The system uses the **Transactional Outbox Pattern** to ensure reliable event publishing. When payment-related entities are created or updated within a database transaction, corresponding events are written to an `outbox_events` table atomically. The `OutboxDispatcherJob` then publishes these events to Kafka asynchronously.
+The system uses a **Two-Stage Transactional Outbox Pattern** to ensure reliable event publishing from distributed stateless edge nodes to a highly available central relay, which ultimately publishes to Kafka.
 
-### **OutboxDispatcherJob**
+### **Stage 1: Edge Node (The Atomic "Machine" Edge Cell)**
 
-The `OutboxDispatcherJob` is a scheduled service that runs in the `payment-service` application and is responsible for reliably dispatching outbox events to Kafka.
+The Edge layer is responsible for synchronous payment acceptance (Stripe integration, intent creation) and local outbox creation. To achieve zero-latency communication and perfectly linear horizontal scaling (akin to a bare-metal "Machine" model), the Edge layer is deployed using the **Kubernetes Sidecar Pattern**.
 
-**Key Responsibilities:**
-- **Claims batches of outbox events** from the database (status: `NEW`)
-- **Publishes events to Kafka** based on event type:
-    - `payment_authorized` → Publishes `PaymentAuthorized` event to Kafka
-    - `payment_order_created` → Publishes `PaymentOrderCreated` event to Kafka
-- **Updates event status** to `SENT` after successful publication
-- **Handles failures** by unclaiming failed events for retry
-- **Reclaims stuck events** that were claimed but never completed (runs every 2 minutes)
+**The Edge Cell Pod (Strict 1:1:1 Ratio):**
+A single Edge Cell is represented as a single Kubernetes Pod containing exactly three isolated containers:
+1. **`payment-service` (Web API)**: Handles high-throughput synchronous checkouts and creates `OutboxEvent` records.
+2. **`local-edge-db` (Local State)**: A dedicated, isolated PostgreSQL container attached to a Persistent Volume (PVC) so data is never lost during a Pod restart.
+3. **`payment-edge-workers` (Local Forwarder)**: A background worker that polls the local DB for `NEW` outbox events and pushes them to the **Central DB**.
 
-**Operational Characteristics:**
-- **Scheduled execution**: Runs every 5 seconds with configurable thread count (default: 2 workers)
-- **Batch processing**: Processes configurable batch size (default: 250 events per batch)
-- **Idempotent publishing**: Uses Kafka transactions to ensure exactly-once delivery
-- **Metrics tracking**: Monitors backlog size, dispatch duration, success/failure counts
-- **Backlog monitoring**: Maintains in-memory backlog counter, resyncs from database periodically (every 5 minutes)
+**Fault Tolerance Hardening:**
+- **Zero Latency**: Because they share a Pod, the API and Worker connect to the database via `localhost:5432`.
+- **Guaranteed QoS (Noisy Neighbor Prevention)**: In Kubernetes, simply setting a "CPU Limit" does not reserve CPU; it only caps it. If containers have `requests` lower than `limits`, they fight over unreserved CPU cycles (the `Burstable` QoS class). By setting `requests` **exactly equal** to `limits` for all three containers, Kubernetes elevates the Pod to the `Guaranteed` QoS class. This physically isolates and reserves dedicated CPU cores exclusively for the database, preventing the Web API from stealing its CPU cycles during traffic spikes.
+- **Topology Spread Constraints**: The Edge Cells are mathematically forced to spread evenly across Cloud Availability Zones to survive datacenter outages.
 
-**Workflow:**
-1. **Claim**: Selects up to N `NEW` events and marks them as `PROCESSING` (atomically)
-2. **Publish**: Deserializes event payloads and publishes to Kafka using atomic transactions
-3. **Persist**: Updates successfully published events to `SENT` status
-4. **Unclaim**: Returns failed events to `NEW` status for retry
-5. **Reclaim**: Background job resets events stuck in `PROCESSING` status (older than 10 minutes)
+### **Stage 2: Central Node (payment-central-relay & payment-consumers)**
 
-**Why This Pattern:**
-- **Guarantees at-least-once delivery**: Events are never lost even if Kafka is temporarily unavailable
-- **Database consistency**: Event creation is part of the same transaction as domain changes
-- **Decouples publishing**: Main request path doesn't wait for Kafka availability
-- **Retry safety**: Failed publications are automatically retried without duplicate processing
+The Central layer acts as the global system of record, ledger orchestrator, and Kafka publisher/consumer. It is divided into two highly available, autonomous modules to preserve separate scaling and thread/resource isolation boundaries:
+
+- **`payment-central-relay`**: A dedicated, non-blocking service containing the global `OutboxRelayJob` and the `PaymentEventPublisher`. It continuously polls the Central DB's `outbox_event` table based on a globally safe `T_Safe` watermark (derived from all edge nodes) and publishes outbox events strictly in-order to Kafka using an isolated `resilientExecutor` thread pool.
+- **`payment-consumers`**: Purely asynchronous consumer application containing all Kafka `@KafkaListener` event handlers. It consumes event streams from Kafka topics, handles PSP capture/refund execution, manages terminal result updates, and coordinates double-entry ledger bookkeeping and Redis balance-cache updates.
+
+**Host Deployment, Fault Isolation, and Non-Sidecar Pattern:**
+Unlike the Edge Cell which strictly enforces the Kubernetes Sidecar pattern (forcing the API, the local PostgreSQL database, and the local edge worker to reside in the same Pod to share localhost-based low-latency networking and co-located physical disk storage), **the Central Cluster components do NOT apply the sidecar pattern**. 
+
+Since this represents an asynchronous processing path, **`payment-central-relay` and `payment-consumers` must NOT be co-located in the same Pod or physical host node**. Instead, they are completely decoupled asynchronously via Kafka to maximize durability and high availability:
+- **Fault Domain Isolation**: If `payment-central-relay` (the outbox relay job) crashes or experiences an outage, `payment-consumers` remains fully operational. It continues to process, execute, and settle any backlog of payment events already stored in the Kafka cluster without interruption.
+- **Resource Independence**: If the consumer layer experiences high latency due to slow external PSP gateway responses or intensive batch ledger writes, it will not steal CPU resources, memory, or DB connections from `payment-central-relay`, preventing cascading failures.
+- **Anti-Affinity Scheduling**: Kubernetes deployments utilize **Pod Anti-Affinity rules** to physically separate `payment-central-relay` and `payment-consumers` onto different physical compute nodes and Availability Zones.
+
+**Why This Topology:**
+- **High Availability**: Edge cells can continue accepting payments and writing to their local Postgres databases even if the Central DB or Kafka goes down entirely.
+- **Resource & Fault Isolation**: The outbox publishing scheduler run-loop is isolated in `payment-central-relay` with its own thread pool, ensuring that heavy consumer processing (e.g. slow PSP gateway calls or batch ledger updates in `payment-consumers`) can never block or exhaust the outbox publishing thread allocation.
+- **Independent Scaling & Topology Separation**: Edge Cells can be scaled out linearly to handle localized high checkout volumes. Meanwhile, the central `payment-consumers` and `payment-central-relay` scale independently on separate compute hosts to handle global asynchronous workloads without constraints on co-location.
+- **Guaranteed At-Least-Once Delivery**: Events are durably stored in the local outboxes first, forwarded to the central consolidated outbox, and only marked as dispatched upon a successful Kafka ack.
+
+### **Stage 3: Outbox Port Architecture & Flow Control**
+
+To maintain a strict **Hexagonal (Ports & Adapters)** design and prevent architectural pollution, outbox capabilities are split into four highly specialized outbound ports with clean, distinct responsibilities:
+
+1. **`LocalOutboxWriterPort`**:
+   - **Declared in**: `payment-application` / `ports/outbound`
+   - **Used by**: `payment-service` (Web API)
+   - **Responsibility**: Invoked within the local Edge transaction boundary to write `OutboxEvent` records directly into the local postgres database (`local-edge-db`).
+2. **`LocalOutboxEdgePort`**:
+   - **Declared in**: `payment-application` / `ports/outbound`
+   - **Used by**: `payment-edge-workers` (Local Sidecar Forwarder)
+   - **Responsibility**: Reads, claims, and marks local outbox events as dispatched. Declares specific methods such as `findEligible(batchSize, workerId)` and `markDispatched(events)`.
+3. **`CentralOutboxEdgePort`**:
+   - **Declared in**: `payment-application` / `ports/outbound`
+   - **Used by**: `payment-edge-workers` (Local Sidecar Forwarder)
+   - **Responsibility**: Acts as a bridge between edge node container and the consolidated Central DB cluster. Invoked by the local forwarder to insert batches of claimed edge events (`insertBatch(edgeNodeId, entries)`) into the central `outbox_event` table.
+4. **`CentralOutboxRelayPort`**:
+   - **Declared in**: `payment-application` / `ports/outbound`
+   - **Used by**: `payment-central-relay` (Central Outbox Publisher)
+   - **Responsibility**: Provides the read/write API for the central consolidated outbox table. Exposes `findEligible(tSafe, batchSize)` to query unclaimed events safely behind the watermark `T_Safe`, and `markDispatched(oeid)` to finalize publication upon successful Kafka broker acknowledgment.
+
+### **Stage 4: Database Connection URLs & Role-Based Credentials**
+
+In line with strict security and network isolation principles, **there is no shared database configuration or connection account**. Each runtime component is allocated a dedicated PostgreSQL user role with the minimum privileges required to perform its specific task.
+
+#### **1. Edge Database Access (Local Edge Cell)**
+- **Scope**: Local transactions, high throughput, low latency.
+- **Config Variable**: `EDGE_DB_URL`
+- **JDBC Connection URL**: `jdbc:postgresql://localhost:5432/edge-db?options=-c%20timezone=UTC`
+- **Component Credentials**:
+  * **`payment-service`**:
+    * **Username Key**: `EDGE_DB_PAYMENT_SERVICE_USERNAME`
+    * **Username**: `edge_db_payment_service_username`
+  * **`payment-edge-workers`**:
+    * **Username Key**: `EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME`
+    * **Username**: `edge_db_payment_edge_workers_username`
+
+#### **2. Central Database Access (Global Consolidated State)**
+- **Scope**: Multi-seller consolidated outbox, double-entry ledger bookkeeping, and global account balance snapshots.
+- **Config Variable**: `CENTRAL_DB_URL` (mapped internally to `SPRING_DATASOURCE_URL` or resolved locally via `SPRING_DATASOURCE_CENTRAL_URL`).
+- **JDBC Connection URLs**:
+  - **Kubernetes / Containerized Production**:
+    `jdbc:postgresql://central-db-postgresql:5432/central-db?options=-c%20timezone=UTC`
+  - **Local Development Environment**:
+    `jdbc:postgresql://localhost:5432/central-db?options=-c%20timezone=UTC`
+- **Component Credentials**:
+  * **`payment-consumers`**:
+    * **Username Key**: `CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME`
+    * **Username**: `central_db_payment_consumers_username`
+  * **`payment-edge-workers`** (when writing to central outbox):
+    * **Username Key**: `CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME`
+    * **Username**: `central_db_payment_edge_workers_username`
+  * **`payment-central-relay`** (when relaying central outbox to Kafka):
+    * **Username Key**: `CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME`
+    * **Username**: `central_db_payment_central_relay_username`
+
+---
+
+## 🟦 Kafka Event Typology & Type Verification
+
+To satisfy strict financial auditability and message correctness (NFR2/NFR6), the platform implements **strict compile-time type-safety** and **declarative runtime serialization**. 
+
+### 1. The Kafka Event and Command Topology
+
+The following catalog defines every event and command passing through Kafka, including their exact topic mappings, event type strings, payload envelope classes, publishers, and consumers:
+
+| No. | Logical Event / Command | Event Type String (`eventType`) | Envelope Payload Class | Kafka Topic | Publisher Module & Class | Consumer Module & Class | Consumer Group ID | Container Factory Bean |
+|---|---|---|---|---|---|---|---|---|
+| **1** | **Payment Authorized Event** | `"payment_authorized"` | `EventEnvelope<PaymentAuthorized>` | `psp-result-queue` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`PspResultConsumer` | `psp-result-consumer-group` | `psp-result-factory` |
+| **2** | **Capture Received Event** | `"capture_received"` | `EventEnvelope<CaptureReceived>` | `capture-execution-queue` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`CaptureCommandExecutor` | `capture-command-executor-group` | (Default String Factory) |
+| **3** | **External Async Capture to PSP Performed** | `"external_async_capture_to_psp_performed"` | `EventEnvelope<ExternalAsyncCaptureToPspPerformed>` | `psp-result-queue` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`CapturePspPerformedConsumer` | `capture-psp-performed-group` | (Default String Factory) |
+| **4** | **Capture Successful Event** | `"capture_successful"` | `EventEnvelope<CaptureSuccessful>` | `psp-result-queue` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`PspResultConsumer` | `psp-result-consumer-group` | `psp-result-factory` |
+| **5** | **Internal Transfer Request** | `"internal_transfer_request"` | `EventEnvelope<InternalTransferRequest>` | `internal-transfer-queue` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`InternalTransferConsumer` | `internal-transfer-consumer-group` | (Default String Factory) |
+| **6** | **Ledger Entries Recorded Event** | `"ledger_entries_recorded"` | `EventEnvelope<LedgerEntriesRecorded>` | `ledger_entries_recorded_topic` | `payment-consumers`<br/>`PspResultProcessingService` | `payment-consumers`<br/>`AccountBalanceConsumer` | `account-balance-consumer-group` | `ledger_entries_recorded_topic-factory` |
+
+---
+
+### 2. Strict Type Safety & Generics Preservation
+
+#### Avoidance of Type Erasure
+In early iterations, generic event envelopes were sometimes cast to a raw `EventEnvelope<Event>` base wrapper. This degraded runtime type signatures and stripped Jackson of the concrete metadata needed to map and deserialize nested JSON sub-structures correctly. 
+
+To harden this, the system strictly implements **concrete type preservation** across both publication and consumption:
+1. **At Publication (`OutboxRelayJob` & `PaymentEventPublisher`)**:
+   Instead of calling `publishBatchAtomically<Event>`, the relay job parses the internal outbox event type and casts the envelope to its exact, concrete compile-time generic class (e.g. `EventEnvelope<PaymentAuthorized>`, `EventEnvelope<CaptureReceived>`, or `EventEnvelope<RefundReceived>`).
+2. **At Serialization (`JacksonSerializationAdapter` & `EventEnvelopeKafkaSerializer`)**:
+   The serialization adapter preserves the complete generic structure, appending the event's fully-qualified class details and type metadata into the JSON payload and Kafka headers (e.g., `traceId`, `eventId`, `eventType`).
+
+#### Runtime Deserialization Binding
+Kafka messages are consumed using Spring Kafka's `ErrorHandlingDeserializer` delegating to our custom `EventEnvelopeKafkaDeserializer`. 
+- **The Metadata Catalog (`PaymentEventMetadataCatalog`)**:
+  Maintains a registry mapping each event class to a specific `TypeReference<EventEnvelope<T>>`.
+- **Deserializer Resolution**:
+  When a byte array is pulled from a topic, the deserializer resolves the topic's corresponding `TypeReference` from the catalog and calls `objectMapper.readValue(data, typeRef)`. This forces Jackson to reconstruct the exact nested type (e.g. `CaptureReceived`) instead of falling back to a raw map or base class.
+- **Type Filtering**:
+  At the container listener level (`KafkaTypedConsumerFactoryConfig`), the container factory is registered with a `RecordFilterStrategy` matching the class's exact expected event type. This ensures that any malformed or unexpected events are filtered or routed to the DLQ immediately without crashing the consumer.
+

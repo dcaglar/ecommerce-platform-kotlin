@@ -1,0 +1,75 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: payment-central-relay
+  lifecycle:
+    timeout-per-shutdown-phase: 45s
+  jackson:
+    time-zone: UTC
+  datasource:
+    url: ${SPRING_DATASOURCE_CENTRAL_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 1500
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1740000
+      keepalive-time: 300000
+      leak-detection-threshold: 60000
+
+management:
+  server:
+    port: 9000
+  health:
+    probes:
+      enabled: true
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: "prometheus,metrics,health"
+  endpoint:
+    health:
+      enabled: true
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: payment-central-relay
+    enable:
+      all: false
+      hikaricp.connections: true
+      hikaricp.connections.acquire: true
+      process.cpu.usage: true
+      jvm.threads.live: true
+      jvm.memory.used: true
+      jvm.memory.max: true
+      jvm.gc.pause: true
+      kafka.producer.batch.size.avg: true
+      kafka.producer.batch.size.max: true
+      kafka.producer.request.latency.avg: true
+      kafka.producer.topic.record.send: true
+      kafka.producer.request.latency.max: true
+      kafka.producer.compression.rate.avg: true
+      kafka.producer.record.send.total: true
+      kafka.producer.record.error.total: true
+      kafka.producer.record.retry.total: true
+      kafka.producer.outgoing.byte.total: true
+      kafka.producer.io.wait.time.total: true
+      kafka.producer.bufferpool.wait.ratio: true
+      kafka.producer.bufferpool.wait.time.total: true
+
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity
+  type-handlers-package: com.dogancaglar.common.db.typehandler
+
+outbox-relay:
+  batch-size: 500
+  poll-interval: 5000

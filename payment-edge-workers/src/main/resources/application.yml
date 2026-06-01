@@ -1,0 +1,107 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: payment-edge-workers
+  jackson:
+    time-zone: UTC
+  data:
+    redis:
+      timeout: 10s
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+          max-wait: 5000ms
+  liquibase:
+    enabled: false
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity
+  type-handlers-package: com.dogancaglar.common.db.typehandler
+
+management:
+  server:
+    port: 9000
+  health:
+    probes:
+      enabled: true
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: "prometheus,metrics,health"
+  endpoint:
+    health:
+      enabled: true
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: payment-edge-workers
+    enable:
+      all: false
+      hikaricp.connections: true
+      hikaricp.connections.acquire: true
+      process.cpu.usage: true
+      jvm.threads.live: true
+      jvm.memory.used: true
+      jvm.memory.max: true
+      jvm.gc.pause: true
+      outbox_dispatched_total: true
+      outbox_dispatch_failed_total: true
+      outbox_event_backlog: true
+      outbox_dispatcher_duration: true
+    distribution:
+      percentiles-histogram:
+        outbox_dispatcher_duration: true
+      percentiles:
+        outbox_dispatcher_duration: 0.5,0.95,0.99
+    export:
+      prometheus:
+        enabled: true
+
+outbox-dispatcher:
+  thread-count: 2
+  batch-size: 300
+  pool-size: 2
+
+db:
+  outbox:
+    statement-timeout-ms: 2000
+    lock-timeout-ms: 200
+    idle-in-tx-timeout-ms: 0
+
+app:
+  datasource:
+    outbox:
+      driver-class-name: org.postgresql.Driver
+      pool-name: edge-outbox-pool
+      maximum-pool-size: 6
+      minimum-idle: 3
+      connection-timeout: 1000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+    maintenance:
+      driver-class-name: org.postgresql.Driver
+      pool-name: edge-maint-pool
+      maximum-pool-size: 1
+      minimum-idle: 0
+      connection-timeout: 1500
+      validation-timeout: 1500
+      idle-timeout: 60000
+      max-lifetime: 1800000
+    central:
+      driver-class-name: org.postgresql.Driver
+      pool-name: central-writer-pool
+      maximum-pool-size: 6
+      minimum-idle: 3
+      connection-timeout: 1000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1800000

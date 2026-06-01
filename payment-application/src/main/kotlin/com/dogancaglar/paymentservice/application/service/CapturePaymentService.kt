@@ -8,9 +8,8 @@ import org.slf4j.LoggerFactory
 
 
 class CapturePaymentService(
-    private val paymentRepository: PaymentRepository,
     private val psp: PspAuthorizationGatewayPort,
-    private val outboxEventPort: OutboxEventRepository,
+    private val outboxEventPort: LocalOutboxWriterPort,
     private val idGeneratorPort: IdGeneratorPort,
     private val serializationPort: SerializationPort) : CapturePaymentUseCase {
 

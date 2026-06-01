@@ -17,13 +17,25 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import com.dogancaglar.paymentservice.application.events.CaptureReceived
+import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
+import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort
+import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CaptureRequestDTO
+import com.dogancaglar.common.event.EventEnvelopeFactory
+import com.dogancaglar.common.id.PublicIdFactory
+import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
+import com.fasterxml.jackson.databind.ObjectMapper
 
 @RestController
 @RequestMapping("/api/v1")
 class PaymentController(
     private val paymentApiOrchestrator: PaymentApiOrchestrator,
-    private val idempotencyService: IdempotencyService
-
+    private val idempotencyService: IdempotencyService,
+    private val outboxWriterPort: LocalOutboxWriterPort,
+    private val idGeneratorPort: IdGeneratorPort,
+    private val objectMapper: ObjectMapper
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -52,7 +64,7 @@ class PaymentController(
             responseClass = CreatePaymentIntentResponseDTO::class.java, // Arg 3: The type
             idExtractor = { response ->
                 // Arg 4: The lambda to get the internal ID for DB storage
-                com.dogancaglar.common.id.PublicIdFactory.toInternalId(response.paymentIntentId!!)
+                PublicIdFactory.toInternalId(response.paymentIntentId!!)
             },
             block = {
                 // Arg 5: The business logic block
@@ -62,7 +74,7 @@ class PaymentController(
 
         val responseDTO = result.response
         // Return 201/200/202 Created with Location header (best practice for resource creation)
-        logger.info("📥 Received payment request for order: ${responseDTO.orderId}, payment id is ${responseDTO.paymentIntentId}")
+        logger.info("📥 Received payment request for order: \${responseDTO.orderId}, payment id is \${responseDTO.paymentIntentId}")
         return when (result.status) {
 
             IdempotencyExecutionStatus.CREATED -> {
@@ -70,13 +82,13 @@ class PaymentController(
                 if (responseDTO.status == "CREATED_PENDING") {
                     ResponseEntity
                         .status(HttpStatus.ACCEPTED)  // 202
-                        .header("Location", "/api/v1/payments/${responseDTO.paymentIntentId}")
+                        .header("Location", "/api/v1/payments/\${responseDTO.paymentIntentId}")
                         .header("Retry-After", "2")
                         .body(responseDTO)  // clientSecret will be null/empty
                 } else {
                     ResponseEntity
                         .status(HttpStatus.CREATED)  // 201
-                        .header("Location", "/api/v1/payments/${responseDTO.paymentIntentId}")
+                        .header("Location", "/api/v1/payments/\${responseDTO.paymentIntentId}")
                         .body(responseDTO)  // clientSecret should be present
                 }
             }
@@ -84,7 +96,7 @@ class PaymentController(
             IdempotencyExecutionStatus.REPLAYED -> ResponseEntity
                 .status(HttpStatus.OK)
                 .header("Idempotent-Replayed", "true")
-                .header("Location", "/api/v1/payments/${responseDTO.paymentIntentId}")
+                .header("Location", "/api/v1/payments/\${responseDTO.paymentIntentId}")
                 .body(responseDTO)
         }
     }
@@ -93,24 +105,24 @@ class PaymentController(
      * Get payment intent status (for polling when payment is pending)
      * Checks if pspReference exists and retrieves clientSecret from Stripe if available
      */
-    @GetMapping("/payments/{paymentId}")
+    @GetMapping("/payments/{paymentIntentId}")
     @PreAuthorize("hasAuthority('payment:write')")
     fun getPaymentIntent(
-        @PathVariable("paymentId") publicPaymentId: String
+        @PathVariable("paymentIntentId") publicPaymentIntentId: String
     ): ResponseEntity<CreatePaymentIntentResponseDTO> {
-        logger.debug("📥 Getting payment intent: {}", publicPaymentId)
-        val dto = paymentApiOrchestrator.getPaymentIntent(publicPaymentId)
+        logger.debug("📥 Getting payment intent: {}", publicPaymentIntentId)
+        val dto = paymentApiOrchestrator.getPaymentIntent(publicPaymentIntentId)
         return ResponseEntity.status(HttpStatus.OK).body(dto)
     }
 
-    @PostMapping("/payments/{paymentId}/authorize")
+    @PostMapping("/payments/{paymentIntentId}/authorize")
     @PreAuthorize("hasAuthority('payment:write')")
     fun authorizePayment(
-        @PathVariable("paymentId") publicPaymentId: String,
+        @PathVariable("paymentIntentId") publicPaymentIntentId: String,
         @Valid @RequestBody request: AuthorizationRequestDTO
     ): ResponseEntity<CreatePaymentIntentResponseDTO> {
 
-        val dto = paymentApiOrchestrator.authorizePayment(publicPaymentId, request)
+        val dto = paymentApiOrchestrator.authorizePayment(publicPaymentIntentId, request)
 
         return ResponseEntity
             .status(HttpStatus.OK)
@@ -118,17 +130,41 @@ class PaymentController(
     }
 
 
-    @PostMapping("/payments/{paymentId}/captures")
+    @PostMapping("/payments/{paymentIntentId}/captures")
     @PreAuthorize("hasAuthority('payment:write')")
-    fun capturePayment(@Valid @RequestBody request: CreatePaymentIntentRequestDTO): ResponseEntity<CreatePaymentIntentResponseDTO> {
-        logger.debug("📥 Sending payment request for order: ${request.orderId}")
-        val responseDTO = paymentApiOrchestrator.createPaymentIntent(request)
-        logger.debug("📥 Received payment request for order: ${responseDTO.orderId}, payment id is ${responseDTO.paymentIntentId}")
+    fun capturePayment(
+        @PathVariable("paymentIntentId") publicPaymentIntentId: String,
+        @Valid @RequestBody request: CaptureRequestDTO
+    ): ResponseEntity<Void> {
+        logger.debug("📥 Received capture request for payment: $publicPaymentIntentId")
 
-        // Return 201 Created with Location header (best practice for resource creation)
-        return ResponseEntity
-            .status(HttpStatus.CREATED)
-            .header("Location", "/api/v1/payments/${responseDTO.paymentIntentId}")
-            .body(responseDTO)
+        val captureEvent = CaptureReceived.from(
+            paymentIntentId = "", // Not needed for routing if public ID is known, but better use internal if we had it
+            publicPaymentIntentId = publicPaymentIntentId,
+            merchantAccountId = request.merchantAccountId,
+            amountValue = request.amount.quantity,
+            currency = request.amount.currency.name,
+            now = Utc.nowInstant()
+        )
+
+        val envelope = EventEnvelopeFactory.envelopeFor(
+            traceId = EventLogContext.getTraceId(),
+            data = captureEvent,
+            aggregateId = captureEvent.publicPaymentIntentId,
+            parentEventId = EventLogContext.getEventId()
+        )
+
+        val payload = objectMapper.writeValueAsString(envelope)
+
+        val outboxEvent = OutboxEvent.createNew(
+            oeid = idGeneratorPort.nextPaymentId(),
+            eventType = envelope.eventType,
+            aggregateId = envelope.aggregateId,
+            payload = payload
+        )
+        
+        outboxWriterPort.save(outboxEvent)
+
+        return ResponseEntity.accepted().build()
     }
 }

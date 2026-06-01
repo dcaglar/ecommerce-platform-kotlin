@@ -87,12 +87,12 @@ class PaymentOrder private constructor(
 
     /**
      * Transitions the payment order to CAPTURE_REQUESTED status.
-     * Only allowed from INITIATED_PENDING status with retryCount = 0.
+     * Only allowed from CAPTURE_RECEIVED status with retryCount = 0.
      */
     fun markCaptureRequested(): PaymentOrder {
-        require(status == PaymentOrderStatus.INITIATED_PENDING) {
+        require(status == PaymentOrderStatus.CAPTURE_RECEIVED) {
             "Invalid transtion Cannot request capture from status '${status.name}'. " +
-                    "Expected status: ${PaymentOrderStatus.INITIATED_PENDING.name}. " +
+                    "Expected status: ${PaymentOrderStatus.CAPTURE_RECEIVED.name}. " +
                     "PaymentOrderId: ${paymentOrderId.value}"
         }
         require(retryCount == 0) {
@@ -127,6 +127,24 @@ class PaymentOrder private constructor(
                     "PaymentOrderId: ${paymentOrderId.value}"
         }
         return copy(status = PaymentOrderStatus.CAPTURE_FAILED)
+    }
+
+    fun markAsRefunded(): PaymentOrder {
+        require(status in ALLOWED_STATUSES_FOR_REFUND) {
+            "Invalid transtion Cannot mark as refunded from status '${status.name}'. " +
+                    "Allowed statuses: ${ALLOWED_STATUSES_FOR_REFUND.joinToString { it.name }}. " +
+                    "PaymentOrderId: ${paymentOrderId.value}"
+        }
+        return copy(status = PaymentOrderStatus.REFUNDED)
+    }
+
+    fun markRefundDeclined(): PaymentOrder {
+        require(status in ALLOWED_STATUSES_FOR_REFUND) {
+            "Invalid transtion Cannot mark refund as declined from status '${status.name}'. " +
+                    "Allowed statuses: ${ALLOWED_STATUSES_FOR_REFUND.joinToString { it.name }}. " +
+                    "PaymentOrderId: ${paymentOrderId.value}"
+        }
+        return copy(status = PaymentOrderStatus.REFUND_FAILED)
     }
     fun markCapturePendingAndIncrementRetry(): PaymentOrder {
         require(status in ALLOWED_STATUSES_FOR_PENDING_CAPTURE) {
@@ -201,6 +219,11 @@ class PaymentOrder private constructor(
             PaymentOrderStatus.PENDING_CAPTURE
         )
 
+        private val ALLOWED_STATUSES_FOR_REFUND = setOf(
+            PaymentOrderStatus.REFUND_REQUESTED,
+            PaymentOrderStatus.PENDING_REFUND
+        )
+
         /**
          * Statuses that allow transition to PENDING_CAPTURE (for retries).
          */
@@ -220,7 +243,7 @@ class PaymentOrder private constructor(
         )
 
         /**
-         * Creates a new payment order with INITIATED_PENDING status.
+         * Creates a new payment order with CAPTURE_RECEIVED status.
          * Validation is performed by the constructor's init block.
          */
         fun createNew(
@@ -235,7 +258,7 @@ class PaymentOrder private constructor(
                 paymentId = paymentId,
                 sellerId = sellerId,
                 amount = amount,
-                status = PaymentOrderStatus.INITIATED_PENDING,
+                status = PaymentOrderStatus.CAPTURE_RECEIVED,
                 retryCount = 0,
                 createdAt = now,
                 updatedAt = now
