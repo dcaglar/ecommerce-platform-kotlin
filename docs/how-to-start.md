@@ -9,6 +9,22 @@ Prereqs (once):
 - minikube, kubectl, helm installed
 - Troubleshooting connectivity? See docs/troubleshooting/connectivity.md
 
+## ⚠️ The Golden Rules (Immutable Constraints)
+
+When working on or extending this system, the following rules are absolute and must never be violated:
+
+1. **The Separation of Powers (Consumers vs. Relays):**
+   - **OutboxRelayJob**: The only component allowed to publish to Kafka. It reads the outbox table and routes messages. It must never update operational database state.
+   - **Consumers (e.g., PspResultConsumer, CaptureCommandExecutor)**: The only components allowed to mutate the core database and ledger. They must never publish to Kafka directly. They communicate their results by appending new events to the Outbox.
+
+2. **No Kafka Transactions:**
+   - We do not use Kafka exactly-once semantics (EOS) or Kafka transactions. Instead, we rely purely on the Two-Stage Outbox Pattern to guarantee message durability and linearizability.
+
+3. **Stateless Network Workers:**
+   - Any worker interacting with the outside world (e.g., `CaptureCommandExecutor` calling the PSP) must do exactly one thing: execute the network call and append the result to the Outbox. It must not touch the ledger or alter core Payment domains.
+
+---
+
 ## 0️⃣ Start the infrastructure and services
 
 Pre-step: switch to the project root directory and make scripts executable
@@ -200,10 +216,12 @@ curl -i -X POST "$BASE_URL/api/v1/payments" \
   -d '{
     "orderId": "ORDER-1450",
     "buyerId": "BUYER-1450",
+    "merchantAccountId": "PLATFORM-MERCHANT-001",
+    "processingModel": "MARKETPLACE",
     "totalAmount": { "quantity": 2900, "currency": "EUR" },
-    "paymentOrders": [
-      { "sellerId": "SELLER-111", "amount": { "quantity": 1450, "currency": "EUR" }},
-      { "sellerId": "SELLER-222", "amount": { "quantity": 1450, "currency": "EUR" }}
+    "splits": [
+      { "targetAccountType": "MARKETPLACE_SUB_SELLER", "targetEntityId": "SELLER-111", "amount": { "quantity": 1450, "currency": "EUR" }},
+      { "targetAccountType": "MARKETPLACE_SUB_SELLER", "targetEntityId": "SELLER-222", "amount": { "quantity": 1450, "currency": "EUR" }}
     ]
   }'
 ```
@@ -297,7 +315,7 @@ The payment flow follows the complete end-to-end Stripe Payment Element flow:
     - Buyer ID (e.g., `BUYER-123`)
     - Total amount (in smallest currency unit, e.g., cents)
     - Select currency
-    - Add one or more payment orders with seller IDs and amounts
+    - Add one or more payment splits with target entity IDs and amounts
     - Click "Proceed to Checkout"
 
 2. **Payment Creation:**
@@ -491,7 +509,7 @@ curl -i -X GET "$BASE_URL/api/v1/sellers/me/balance" \
   - **Configuration**: Failsafe includes `*IntegrationTest.kt` files by filename pattern
   - **Lifecycle Separation**: Surefire and Failsafe complement each other - unit tests provide fast feedback, integration tests provide comprehensive validation before releases
 - **No Hanging Tests**: All MockK syntax issues resolved for reliable test execution
-- **Type Inference Fixed**: Resolved MockK type inference issues in `OutboxDispatcherJobTest.kt` with explicit type hints and Jackson JSR310 module configuration
+- **Type Inference Fixed**: Resolved MockK type inference issues in `OutboxRelayJobTest.kt` with explicit type hints and Jackson JSR310 module configuration
 
 For deep architecture or flow diagrams, see:
 - [`docs/architecture.md`](./architecture/architecture.md)

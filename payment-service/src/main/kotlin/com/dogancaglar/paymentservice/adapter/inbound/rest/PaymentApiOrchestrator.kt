@@ -42,9 +42,9 @@ class PaymentApiOrchestrator(
         return PaymentRequestMapper.toPaymentResponseDto(paymentIntent)
     }
 
-    fun authorizePayment(publicPaymentId:String,request: AuthorizationRequestDTO): CreatePaymentIntentResponseDTO {
-        logger.info("🔁 PaymentApiOrchestrator.authorizePayment started for short publicpaymentintentid $publicPaymentId")
-        val cmd = PaymentRequestMapper.toAuthorizePaymentIntentCommand(publicPaymentId,request)
+    fun authorizePayment(publicPaymentIntentId:String, request: AuthorizationRequestDTO): CreatePaymentIntentResponseDTO {
+        logger.info("🔁 PaymentApiOrchestrator.authorizePayment started for short publicPaymentIntentId $publicPaymentIntentId")
+        val cmd = PaymentRequestMapper.toAuthorizePaymentIntentCommand(publicPaymentIntentId,request)
         logger.info("⚡ [Orchestrator] Calling authorizePaymentIntentUseCase.authorize for internal long numeric ID: ${cmd.paymentIntentId}")
         val paymentIntent = authorizePaymentIntentUseCase.authorize(cmd)
         return PaymentRequestMapper.toPaymentResponseDto(paymentIntent)

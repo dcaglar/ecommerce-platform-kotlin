@@ -164,7 +164,7 @@ class AccountBalanceServiceTest {
     }
 
     // ───────────────────────────────────────────────
-    // 5️⃣  Auth+Capture pair → only non-zero accounts
+    // 5️⃣  Auth+CaptureTx pair → only non-zero accounts
     // ───────────────────────────────────────────────
     @Test
     fun `should update only non-zero accounts in authHold plus capture flow`() {

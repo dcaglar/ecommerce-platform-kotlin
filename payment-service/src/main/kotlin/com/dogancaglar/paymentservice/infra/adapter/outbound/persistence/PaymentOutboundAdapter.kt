@@ -1,38 +1,18 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence
 
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.converter.PaymentEntityMapper
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentMapper
-import com.dogancaglar.paymentservice.domain.model.payment.Payment
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
-import org.springframework.stereotype.Repository
-
-@Repository
-class PaymentOutboundAdapter(
-    private val paymentMapper: PaymentMapper,
-    private val entityMapper: PaymentEntityMapper
-) : PaymentRepository {
-
-
-
-    override fun save(payment: Payment): Payment {
-        paymentMapper.insert(entityMapper.toEntity(payment))
-        return payment
-    }
-
-    override fun findById(paymentId: PaymentId): Payment {
-        return entityMapper.toDomain(paymentMapper.findById(paymentId.value)!!)
-    }
-
-
-    override fun getMaxPaymentId(): PaymentId {
-        val paymentIdLong = paymentMapper.getMaxPaymentId() ?: 0
-        return PaymentId(paymentIdLong)
-    }
-
-    override fun updatePayment(payment: Payment): Unit {
-        val entity = entityMapper.toEntity(payment)
-        paymentMapper.update(entity);
-    }
-
-}
+/*
+ * ═══════════════════════════════════════════════════════════════════
+ *  MOVED — Epic 1 Architecture Correction
+ * ═══════════════════════════════════════════════════════════════════
+ *  PaymentOutboundAdapter has been moved to the payment-consumers module.
+ *
+ *  Reason: The Payment aggregate is a Central Core concern.
+ *  It is created exclusively by PspResultConsumer in payment-consumers
+ *  upon receiving a PaymentAuthorized Kafka event.
+ *  The Edge Cell (payment-service) must NOT write to the payments table.
+ *
+ *  New location:
+ *    payment-consumers/src/main/kotlin/
+ *      .../infra/adapter/outbound/persistence/PaymentOutboundAdapter.kt
+ * ═══════════════════════════════════════════════════════════════════
+ */

@@ -1,13 +1,7 @@
 package com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.logging.EventLogContext
-import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ID
-import com.dogancaglar.common.logging.GenericLogFields.PAYMENT_ORDER_ID
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
-import com.dogancaglar.paymentservice.application.events.PaymentOrderCaptured
-import com.dogancaglar.paymentservice.application.events.PaymentOrderRefunded
-import com.dogancaglar.common.event.Event
 import com.dogancaglar.paymentservice.application.service.PspResultProcessingService
 import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.CONSUMER_GROUPS
 import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.Topics
@@ -17,6 +11,12 @@ import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
 
+/**
+ * PspResultConsumer
+ * 
+ * Mandate: Listens to psp-result-queue and delegates to PspResultProcessingService
+ * to execute real financial state mutations in a transactional manner.
+ */
 @Component
 class PspResultConsumer(
     private val pspResultProcessingService: PspResultProcessingService,
@@ -25,56 +25,42 @@ class PspResultConsumer(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @KafkaListener(
-        topics = [Topics.PAYMENT_AUTHORIZED, Topics.PAYMENT_ORDER_CAPTURED_TOPIC, Topics.PAYMENT_ORDER_REFUNDED_TOPIC],
+        topics = [Topics.PAYMENT_AUTHORIZED],
         containerFactory = "psp-result-factory",
         groupId = CONSUMER_GROUPS.PSP_RESULT_CONSUMER
     )
     fun onPspResult(
-        record: ConsumerRecord<String, EventEnvelope<Event>>,
+        record: ConsumerRecord<String, EventEnvelope<com.dogancaglar.common.event.Event>>,
         consumer: org.apache.kafka.clients.consumer.Consumer<*, *>
     ) {
-        val envelope = record.value()
-        val eventData = envelope.data
-        val aggregateId = when (eventData) {
-            is PaymentOrderCaptured -> eventData.publicPaymentOrderId
-            is PaymentOrderRefunded -> eventData.publicPaymentOrderId
-            is PaymentAuthorized -> eventData.publicPaymentId
-            else -> envelope.aggregateId
+        val exists = dedupe.exists(record.value().eventId)
+        if (exists) {
+            logger.warn("⚠️ Event is processed already, skipping eventId=${record.value().eventId}")
+            return
         }
-
-        EventLogContext.with(envelope) {
-            if (dedupe.exists(envelope.eventId)) {
-                logger.warn(
-                    "⚠️ Event is processed already for aggregateId $aggregateId, skipping"
-                )
-                return@with
-            }
-
-            logger.info(
-                "🎬 Started processing for aggregateId $aggregateId"
-            )
-
-            try {
-                when (eventData) {
-                    is PaymentAuthorized -> pspResultProcessingService.processAuthorized(eventData)
-                    is PaymentOrderCaptured -> pspResultProcessingService.processCaptured(eventData)
-                    is PaymentOrderRefunded -> pspResultProcessingService.processRefunded(eventData)
-                    else -> {
-                        logger.warn("⚠️ Received unknown event type: ${eventData.javaClass.simpleName}")
-                        return@with
-                    }
+        
+        val event = record.value().data
+        
+        try {
+            when (event) {
+                is PaymentAuthorized -> {
+                    logger.info("🎬 Processing PaymentAuthorized event for paymentIntentId: ${event.paymentIntentId}")
+                    pspResultProcessingService.processAuthorized(event)
                 }
-
-                dedupe.markProcessed(envelope.eventId, 3600)
-                logger.info(
-                    "✅ Completed processing PSP result for aggregateId $aggregateId"
-                )
-            } catch (ex: Exception) {
-                logger.error(
-                    "🚨 Unexpected error processing PSP result for aggregateId $aggregateId error was : ${ex.message}", ex
-                )
-                throw ex
+                is com.dogancaglar.paymentservice.application.events.CaptureSuccessful -> {
+                    logger.info("🎬 Processing CaptureSuccessful event for paymentIntentId: ${event.publicPaymentIntentId}")
+                    pspResultProcessingService.processCaptureSuccessful(event)
+                }
+                else -> {
+                    logger.warn("⚠️ Unhandled event type in PspResultConsumer: ${event.javaClass.name}")
+                }
             }
+            
+            dedupe.markProcessed(record.value().eventId, 3600)
+            consumer.commitSync() // Manual ack
+        } catch (e: Exception) {
+            logger.error("❌ Failed to process event ${event.javaClass.simpleName} with eventId: ${record.value().eventId}", e)
+            throw e // Let Kafka handle retry/DLQ
         }
     }
 }

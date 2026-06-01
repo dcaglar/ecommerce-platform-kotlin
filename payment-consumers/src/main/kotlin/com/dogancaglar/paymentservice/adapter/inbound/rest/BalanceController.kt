@@ -37,7 +37,7 @@ class BalanceController(
      * Get balance for the authenticated seller (self-service).
      * 
      * Supports two authentication scenarios:
-     * - Case 1: User with SELLER role (via customer-area frontend, OIDC Authorization Code flow)
+     * - Case 1: User with SELLER role (via customer-area frontend, OIDC AuthorizationTx Code flow)
      * - Case 3: Machine client with SELLER_API role (via merchant API, Client Credentials flow)
      * 
      * The sellerId is extracted from the JWT token's "seller_id" claim.

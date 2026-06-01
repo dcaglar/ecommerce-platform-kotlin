@@ -11,15 +11,15 @@ import java.time.Instant
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class PaymentOrderCaptureReceived private constructor(
-    override val paymentOrderId: String,
-    override val publicPaymentOrderId: String,
-    override val paymentId: String,
-    override val publicPaymentId: String,
-    override val sellerId: String,
+    val paymentOrderId: String,
+    val publicPaymentOrderId: String,
+    override val paymentIntentId: String,
+    override val publicPaymentIntentId: String,
+    val sellerId: String,
     override val amountValue: Long,
     override val currency: String,
     override val timestamp: Instant
-) : PaymentOrderEvent() {
+) : com.dogancaglar.paymentservice.application.events.PaymentBaseEvent() {
 
     override val eventType = EVENT_TYPE
 
@@ -34,8 +34,8 @@ data class PaymentOrderCaptureReceived private constructor(
             return PaymentOrderCaptureReceived(
                 paymentOrderId = order.paymentOrderId.value.toString(),
                 publicPaymentOrderId = order.paymentOrderId.toPublicPaymentOrderId(),
-                paymentId = order.paymentId.value.toString(),
-                publicPaymentId = order.paymentId.toPublicPaymentId(),
+                paymentIntentId = order.paymentId.value.toString(),
+                publicPaymentIntentId = order.paymentId.toPublicPaymentId(),
                 sellerId = order.sellerId.value,
                 amountValue = order.amount.quantity,
                 currency = order.amount.currency.currencyCode,

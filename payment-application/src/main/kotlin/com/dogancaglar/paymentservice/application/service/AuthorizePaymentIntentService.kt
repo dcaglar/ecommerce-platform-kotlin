@@ -10,12 +10,9 @@ import com.dogancaglar.paymentservice.domain.exception.PaymentNotReadyException
 import com.dogancaglar.paymentservice.domain.exception.PspPermanentException
 import com.dogancaglar.paymentservice.domain.exception.PspTransientException
 import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
-import com.dogancaglar.paymentservice.domain.model.payment.Payment
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntentStatus
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 import com.dogancaglar.paymentservice.ports.inbound.usecases.AuthorizePaymentIntentUseCase
 import com.dogancaglar.paymentservice.ports.outbound.*
 import org.slf4j.LoggerFactory
@@ -93,7 +90,7 @@ class AuthorizePaymentIntentService(
             val finishPspCall = System.currentTimeMillis()
             logger.info("Authorize took {} ms", finishPspCall - startPspCall)
             if (finalPaymentIntent.status == PaymentIntentStatus.AUTHORIZED) {
-                generatePaymentOrderLines(finalPaymentIntent)
+                handleAuthorizedPaymentResult(finalPaymentIntent)
             }
             finalPaymentIntent
         } catch (e: Exception){
@@ -105,7 +102,7 @@ class AuthorizePaymentIntentService(
 
     private fun handleBackgroundPaymentIntentAuthorizationSuccess(authorizedPaymentIntent: PaymentIntent) {
         logger.info("Background payment intent authorization successful for ${authorizedPaymentIntent.paymentIntentId.value}, promoting to status authorized and generating orders")
-        generatePaymentOrderLines(authorizedPaymentIntent)
+        handleAuthorizedPaymentResult(authorizedPaymentIntent)
     }
 
 
@@ -152,39 +149,25 @@ class AuthorizePaymentIntentService(
 
 
 
-    private fun generatePaymentOrderLines(confirmedPaymentIntent : PaymentIntent){
+    private fun handleAuthorizedPaymentResult(confirmedPaymentIntent : PaymentIntent){
         if(confirmedPaymentIntent.status == PaymentIntentStatus.AUTHORIZED){
-            val paymentId = PaymentId(idGeneratorPort.nextPaymentId())
-            //2.create payment + paymentorders + outboxevents + updated[pamyentintent
-            val payment = Payment.fromAuthorizedIntent(paymentId,confirmedPaymentIntent)
-            val paymentOrders = confirmedPaymentIntent.paymentOrderLines.map { line ->
-                val sellerId = line.sellerId
-                PaymentOrder.createNew(
-                    paymentOrderId = PaymentOrderId(idGeneratorPort.nextPaymentOrderId()),
-                    paymentId = paymentId,
-                    sellerId = sellerId,
-                    amount = line.amount
-                )
-            }
-            //generate outbox<paymentauthorized> + outbox<paymentordercreated>  from payment objefct which is just created,and save it in db
-            val outboxEventPaymentAuthorizedEvent = toOutboxPaymentAuthorizedEvent(payment)
-            val outboxEventPaymentOrderCreatedList = paymentOrders.map { toOutboxPaymentOrderCaptureReceivedEvent(it) }
-            //persist all changes in on tatomic tranascation
-            paymentTransactionalFacadePort.handleAuthorized(confirmedPaymentIntent,payment,paymentOrders,outboxEventPaymentOrderCreatedList+outboxEventPaymentAuthorizedEvent)
+            //generate outbox<paymentauthorized> +  from paymentintent objefct which is just authorized
+            val outboxEventPaymentAuthorizedEvent = toOutboxPaymentAuthorizedEvent(confirmedPaymentIntent)
+            paymentTransactionalFacadePort.handleAuthorized(confirmedPaymentIntent,outboxEventPaymentAuthorizedEvent)
         }
     }
 
-    private fun toOutboxPaymentAuthorizedEvent(payment: Payment): OutboxEvent {
-        val paymentCreatedEvent = PaymentAuthorized.from(payment,Utc.nowInstant())
+    private fun toOutboxPaymentAuthorizedEvent(paymentIntent: PaymentIntent): OutboxEvent {
+        val paymentAuthorizedEvent = PaymentAuthorized.from(paymentIntent,Utc.nowInstant())
         val envelope = EventEnvelopeFactory.envelopeFor(
             traceId = EventLogContext.getTraceId(),
-            data = paymentCreatedEvent,
-            aggregateId = paymentCreatedEvent.paymentId,
+            data = paymentAuthorizedEvent,
+            aggregateId = paymentAuthorizedEvent.paymentIntentId,
             parentEventId = EventLogContext.getEventId()
         )
 
         return OutboxEvent.createNew(
-            oeid = payment.paymentId.value,
+            oeid = paymentIntent.paymentIntentId.value,
             eventType = envelope.eventType,
             aggregateId = envelope.aggregateId,
             payload = serializationPort.toJson(envelope),

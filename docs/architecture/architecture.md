@@ -1,6 +1,6 @@
 # 🟦 Event-Driven Payments & Ledger Infrastructure for Multi-Seller Platforms
 
-This project represents a backend **payment platform for a Merchant-of-Record (MoR) environment**.  
+This project represents a backend **payment platform for  Merchant-of-Record (MoR) environment**.  
 Think of a multi-seller e-commerce marketplace where shoppers can buy items from different sellers in a single checkout.  
 The platform manages the **full payment lifecycle**: synchronous authorization, multi-seller decomposition, seller-level operations, and internal financial accounting.
 
@@ -8,15 +8,15 @@ The platform manages the **full payment lifecycle**: synchronous authorization, 
 
 # 🟩 Key Clarifications (MoR Model)
 
+
 ### **1. Is the payment platform internal?**
-Yes. The payment platform is an **internal backend domain service**, not exposed to shoppers directly.  
-Checkout / Order Service calls it to create payments, decompose them into seller-specific PaymentOrders, and initiate payment authorization.
+Yes. The payment platform is an **internal backend domain service**, not exposed to shoppers directly. While it provides endpoints like `POST /api/v1/payments/{paymentId}/authorize`, these are meant to be called by your own internal proxies or checkout services, never directly by the shopper's browser.
 
 ---
 
-### **2. Do we perform authorization ourselves?**
-No. We delegate authorization, capture, refund, and cancel operations to an external PSP via our gateway.  
-From the PSP’s perspective, we appear as a **single merchant-of-record**; seller details remain internal.
+### **2. Do we perform the actual financial authorization ourselves?**
+No. Even though we expose an `/authorize` endpoint to orchestrate the flow, we do not perform the actual financial authorization. We simply act as a gateway to trigger and record the authorization happening at an external PSP (like Stripe).  
+From the PSP’s perspective, we appear as a **single merchant-of-record**; seller details remain completely internal to our ledger.
 
 ---
 
@@ -26,13 +26,8 @@ The PSP simply transfers funds into the MoR account.
 
 ---
 
-### **4. Why authorize once but capture/refund per PaymentOrder?**
-Authorization happens **once for the entire basket**, matching shopper intent.  
-Captures, cancels, and refunds happen **per PaymentOrder**, since each seller’s fulfillment lifecycle is independent.
-
-### **5. Why do we have payment intent, and payment seperately**
-
-Separating PaymentIntent from Payment lets our system handle user interaction safely,money movement correctly,retry safely.
+### **4. Why separate PaymentIntent and Payment?**
+Separating PaymentIntent from Payment lets our system handle user interaction safely, money movement correctly, and retry safely without creating duplicate financial records.
 
 
 # 🟧 Functional Requirements
@@ -61,13 +56,13 @@ Separating PaymentIntent from Payment lets our system handle user interaction sa
 ## **For Internal Services (Checkout / Order / Finance / Payouts)**
 
 ### **FR5 — Checkout/Order Service should be able to create a Payment.**
-- It must be possible for the Order Service to create a Payment and obtain the generated Payment along with its seller-level PaymentOrders.
+- It must be possible for the Order Service to create a PaymentIntent and obtain the generated Payment along with its seller-level PaymentSplits.
 
 ### **FR6 — Checkout/Order Service should be able to trigger authorization via PSP.**
 - The system must allow Checkout to authorize the total payment amount through an external PSP.
 
-### **FR7 — Internal services should be able to perform seller-level operations.**
-- Internal services must be able to request captures, cancellations, and refunds *per PaymentOrder*.
+### **FR7 — Internal services should be able to perform operations.**
+- Internal services must be able to request captures, cancellations, and refunds *per Payment*.
 
 ### **FR8 — The system must maintain internal fund distribution for reporting and payouts.**
 - Internal components (Finance, Payouts) must be able to retrieve seller payables, platform fees, and other financial allocations.
@@ -106,8 +101,8 @@ Even under retries, restarts, and network issues, financial outcomes must remain
 # 🟦 Architecture Summary (Non-Functional / Implementation Section)
 
 The platform internally uses:
-- **Event-driven architecture** for asynchronous flows for payment order and ledger
-- **Kafka topics** for PaymentOrder creation, PSP calls, and ledger events
+- **Event-driven architecture** for asynchronous flows for payments and the ledger
+- **Kafka topics** for execution queuing and PSP results
 - **Idempotent state transitions** to ensure correctness under retries
 - **Double-entry ledger** for immutable financial history
 - **PSP gateway client** for authorization, capture, refund, and cancel operations
@@ -115,9 +110,9 @@ The platform internally uses:
 
 ---
 
-🟦 Core Entities (Domain-Level)
+# 🟦 Core Entities (Domain-Level)
 
-These represent the nouns your system uses to satisfy the functional requirements.  
+These represent the nouns our system uses to satisfy the functional requirements.  
 They define the **data model**, the **API vocabulary**, and the **business language** of the Merchant-of-Record payment platform.
 
 ---
@@ -139,7 +134,7 @@ These actors perform operations on payments, orders, balances, and payouts.
 ---
 
 # 🟩 Core Business Entities
-These are the fundamental nouns of out Merchant-of-Record payment platform.
+These are the fundamental nouns of our Merchant-of-Record payment platform.
 
 ---
 
@@ -150,7 +145,7 @@ Represents the **shopper's intent to pay** for a multi-seller basket.
 **When it's created:**
 - Step 1: Shopper initiates checkout → `POST /api/v1/payments` endpoint
 - Created with status `CREATED_PENDING` (initially), then transitions to `CREATED` once Stripe ID is obtained.
-- Contains: `buyerId`, `orderId`, `totalAmount`, `paymentOrderLines` (seller breakdown)
+- Contains: `buyerId`, `orderId`, `totalAmount`, `paymentSplits` (seller breakdown)
 
 **Why it exists:**
 - Separates "intent to pay" from "actual payment transaction"
@@ -175,32 +170,31 @@ Represents the **actual financial transaction** created after authorization succ
 
 
 
-## **3. PaymentOrder**
-Represents the **per-seller financial component** of a Payment.
+## **3. OutboxEvent**
+Represents **immutable integration events** stored locally on edge or centrally.
 
 **When it's created:**
-  When `Payment` is created
-- One `PaymentOrder` per seller (from `Payment.paymentOrderLines`)
-- Initial status: `CAPTURE_REQUESTED`
+  When intent mutations or external network results are received.
 
 **Why it exists:**
-- Each seller has independent fulfillment lifecycle
-- Sellers can be captured, refunded, or cancelled independently
-- Enables per-seller financial tracking and payouts
-- Supports retry logic per seller (if one seller's capture fails, others continue)
-- Maps directly to seller-level accounting entries
+- Guarantees exactly-once publishing through the database transaction.
+- Eliminates dual-write vulnerabilities between DB and Kafka.
 
 ---
 
-## **4. Payment transaction**
+## **4. Payment Transaction (Tx)**
 
-Represents the **current financial standing** of an account (e.g., seller’s accrued revenue).  
-Derived from applied LedgerEntries.
+Represents an **individual financial operation** executed against a Payment (e.g., `AuthorizationTx`, `CaptureTx`, `RefundTx`, `SettleTx`). 
 
-**Why it exists:**  
-Used for reporting, analytics, payouts, and consistency validation.
+**When it's created:**
+  - Whenever an operation is requested and executed against the PSP (e.g., when we successfully capture funds, a `CaptureTx` is recorded).
 
-## **4. LedgerEntry**
+**Why it exists:**
+  - **Audit & History:** While the `Payment` aggregate tracks the *cumulative total* (e.g., "This payment has 100 EUR captured"), the `Tx` tracks the *individual actions* ("We captured 50 EUR on Monday, and 50 EUR on Tuesday").
+  - **External PSP Linking:** It stores the external network identifiers (like the PSP's acquirer reference) to trace exactly which network call caused the balance change.
+  - **Ledger Bridging:** It acts as the business-level parent for double-entry accounting. Each successful `Tx` generates exactly one `JournalEntry` to balance the MoR's books.
+
+## **5. LedgerEntry**
 
 Represents a **single double-entry journal entry**.
 
@@ -216,7 +210,7 @@ Ensures financial correctness, auditability, and immutable accounting history.
 
 ---
 
-## **5. Posting (Debit / Credit)**
+## **6. Posting (Debit / Credit)**
 
 A component of a LedgerEntry.
 
@@ -229,7 +223,7 @@ LedgerEntries consist of multiple postings — always balanced.
 
 ---
 
-## **6. Account**
+## **7. Account**
 
 Represents a **financial account** in the internal ledger, such as:
 
@@ -244,7 +238,7 @@ Money moves internally between accounts, not as free-form variables.
 
 ---
 
-## **7. Balance**
+## **8. Balance**
 
 Represents the **current financial standing** of an account (e.g., seller’s accrued revenue).  
 Derived from applied LedgerEntries.
@@ -282,7 +276,7 @@ graph TD
             direction TB
             API1("Payment Acceptance Service<br/>(Authorization / Capture / Refund)")
             IdemDB1[("Idempotency DB<br/>IdempotencyRecord")]
-            EdgeDB1[("Edge Local DB<br/>PaymentIntent<br/>Payment<br/>PaymentOrder<br/>OutboxEvents")]
+            EdgeDB1[("Edge Local DB<br/>PaymentIntent<br/>Payment<br/>OutboxEvents")]
             Fwd1[["Local Outbox Forwarder"]]
             
             API1 -.-> IdemDB1
@@ -294,7 +288,7 @@ graph TD
             direction TB
             API2("Payment Acceptance Service<br/>(Authorization / Capture / Refund)")
             IdemDB2[("Idempotency DB<br/>IdempotencyRecord")]
-            EdgeDB2[("Edge Local DB<br/>PaymentIntent<br/>Payment<br/>PaymentOrder<br/>OutboxEvents")]
+            EdgeDB2[("Edge Local DB<br/>PaymentIntent<br/>Payment<br/>OutboxEvents")]
             Fwd2[["Local Outbox Forwarder"]]
             
             API2 -.-> IdemDB2
@@ -312,31 +306,31 @@ graph TD
         
         subgraph Topics["Kafka Topics"]
             direction LR
-            CapTopic>"Capture Topic"]
-            RefTopic>"Refund Topic"]
-            ResTopic>"PSP-Result Topic<br/>(Accepted: PaymentAuthorized,<br/>PaymentCaptured, PaymentRefunded)"]
+            CapTopic>"capture-execution-queue"]
+            TransTopic>"internal-transfer-queue"]
+            ResTopic>"psp-result-queue<br/>(Accepted: PaymentAuthorized,<br/>CaptureSuccessful)"]
         end
         
         CentralDB -->|Polls OutboxEvents| Relay
         
         Relay -->|OutboxEvent&lt;CaptureReceived&gt;| CapTopic
-        Relay -->|OutboxEvent&lt;RefundReceived&gt;| RefTopic
-        Relay -->|OutboxEvent&lt;PaymentAuthorized&gt;<br/>OutboxEvent&lt;Captured&gt;<br/>OutboxEvent&lt;Refunded&gt;| ResTopic
+        Relay -->|OutboxEvent&lt;InternalTransferRequest&gt;| TransTopic
+        Relay -->|OutboxEvent&lt;PaymentAuthorized&gt;<br/>OutboxEvent&lt;CaptureSuccessful&gt;| ResTopic
         
         subgraph Consumers["Payment Consumers (payment-consumers)"]
             direction TB
-            CapCons("PSP CAPTURE EXECUTOR<br/>Calls psp.capture()<br/>Stores OutboxEvent&lt;Captured&gt;")
-            RefCons("PSP REFUND EXECUTOR<br/>Calls psp.refund()<br/>Stores OutboxEvent&lt;Refunded&gt;")
+            CapCons("CAPTURE COMMAND EXECUTOR<br/>Calls psp.capture()<br/>Stores OutboxEvent&lt;CapturePspPerformed&gt;")
+            TransCons("INTERNAL TRANSFER CONSUMER<br/>Records Internal Ledger Splits")
             
-            ResCons("PSP RESULT CONSUMER<br/><b>PaymentAuthorized</b> -> createAuthTx, createAuthJournal<br/><b>PaymentCaptured</b> -> createCaptureTx, createCaptureJournals<br/><b>PaymentRefunded</b> -> createRefundTx, createRefundJournals<br/><i>*All store OutboxEvent&lt;JournalsPosted&gt;*</i>")
+            ResCons("PSP RESULT CONSUMER<br/><b>PaymentAuthorized</b> -> createAuthTx, createAuthJournal<br/><b>CaptureSuccessful</b> -> createCaptureTx, createCaptureJournals<br/><i>*Appends OutboxEvent&lt;InternalTransferRequest&gt;*</i>")
         end
         
         CapTopic --> CapCons
-        RefTopic --> RefCons
+        TransTopic --> TransCons
         ResTopic --> ResCons
         
         CapCons -->|Writes Result| CentralDB
-        RefCons -->|Writes Result| CentralDB
+        TransCons -->|Writes Result| CentralDB
         ResCons -->|Stores Txs & Journals| CentralDB
     end
 
@@ -350,8 +344,8 @@ graph TD
     class IdemDB1,EdgeDB1,IdemDB2,EdgeDB2,CentralDB db
     class API1,API2 service
     class Fwd1,Fwd2,Relay job
-    class CapTopic,RefTopic,ResTopic topic
-    class CapCons,RefCons,ResCons consumer
+    class CapTopic,TransTopic,ResTopic topic
+    class CapCons,TransCons,ResCons consumer
 ```
 
 **Payment Platform** is an internal backend domain service that manages the complete payment lifecycle for a multi-seller marketplace platform. It operates as a Merchant-of-Record (MoR), handling all financial transactions between shoppers, sellers, and the platform. The platform is divided into three highly available tiers:
@@ -396,47 +390,40 @@ graph TD
         PSP_Auth -.->|TIMEOUT| PI2
     end
 
-    subgraph PaymentPhase ["Order Fulfillment Phase (Asynchronous)"]
+    subgraph PaymentPhase ["Edge Ingestion Phase (Asynchronous)"]
         direction TB
-        PI3 -->|Create Payment| P1[Payment<br/>Status: NOT_CAPTURED<br/>Captured: 0 EUR]
+        PI3 -->|Create Payment| P1[Payment<br/>Status: AUTHORIZED<br/>Captured: 0 EUR]
         
-        P1 -->|Fork into Orders| PO1[PaymentOrder 1<br/>SELLER-111<br/>Status: CAPTURE_RECEIVED]
-        P1 -->|Fork into Orders| PO2[PaymentOrder 2<br/>SELLER-222<br/>Status: CAPTURE_RECEIVED]
+        P1 -->|POST /captures| CAP1[Edge DB Outbox<br/>CaptureReceived]
     end
 
-    subgraph ExecutionPhase ["Execution & Consumers"]
+    subgraph ExecutionPhase ["Execution & Relay"]
         direction TB
-        PO1 -->|Relayed to topic| PO1A("PspCaptureExecutorConsumer")
-        PO2 -->|Relayed to topic| PO2A("PspCaptureExecutorConsumer")
+        CAP1 -->|Relayed by OutboxRelayJob| CAP2("CaptureCommandExecutor")
         
-        PO1A -->|PSP Capture Call| PSP1{PSP Result}
-        PO2A -->|PSP Capture Call| PSP2{PSP Result}
+        CAP2 -->|PSP Capture Call| PSP1{PSP Result}
         
-        PSP1 -->|SUCCESS/FAILED| PO1B[OutboxEvent: psp_result_updated]
-        PSP2 -->|SUCCESS/FAILED| PO2B[OutboxEvent: psp_result_updated]
+        PSP1 -->|Append to Central Outbox| PSP2[OutboxEvent: ExternalAsyncCaptureToPspPerformed]
+        PSP2 -->|Relayed to psp-result-queue| PSP3("PspResultConsumer")
         
-        PO1B -->|Relayed| PO1C("PspResultConsumer")
-        PO2B -->|Relayed| PO2C("PspResultConsumer")
+        PSP3 -->|Wait for Webhook| WEB1[Edge DB Outbox<br/>CaptureSuccessful]
+        WEB1 -->|Relayed to psp-result-queue| WEB2("PspResultConsumer")
     end
 
-    PO1C -->|Updates Ledger| P2[Payment<br/>Status: PARTIALLY_CAPTURED]
-    PO2C -->|Updates Ledger| P3[Payment<br/>Status: CAPTURED]
+    WEB2 -->|Updates Ledger| P3[Payment<br/>Status: CAPTURED<br/>MERCHANT_GROSS_POOL updated]
     
-    P3 -.->|Refund Request| REF1[PaymentOrder 1<br/>Status: REFUND_RECEIVED]
-    REF1 -->|Relayed to topic| REF2("PspRefundExecutorConsumer")
-    REF2 -->|PSP Refund Call| PSP3{PSP Result}
-    PSP3 -->|SUCCESS/FAILED| REF3[OutboxEvent: psp_result_updated]
-    REF3 -->|Relayed| REF4("PspResultConsumer")
-    REF4 -->|Updates Ledger| P4[Payment<br/>Status: PARTIALLY_REFUNDED]
+    P3 -.->|If MARKETPLACE| SPLIT1[OutboxEvent: InternalTransferRequest]
+    SPLIT1 -->|Relayed to internal-transfer-queue| SPLIT2("InternalTransferConsumer")
+    SPLIT2 -->|Sub-Seller Distribution| SPLIT3[JournalType.INTERNAL_TRANSFER]
 
     class IdemCheck,ReturnStored idem
     class PI0,PI1,PI2 intentPending
     class PI3 intentSuccess
     class PI4 intentFailed
-    class P1,P2,P3,P4 payment
-    class PO1,PO2,REF1,PO1B,PO2B,REF3 order
-    class PO1A,PO2A,PO1C,PO2C,REF2,REF4 consumer
-    class PSP_Create,PSP_Auth,PSP1,PSP2,PSP3 psp
+    class P1,P3 payment
+    class CAP1,WEB1,SPLIT1 order
+    class CAP2,PSP3,WEB2,SPLIT2 consumer
+    class PSP_Create,PSP_Auth,PSP1 psp
 ```
 
 ### Simplified Consumer Architecture
@@ -450,10 +437,10 @@ Historically, consumers would read an event, process it (e.g. call a PSP), and t
 - **Unrealistic Exactly-Once Guarantees**: Achieving true exactly-once semantics across a database, an external HTTP API, and Kafka is impossible without distributed locks or 2PC (Two-Phase Commit).
 
 **The New Pattern (Outbox-Driven Consumers):**
-1. **Intents (Capture/Refund Received)**: `payment_order_capture_received` and `payment_order_refund_received` events denote that an intent to capture or refund has been recorded in the database.
-2. **Executors (`PspCaptureExecutorConsumer` / `PspRefundExecutorConsumer`)**: These components listen to `capture_topic` and `refund_topic` respectively. They perform the synchronous call to the external PSP Gateway. Upon receiving a terminal or retryable result, they **do not publish back to Kafka directly**. Instead, they write a `PaymentOrderPspResultUpdated` event into the Central Database Outbox.
-3. **Outbox Relay**: The `OutboxRelayJob` reads these results from the database outbox and publishes them asynchronously to the `psp_result_topic`.
-4. **Result Processing (`PspResultConsumer`)**: Listens to the `psp_result_topic` to apply the results to the central database, finalize payment statuses, and trigger internal double-entry ledger bookkeeping.
+1. **Intents (Capture/Refund Received)**: `CaptureReceived` events denote that an intent to capture has been recorded in the database edge outbox.
+2. **Executors (`CaptureCommandExecutor`)**: These components listen to `capture-execution-queue`. They perform the synchronous call to the external PSP Gateway. Upon receiving a terminal or retryable result, they **do not publish back to Kafka directly**. Instead, they write a `ExternalAsyncCaptureToPspPerformed` event into the Central Database Outbox.
+3. **Outbox Relay**: The `OutboxRelayJob` reads these results from the database outbox and publishes them asynchronously to the `psp-result-queue`.
+4. **Result Processing (`PspResultConsumer`)**: Listens to the `psp-result-queue` to apply the results to the central database, finalize payment statuses, trigger internal double-entry ledger bookkeeping, and schedule any required internal transfers.
 
 ### Authorization/Idempotency Sequence Diagram
 
@@ -571,31 +558,54 @@ sequenceDiagram
     Browser->>Shopper: Display "Payment Successful" message
 ```
 
-#### Ledger Record Sequence Flow
+#### Ledger Finalization & Split Execution Flow
 
 ```mermaid
 sequenceDiagram
-    box rgb(230, 230, 250) "Message Broker"
-        participant Kafka
+    autonumber
+    
+    box rgb(230, 230, 250) "Message Broker (Kafka)"
+        participant psp_result as Topic: psp-result-queue
+        participant transfer_topic as Topic: internal-transfer
     end
 
-    box rgb(255, 250, 240) "Payment Consumers (Central)"
-        participant Dispatcher as LedgerRecordingRequestDispatcher
-        participant Command as LedgerRecordingCommand
-        participant Consumer as LedgerRecordingConsumer
-        participant Service as RecordLedgerEntriesService
+    box rgb(255, 250, 240) "Payment Consumers"
+        participant PspResult as PspResultConsumer
+        participant Transfer as InternalTransferConsumer
+    end
+
+    box rgb(245, 245, 245) "Central Relay Node"
+        participant Relay as OutboxRelayJob
     end
 
     box rgb(240, 255, 240) "Database"
-        participant LedgerDB as Ledger Table
+        participant DB as Central Database
     end
 
-    Kafka->>Dispatcher: Consume PaymentOrderFinalized
-    Dispatcher->>Kafka: Publish LedgerRecordingCommand
-    Kafka->>Consumer: Consume LedgerRecordingCommand
-    Consumer->>Service: recordLedgerEntries()
-    Service->>LedgerDB: Append JournalEntries
-    Service->>Kafka: Publish LedgerEntriesRecorded
+    %% Step 1: Gross Capture
+    psp_result->>PspResult: 1. Consume: CaptureSuccessful (from Edge Webhook)
+    
+    Note over PspResult, DB: --- Phase A: Gross Settlement ---
+    PspResult->>DB: 2. Update Payment Status to CAPTURED
+    PspResult->>DB: 3. Insert JournalEntry (Gross Asset Capture)
+    
+    %% Step 2: Staging Splits
+    Note over PspResult, DB: --- Phase B: Atomic Split Staging ---
+    PspResult->>DB: 4. Check PaymentSplits (Marketplace Logic)
+    PspResult->>DB: 5. Insert OutboxEvent<InternalTransferRequest> (One per seller)
+    PspResult-->>psp_result: 6. ACK Kafka Message
+    
+    %% Step 3: Relay Sweeping
+    Note over Relay, DB: --- Phase C: Outbox Sweep ---
+    Relay->>DB: 7. Polls Outbox table
+    DB-->>Relay: Returns new InternalTransferRequest events
+    Relay->>transfer_topic: 8. Publish to internal-transfer-queue
+    
+    %% Step 4: Split Execution
+    Note over Transfer, DB: --- Phase D: Split Ledger Execution ---
+    transfer_topic->>Transfer: 9. Consume: InternalTransferRequest
+    Transfer->>DB: 10. Insert JournalEntry (INTERNAL_TRANSFER)<br/>Credits Seller, Debits Gross Pool
+    Transfer-->>transfer_topic: 11. ACK Kafka Message
 ```
 
 #### Balance Flow Sequence
@@ -806,14 +816,12 @@ The following catalog defines every event and command passing through Kafka, inc
 
 | No. | Logical Event / Command | Event Type String (`eventType`) | Envelope Payload Class | Kafka Topic | Publisher Module & Class | Consumer Module & Class | Consumer Group ID | Container Factory Bean |
 |---|---|---|---|---|---|---|---|---|
-| **1** | **Payment Authorized Event** | `"payment_authorized"` | `EventEnvelope<PaymentAuthorized>` | `payment_authorized_topic` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`PaymentAuthorizedConsumer` | `payment-authorized-processor-consumer-group` | `payment_authorized_topic-factory` |
-| **2** | **Payment Order Capture Received** | `"payment_order_capture_received"` | `EventEnvelope<PaymentOrderCaptureReceived>` | `payment_order_created_topic` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`PaymentOrderEnqueuer` | `payment-order-enqueuer-consumer-group` | `payment_order_created_topic-factory` |
-| **3** | **Payment Order Capture Command** | `"payment_order_capture_requested"` | `EventEnvelope<PaymentOrderCaptureCommand>` | `capture_topic` | `payment-consumers`<br/>`PaymentOrderEnqueuer` | `payment-consumers`<br/>`PaymentOrderCaptureExecutor` | `psp-capture-executor-consumer-group` | `capture_topic-factory` |
-| **4** | **Payment Order Refund Received** | `"payment_order_refund_received"` | `EventEnvelope<PaymentOrderRefundReceived>` | `refund_topic` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`PspRefundExecutorConsumer` | `psp-refund-executor-consumer-group` | `refund_topic-factory` |
-| **5** | **PSP Transaction Result Updated** | `"payment_order_psp_result_updated"` | `EventEnvelope<PaymentOrderPspResultUpdated>` | `psp_result_topic` | `payment-consumers`<br/>`PaymentOrderCaptureExecutor` & `PspRefundExecutorConsumer` | `payment-consumers`<br/>`PaymentOrderPspResultApplier` | `payment-order-psp-result-updated-consumer-group` | `payment_order_psp_result_updated_topic-factory` |
-| **6** | **Payment Order Finalized** | `"payment_order_finalized"` | `EventEnvelope<PaymentOrderFinalized>` | `payment_order_finalized_topic` | `payment-consumers`<br/>`PaymentOrderPspResultApplier` | `payment-consumers`<br/>`LedgerRecordingRequestDispatcher` | `ledger-recording-request-dispatcher-consumer-group` | `payment_order_finalized_topic-factory` |
-| **7** | **Ledger Recording Request Command** | `"ledger_recording_requested"` | `EventEnvelope<LedgerRecordingCommand>` | `ledger_record_request_queue_topic` | `payment-consumers`<br/>`LedgerRecordingRequestDispatcher` | `payment-consumers`<br/>`LedgerRecordingConsumer` | `ledger-recording-consumer-group` | `ledger_record_request_queue_topic-factory` |
-| **8** | **Ledger Entries Recorded Event** | `"ledger_entries_recorded"` | `EventEnvelope<LedgerEntriesRecorded>` | `ledger_entries_recorded_topic` | `payment-consumers`<br/>`LedgerRecordingConsumer` | `payment-consumers`<br/>`AccountBalanceConsumer` | `account-balance-consumer-group` | `ledger_entries_recorded_topic-factory` |
+| **1** | **Payment Authorized Event** | `"payment_authorized"` | `EventEnvelope<PaymentAuthorized>` | `psp-result-queue` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`PspResultConsumer` | `psp-result-consumer-group` | `psp-result-factory` |
+| **2** | **Capture Received Event** | `"capture_received"` | `EventEnvelope<CaptureReceived>` | `capture-execution-queue` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`CaptureCommandExecutor` | `capture-command-executor-group` | (Default String Factory) |
+| **3** | **External Async Capture to PSP Performed** | `"external_async_capture_to_psp_performed"` | `EventEnvelope<ExternalAsyncCaptureToPspPerformed>` | `psp-result-queue` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`CapturePspPerformedConsumer` | `capture-psp-performed-group` | (Default String Factory) |
+| **4** | **Capture Successful Event** | `"capture_successful"` | `EventEnvelope<CaptureSuccessful>` | `psp-result-queue` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`PspResultConsumer` | `psp-result-consumer-group` | `psp-result-factory` |
+| **5** | **Internal Transfer Request** | `"internal_transfer_request"` | `EventEnvelope<InternalTransferRequest>` | `internal-transfer-queue` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`InternalTransferConsumer` | `internal-transfer-consumer-group` | (Default String Factory) |
+| **6** | **Ledger Entries Recorded Event** | `"ledger_entries_recorded"` | `EventEnvelope<LedgerEntriesRecorded>` | `ledger_entries_recorded_topic` | `payment-consumers`<br/>`PspResultProcessingService` | `payment-consumers`<br/>`AccountBalanceConsumer` | `account-balance-consumer-group` | `ledger_entries_recorded_topic-factory` |
 
 ---
 

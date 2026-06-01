@@ -9,4 +9,7 @@
     <include file="2025-01-04-account-profile.xml" relativeToChangelogFile="true"/>
     <include file="2026-05-26-edge-to-ledger.xml" relativeToChangelogFile="true"/>
     <include file="payment-outbox-changelog.xml" relativeToChangelogFile="true"/>
+    <!-- Epic 1: Payment aggregate moves to Central DB; payment_tx refactored -->
+    <include file="2026-05-31-central-payments-table.xml" relativeToChangelogFile="true"/>
+    <include file="2026-05-31-payment-tx-refactor.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

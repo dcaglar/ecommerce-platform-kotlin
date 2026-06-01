@@ -2,6 +2,8 @@ package com.dogancaglar.paymentservice.domain.model.ledger
 
 import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.common.Currency
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.vo.TxId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -19,6 +21,7 @@ class JournalEntryTest {
     private val eur = Currency("EUR")
     val platformCashAccount = Account.create(AccountType.PLATFORM_CASH, "merchantId")
     val merchantAccount = Account.create(AccountType.MERCHANT_PAYABLE, "merchantId")
+    val merchantGrossPool = Account.create(AccountType.MERCHANT_PAYABLE, "merchantId")
     val pspFeeExpenseAccount = Account.create(AccountType.PSP_FEE_EXPENSE, "GLOBAL")
     val commissionRevenueAccount = Account.create(AccountType.PLATFORM_COMMISSION_REVENUE, "GLOBAL")
     val authLiabilityAccount = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
@@ -29,8 +32,8 @@ class JournalEntryTest {
     fun `authHold should create balanced entry with AUTH_RECEIVABLE debit and AUTH_LIABILITY credit`() {
         val amount = Amount.of(10_000, eur)
         val result = JournalEntry.authHold(
-            txId = 1L,
-            paymentId = 100L,
+            txId = TxId(1L),
+            paymentId = PaymentId(100L),
             acquirerReference = "acq-1",
             journalIdentifier = "PAY-1",
             authorizedAmount = amount,
@@ -55,19 +58,18 @@ class JournalEntryTest {
     }
 
     @Test
-    fun `capture should balance and shift from auth to psp receivables, and increase merchant payable`() {
+    fun `captureGrossAsset should balance and shift from auth to psp receivables, and increase merchant payable`() {
         val amount = Amount.of(10_000, eur)
-        val result = JournalEntry.capture(
-            txId = 2L,
-            paymentId = 100L,
-            paymentOrderId = 200L,
-            authorizationTxId = 1L,
+        val result = JournalEntry.captureGrossAsset(
+            txId = TxId(2L),
+            paymentId = PaymentId(100L),
+            authorizationTxId = TxId(1L),
             acquirerReference = "acq-2",
             journalIdentifier = "PAY-2",
             capturedAmount = amount,
             authReceivable = authReceivableAccount,
             authLiability = authLiabilityAccount,
-            merchantAccount = merchantAccount,
+            merchantGrossPool = merchantGrossPool,
             pspReceivable = pspReceivableAccount
         )
         val entryList = result.journalEntries
@@ -89,7 +91,7 @@ class JournalEntryTest {
         // Global balance should be zero
         assertEquals(0L, entry.postings.sumOf { it.getSignedAmount().quantity })
         // Merchant payable up
-        assertEquals(10000, netAmountByAccount[merchantAccount.accountCode])
+        assertEquals(10000, netAmountByAccount[merchantGrossPool.accountCode])
         // PSP receivable up
         assertEquals(10000, netAmountByAccount[pspReceivableAccount.accountCode])
         // Balance out auths
@@ -111,9 +113,9 @@ class JournalEntryTest {
     }
 
     @Test
-    fun `commissiionFee should reduce merchant liability and record commission revenue`() {
+    fun `commissionFeeRegistered should reduce merchant liability and record commission revenue`() {
         val commissionFee = Amount.of(200, Currency("EUR"))
-        val entryList = JournalEntry.commissionFeRegistered("PAY-4", commissionFee, commissionRevenueAccount,merchantAccount)
+        val entryList = JournalEntry.commissionFeeRegistered("PAY-4", commissionFee, commissionRevenueAccount,merchantAccount)
         val entry = entryList.first()
 
         assertEquals(0L, entry.postings.sumOf { it.getSignedAmount().quantity })
@@ -148,23 +150,22 @@ class JournalEntryTest {
         val commissionFeeRevenue = Amount.of(400, eur) //our commission as reevenue
         val payout = capturedAmount-commissionFeeRevenue
 
-        val captureResult = JournalEntry.capture(
-            txId = 5L,
-            paymentId = 100L,
-            paymentOrderId = 500L,
-            authorizationTxId = 1L,
+        val captureResult = JournalEntry.captureGrossAsset(
+            txId = TxId(5L),
+            paymentId = PaymentId(100L),
+            authorizationTxId = TxId(1L),
             acquirerReference = "acq-5",
             journalIdentifier = "PAY-5",
             capturedAmount = capturedAmount,
             authReceivable = authReceivableAccount,
             authLiability = authLiabilityAccount,
-            merchantAccount = merchantAccount,
+            merchantGrossPool = merchantGrossPool,
             pspReceivable = pspReceivableAccount
         )
         val entryLists = listOf(
             captureResult.journalEntries,
             JournalEntry.settlement("PAY-5", capturedAmount, settledAmount, platformCashAccount,pspFeeExpenseAccount,pspReceivableAccount),
-            JournalEntry.commissionFeRegistered("PAY-5", commissionFeeRevenue, commissionRevenueAccount,merchantAccount),
+            JournalEntry.commissionFeeRegistered("PAY-5", commissionFeeRevenue, commissionRevenueAccount,merchantAccount),
             JournalEntry.payout("MERCHANT-1", capturedAmount-commissionFeeRevenue, merchantAccount, platformCashAccount)
         )
         val allPostings = entryLists.flatMap { entryList -> entryList.flatMap { it.postings } }
@@ -181,18 +182,6 @@ class JournalEntryTest {
         assertEquals(200, netByAccount[platformCashAccount.accountCode]) // profit 200
         assertEquals(200L, netByAccount[pspFeeExpenseAccount.accountCode]) // psp fee expense 200
         assertEquals(400, netByAccount[commissionRevenueAccount.accountCode]) // revenue= 400
-    }
-
-    @Test
-    fun `failedPayment should return empty list`() {
-        val entryList = JournalEntry.failedPayment("PAY-FAILED", Amount.of(10_000, Currency("USD")))
-
-        assertTrue(entryList.isEmpty())
-    }
-
-    @Test
-    fun `all factory methods should create entries with correct IDs`() {
-        //
     }
 }
 

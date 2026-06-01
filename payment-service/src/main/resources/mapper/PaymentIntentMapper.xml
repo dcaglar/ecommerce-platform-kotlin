@@ -16,7 +16,9 @@
                 typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
         <result property="updatedAt" column="updated_at"
                 typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
-        <result property="paymentLinesJson" column="payment_order_lines" jdbcType="VARCHAR"/>
+        <result property="splitsJson"        column="splits_json" jdbcType="VARCHAR"/>
+        <result property="merchantAccountId" column="merchant_account_id"/>
+        <result property="processingModel" column="processing_model"/>
     </resultMap>
 
     <select id="getMaxPaymentIntentId" resultType="long">
@@ -32,10 +34,12 @@
         psp_reference,
         buyer_id,
         order_id,
+        merchant_account_id,
+        processing_model,
         total_amount_value,
         currency,
         status,
-        payment_order_lines,
+        splits_json,
         created_at,
         updated_at
         ) VALUES (
@@ -43,10 +47,12 @@
         #{pspReference},
         #{buyerId},
         #{orderId},
+        #{merchantAccountId},
+        #{processingModel},
         #{totalAmountValue},
         #{currency},
         #{status},
-        CAST(#{paymentLinesJson} AS jsonb),
+        CAST(#{splitsJson} AS jsonb),
         #{createdAt},
         #{updatedAt}
         )
@@ -57,12 +63,14 @@
         psp_reference,
         buyer_id,
         order_id,
+        merchant_account_id,
+        processing_model,
         total_amount_value,
         currency,
         status,
         created_at,
         updated_at,
-        payment_order_lines::text as payment_order_lines
+        splits_json::text AS splits_json
         FROM payment_intents
         WHERE payment_intent_id = #{id}
     </select>
@@ -77,10 +85,12 @@
         psp_reference = #{pspReference},
         order_id = #{orderId},
         buyer_id = #{buyerId},
+        merchant_account_id = #{merchantAccountId},
+        processing_model = #{processingModel},
         total_amount_value = #{totalAmountValue},
         currency = #{currency},
         status = #{status},
-        payment_order_lines = CAST(#{paymentLinesJson} AS jsonb),
+        splits_json = CAST(#{splitsJson} AS jsonb),
         created_at = #{createdAt},
         updated_at = #{updatedAt}
         WHERE payment_intent_id = #{paymentIntentId}

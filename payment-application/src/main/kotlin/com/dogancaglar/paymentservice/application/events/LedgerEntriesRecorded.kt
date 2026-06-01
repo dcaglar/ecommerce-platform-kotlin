@@ -1,7 +1,5 @@
 package com.dogancaglar.paymentservice.application.events
 
-import com.dogancaglar.paymentservice.application.command.LedgerRecordingCommand
-import com.dogancaglar.paymentservice.application.events.PaymentOrderEvent
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -9,11 +7,11 @@ import java.time.Instant
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class LedgerEntriesRecorded private constructor(
-    @JsonProperty("paymentOrderId") override val paymentOrderId: String,
-    @JsonProperty("publicPaymentOrderId") override val publicPaymentOrderId: String,
-    @JsonProperty("paymentId") override val paymentId: String,
-    @JsonProperty("publicPaymentId") override val publicPaymentId: String,
-    @JsonProperty("sellerId") override val sellerId: String,
+    @JsonProperty("paymentOrderId") val paymentOrderId: String?,
+    @JsonProperty("publicPaymentOrderId") val publicPaymentOrderId: String?,
+    @JsonProperty("paymentId") override val paymentIntentId: String,
+    @JsonProperty("publicPaymentId") override val publicPaymentIntentId: String,
+    @JsonProperty("sellerId") val sellerId: String?,
     @JsonProperty("amountValue") override val amountValue: Long,
     @JsonProperty("currency") override val currency: String,
 
@@ -21,7 +19,7 @@ data class LedgerEntriesRecorded private constructor(
     @JsonProperty("ledgerEntries") val ledgerEntries: List<LedgerEntryEventData>,
 
     @JsonProperty("timestamp") override val timestamp: Instant
-) : PaymentOrderEvent() {
+) : com.dogancaglar.paymentservice.application.events.PaymentBaseEvent() {
 
     override val eventType: String = EVENT_TYPE
 
@@ -41,16 +39,16 @@ data class LedgerEntriesRecorded private constructor(
          * Factory for use by RecordLedgerEntriesService.
          */
         fun from(
-            cmd: PaymentOrderEvent,
+            cmd: com.dogancaglar.paymentservice.application.events.PaymentBaseEvent,
             batchId: String,
             entries: List<LedgerEntryEventData>,
             now: Instant
         ) = LedgerEntriesRecorded(
-            paymentOrderId = cmd.paymentOrderId,
-            publicPaymentOrderId = cmd.publicPaymentOrderId,
-            paymentId = cmd.paymentId,
-            publicPaymentId = cmd.publicPaymentId,
-            sellerId = cmd.sellerId,
+            paymentOrderId = if (cmd is PaymentCaptured) null else null, // Kept for compatibility mapping
+            publicPaymentOrderId = null,
+            paymentIntentId = cmd.paymentIntentId,
+            publicPaymentIntentId = cmd.publicPaymentIntentId,
+            sellerId = if (cmd is PaymentCaptured) cmd.merchantAccountId else null,
             amountValue = cmd.amountValue,
             currency = cmd.currency,
             ledgerBatchId = batchId,

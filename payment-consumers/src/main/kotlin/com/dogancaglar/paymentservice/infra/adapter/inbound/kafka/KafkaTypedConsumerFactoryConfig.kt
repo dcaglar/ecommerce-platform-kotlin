@@ -7,13 +7,8 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.GenericLogFields
 import com.dogancaglar.common.kafka.serde.EventEnvelopeKafkaSerializer
 import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
-import com.dogancaglar.paymentservice.application.events.PaymentOrderCaptureReceived
-import com.dogancaglar.paymentservice.application.command.LedgerRecordingCommand
-import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCommand
-import com.dogancaglar.paymentservice.application.events.PaymentOrderFinalized
 import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.PaymentEventMetadataCatalog
 import com.dogancaglar.paymentservice.infra.adapter.outbound.kafka.metadata.Topics
-import com.dogancaglar.paymentservice.domain.exception.MissingPaymentOrderException
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -134,7 +129,6 @@ class KafkaTypedConsumerFactoryConfig(
                 org.apache.kafka.clients.consumer.CommitFailedException::class.java,
             )
             addNotRetryableExceptions(
-                MissingPaymentOrderException::class.java,
                 java.lang.IllegalArgumentException::class.java,
                 java.lang.NullPointerException::class.java,
                 java.lang.ClassCastException::class.java,
@@ -200,49 +194,10 @@ class KafkaTypedConsumerFactoryConfig(
         }
 
 
-    @Bean("${Topics.PAYMENT_ORDER_CREATED}-factory")
-    fun paymentOrderCreatedFactory(
-        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
-        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
-        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
-        errorHandler: DefaultErrorHandler
-    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderCaptureReceived>> {
-        val cfg = cfgFor(PaymentEventMetadataCatalog.PaymentOrderCreatedMetadata.topic, "${Topics.PAYMENT_ORDER_CREATED}-factory")
-        return createFactory(
-            clientId = cfg.id,
-            concurrency = cfg.concurrency,
-            interceptor = interceptor,
-            consumerFactory = customFactory,
-            errorHandler = errorHandler,
-            ackMode = ContainerProperties.AckMode.MANUAL,
-            expectedEventType = PaymentEventMetadataCatalog.PaymentOrderCreatedMetadata.eventType,
-            batchMode = false
-        )
-    }
 
 
-    @Bean("${Topics.PAYMENT_ORDER_CAPTURE_REQUEST_QUEUE}-factory")
-    fun paymentOrderPspCallRequestedFactory(
-        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
-        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
-        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
-        errorHandler: DefaultErrorHandler
-    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderCaptureCommand>> {
-        val cfg = cfgFor(
-            PaymentEventMetadataCatalog.PaymentOrderCaptureCommandMetadata.topic,
-            "${Topics.PAYMENT_ORDER_CAPTURE_REQUEST_QUEUE}-factory"
-        )
-        return createFactory(
-            clientId = cfg.id,
-            concurrency = cfg.concurrency,
-            interceptor = interceptor,
-            consumerFactory = customFactory,
-            errorHandler = errorHandler,
-            ackMode = ContainerProperties.AckMode.MANUAL,
-            expectedEventType = PaymentEventMetadataCatalog.PaymentOrderCaptureCommandMetadata.eventType,
-            batchMode = false
-        )
-    }
+
+
 
 
     @Bean("psp-result-factory")
@@ -291,31 +246,6 @@ class KafkaTypedConsumerFactoryConfig(
         )
     }
 
-    @Bean("${Topics.PAYMENT_ORDER_FINALIZED}-factory")
-    fun paymentOrderFinalizedFactory(
-        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
-        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
-        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
-        errorHandler: DefaultErrorHandler
-    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<PaymentOrderFinalized>> {
-
-        val cfg = cfgFor(
-            Topics.PAYMENT_ORDER_FINALIZED,
-            "${Topics.PAYMENT_ORDER_FINALIZED}-factory"
-        )
-
-        return createFactory(
-            clientId = cfg.id,
-            concurrency = cfg.concurrency,
-            interceptor = interceptor,
-            consumerFactory = customFactory,
-            errorHandler = errorHandler,
-            ackMode = ContainerProperties.AckMode.MANUAL,
-            expectedEventType = PaymentEventMetadataCatalog.PaymentOrderFinalizedMetadata.eventType,
-            ackDiscarded = true,
-            batchMode = false
-        )
-    }
 
     @Bean
     fun mdcRecordInterceptor(): RecordInterceptor<String, EventEnvelope<*>> = HeaderMdcInterceptor()

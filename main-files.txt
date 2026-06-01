@@ -134,7 +134,7 @@ payment-domain/src/main/kotlin/com/dogancaglar/paymentservice/domain/model/vo/Or
 payment-domain/src/main/kotlin/com/dogancaglar/paymentservice/domain/model/vo/PaymentId.kt
 payment-domain/src/main/kotlin/com/dogancaglar/paymentservice/domain/model/vo/PaymentIntentId.kt
 payment-domain/src/main/kotlin/com/dogancaglar/paymentservice/domain/model/vo/PaymentOrderId.kt
-payment-domain/src/main/kotlin/com/dogancaglar/paymentservice/domain/model/vo/PaymentOrderLine.kt
+payment-domain/src/main/kotlin/com/dogancaglar/paymentservice/domain/model/vo/PaymentSplit.kt
 payment-domain/src/main/kotlin/com/dogancaglar/paymentservice/domain/model/vo/SellerId.kt
 payment-domain/src/main/kotlin/com/dogancaglar/paymentservice/domain/util/LedgerEntryFactory.kt
 payment-infrastructure/src/main/kotlin/com/dogancaglar/paymentinfra/PaymentInfrastructureAutoConfig.kt

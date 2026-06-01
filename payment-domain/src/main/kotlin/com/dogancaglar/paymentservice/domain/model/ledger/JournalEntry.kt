@@ -1,213 +1,389 @@
 package com.dogancaglar.paymentservice.domain.model.ledger
 
 import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.payment.BalanceAccountType
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit
+import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
+import com.dogancaglar.paymentservice.domain.model.vo.TxId
 
 /**
- * Represents one atomic, balanced accounting event.
- * Each JournalEntry must sum to zero across all postings.
+ * JournalEntry
  *
- * Use the static factory methods in the companion object to create validated JournalEntry instances.
- * Example: JournalEntry.authHold("PAY-1", amount)
+ * Represents one atomic, balanced double-entry accounting event.
+ * Every JournalEntry is immutable and validates itself at construction time.
+ *
+ * Invariants enforced at construction:
+ *  - Must have at least 2 postings (one debit, one credit minimum).
+ *  - Total debit quantity must equal total credit quantity (balanced entry).
+ *  - No duplicate account codes within a single entry.
+ *
+ * All instances must be created via the factory methods in [JournalFactory].
+ * Direct construction is prohibited (private constructor).
+ *
+ * ============================================================
+ * CAPTURE JOURNAL DESIGN (US 1.4)
+ * ============================================================
+ *
+ * The old [capture] factory method has been renamed to [captureGrossAsset].
+ * This rename is intentional and carries semantic weight:
+ *
+ *  - captureGrossAsset:
+ *      Allocates 100% of the captured amount to the PRIMARY MERCHANT'S
+ *      MERCHANT_GROSS_POOL account, regardless of whether the payment is
+ *      DIRECT_MERCHANT or MARKETPLACE. The split distribution happens AFTER
+ *      this entry, in separate INTERNAL_TRANSFER postings.
+ *
+ *  - executeSubSellerSplit:
+ *      Generates one [JournalType.INTERNAL_TRANSFER] JournalEntry per split
+ *      instruction. Each entry debits the merchant's MERCHANT_GROSS_POOL and
+ *      credits the sub-seller's BalanceAccountType-designated account.
+ *      This method is ONLY called for MARKETPLACE payments.
+ *      The caller (PspResultConsumer) is responsible for checking processingModel
+ *      before invoking this method.
+ *
+ * Why this two-step design?
+ *  - It preserves a complete, auditable record: the gross settlement asset
+ *    always lands in MERCHANT_GROSS_POOL first, making it trivial to reconcile
+ *    captures against acquirer settlement batches without complicating the
+ *    split accounting.
+ *  - INTERNAL_TRANSFER entries are clearly labelled and isolated from the
+ *    gateway-facing CAPTURE entry, so the ledger is human-readable.
+ *  - If split distribution fails partway through, only the failed transfers
+ *    are missing; the gross capture is never corrupted.
  */
 class JournalEntry private constructor(
-    val id: String,                      // e.g. "CAPTURE:A999"
-    val txType: JournalType,             // e.g. AUTH_HOLD, CAPTURE, REFUND
-    val name: String,                    // Human-readable label (optional)
+    val id: String,
+    val txType: JournalType,
+    val name: String,
     val postings: List<Posting>,
-    val referenceType: String? = null,   // e.g. "authorization", "capture"
-    val referenceId: String? = null      // e.g. "A999"
+    val referenceType: String? = null,
+    val referenceId: String? = null
 ) {
 
     init {
-        require(postings.isNotEmpty() && postings.size>=2) { "JournalEntry must have at least 2 posting" }
-        val totalDebitAmount = postings.filterIsInstance<Posting.Debit>().sumOf { it.amount.quantity }
-        val totalCreditAmount = postings.filterIsInstance<Posting.Credit>().sumOf { it.amount.quantity }
-        require(totalDebitAmount == totalCreditAmount) {
-            "Unbalanced journal entry: debits and credits differ (debits=$totalDebitAmount, credits=$totalCreditAmount)"
+        require(postings.size >= 2) {
+            "JournalEntry must have at least 2 postings, but had ${postings.size}"
         }
-
-        val duplicateAccounts = postings
+        val totalDebit  = postings.filterIsInstance<Posting.Debit>().sumOf { it.amount.quantity }
+        val totalCredit = postings.filterIsInstance<Posting.Credit>().sumOf { it.amount.quantity }
+        require(totalDebit == totalCredit) {
+            "Unbalanced JournalEntry [$id]: debits=$totalDebit, credits=$totalCredit"
+        }
+        val duplicates = postings
             .groupingBy { it.account.accountCode }
             .eachCount()
             .filterValues { it > 1 }
             .keys
-
-        require(duplicateAccounts.isEmpty()) {
-            "JournalEntry contains duplicate accounts: ${duplicateAccounts.joinToString(", ")}"
+        require(duplicates.isEmpty()) {
+            "JournalEntry [$id] contains duplicate accounts: ${duplicates.joinToString(", ")}"
         }
     }
 
-    override fun toString(): String {
-        return "JournalEntry(id='$id', txType=$txType, name='$name', postings=$postings, referenceType=$referenceType, referenceId=$referenceId)"
-    }
+    override fun toString(): String =
+        "JournalEntry(id='$id', txType=$txType, name='$name', " +
+        "postings=$postings, referenceType=$referenceType, referenceId=$referenceId)"
 
     companion object JournalFactory {
 
-        // ==================== Factory Methods ====================
+        // =====================================================================
+        // AUTH_HOLD
+        // =====================================================================
 
+        /**
+         * authHold
+         *
+         * Records the PSP authorization hold on the shopper's instrument.
+         *
+         * Postings:
+         *   DR PSP_RECEIVABLE (AUTH_RECEIVABLE account)
+         *   CR AUTH_LIABILITY
+         *
+         * Called by: PspResultConsumer, phase 1 (PaymentAuthorized event processing).
+         */
         fun authHold(
-            txId: Long,
-            paymentId: Long,
-            acquirerReference: String,
+            paymentId: PaymentId,
             journalIdentifier: String,
             authorizedAmount: Amount,
             authReceivable: Account,
             authLiability: Account
-        ): LedgerOperationResult = LedgerOperationResult(
-            transaction = PaymentTx.Authorization(
-                txId = txId,
-                paymentId = paymentId,
-                acquirerReference = acquirerReference,
-                amount = authorizedAmount
-            ),
-            journalEntries = listOf(
-                JournalEntry(
-                    id = "AUTH:${journalIdentifier}",
-                    txType = JournalType.AUTH_HOLD,
-                    name = "Authorization Hold",
-                    postings = listOf(
-                        Posting.Debit.create(authReceivable, authorizedAmount),
-                        Posting.Credit.create(authLiability, authorizedAmount)
-                    )
+        ): List<JournalEntry> = listOf(
+            JournalEntry(
+                id            = "AUTH:$journalIdentifier",
+                txType        = JournalType.AUTH_HOLD,
+                name          = "AuthorizationTx Hold",
+                referenceType = "payment",
+                referenceId   = paymentId.value.toString(),
+                postings      = listOf(
+                    Posting.Debit.create(authReceivable, authorizedAmount),
+                    Posting.Credit.create(authLiability, authorizedAmount)
                 )
             )
         )
 
-        fun capture(
-            txId: Long,
-            paymentId: Long,
-            paymentOrderId: Long,
-            authorizationTxId: Long,
-            acquirerReference: String,
+        // =====================================================================
+        // CAPTURE — Gross Asset Settlement (RENAMED from capture())
+        // =====================================================================
+
+        /**
+         * captureGrossAsset
+         *
+         * Clears the authorization hold and books 100% of the captured amount
+         * into the primary merchant's MERCHANT_GROSS_POOL. This applies to both
+         * DIRECT_MERCHANT and MARKETPLACE payments — the split distribution
+         * happens separately via [executeSubSellerSplit].
+         *
+         * Postings:
+         *   DR AUTH_LIABILITY              (releases the hold)
+         *   CR AUTH_RECEIVABLE             (clears the receivable)
+         *   DR PSP_RECEIVABLE              (records money inbound from PSP)
+         *   CR MERCHANT_GROSS_POOL         (primary merchant's holding pool)
+         *
+         * Called by: PspResultConsumer, phase 3 (CaptureSuccessful webhook event).
+         *
+         * @param txId              ID of the CaptureTx record being created.
+         * @param journalIdentifier Human-readable label for the journal ID (e.g., paymentId + timestamp).
+         * @param capturedAmount    Amount confirmed by the PSP webhook. Must be positive.
+         * @param authReceivable    AUTH_RECEIVABLE account for this payment.
+         * @param authLiability     AUTH_LIABILITY account for this payment.
+         * @param merchantGrossPool MERCHANT_GROSS_POOL account for the primary merchant.
+         * @param pspReceivable     PSP_RECEIVABLES account (money inbound from PSP).
+         * @return                  A List of JournalEntry for the CAPTURE.
+         */
+        fun captureGrossAsset(
+            txId: TxId,
             journalIdentifier: String,
             capturedAmount: Amount,
             authReceivable: Account,
             authLiability: Account,
-            merchantAccount: Account,
+            merchantGrossPool: Account,
             pspReceivable: Account
-        ): LedgerOperationResult = LedgerOperationResult(
-            transaction = PaymentTx.Capture(
-                txId = txId,
-                paymentId = paymentId,
-                paymentOrderId = paymentOrderId,
-                authorizationTxId = authorizationTxId,
-                acquirerReference = acquirerReference,
-                amount = capturedAmount
-            ),
-            journalEntries = listOf(
-                JournalEntry(
-                    id = "CAPTURE:${journalIdentifier}",
-                    txType = JournalType.CAPTURE,
-                    name = "Payment Capture",
-                    postings = listOf(
-                        Posting.Credit.create(authReceivable, capturedAmount),
-                        Posting.Debit.create(authLiability, capturedAmount),
-                        Posting.Credit.create(merchantAccount, capturedAmount),
-                        Posting.Debit.create(pspReceivable, capturedAmount)
-                    )
-                )
-            )
-        )
-        fun refund(
-            txId: Long,
-            paymentId: Long,
-            paymentOrderId: Long,
-            captureTxId: Long,
-            acquirerReference: String,
-            journalIdentifier: String,
-            refundedAmount: Amount,
-            authReceivable: Account,
-            authLiability: Account,
-            merchantAccount: Account,
-            pspReceivable: Account
-        ): LedgerOperationResult = LedgerOperationResult(
-            transaction = PaymentTx.Refund(
-                txId = txId,
-                paymentId = paymentId,
-                paymentOrderId = paymentOrderId,
-                captureTxId = captureTxId,
-                acquirerReference = acquirerReference,
-                amount = refundedAmount
-            ),
-            journalEntries = listOf(
-                JournalEntry(
-                    id = "REFUND:${journalIdentifier}",
-                    txType = JournalType.REFUND,
-                    name = "Payment Refund",
-                    postings = listOf(
-                        Posting.Debit.create(authReceivable, refundedAmount),
-                        Posting.Credit.create(authLiability, refundedAmount),
-                        Posting.Debit.create(merchantAccount, refundedAmount),
-                        Posting.Credit.create(pspReceivable, refundedAmount)
-                    )
+        ): List<JournalEntry> = listOf(
+            JournalEntry(
+                id            = "CAPTURE:$journalIdentifier",
+                txType        = JournalType.CAPTURE,
+                name          = "Gross Asset CaptureTx — Primary Merchant Pool",
+                referenceType = "capture",
+                referenceId   = txId.value.toString(),
+                postings      = listOf(
+                    Posting.Debit.create(authLiability, capturedAmount),    // release the hold
+                    Posting.Credit.create(authReceivable, capturedAmount),  // clear the receivable
+                    Posting.Debit.create(pspReceivable, capturedAmount),    // money arriving from PSP
+                    Posting.Credit.create(merchantGrossPool, capturedAmount) // land in gross pool
                 )
             )
         )
 
+        // =====================================================================
+        // INTERNAL_TRANSFER — Sub-Seller Split Distribution
+        // =====================================================================
+
+        /**
+         * executeSubSellerSplit
+         *
+         * Generates a list of INTERNAL_TRANSFER JournalEntries that redistribute
+         * funds from the primary merchant's MERCHANT_GROSS_POOL to each sub-seller's
+         * designated [BalanceAccountType] account.
+         *
+         * One JournalEntry is produced per [PaymentSplit] instruction.
+         *
+         * Postings per entry:
+         *   DR MERCHANT_GROSS_POOL (debit the primary merchant's pool)
+         *   CR <split.targetAccountType account> (credit the sub-seller / platform bucket)
+         *
+         * Mathematical guarantee:
+         *   Because the [splits] array was validated at Payment creation time to
+         *   sum exactly to [totalAmount], the aggregate of all INTERNAL_TRANSFER
+         *   entries will exactly drain the MERCHANT_GROSS_POOL of the captured amount,
+         *   leaving the pool at zero for a fully distributed MARKETPLACE payment.
+         *
+         * IMPORTANT — CALLER RESPONSIBILITY:
+         *   This method MUST only be called when processingModel == MARKETPLACE.
+         *   The caller (PspResultConsumer) is responsible for the guard. Calling this
+         *   on a DIRECT_MERCHANT payment is a programming error and will result in
+         *   incorrect ledger postings.
+         *
+         * @param journalIdentifier    Base label for the journal IDs (e.g., paymentId + txId).
+         * @param merchantGrossPool    MERCHANT_GROSS_POOL account for the primary merchant.
+         * @param splits               The complete split routing matrix from the Payment aggregate.
+         * @param resolveTargetAccount Lambda that maps (BalanceAccountType, entityId) → Account.
+         *                             Allows the caller (in the application layer) to resolve
+         *                             ledger accounts from the Account directory without coupling
+         *                             this domain factory to any infrastructure port.
+         * @return                     One [JournalEntry] per split instruction.
+         */
+        fun executeSubSellerSplit(
+            journalIdentifier: String,
+            merchantGrossPool: Account,
+            splits: List<PaymentSplit>,
+            resolveTargetAccount: (BalanceAccountType, String) -> Account
+        ): List<JournalEntry> {
+            require(splits.isNotEmpty()) {
+                "executeSubSellerSplit requires at least one PaymentSplit, but received an empty list"
+            }
+            return splits.mapIndexed { index, split ->
+                val targetAccount = resolveTargetAccount(split.targetAccountType, split.targetEntityId)
+                JournalEntry(
+                    id            = "INTERNAL_TRANSFER:${journalIdentifier}:$index",
+                    txType        = JournalType.INTERNAL_TRANSFER,
+                    name          = "Sub-Seller Split — ${split.targetAccountType} / ${split.targetEntityId}",
+                    referenceType = "split",
+                    referenceId   = split.targetEntityId,
+                    postings      = listOf(
+                        Posting.Debit.create(merchantGrossPool, split.amount),  // drain merchant pool
+                        Posting.Credit.create(targetAccount, split.amount)       // credit sub-seller
+                    )
+                )
+            }
+        }
+
+        // =====================================================================
+        // REFUND
+        // =====================================================================
+
+        /**
+         * refund
+         *
+         * Reverses a prior capture by crediting the PSP with the refunded amount
+         * and debiting the merchant's gross pool.
+         *
+         * Postings:
+         *   DR MERCHANT_GROSS_POOL (reduces the merchant's balance)
+         *   CR PSP_RECEIVABLE      (records the outbound refund to PSP)
+         *   DR AUTH_LIABILITY      (re-opens the liability position)
+         *   CR AUTH_RECEIVABLE     (reduces the receivable by refund amount)
+         *
+         * Called by: PspResultConsumer, processing a PaymentRefunded webhook event.
+         */
+        fun refund(
+            txId: TxId,
+            journalIdentifier: String,
+            refundedAmount: Amount,
+            authReceivable: Account,
+            authLiability: Account,
+            merchantGrossPool: Account,
+            pspReceivable: Account
+        ): List<JournalEntry> = listOf(
+            JournalEntry(
+                id            = "REFUND:$journalIdentifier",
+                txType        = JournalType.REFUND,
+                name          = "Payment RefundTx",
+                referenceType = "refund",
+                referenceId   = txId.value.toString(),
+                postings      = listOf(
+                    Posting.Debit.create(authLiability, refundedAmount),
+                    Posting.Credit.create(authReceivable, refundedAmount),
+                    Posting.Debit.create(merchantGrossPool, refundedAmount),
+                    Posting.Credit.create(pspReceivable, refundedAmount)
+                )
+            )
+        )
+
+        // =====================================================================
+        // SETTLEMENT
+        // =====================================================================
+
+        /**
+         * settlement
+         *
+         * Records funds received from the acquirer into the platform's cash account.
+         * The difference between capturedAmount and settledAmount represents PSP fees.
+         *
+         * Postings:
+         *   DR PSP_FEE_EXPENSE   (PSP fee absorbed by platform)
+         *   DR PLATFORM_CASH     (net funds received)
+         *   CR PSP_RECEIVABLE    (clears the receivable)
+         */
         fun settlement(
-            journalIdentifier:String,
+            journalIdentifier: String,
             capturedAmount: Amount,
             settledAmount: Amount,
             platformCashAccount: Account,
             pspFeeExpenseAccount: Account,
             pspReceivable: Account
-        ): List<JournalEntry> =
-            listOf(JournalEntry(
-                id = "SETTLEMENT:${journalIdentifier}",
-                txType = JournalType.SETTLEMENT,
-                name = "Funds received from Acquirer",
-                postings = listOf(
-                    Posting.Debit.create(pspFeeExpenseAccount,capturedAmount - settledAmount),
+        ): List<JournalEntry> = listOf(
+            JournalEntry(
+                id            = "SETTLEMENT:$journalIdentifier",
+                txType        = JournalType.SETTLEMENT,
+                name          = "Acquirer Funds Settlement",
+                postings      = listOf(
+                    Posting.Debit.create(pspFeeExpenseAccount, capturedAmount - settledAmount),
                     Posting.Debit.create(platformCashAccount, settledAmount),
                     Posting.Credit.create(pspReceivable, capturedAmount)
                 )
             )
-            )
+        )
 
-        fun commissionFeRegistered(journalIdentifier:String, commissionFee: Amount, commissiissionFeeAccount:Account ,merchantAccount: Account): List<JournalEntry> =
-            listOf(JournalEntry(
-                id = "PSP-FEE:$journalIdentifier",
-                txType = JournalType.COMMISSION_FEE,
-                name = "Psp Fee is recorded",
+        // =====================================================================
+        // COMMISSION FEE
+        // =====================================================================
+
+        /**
+         * commissionFeeRegistered
+         *
+         * Records the platform's commission charge against the merchant account.
+         *
+         * Postings:
+         *   DR MERCHANT_GROSS_POOL         (reduces merchant balance by commission)
+         *   CR PLATFORM_COMMISSION_ESCROW  (records the commission receivable)
+         */
+        fun commissionFeeRegistered(
+            journalIdentifier: String,
+            commissionFee: Amount,
+            commissionFeeAccount: Account,
+            merchantAccount: Account
+        ): List<JournalEntry> = listOf(
+            JournalEntry(
+                id       = "COMMISSION_FEE:$journalIdentifier",
+                txType   = JournalType.COMMISSION_FEE,
+                name     = "Platform Commission Fee",
                 postings = listOf(
                     Posting.Debit.create(merchantAccount, commissionFee),
-                    Posting.Credit.create(commissiissionFeeAccount, commissionFee)
+                    Posting.Credit.create(commissionFeeAccount, commissionFee)
                 )
-            ))
+            )
+        )
 
+        // =====================================================================
+        // PAYOUT
+        // =====================================================================
+
+        /**
+         * payout
+         *
+         * Records a cash disbursement from the platform to a merchant/seller.
+         *
+         * Postings:
+         *   DR MERCHANT_GROSS_POOL  (reduces the merchant's payable balance)
+         *   CR PLATFORM_CASH        (reduces platform's cash holding)
+         */
         fun payout(
             journalIdentifier: String,
             payoutAmount: Amount,
             merchantAccount: Account,
             platformCashAccount: Account
-        ): List<JournalEntry> =
-            listOf(JournalEntry(
-                id = "PAYOUT:$journalIdentifier",
-                txType = JournalType.PAYOUT,
-                name = "Merchant Payout",
+        ): List<JournalEntry> = listOf(
+            JournalEntry(
+                id       = "PAYOUT:$journalIdentifier",
+                txType   = JournalType.PAYOUT,
+                name     = "Merchant Payout Disbursement",
                 postings = listOf(
                     Posting.Debit.create(merchantAccount, payoutAmount),
                     Posting.Credit.create(platformCashAccount, payoutAmount)
                 )
-            ))
+            )
+        )
 
-        // ==================== Convenience Methods ====================
+        // =====================================================================
+        // PERSISTENCE REHYDRATION
+        // =====================================================================
 
-        fun fullFlow(
-            paymentOrderId: String,
-            amount: Amount,
-            authReceivable:Account,
-            authLiability:Account,
-            pspReceivable: Account,
-            merchantAccount: Account,
-            acquirerAccount: Account
-        ): List<JournalEntry> {
-           return emptyList()
-        }
-
-        fun failedPayment(paymentOrderId: String, amount: Amount): List<JournalEntry> =
-            emptyList()
-
+        /**
+         * fromPersistence
+         *
+         * Rehydrates a JournalEntry from persisted database rows.
+         * Used exclusively by the repository layer. No business validation runs here
+         * beyond the init{} block invariants — assume the DB holds valid, balanced data.
+         */
         fun fromPersistence(
             id: String,
             txType: JournalType,
@@ -216,15 +392,12 @@ class JournalEntry private constructor(
             referenceType: String? = null,
             referenceId: String? = null
         ): JournalEntry = JournalEntry(
-            id = id,
-            txType = txType,
-            name = name,
-            postings = postings,
+            id            = id,
+            txType        = txType,
+            name          = name,
+            postings      = postings,
             referenceType = referenceType,
-            referenceId = referenceId
+            referenceId   = referenceId
         )
-
     }
-
-
 }

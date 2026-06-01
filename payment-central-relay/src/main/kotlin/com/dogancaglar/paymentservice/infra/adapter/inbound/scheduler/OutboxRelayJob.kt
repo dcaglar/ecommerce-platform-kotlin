@@ -1,8 +1,6 @@
 package com.dogancaglar.paymentservice.infra.adapter.inbound.scheduler
 
-import com.dogancaglar.common.event.Event
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
 import com.dogancaglar.paymentservice.application.events.PaymentOrderCaptureReceived
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
@@ -21,7 +19,6 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 
 @Service
 class OutboxRelayJob(
@@ -84,8 +81,12 @@ class OutboxRelayJob(
                     val envelope = convertToPaymentAuthorizedEnvelope(entry)
                     kafkaPublisher.publishAsync(envelope)
                 }
-                OutboxEventType.payment_order_capture_received -> {
-                    val envelope = convertToPaymentOrderCaptureReceivedEnvelope(entry)
+                OutboxEventType.capture_received -> {
+                    val envelope = convertToCaptureReceivedEnvelope(entry)
+                    kafkaPublisher.publishAsync(envelope)
+                }
+                OutboxEventType.external_async_capture_psp_performed -> {
+                    val envelope = convertToExternalAsyncCaptureToPspPerformedEnvelope(entry)
                     kafkaPublisher.publishAsync(envelope)
                 }
                 OutboxEventType.payment_order_refund_received -> {
@@ -98,6 +99,14 @@ class OutboxRelayJob(
                 }
                 OutboxEventType.payment_order_refunded -> {
                     val envelope = convertToPaymentOrderRefundedEnvelope(entry)
+                    kafkaPublisher.publishAsync(envelope)
+                }
+                OutboxEventType.capture_successful -> {
+                    val envelope = convertToCaptureSuccessfulEnvelope(entry)
+                    kafkaPublisher.publishAsync(envelope)
+                }
+                OutboxEventType.internal_transfer_request -> {
+                    val envelope = convertToInternalTransferRequestEnvelope(entry)
                     kafkaPublisher.publishAsync(envelope)
                 }
                 else -> {
@@ -133,10 +142,17 @@ class OutboxRelayJob(
         return envelope
     }
 
-     private fun convertToPaymentOrderCaptureReceivedEnvelope(evt: OutboxEvent): EventEnvelope<PaymentOrderCaptureReceived> {
+     private fun convertToCaptureReceivedEnvelope(evt: OutboxEvent): EventEnvelope<com.dogancaglar.paymentservice.application.events.CaptureReceived> {
         val envelopeType = objectMapper.typeFactory
-            .constructParametricType(EventEnvelope::class.java, PaymentOrderCaptureReceived::class.java)
-        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentOrderCaptureReceived>
+            .constructParametricType(EventEnvelope::class.java, com.dogancaglar.paymentservice.application.events.CaptureReceived::class.java)
+        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<com.dogancaglar.paymentservice.application.events.CaptureReceived>
+        return envelope
+    }
+
+     private fun convertToExternalAsyncCaptureToPspPerformedEnvelope(evt: OutboxEvent): EventEnvelope<com.dogancaglar.paymentservice.application.events.ExternalAsyncCaptureToPspPerformed> {
+        val envelopeType = objectMapper.typeFactory
+            .constructParametricType(EventEnvelope::class.java, com.dogancaglar.paymentservice.application.events.ExternalAsyncCaptureToPspPerformed::class.java)
+        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<com.dogancaglar.paymentservice.application.events.ExternalAsyncCaptureToPspPerformed>
         return envelope
     }
 
@@ -147,10 +163,10 @@ class OutboxRelayJob(
         return envelope
     }
 
-     private fun convertToPaymentOrderCapturedEnvelope(evt: OutboxEvent): EventEnvelope<com.dogancaglar.paymentservice.application.events.PaymentOrderCaptured> {
+     private fun convertToPaymentOrderCapturedEnvelope(evt: OutboxEvent): EventEnvelope<com.dogancaglar.paymentservice.application.events.PaymentCaptured> {
         val envelopeType = objectMapper.typeFactory
-            .constructParametricType(EventEnvelope::class.java, com.dogancaglar.paymentservice.application.events.PaymentOrderCaptured::class.java)
-        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<com.dogancaglar.paymentservice.application.events.PaymentOrderCaptured>
+            .constructParametricType(EventEnvelope::class.java, com.dogancaglar.paymentservice.application.events.PaymentCaptured::class.java)
+        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<com.dogancaglar.paymentservice.application.events.PaymentCaptured>
         return envelope
     }
 
@@ -158,6 +174,20 @@ class OutboxRelayJob(
         val envelopeType = objectMapper.typeFactory
             .constructParametricType(EventEnvelope::class.java, com.dogancaglar.paymentservice.application.events.PaymentOrderRefunded::class.java)
         val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<com.dogancaglar.paymentservice.application.events.PaymentOrderRefunded>
+        return envelope
+    }
+
+     private fun convertToCaptureSuccessfulEnvelope(evt: OutboxEvent): EventEnvelope<com.dogancaglar.paymentservice.application.events.CaptureSuccessful> {
+        val envelopeType = objectMapper.typeFactory
+            .constructParametricType(EventEnvelope::class.java, com.dogancaglar.paymentservice.application.events.CaptureSuccessful::class.java)
+        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<com.dogancaglar.paymentservice.application.events.CaptureSuccessful>
+        return envelope
+    }
+
+     private fun convertToInternalTransferRequestEnvelope(evt: OutboxEvent): EventEnvelope<com.dogancaglar.paymentservice.application.events.InternalTransferRequest> {
+        val envelopeType = objectMapper.typeFactory
+            .constructParametricType(EventEnvelope::class.java, com.dogancaglar.paymentservice.application.events.InternalTransferRequest::class.java)
+        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<com.dogancaglar.paymentservice.application.events.InternalTransferRequest>
         return envelope
     }
 }

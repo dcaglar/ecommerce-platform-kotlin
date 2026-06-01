@@ -7,10 +7,12 @@ data class PaymentIntentEntity(
     val pspReference: String?="",
     val buyerId: String,
     val orderId: String,
+    val merchantAccountId: String,
+    val processingModel: String,
     val totalAmountValue: Long,
     val currency: String,
     val status: String,
     val createdAt: Instant,
     val updatedAt: Instant,
-    val paymentLinesJson: String    // ← NEW JSON column
+    val splitsJson: String
 )

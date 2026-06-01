@@ -5,7 +5,6 @@ import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderLine
 import java.time.LocalDateTime
 
 /**
@@ -19,29 +18,31 @@ import java.time.LocalDateTime
  */
 class PaymentIntent private constructor(
     val paymentIntentId: PaymentIntentId,
-    val clientSecret : String?="",
+    val clientSecret: String? ="",
     val pspReference: String?,          // Stripe PaymentIntent id (nullable only before CREATED)
     val buyerId: BuyerId,
     val orderId: OrderId,
     val totalAmount: Amount,
-    val paymentOrderLines: List<PaymentOrderLine>,
+    val processingModel: ProcessingModel,
+    val merchantAccountId: String,
+    val splits: List<PaymentSplit>,
     val status: PaymentIntentStatus,
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime
 ) {
 
     init {
-        require(paymentOrderLines.isNotEmpty()) { "PaymentIntent must have at least one payment line" }
+        require(splits.isNotEmpty()) { "PaymentIntent must have at least one payment line" }
         require(totalAmount.isPositive()) { "Total amount must be positive" }
 
         // All lines must share same currency as totalAmount
-        val lineCurrencies = paymentOrderLines.map { it.amount.currency }.distinct()
+        val lineCurrencies = splits.map { it.amount.currency }.distinct()
         require(lineCurrencies.size == 1 && lineCurrencies.first() == totalAmount.currency) {
             "All payment lines must use the same currency as total amount"
         }
 
         // Total amount must equal sum of lines
-        val sum = paymentOrderLines.sumOf { it.amount.quantity }
+        val sum = splits.sumOf { it.amount.quantity }
         require(sum == totalAmount.quantity) {
             "Total amount (${totalAmount.quantity}) must equal sum of payment lines ($sum)"
         }
@@ -166,8 +167,10 @@ class PaymentIntent private constructor(
         clientSecret = clientSecret,
         buyerId = buyerId,
         orderId = orderId,
+        processingModel =  processingModel,
+        merchantAccountId = merchantAccountId,
         totalAmount = totalAmount,
-        paymentOrderLines = paymentOrderLines,
+        splits = splits,
         status = status,
         createdAt = createdAt,
         updatedAt = updatedAt
@@ -178,7 +181,7 @@ class PaymentIntent private constructor(
     // ------------------------
 
     override fun toString(): String {
-        return "PaymentIntent(paymentIntentId=${paymentIntentId.value}, clientSecret=$clientSecret, pspReference=$pspReference, buyerId=${buyerId.value}, orderId=${orderId.value}, totalAmount=$totalAmount, paymentOrderLines=$paymentOrderLines, status=$status, createdAt=$createdAt, updatedAt=$updatedAt)"
+        return "PaymentIntent(paymentIntentId=${paymentIntentId.value}, clientSecret=$clientSecret, pspReference=$pspReference, buyerId=${buyerId.value}, orderId=${orderId.value}, totalAmount=$totalAmount, paymentOrderLines=$splits, status=$status, createdAt=$createdAt, updatedAt=$updatedAt)"
     }
 
     companion object {
@@ -186,8 +189,10 @@ class PaymentIntent private constructor(
             paymentIntentId: PaymentIntentId,
             buyerId: BuyerId,
             orderId: OrderId,
+            processingModel: ProcessingModel,
+            merchantAccountId: String,
             totalAmount: Amount,
-            paymentOrderLines: List<PaymentOrderLine>
+            splits: List<PaymentSplit>
         ): PaymentIntent {
             val now = Utc.nowLocalDateTime()
             return PaymentIntent(
@@ -195,8 +200,10 @@ class PaymentIntent private constructor(
                 pspReference = null,
                 buyerId = buyerId,
                 orderId = orderId,
+                processingModel =  processingModel,
+                merchantAccountId = merchantAccountId,
                 totalAmount = totalAmount,
-                paymentOrderLines = paymentOrderLines,
+                splits = splits,
                 status = PaymentIntentStatus.CREATED_PENDING,
                 createdAt = now,
                 updatedAt = now
@@ -210,17 +217,21 @@ class PaymentIntent private constructor(
             buyerId: BuyerId,
             orderId: OrderId,
             totalAmount: Amount,
-            paymentOrderLines: List<PaymentOrderLine>,
+            merchantAccountId: String,
+            processingModel: ProcessingModel,
+            splits: List<PaymentSplit>,
             status: PaymentIntentStatus,
             createdAt: LocalDateTime,
             updatedAt: LocalDateTime
         ): PaymentIntent = PaymentIntent(
             paymentIntentId = paymentIntentId,
-            pspReference=pspReference,
+            pspReference =pspReference,
             buyerId = buyerId,
             orderId = orderId,
+            merchantAccountId = merchantAccountId,
+            processingModel = processingModel,
             totalAmount = totalAmount,
-            paymentOrderLines = paymentOrderLines,
+            splits = splits,
             status = status,
             createdAt = createdAt,
             updatedAt = updatedAt

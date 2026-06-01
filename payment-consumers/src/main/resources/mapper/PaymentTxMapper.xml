@@ -1,33 +1,120 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    PaymentTxMapper — Central DB (payment-consumers module)
+    ============================================================
+    Column mapping reflects the Epic 1 Tx schema:
+      - status           TxStatus string (PENDING | SUCCESS | FAILED)
+      - settle_status    SettleStatus string — nullable, CAPTURE rows only
+      - acquirer_batch_ref  VARCHAR — nullable, SETTLE rows only
+      - settled_amount_value BIGINT — nullable, SETTLE rows only
+
+    Removed: payment_order_id (no longer exists in the domain or schema).
+-->
 <mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentTxMapper">
 
-    <resultMap id="PaymentTxResultMap" type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentTxEntity">
-        <id property="txId" column="tx_id"/>
-        <result property="txType" column="tx_type"/>
-        <result property="parentTxId" column="parent_tx_id"/>
-        <result property="paymentId" column="payment_id"/>
-        <result property="paymentOrderId" column="payment_order_id"/>
+    <resultMap id="PaymentTxResultMap"
+               type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentTxEntity">
+        <id  property="txId"               column="tx_id"/>
+        <result property="txType"          column="tx_type"/>
+        <result property="paymentId"       column="payment_id"/>
+        <result property="paymentIntentId" column="payment_intent_id"/>
+        <result property="parentTxId"      column="parent_tx_id"/>
         <result property="acquirerReference" column="acquirer_reference"/>
-        <result property="amountValue" column="amount_value"/>
-        <result property="amountCurrency" column="amount_currency"/>
-        <result property="createdAt" column="created_at"/>
+        <result property="amountValue"     column="amount_value"/>
+        <result property="amountCurrency"  column="amount_currency"/>
+        <result property="status"          column="status"/>
+        <result property="settleStatus"    column="settle_status"/>
+        <result property="acquirerBatchRef" column="acquirer_batch_ref"/>
+        <result property="settledAmountValue" column="settled_amount_value"/>
+        <result property="createdAt"       column="created_at"/>
     </resultMap>
 
-    <insert id="insert" parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentTxEntity">
-        INSERT INTO payment_tx (
-            tx_id, tx_type, parent_tx_id, payment_id, payment_order_id,
-            acquirer_reference, amount_value, amount_currency
-        ) VALUES (
-            #{txId}, #{txType}, #{parentTxId}, #{paymentId}, #{paymentOrderId},
-            #{acquirerReference}, #{amountValue}, #{amountCurrency}
-        )
-    </insert>
+    <!-- ================================================================
+         READ
+         ================================================================ -->
 
     <select id="findByPaymentId" resultMap="PaymentTxResultMap">
-        SELECT * FROM payment_tx
+        SELECT tx_id,
+               tx_type,
+               payment_id,
+               payment_intent_id,
+               parent_tx_id,
+               acquirer_reference,
+               amount_value,
+               amount_currency,
+               status,
+               settle_status,
+               acquirer_batch_ref,
+               settled_amount_value,
+               created_at
+        FROM payment_tx
         WHERE payment_id = #{paymentId}
         ORDER BY created_at ASC
     </select>
+
+    <!-- ================================================================
+         WRITE
+         ================================================================ -->
+
+    <!--
+        INSERT covers all four subclass variants (AUTHORIZATION, CAPTURE, REFUND, SETTLE).
+        Nullable columns (parent_tx_id, settle_status, acquirer_batch_ref,
+        settled_amount_value) are passed as NULL from PaymentTxAdapter for rows
+        where they do not apply.
+    -->
+    <insert id="insert"
+            parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentTxEntity">
+        INSERT INTO payment_tx (
+            tx_id,
+            tx_type,
+            payment_id,
+            payment_intent_id,
+            parent_tx_id,
+            acquirer_reference,
+            amount_value,
+            amount_currency,
+            status,
+            settle_status,
+            acquirer_batch_ref,
+            settled_amount_value
+        ) VALUES (
+            #{txId},
+            #{txType},
+            #{paymentId},
+            #{paymentIntentId},
+            #{parentTxId},
+            #{acquirerReference},
+            #{amountValue},
+            #{amountCurrency},
+            #{status},
+            #{settleStatus},
+            #{acquirerBatchRef},
+            #{settledAmountValue}
+        )
+    </insert>
+
+    <!--
+        UPDATE settle_status: called by the settlement batch job when a CAPTURE row
+        is matched against an incoming acquirer settlement file.
+    -->
+    <update id="updateSettleStatus">
+        UPDATE payment_tx
+        SET settle_status          = #{settleStatus},
+            settled_amount_value   = #{settledAmountValue},
+            acquirer_batch_ref     = #{acquirerBatchRef}
+        WHERE tx_id = #{txId}
+          AND tx_type = 'CAPTURE'
+    </update>
+
+    <!--
+        UPDATE status: called when a PENDING CAPTURE or REFUND is confirmed
+        or failed by a PSP webhook event.
+    -->
+    <update id="updateStatus">
+        UPDATE payment_tx
+        SET status = #{status}
+        WHERE tx_id = #{txId}
+    </update>
 
 </mapper>

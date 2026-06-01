@@ -17,7 +17,10 @@ object EVENT_TYPE {
     const val LEDGER_RECORDING_REQUESTED = "ledger_recording_requested"
     const val LEDGER_ENTRIES_RECORDED = "ledger_entries_recorded"
 
-
+    const val CAPTURE_RECEIVED = "capture_received"
+    const val EXTERNAL_ASYNC_CAPTURE_PSP_PERFORMED = "external_async_capture_psp_performed"
+    const val CAPTURE_SUCCESSFUL = "capture_successful"
+    const val INTERNAL_TRANSFER_REQUEST = "internal_transfer_request"
 }
 
 
@@ -25,7 +28,7 @@ object Topics {
     const val CAPTURE_QUEUE = "capture_topic"
     const val REFUND_QUEUE = "refund_topic"
     const val PSP_RESULT = "psp_result_topic"
-    const val PAYMENT_AUTHORIZED = "payment_authorized_topic"
+    const val PAYMENT_AUTHORIZED = "psp-result-queue"
 
     const val PAYMENT_ORDER_CREATED = "payment_order_created_topic"
     const val PAYMENT_ORDER_CAPTURE_REQUEST_QUEUE = "payment_order_capture_requested_topic"
@@ -37,6 +40,10 @@ object Topics {
     const val LEDGER_RECORD_REQUEST_QUEUE = "ledger_record_request_queue_topic"
     const val LEDGER_ENTRIES_RECORDED = "ledger_entries_recorded_topic"
 
+    const val CAPTURE_EXECUTION_QUEUE = "capture-execution-queue"
+    const val CAPTURE_PSP_PERFORMED_QUEUE = "capture_psp_performed_queue"
+    const val INTERNAL_TRANSFER_QUEUE = "internal-transfer-queue"
+    
     fun dlqOf(topic: String) = "$topic.DLQ"
 
     val ALL = listOf(
@@ -51,11 +58,17 @@ object Topics {
         PAYMENT_ORDER_CAPTURED_TOPIC,
         PAYMENT_ORDER_REFUNDED_TOPIC,
         LEDGER_RECORD_REQUEST_QUEUE,
-        LEDGER_ENTRIES_RECORDED
+        LEDGER_ENTRIES_RECORDED,
+        CAPTURE_EXECUTION_QUEUE,
+        CAPTURE_PSP_PERFORMED_QUEUE,
+        INTERNAL_TRANSFER_QUEUE
     )
 }
 
 object CONSUMER_GROUPS {
+    const val CAPTURE_COMMAND_EXECUTOR = "capture-command-executor-consumer-group"
+    const val CAPTURE_PSP_PERFORMED = "capture-psp-performed-consumer-group"
+    const val INTERNAL_TRANSFER_CONSUMER = "internal-transfer-consumer-group"
     const val PSP_CAPTURE_EXECUTOR = "psp-capture-executor-consumer-group"
     const val PSP_REFUND_EXECUTOR = "psp-refund-executor-consumer-group"
     const val PSP_RESULT_CONSUMER = "psp-result-consumer-group"

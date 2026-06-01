@@ -24,7 +24,7 @@ payment-application/src/main/kotlin
             │   │   ├── PaymentCommand.kt
             │   │   ├── PaymentIntentAuthorized.kt
             │   │   ├── PaymentOrderBaseEvent.kt
-            │   │   ├── PaymentOrderCaptured.kt
+            │   │   ├── PaymentCaptured.kt
             │   │   ├── PaymentOrderCaptureReceived.kt
             │   │   ├── PaymentOrderCommand.kt
             │   │   ├── PaymentOrderEvent.kt

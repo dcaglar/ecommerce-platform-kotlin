@@ -22,7 +22,7 @@ payment-domain/src/main/kotlin
                 │   │   ├── JournalType.kt
                 │   │   ├── LedgerEntry.kt
                 │   │   ├── LedgerOperationResult.kt
-                │   │   ├── PaymentTx.kt
+                │   │   ├── Tx.kt
                 │   │   └── Posting.kt
                 │   ├── payment
                 │   │   ├── OutboxEvent.kt
@@ -41,7 +41,7 @@ payment-domain/src/main/kotlin
                 │       ├── PaymentId.kt
                 │       ├── PaymentIntentId.kt
                 │       ├── PaymentOrderId.kt
-                │       ├── PaymentOrderLine.kt
+                │       ├── PaymentSplit.kt
                 │       └── SellerId.kt
                 └── util
                     └── LedgerEntryFactory.kt

@@ -36,12 +36,12 @@ class PaymentServiceConfig {
 
 
     @Bean
-    fun capturePaymentService(paymentRepository: PaymentRepository,
+    fun capturePaymentService(
                               psp: PspAuthorizationGatewayPort,
                               @Qualifier("outboxWebAdapter")  outboxWebAdapter: LocalOutboxWriterPort,
                               idGeneratorPort: IdGeneratorPort,
                               serializationPort: SerializationPort): CapturePaymentService {
-        return CapturePaymentService(paymentRepository,psp,outboxWebAdapter,idGeneratorPort,serializationPort)
+        return CapturePaymentService(psp,outboxWebAdapter,idGeneratorPort,serializationPort)
     }
 
 
