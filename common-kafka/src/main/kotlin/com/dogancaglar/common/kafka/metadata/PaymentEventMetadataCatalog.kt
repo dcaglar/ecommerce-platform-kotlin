@@ -4,70 +4,66 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.event.metadata.EventMetadata
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
 import com.fasterxml.jackson.core.type.TypeReference
-import com.dogancaglar.paymentservice.application.events.CaptureReceived
-import com.dogancaglar.paymentservice.application.events.CaptureSuccessful
-import com.dogancaglar.paymentservice.application.events.ExternalAsyncCaptureToPspPerformed
-import com.dogancaglar.paymentservice.application.events.InternalTransferRequest
+import com.dogancaglar.paymentservice.application.events.CaptureRequested
+import com.dogancaglar.paymentservice.application.events.CaptureConfirmed
+import com.dogancaglar.paymentservice.application.events.EventType
+import com.dogancaglar.paymentservice.application.events.CaptureSubmitted
+import com.dogancaglar.paymentservice.application.events.InternalTransferRequested
 
 object PaymentEventMetadataCatalog {
 
+    // 1. Routes to shared PSP_RESULTS topic
     object PaymentAuthorizedMetadata : EventMetadata<PaymentAuthorized> {
-        override val topic = Topics.PSP_RESULT_QUEUE
-        override val eventType = EVENT_TYPE.PAYMENT_AUTHORIZED
+        override val topic = Topics.PSP_RESULTS
+        override val eventType = EventType.PAYMENT_AUTHORIZED
         override val clazz = PaymentAuthorized::class.java
         override val typeRef = object : TypeReference<EventEnvelope<PaymentAuthorized>>() {}
-        override val partitionKey = { evt: PaymentAuthorized ->
-            evt.paymentIntentId
-        }
+        override val partitionKey = { evt: PaymentAuthorized -> evt.paymentIntentId }
     }
 
-
-    object CaptureReceivedMetadata : EventMetadata<CaptureReceived> {
-        override val topic = Topics.CAPTURE_EXECUTION_QUEUE
-        override val eventType = EVENT_TYPE.CAPTURE_RECEIVED
-        override val clazz = CaptureReceived::class.java
-        override val typeRef = object : TypeReference<EventEnvelope<CaptureReceived>>() {}
-        override val partitionKey = { evt: CaptureReceived ->
-            evt.paymentIntentId
-        }
+    // 2. Routes to CAPTURE_COMMANDS for the PaymentCaptureExecutor
+    object CaptureRequestedMetadata : EventMetadata<CaptureRequested> {
+        override val topic = Topics.CAPTURE_COMMANDS
+        override val eventType = EventType.CAPTURE_REQUESTED
+        override val clazz = CaptureRequested::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<CaptureRequested>>() {}
+        override val partitionKey = { evt: CaptureRequested -> evt.paymentIntentId }
     }
 
-    object ExternalAsyncCaptureToPspPerformedMetadata : EventMetadata<ExternalAsyncCaptureToPspPerformed> {
-        override val topic = Topics.CAPTURE_PSP_PERFORMED_QUEUE
-        override val eventType = EVENT_TYPE.EXTERNAL_ASYNC_CAPTURE_PSP_PERFORMED
-        override val clazz = ExternalAsyncCaptureToPspPerformed::class.java
-        override val typeRef = object : TypeReference<EventEnvelope<ExternalAsyncCaptureToPspPerformed>>() {}
-        override val partitionKey = { evt: ExternalAsyncCaptureToPspPerformed ->
-            evt.paymentIntentId
-        }
+    // 3. Routes to CAPTURE_SUBMITTED_ACKS (The HTTP 202)
+    object CaptureSubmittedMetadata : EventMetadata<CaptureSubmitted> {
+        override val topic = Topics.CAPTURE_SUBMITTED_ACKS
+        override val eventType = EventType.CAPTURE_SUBMITTED
+        override val clazz = CaptureSubmitted::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<CaptureSubmitted>>() {}
+        override val partitionKey = { evt: CaptureSubmitted -> evt.paymentIntentId }
     }
 
-    object CaptureSuccessfulMetadata : EventMetadata<CaptureSuccessful> {
-        override val topic = Topics.PSP_RESULT_QUEUE // Maps to psp-result-queue
-        override val eventType = EVENT_TYPE.CAPTURE_SUCCESSFUL
-        override val clazz = CaptureSuccessful::class.java
-        override val typeRef = object : TypeReference<EventEnvelope<CaptureSuccessful>>() {}
-        override val partitionKey = { evt: CaptureSuccessful ->
-            evt.merchantAccountId
-        }
+    // 4. Routes to shared PSP_RESULTS topic (The Adyen Webhook)
+    object CaptureConfirmedMetadata : EventMetadata<CaptureConfirmed> {
+        override val topic = Topics.PSP_RESULTS
+        override val eventType = EventType.CAPTURE_CONFIRMED
+        override val clazz = CaptureConfirmed::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<CaptureConfirmed>>() {}
+        // Use publicPaymentIntentId here to ensure it lands in the exact same partition as PaymentAuthorized
+        override val partitionKey = { evt: CaptureConfirmed -> evt.publicPaymentIntentId }
     }
 
-    object InternalTransferRequestMetadata : EventMetadata<InternalTransferRequest> {
-        override val topic = Topics.INTERNAL_TRANSFER_QUEUE
-        override val eventType = EVENT_TYPE.INTERNAL_TRANSFER_REQUEST
-        override val clazz = InternalTransferRequest::class.java
-        override val typeRef = object : TypeReference<EventEnvelope<InternalTransferRequest>>() {}
-        override val partitionKey = { evt: InternalTransferRequest ->
-            evt.targetAccountId
-        }
+    // 5. Routes to INTERNAL_TRANSFERS
+    object InternalTransferRequestedMetadata : EventMetadata<InternalTransferRequested> {
+        override val topic = Topics.INTERNAL_TRANSFERS
+        override val eventType = EventType.INTERNAL_TRANSFER_REQUESTED
+        override val clazz = InternalTransferRequested::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<InternalTransferRequested>>() {}
+        override val partitionKey = { evt: InternalTransferRequested -> evt.targetEntityId }
     }
 
     val all: List<EventMetadata<*>> = listOf(
         PaymentAuthorizedMetadata,
-        CaptureReceivedMetadata,
-        ExternalAsyncCaptureToPspPerformedMetadata,
-        CaptureSuccessfulMetadata,
-        InternalTransferRequestMetadata
+        CaptureRequestedMetadata,
+        CaptureSubmittedMetadata,
+        CaptureConfirmedMetadata,
+        InternalTransferRequestedMetadata
     )
 
 }

@@ -4,7 +4,10 @@ interface IdGeneratorPort {
 
     fun nextPaymentIntentId(): Long
 
-    fun nextPaymentId(): Long
+    fun nextPaymentId():Long
+
+    fun nextTxId():Long
+
 
 
 

@@ -52,7 +52,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.TxId
  */
 class JournalEntry private constructor(
     val id: String,
-    val txType: JournalType,
+    val journalType: JournalType,
     val name: String,
     val paymentId: PaymentId, // 🛡️ Strict Domain Primitive
     val txId: TxId,           // 🛡️ Strict Domain Primitive
@@ -79,7 +79,7 @@ class JournalEntry private constructor(
     }
 
     override fun toString(): String =
-        "JournalEntry(id='$id', txType=$txType, name='$name', " +
+        "JournalEntry(id='$id', txType=$journalType, name='$name', " +
         "postings=$postings)"
 
     companion object JournalFactory {
@@ -98,7 +98,7 @@ class JournalEntry private constructor(
         ): List<JournalEntry> = listOf(
             JournalEntry(
                 id        = "AUTH:$journalIdentifier",
-                txType    = JournalType.AUTH_HOLD,
+                journalType    = JournalType.AUTH_HOLD,
                 name      = "AuthorizationTx Hold",
                 paymentId = paymentId,
                 txId      = txId,
@@ -124,7 +124,7 @@ class JournalEntry private constructor(
         ): List<JournalEntry> = listOf(
             JournalEntry(
                 id        = "CAPTURE:$journalIdentifier",
-                txType    = JournalType.CAPTURE,
+                journalType    = JournalType.CAPTURE,
                 name      = "Gross Asset CaptureTx — Primary Merchant Pool",
                 paymentId = paymentId,
                 txId      = txId,
@@ -190,7 +190,7 @@ class JournalEntry private constructor(
                 val targetAccount = resolveTargetAccount(split.targetAccountType, split.targetEntityId)
                 JournalEntry(
                     id        = "INTERNAL_TRANSFER:${journalIdentifier}:$index",
-                    txType    = JournalType.INTERNAL_TRANSFER,
+                    journalType    = JournalType.INTERNAL_TRANSFER,
                     name      = "Sub-Seller Split — ${split.targetAccountType} / ${split.targetEntityId}",
                     paymentId = paymentId,
                     txId      = txId,
@@ -201,6 +201,36 @@ class JournalEntry private constructor(
                 )
             }
         }
+
+        /**
+         * internalTransfer
+         *
+         * Generates a single INTERNAL_TRANSFER JournalEntry that redistributes
+         * funds from the primary merchant's MERCHANT_GROSS_POOL to a target account.
+         * Used by decoupled InternalTransferRequestExecutor processing single split requests.
+         */
+        fun internalTransfer(
+            paymentId: PaymentId,
+            txId: TxId,
+            journalIdentifier: String,
+            amount: Amount,
+            merchantGrossPool: Account,
+            targetAccount: Account,
+            targetAccountType: AccountType,
+            targetEntityId: String
+        ): List<JournalEntry> = listOf(
+            JournalEntry(
+                id        = "INTERNAL_TRANSFER:${journalIdentifier}",
+                journalType    = JournalType.INTERNAL_TRANSFER,
+                name      = "Sub-Seller Split — $targetAccountType / $targetEntityId",
+                paymentId = paymentId,
+                txId      = txId,
+                postings  = listOf(
+                    Posting.Debit.create(merchantGrossPool, amount),
+                    Posting.Credit.create(targetAccount, amount)
+                )
+            )
+        )
 
         // =====================================================================
         // REFUND
@@ -232,7 +262,7 @@ class JournalEntry private constructor(
         ): List<JournalEntry> = listOf(
             JournalEntry(
                 id            = "REFUND:$journalIdentifier",
-                txType        = JournalType.REFUND,
+                journalType        = JournalType.REFUND,
                 name          = "Payment RefundTx",
                 paymentId = paymentId,
                 txId= txId,
@@ -272,7 +302,7 @@ class JournalEntry private constructor(
         ): List<JournalEntry> = listOf(
             JournalEntry(
                 id            = "SETTLEMENT:$journalIdentifier",
-                txType        = JournalType.SETTLEMENT,
+                journalType        = JournalType.SETTLEMENT,
                 name          = "Acquirer Funds Settlement",
                 paymentId     = paymentId,
                 txId          = txId,
@@ -307,7 +337,7 @@ class JournalEntry private constructor(
         ): List<JournalEntry> = listOf(
             JournalEntry(
                 id       = "COMMISSION_FEE:$journalIdentifier",
-                txType   = JournalType.COMMISSION_FEE,
+                journalType   = JournalType.COMMISSION_FEE,
                 name     = "Platform Commission Fee",
                 paymentId = paymentId,
                 txId     = txId,
@@ -341,7 +371,7 @@ class JournalEntry private constructor(
         ): List<JournalEntry> = listOf(
             JournalEntry(
                 id       = "PAYOUT:$journalIdentifier",
-                txType   = JournalType.PAYOUT,
+                journalType   = JournalType.PAYOUT,
                 name     = "Merchant Payout Disbursement",
                 paymentId = paymentId,
                 txId     = txId,
@@ -372,7 +402,7 @@ class JournalEntry private constructor(
             postings: List<Posting>
         ): JournalEntry = JournalEntry(
             id            = id,
-            txType        = txType,
+            journalType        = txType,
             name          = name,
             paymentId     = paymentId,
             txId          = txId,

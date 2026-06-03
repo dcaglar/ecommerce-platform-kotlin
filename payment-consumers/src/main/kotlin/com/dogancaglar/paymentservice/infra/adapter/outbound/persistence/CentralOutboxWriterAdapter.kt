@@ -31,6 +31,7 @@ class CentralOutboxWriterAdapter(
             eventType = event.eventType,
             aggregateId = event.aggregateId,
             payload = event.payload,
+
             status = event.status.name,
             createdAt = event.createdAt.toInstant(UTC),
             updatedAt = event.updatedAt.toInstant(UTC)

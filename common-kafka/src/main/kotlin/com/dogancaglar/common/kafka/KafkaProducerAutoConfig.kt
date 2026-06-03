@@ -50,7 +50,6 @@ class KafkaProducerAutoConfig(
             put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, EventEnvelopeKafkaSerializer::class.java)
 
             // reliability
-            put(ProducerConfig.ACKS_CONFIG, "all")
             put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true)
             put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5)
 
@@ -63,17 +62,10 @@ class KafkaProducerAutoConfig(
             put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "zstd")
         }
 
-    /** ---------- SYNC / LOW-LATENCY PRODUCER ---------- */
-    private fun lowLatencyOverrides(m: MutableMap<String, Any>) = m.apply {
-        put(ProducerConfig.LINGER_MS_CONFIG, 3)          // tiny wait
-        put(ProducerConfig.BATCH_SIZE_CONFIG, 131_072)   // 128 KiB
-        put(ProducerConfig.BUFFER_MEMORY_CONFIG, 67_108_864) // 64 MiB
-    }
-
     @Bean("syncPaymentEventProducerFactory")
     fun syncPaymentEventProducerFactory(mr: MeterRegistry): DefaultKafkaProducerFactory<String, EventEnvelope<*>> =
         DefaultKafkaProducerFactory<String, EventEnvelope<*>>(
-            lowLatencyOverrides(baseProps()).apply {
+            baseProps().apply {
                 put(ProducerConfig.CLIENT_ID_CONFIG, "$appName-sync-payment-tx-producer-client")
             }
         ).apply {
@@ -94,17 +86,10 @@ class KafkaProducerAutoConfig(
 
 
 
-    /** ---------- BATCH / THROUGHPUT PRODUCER (outbox, retry dispatcher) ---------- */
-    private fun batchOverrides(m: MutableMap<String, Any>) = m.apply {
-        put(ProducerConfig.LINGER_MS_CONFIG, 25)         // coalesce sends
-        put(ProducerConfig.BATCH_SIZE_CONFIG, 262_144)   // 256 KiB
-        put(ProducerConfig.BUFFER_MEMORY_CONFIG, 134_217_728) // 128 MiB
-    }
-
     @Bean("batchPaymentProducerFactory")
     fun batchPaymentProducerFactory(mr: MeterRegistry): DefaultKafkaProducerFactory<String, EventEnvelope<*>> =
         DefaultKafkaProducerFactory<String, EventEnvelope<*>>(
-            batchOverrides(baseProps()).apply {
+            baseProps().apply {
                 put(ProducerConfig.CLIENT_ID_CONFIG, "$appName-batch-payment-tx-producer-client")
             }
         ).apply {

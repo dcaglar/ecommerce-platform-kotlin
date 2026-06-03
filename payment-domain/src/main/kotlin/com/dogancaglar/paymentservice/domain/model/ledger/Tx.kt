@@ -193,10 +193,25 @@ sealed class Tx {
 
         )
 
-
-        fun internalTransferTx(txId: TxId,paymentId: PaymentId,paymentIntentId: PaymentIntentId,captureTxId: TxId,acquirerReference: String
-        ,transferAmount: Amount,status: TxStatus= TxStatus.PENDING
+        fun createInternalTransferTx(
+            txId: TxId,
+            paymentId: PaymentId,
+            paymentIntentId: PaymentIntentId,
+            captureTxId: TxId,
+            amount: Amount,
+            status: TxStatus = TxStatus.SUCCESS
+        ): CaptureTx = CaptureTx(
+            txId              = txId,
+            paymentId         = paymentId,
+            paymentIntentId   = paymentIntentId,
+            authorizationTxId = captureTxId, // map captureTxId to authorizationTxId for InternalTransfer since we don't have InternalTransferTx type yet and MarketPlaceSplitInstructionConsumer uses it.
+            acquirerReference = "INTERNAL",
+            amount            = amount,
+            status            = status
         )
+
+
+
     }
 
 

@@ -3,32 +3,53 @@ package com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.consumers
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.kafka.metadata.CONSUMER_GROUPS
 import com.dogancaglar.common.kafka.metadata.Topics
-import com.dogancaglar.paymentservice.application.events.ExternalAsyncCaptureToPspPerformed
-import com.dogancaglar.paymentservice.application.service.PspResultProcessingService
-import com.fasterxml.jackson.core.type.TypeReference
+import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.paymentservice.application.events.CaptureSubmitted
+import com.dogancaglar.paymentservice.application.service.RecordCaptureSubmissionService
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
 
+import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
+
 @Component
 class CapturePspPerformedConsumer(
     private val objectMapper: ObjectMapper,
-    private val pspResultProcessingService: PspResultProcessingService
+    private val recordCaptureSubmissionService: RecordCaptureSubmissionService,
+    private val dedupe: EventDeduplicationPort
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @KafkaListener(
-        topics = [Topics.CAPTURE_PSP_PERFORMED_QUEUE],
-        groupId = CONSUMER_GROUPS.CAPTURE_PSP_PERFORMED
+        topics = [Topics.CAPTURE_SUBMITTED_ACKS],
+        containerFactory = "\${Topics.CAPTURE_SUBMITTED_ACKS}-factory",
+        groupId = CONSUMER_GROUPS.CAPTURE_SUBMITTED_CONSUMER
     )
-    fun consume(payload: String) {
-        val typeRef = object : TypeReference<EventEnvelope<ExternalAsyncCaptureToPspPerformed>>() {}
-        val envelope = objectMapper.readValue(payload, typeRef)
-        val event = envelope.data
+    fun consume(record: ConsumerRecord<String, EventEnvelope<CaptureSubmitted>>) {
+        val envelope = record.value()
+        EventLogContext.with(envelope) {
+            val eventId = envelope.eventId
+            if (dedupe.exists(eventId)) {
+                logger.warn("⚠️ Event is processed already, skipping eventId=\$eventId")
+                return@with
+            }
 
-        logger.info("Consuming capture PSP performed event for payment: \${event.publicPaymentIntentId}")
+            val eventData = envelope.data
+            logger.info("Consuming capture PSP performed event for payment: \${eventData.publicPaymentIntentId}")
 
-        pspResultProcessingService.processCapturePspPerformed(event)
+            try {
+                recordCaptureSubmissionService.recordSubmission(
+                    event = eventData,
+                    traceId = envelope.traceId,
+                    parentEventId = envelope.eventId
+                )
+                dedupe.markProcessed(eventId, 3600)
+            } catch (e: Exception) {
+                logger.error("❌ Failed to process capture PSP performed event", e)
+                throw e
+            }
+        }
     }
 }

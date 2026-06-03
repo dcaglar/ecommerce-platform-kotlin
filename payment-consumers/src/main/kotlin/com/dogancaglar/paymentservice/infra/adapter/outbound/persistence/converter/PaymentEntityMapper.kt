@@ -11,9 +11,8 @@ import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentEntity
-import com.dogancaglar.paymentservice.infra.adapter.outbound.serialization.JacksonUtil
 import com.fasterxml.jackson.core.type.TypeReference
-import org.springframework.stereotype.Component
+import com.fasterxml.jackson.databind.ObjectMapper
 
 /**
  * PaymentEntityMapper
@@ -34,10 +33,9 @@ import org.springframework.stereotype.Component
  *  - On read, [splitsJson] is deserialized into List<PaymentSplitDto> and
  *    converted back to domain objects via [PaymentSplitDto.toDomain()].
  */
-@Component
-class PaymentEntityMapper {
-
-    private val objectMapper = JacksonUtil.createObjectMapper()
+class PaymentEntityMapper(
+    private val objectMapper: ObjectMapper
+) {
 
     private val splitsTypeRef = object : TypeReference<List<PaymentSplitDto>>() {}
 

@@ -4,7 +4,7 @@ import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.GenericLogFields
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.application.events.CaptureReceived
+import com.dogancaglar.paymentservice.application.events.CaptureRequested
 import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -20,18 +20,22 @@ class DomainEventFactoryTest {
         MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
             val now = Utc.nowInstant()
-            val event = CaptureReceived.from(
-                captureTxId = 1L,
-                paymentIntentId = "1001",
-                publicPaymentIntentId = "pi_123",
-                merchantAccountId = "m_1",
-                amountValue = 1000L,
-                currency = "EUR",
-                now = now
+            val event = CaptureRequested.from(
+                paymentIntent = com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent.createNew(
+                    paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(1001L),
+                    buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer_1"),
+                    orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order_1"),
+                    processingModel = com.dogancaglar.paymentservice.domain.model.payment.ProcessingModel.DIRECT_MERCHANT,
+                    merchantAccountId = "m_1",
+                    totalAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
+                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SUB_SELLER, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
+                ),
+                captureAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
+                timestamp = now
             )
             
             // when
-            val envelope: EventEnvelope<CaptureReceived> = EventEnvelopeFactory.envelopeFor(
+            val envelope: EventEnvelope<CaptureRequested> = EventEnvelopeFactory.envelopeFor(
                 data = event,
                 aggregateId = event.publicPaymentIntentId,
                 traceId = traceIdFromMDC
@@ -40,7 +44,7 @@ class DomainEventFactoryTest {
             // then
             Assertions.assertThat(envelope.eventId).isNotNull
             Assertions.assertThat(envelope.traceId).isEqualTo(traceIdFromMDC)
-            Assertions.assertThat(envelope.eventType).isEqualTo("capture_received")
+            Assertions.assertThat(envelope.eventType).isEqualTo("capture_requested")
         } finally {
             MDC.clear()
         }
@@ -51,14 +55,18 @@ class DomainEventFactoryTest {
         // when
         assertThrows<IllegalStateException> {
             val now = Utc.nowInstant()
-            val event = CaptureReceived.from(
-                captureTxId = 1L,
-                paymentIntentId = "1001",
-                publicPaymentIntentId = "pi_123",
-                merchantAccountId = "m_1",
-                amountValue = 1000L,
-                currency = "EUR",
-                now = now
+            val event = CaptureRequested.from(
+                paymentIntent = com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent.createNew(
+                    paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(1001L),
+                    buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer_1"),
+                    orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order_1"),
+                    processingModel = com.dogancaglar.paymentservice.domain.model.payment.ProcessingModel.DIRECT_MERCHANT,
+                    merchantAccountId = "m_1",
+                    totalAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
+                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SUB_SELLER, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
+                ),
+                captureAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
+                timestamp = now
             )
             
             EventEnvelopeFactory.envelopeFor(
@@ -75,14 +83,18 @@ class DomainEventFactoryTest {
         MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
             val now = Utc.nowInstant()
-            val event1 = CaptureReceived.from(
-                captureTxId = 1L,
-                paymentIntentId = "1001",
-                publicPaymentIntentId = "pi_123",
-                merchantAccountId = "m_1",
-                amountValue = 1000L,
-                currency = "EUR",
-                now = now
+            val event1 = CaptureRequested.from(
+                paymentIntent = com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent.createNew(
+                    paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(1001L),
+                    buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer_1"),
+                    orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order_1"),
+                    processingModel = com.dogancaglar.paymentservice.domain.model.payment.ProcessingModel.DIRECT_MERCHANT,
+                    merchantAccountId = "m_1",
+                    totalAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
+                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SUB_SELLER, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
+                ),
+                captureAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
+                timestamp = now
             )
             val envelope1 = EventEnvelopeFactory.envelopeFor(
                 data = event1,
@@ -90,14 +102,18 @@ class DomainEventFactoryTest {
                 traceId = traceIdFromMDC
             )
             
-            val event2 = CaptureReceived.from(
-                captureTxId = 2L,
-                paymentIntentId = "1002",
-                publicPaymentIntentId = "pi_124",
-                merchantAccountId = "m_1",
-                amountValue = 1000L,
-                currency = "EUR",
-                now = now
+            val event2 = CaptureRequested.from(
+                paymentIntent = com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent.createNew(
+                    paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(1002L),
+                    buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer_1"),
+                    orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order_1"),
+                    processingModel = com.dogancaglar.paymentservice.domain.model.payment.ProcessingModel.DIRECT_MERCHANT,
+                    merchantAccountId = "m_1",
+                    totalAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
+                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SUB_SELLER, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
+                ),
+                captureAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
+                timestamp = now
             )
             val envelope2 = EventEnvelopeFactory.envelopeFor(
                 data = event2,
@@ -120,14 +136,18 @@ class DomainEventFactoryTest {
         MDC.put(GenericLogFields.TRACE_ID, traceIdFromMDC)
         try {
             val now = Utc.nowInstant()
-            val event = CaptureReceived.from(
-                captureTxId = 1L,
-                paymentIntentId = "1001",
-                publicPaymentIntentId = "pi_123",
-                merchantAccountId = "m_1",
-                amountValue = 1000L,
-                currency = "EUR",
-                now = now
+            val event = CaptureRequested.from(
+                paymentIntent = com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent.createNew(
+                    paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(1001L),
+                    buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer_1"),
+                    orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order_1"),
+                    processingModel = com.dogancaglar.paymentservice.domain.model.payment.ProcessingModel.DIRECT_MERCHANT,
+                    merchantAccountId = "m_1",
+                    totalAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
+                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SUB_SELLER, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
+                ),
+                captureAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
+                timestamp = now
             )
 
             val envelope = EventEnvelopeFactory.envelopeFor(
@@ -138,7 +158,7 @@ class DomainEventFactoryTest {
 
             Assertions.assertThat(envelope.traceId).isNotBlank
             Assertions.assertThat(envelope.eventId).isNotNull
-            Assertions.assertThat(envelope.eventType).isEqualTo("capture_received")
+            Assertions.assertThat(envelope.eventType).isEqualTo("capture_requested")
             Assertions.assertThat(envelope.aggregateId).isEqualTo(event.publicPaymentIntentId)
             Assertions.assertThat(envelope.data).isEqualTo(event)
         } finally {
@@ -153,14 +173,18 @@ class DomainEventFactoryTest {
         try {
             val parentId = UUID.randomUUID().toString()
             val now = Utc.nowInstant()
-            val event = CaptureReceived.from(
-                captureTxId = 1L,
-                paymentIntentId = "1001",
-                publicPaymentIntentId = "pi_123",
-                merchantAccountId = "m_1",
-                amountValue = 1000L,
-                currency = "EUR",
-                now = now
+            val event = CaptureRequested.from(
+                paymentIntent = com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent.createNew(
+                    paymentIntentId = com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId(1001L),
+                    buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer_1"),
+                    orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order_1"),
+                    processingModel = com.dogancaglar.paymentservice.domain.model.payment.ProcessingModel.DIRECT_MERCHANT,
+                    merchantAccountId = "m_1",
+                    totalAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
+                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SUB_SELLER, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
+                ),
+                captureAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
+                timestamp = now
             )
 
             val envelope = EventEnvelopeFactory.envelopeFor(

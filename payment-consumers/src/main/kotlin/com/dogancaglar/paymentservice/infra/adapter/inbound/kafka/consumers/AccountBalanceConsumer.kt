@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.consumers
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
+import com.dogancaglar.paymentservice.application.events.JournalEntriesRecorded
 import com.dogancaglar.paymentservice.application.util.LedgerDomainEventEntityMapper
 import com.dogancaglar.common.kafka.metadata.CONSUMER_GROUPS
 import com.dogancaglar.common.kafka.metadata.Topics
@@ -30,12 +30,12 @@ class AccountBalanceConsumer(
     
 
     @KafkaListener(
-        topics = [Topics.LEDGER_ENTRIES_RECORDED],
-        containerFactory = "${Topics.LEDGER_ENTRIES_RECORDED}-factory",
+        topics = [Topics.JOURNAL_ENTRIES_RECORDED],
+        containerFactory = "${Topics.JOURNAL_ENTRIES_RECORDED}-factory",
         groupId = CONSUMER_GROUPS.ACCOUNT_BALANCE_CONSUMER
     )
     fun onLedgerEntriesRecorded(
-        records: List<ConsumerRecord<String, EventEnvelope<LedgerEntriesRecorded>>>,
+        records: List<ConsumerRecord<String, EventEnvelope<JournalEntriesRecorded>>>,
         consumer: Consumer<*, *>
     ) {
         // Deduplication: Filter out already-processed events and log duplicates

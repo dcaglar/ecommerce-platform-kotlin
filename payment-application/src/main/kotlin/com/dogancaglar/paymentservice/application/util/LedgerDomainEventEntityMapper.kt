@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.application.util
 
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.application.events.LedgerEntryEventData
+import com.dogancaglar.paymentservice.application.events.JournalEntryEventData
 import com.dogancaglar.paymentservice.application.events.PostingDirection
 import com.dogancaglar.paymentservice.application.events.PostingEventData
 import com.dogancaglar.paymentservice.domain.model.common.Amount
@@ -15,12 +15,12 @@ import com.dogancaglar.paymentservice.domain.model.vo.TxId
 object LedgerDomainEventEntityMapper {
 
     /**
-     * Maps JournalEntry domain model to LedgerEntryEventData DTO.
+     * Maps JournalEntry domain model to JournalEntryEventData DTO.
      */
-    fun toLedgerEntryEventData(journal: JournalEntry): LedgerEntryEventData {
-        return LedgerEntryEventData.create(
+    fun toLedgerEntryEventData(journal: JournalEntry): JournalEntryEventData {
+        return JournalEntryEventData.create(
             journalEntryId = journal.id,
-            journalType = journal.txType,
+            journalType = journal.journalType,
             journalName = journal.name,
             paymentId = journal.paymentId.value,
             txId = journal.txId.value,
@@ -30,7 +30,7 @@ object LedgerDomainEventEntityMapper {
     }
 
 
-    fun toDomain(ledgerEntryEvent: LedgerEntryEventData): JournalEntry {
+    fun toDomain(ledgerEntryEvent: JournalEntryEventData): JournalEntry {
         val postingsDomain = ledgerEntryEvent.postings.map { it.toDomain() }
 
         return JournalEntry.rehytrate(

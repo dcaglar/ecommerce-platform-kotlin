@@ -8,18 +8,10 @@
     <resultMap id="JournalEntryResultMap"
                type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.JournalEntryEntity">
         <id property="id" column="id"/>
-        <result property="txType" column="tx_type"/>
+        <result property="journalType" column="journal_type"/>
         <result property="name" column="name"/>
-        <result property="referenceType" column="reference_type"/>
-        <result property="referenceId" column="reference_id"/>
-        <result property="createdAt" column="created_at"
-                typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
-    </resultMap>
-
-    <resultMap id="LedgerEntryResultMap"
-               type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.LedgerEntryEntity">
-        <id property="id" column="id"/>
-        <result property="journalId" column="journal_id"/>
+        <result property="paymentId" column="payment_id"/>
+        <result property="txId" column="tx_id"/>
         <result property="createdAt" column="created_at"
                 typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
     </resultMap>
@@ -38,12 +30,10 @@
     </resultMap>
 
     <insert id="insertJournalEntry" parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.JournalEntryEntity">
-        INSERT INTO journal_entries (id, tx_type, name, reference_type, reference_id, created_at)
-        VALUES (#{id}, #{txType}, #{name}, #{referenceType}, #{referenceId}, #{createdAt})
+        INSERT INTO journal_entries (id, journal_type, name, payment_id, tx_id, created_at)
+        VALUES (#{id}, #{journalType}, #{name}, #{paymentId}, #{txId}, #{createdAt})
         ON CONFLICT (id) DO NOTHING
     </insert>
-
-
 
     <insert id="insertPosting" parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PostingEntity">
         INSERT INTO postings (journal_id, account_code, account_type, amount, direction, currency, created_at)
@@ -52,7 +42,7 @@
     </insert>
 
     <select id="findByJournalId" resultMap="JournalEntryResultMap">
-        SELECT id, tx_type, name, reference_type, reference_id, created_at
+        SELECT id, journal_type, name, payment_id, tx_id, created_at
         FROM journal_entries
         WHERE id = #{journalId}
     </select>

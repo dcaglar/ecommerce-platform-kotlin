@@ -3,6 +3,7 @@ package com.dogancaglar.common.kafka.serde
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.kafka.metadata.PaymentEventMetadataCatalog
 import com.fasterxml.jackson.core.type.TypeReference
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
@@ -12,9 +13,11 @@ import org.apache.kafka.common.serialization.Deserializer
 
 class EventEnvelopeKafkaDeserializer : Deserializer<EventEnvelope<*>> {
 
-    val objectMapper = ObjectMapper()
-        .registerModule(JavaTimeModule()).registerKotlinModule()
+    val objectMapper: ObjectMapper = ObjectMapper()
+        .registerModule(JavaTimeModule())
+        .registerKotlinModule()
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 
     private val topicTypeMap: Map<String, TypeReference<out EventEnvelope<*>>> =
         PaymentEventMetadataCatalog.all.associate { it.topic to it.typeRef }

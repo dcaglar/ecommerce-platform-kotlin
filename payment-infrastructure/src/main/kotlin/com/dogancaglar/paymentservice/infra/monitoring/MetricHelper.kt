@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.infra.monitoring
 
 /**
  * Creates a key-value tag pair in a type-safe and readable way.
- * Example: tag(MetricTags.EVENT_TYPE, MetricTagValues.EventType.PAYMENT_ORDER_CREATED)
+ * Example: tag(MetricTags.EventType, MetricTagValues.EventType.PAYMENT_ORDER_CREATED)
  */
 fun tag(key: String, value: String): Pair<String, String> = key to value
 
@@ -11,7 +11,7 @@ fun tag(key: String, value: String): Pair<String, String> = key to value
  * Example:
  *   tagsOf(
  *     tag(MetricTags.FLOW, MetricTagValues.Flow.OUTBOX),
- *     tag(MetricTags.EVENT_TYPE, MetricTagValues.EventType.PAYMENT_ORDER_CREATED)
+ *     tag(MetricTags.EventType, MetricTagValues.EventType.PAYMENT_ORDER_CREATED)
  *   )
  */
 fun tagsOf(vararg tags: Pair<String, String>): Array<String> =

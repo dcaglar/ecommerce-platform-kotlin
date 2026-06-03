@@ -35,3 +35,13 @@ enum class PspModificationStatus {
 
     fun requiresRetry(): Boolean = isRetryablePspResponse()
 }
+
+
+/**
+ * Lightweight domain response representing the tracking token and
+ * modification status received from the external network gateway handshake.
+ */
+data class PspCaptureGatewayResponse(
+    val pspReference: String,
+    val status: PspModificationStatus
+)

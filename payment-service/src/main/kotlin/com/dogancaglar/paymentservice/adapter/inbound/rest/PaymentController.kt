@@ -17,22 +17,15 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
-import com.dogancaglar.paymentservice.application.events.CaptureReceived
-import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
-import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort
-import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CaptureRequestDTO
-import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.id.PublicIdFactory
-import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CaptureResponseDTO
-import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
-import com.fasterxml.jackson.databind.ObjectMapper
 
 @RestController
 @RequestMapping("/api/v1")
 class PaymentController(
     private val paymentApiOrchestrator: PaymentApiOrchestrator,
+    private val modificationOrchestrator: ModificationOrchestrator,
     private val idempotencyService: IdempotencyService,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -135,7 +128,7 @@ class PaymentController(
         @Valid @RequestBody request: CaptureRequestDTO
     ): ResponseEntity<CaptureResponseDTO> {
         logger.debug("📥 Received capture request for payment: $publicPaymentIntentId")
-       val responseDTO =  paymentApiOrchestrator.capturePayment(publicPaymentIntentId,request)
+        val responseDTO = modificationOrchestrator.capturePayment(publicPaymentIntentId, request)
 
 
         return ResponseEntity.status(HttpStatus.OK).body(responseDTO)

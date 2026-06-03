@@ -2,11 +2,10 @@ package com.dogancaglar.paymentservice.infra.adapter.inbound.scheduler
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.application.events.CaptureConfirmed
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
-import com.dogancaglar.paymentservice.application.events.CaptureReceived
-import com.dogancaglar.paymentservice.application.events.PaymentCaptured
+import com.dogancaglar.paymentservice.application.events.CaptureRequested
 import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
-import com.dogancaglar.paymentservice.infra.adapter.inbound.scheduler.OutboxRelayJob
 import com.dogancaglar.paymentservice.ports.outbound.CentralOutboxRelayPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
@@ -19,7 +18,6 @@ import io.mockk.verify
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
-import java.time.Duration
 import java.time.Instant
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
@@ -31,7 +29,7 @@ class OutboxRelayJobTest {
     private lateinit var kafkaPublisher: EventPublisherPort
     private lateinit var executor: ThreadPoolTaskExecutor
     private lateinit var objectMapper: ObjectMapper
-    private lateinit var serializationPort: SerializationPort
+
     private lateinit var meterRegistry: MeterRegistry
     private lateinit var outboxRelayJob: OutboxRelayJob
 
@@ -41,7 +39,7 @@ class OutboxRelayJobTest {
         kafkaPublisher = mockk(relaxed = true)
         executor = mockk(relaxed = true)
         objectMapper = mockk(relaxed = true)
-        serializationPort = mockk(relaxed = true)
+
 
         // Make mock executor run tasks synchronously in tests, wrapping in try-catch to mimic background thread isolation
         every { executor.execute(any()) } answers {
@@ -60,7 +58,6 @@ class OutboxRelayJobTest {
             kafkaPublisher = kafkaPublisher,
             executor = executor,
             objectMapper = objectMapper,
-            serializationPort = serializationPort,
             batchSize = 100,
             meterRegistry = meterRegistry
         )
@@ -110,7 +107,7 @@ class OutboxRelayJobTest {
         )
         val event2 = OutboxEvent.rehydrate(
             oeid = 2L,
-            eventType = "capture_received",
+            eventType = "CAPTURE_REQUESTED",
             aggregateId = "seller-1",
             payload = "{\"paymentOrderId\":\"2\"}",
             status = "NEW",
@@ -119,7 +116,7 @@ class OutboxRelayJobTest {
         )
         val event3 = OutboxEvent.rehydrate(
             oeid = 3L,
-            eventType = "payment_captured",
+            eventType = "CAPTURE_CONFIRMED",
             aggregateId = "seller-2",
             payload = "{\"paymentOrderId\":\"3\"}",
             status = "NEW",
@@ -136,12 +133,12 @@ class OutboxRelayJobTest {
         every { objectMapper.typeFactory } returns mockTypeFactory
         
         every { mockTypeFactory.constructParametricType(EventEnvelope::class.java, PaymentAuthorized::class.java) } returns mockJavaType
-        every { mockTypeFactory.constructParametricType(EventEnvelope::class.java, CaptureReceived::class.java) } returns mockJavaType
-        every { mockTypeFactory.constructParametricType(EventEnvelope::class.java, PaymentCaptured::class.java) } returns mockJavaType
+        every { mockTypeFactory.constructParametricType(EventEnvelope::class.java, CaptureRequested::class.java) } returns mockJavaType
+        every { mockTypeFactory.constructParametricType(EventEnvelope::class.java, CaptureConfirmed::class.java) } returns mockJavaType
 
         val envelope1 = mockk<EventEnvelope<PaymentAuthorized>>()
-        val envelope2 = mockk<EventEnvelope<CaptureReceived>>()
-        val envelope3 = mockk<EventEnvelope<PaymentCaptured>>()
+        val envelope2 = mockk<EventEnvelope<CaptureRequested>>()
+        val envelope3 = mockk<EventEnvelope<CaptureConfirmed>>()
 
         every { objectMapper.readValue<Any>(event1.payload, mockJavaType) } returns envelope1
         every { objectMapper.readValue<Any>(event2.payload, mockJavaType) } returns envelope2

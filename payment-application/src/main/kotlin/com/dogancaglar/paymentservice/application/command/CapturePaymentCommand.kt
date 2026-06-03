@@ -5,7 +5,6 @@ import com.dogancaglar.paymentservice.domain.model.payment.PaymentMethod
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 
 data class CapturePaymentCommand(
-    val captureTxId: Long,
     val paymentIntentId: PaymentIntentId,
     val merchantAccountId: String,
     val amount: Amount

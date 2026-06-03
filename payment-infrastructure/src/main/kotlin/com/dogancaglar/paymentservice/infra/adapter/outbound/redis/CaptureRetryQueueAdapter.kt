@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.infra.adapter.outbound.redis
 
 import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.logging.EventLogContext
-import com.dogancaglar.paymentservice.application.events.CaptureReceived
+import com.dogancaglar.paymentservice.application.events.CaptureRequested
 import com.dogancaglar.paymentservice.application.util.RetryItem
 import com.dogancaglar.paymentservice.infra.adapter.outbound.redis.client.CaptureRetryRedisCache
 import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component
 class CaptureRetryQueueAdapter(
     private val captureRetryRedisCache: CaptureRetryRedisCache,
     meterRegistry: MeterRegistry,
-    val serializationPort: SerializationPort) : RetryQueuePort<CaptureReceived> {
+    val serializationPort: SerializationPort) : RetryQueuePort<CaptureRequested> {
 
     init {
         Gauge.builder("redis_retry_zset_size") { captureRetryRedisCache.zsetSize() }
@@ -27,7 +27,7 @@ class CaptureRetryQueueAdapter(
     private val logger = LoggerFactory.getLogger(CaptureRetryQueueAdapter::class.java)
 
     override fun scheduleRetry(
-        event: CaptureReceived,
+        event: CaptureRequested,
         backOffMillis: Long,
     ) {
         val totalStart = System.currentTimeMillis()

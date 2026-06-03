@@ -27,8 +27,7 @@ The PSP simply transfers funds into the MoR account.
 ---
 
 ### **4. Why separate PaymentIntent and Payment?**
-Separating PaymentIntent from Payment lets our system handle user interaction safely, money movement correctly, and retry safely without creating duplicate financial records.
-
+PaymentIntent is just a domain entity living in edge layer and edge db so its not a global entity,but Payment is part of central cluster and it is the real entity created after a financial ionteraction with external world
 
 # 🟧 Functional Requirements
 *(written using Shopper, Seller, and Internal Services as actors)*
@@ -36,20 +35,20 @@ Separating PaymentIntent from Payment lets our system handle user interaction sa
 ## **For Shoppers**
 
 ### **FR1 — Shoppers should be able to make a payment for a multi-seller basket.**
-- A shopper must be able to confirm checkout and initiate a payment for the total amount of their order.
+- A shopper must be able to proceed to checkout page(cretePaymentIntent), and then pay via clicking pay button on checkout page(authorize endpoint)
 
 ### **FR2 — Shoppers should be able to see accurate payment authorization status.**
-- Shoppers should be able to view whether their payment is authorized or declined
+- Shoppers should be able to view whether their payment is authorized or declined, its a syncronous psp call, and shoppers can see payment status via the paymentintent
 
 ---
 
 ## **For Sellers**
 
-### **FR3 — Sellers should be able to receive their portion of a shopper’s payment.**
+### **FR3 — Sellers should be able to receive their portion of a shopper’s payment if defined in splits array
 - Each seller must receive the correctly allocated share of the total payment based on the items purchased from them.
 
 ### **FR4 — Sellers should be able to view their financial state.**
-- Sellers should be able to access their balances, payable amounts, and payout summaries.
+- Sellers should be able to access their balances, payable amounts, and payout summaries via projected views
 
 ---
 
@@ -67,11 +66,6 @@ Separating PaymentIntent from Payment lets our system handle user interaction sa
 ### **FR8 — The system must maintain internal fund distribution for reporting and payouts.**
 - Internal components (Finance, Payouts) must be able to retrieve seller payables, platform fees, and other financial allocations.
 
-### **FR9 — Internal services should be able to retrieve real-time payment and ledger state.**
-- Order, Finance, Risk, and Payout subsystems must be able to query payment status, PSP results, seller balances, and ledger entries.
-
-### **FR10 — Treasury/Payout services should be able to receive payout instructions.**
-- Out of Scope
 
 ---
 
@@ -148,8 +142,7 @@ Represents the **shopper's intent to pay** for a multi-seller basket.
 - Contains: `buyerId`, `orderId`, `totalAmount`, `paymentSplits` (seller breakdown)
 
 **Why it exists:**
-- Separates "intent to pay" from "actual payment transaction"
-- Allows authorization workflow to happen before committing to financial records
+- Separates "intent to pay"(living in its own edge) from "actual payment transaction(payment-living in the central cluster)"
 - Enables idempotent authorization attempts (prevents duplicate PSP calls)
 - Supports retry logic for transient PSP failures
 
@@ -171,7 +164,7 @@ Represents the **actual financial transaction** created after authorization succ
 
 
 ## **3. OutboxEvent**
-Represents **immutable integration events** stored locally on edge or centrally.
+Represents **immutable integration events** stored locally on edge or centrally, it simply stores the deserilazed byte of an any EventEnvelope<Event>
 
 **When it's created:**
   When intent mutations or external network results are received.
@@ -184,26 +177,25 @@ Represents **immutable integration events** stored locally on edge or centrally.
 
 ## **4. Payment Transaction (Tx)**
 
-Represents an **individual financial operation** executed against a Payment (e.g., `AuthorizationTx`, `CaptureTx`, `RefundTx`, `SettleTx`). 
+Represents an **individual interaction with an external PSP** executed against a Payment (e.g., `AuthorizationTx`, `CaptureTx`, `RefundTx`, `SettleTx`). 
 
 **When it's created:**
-  - Whenever an operation is requested and executed against the PSP (e.g., when we successfully capture funds, a `CaptureTx` is recorded).
+  - Whenever an operation is requested and executed against the external PSP (e.g., when we successfully call external psp capture api, a `CaptureTx` is recorded).
 
 **Why it exists:**
-  - **Audit & History:** While the `Payment` aggregate tracks the *cumulative total* (e.g., "This payment has 100 EUR captured"), the `Tx` tracks the *individual actions* ("We captured 50 EUR on Monday, and 50 EUR on Tuesday").
+  - **Audit & History:** While the `Payment` aggregate tracks the *cumulative total* (e.g., "This payment has 100 EUR captured"), the `Tx` tracks the *individual external psp interactions* ("We did call external psp capture api with this parameters, and this was the response from them").
   - **External PSP Linking:** It stores the external network identifiers (like the PSP's acquirer reference) to trace exactly which network call caused the balance change.
-  - **Ledger Bridging:** It acts as the business-level parent for double-entry accounting. Each successful `Tx` generates exactly one `JournalEntry` to balance the MoR's books.
+  - **JournalEntry record Bridging to actual external PSP interaction:** It actually is the proof of the transaction when we look at our JournalEntry and understand why we have this journal entry in our system,because of this external interaction with psp
 
-## **5. LedgerEntry**
-
-Represents a **single double-entry journal entry**.
+## **5. JournalEntry**
+Represents a **single double-entry journal entry**.It is always true that sum of the debit and credit postings are equal
 
 Contains:
 - Debit postings
 - Credit postings
 - JournalId
 - Timestamp
-- Business context (paymentIntentId, txId, sellerId, etc.)
+- TxId(which is the linking this JournalEntry  to the exact external psp interaction record ) (paymentIntentId, txId, sellerId, etc.)
 
 **Why it exists:**  
 Ensures financial correctness, auditability, and immutable accounting history.
@@ -219,7 +211,7 @@ A component of a LedgerEntry.
 - Reflects accounting direction (DR/CR)
 
 **Why it exists:**  
-LedgerEntries consist of multiple postings — always balanced.
+JournalEntries consist of multiple postings — always balanced.
 
 ---
 
@@ -227,11 +219,15 @@ LedgerEntries consist of multiple postings — always balanced.
 
 Represents a **financial account** in the internal ledger, such as:
 
-- PSP_RECEIVABLE
-- SELLER_PAYABLE
-- PLATFORM_FEE_REVENUE
-- SCHEME_FEE_EXPENSE
 - PLATFORM_CASH
+- PSP_RECEIVABLES
+- AUTH_RECEIVABLE
+- AUTH_LIABILITY
+- MARKETPLACE_OPERATOR
+- MARKETPLACE_SUB_SELLER
+- PLATFORM_COMMISSION_ESCROW
+- PLATFORM_OPERATIONAL_REVENUE
+- PSP_FEE_EXPENSE
 
 **Why it exists:**  
 Money moves internally between accounts, not as free-form variables.
@@ -274,25 +270,33 @@ graph TD
         
         subgraph Edge1["Edge Cell 1"]
             direction TB
-            API1["Payment Acceptance Service<br/>(Authorization / Capture / Refund)"]
+            API1["Payment Acceptance Service"]
             IdemDB1[("Idempotency DB<br/>IdempotencyRecord")]
             EdgeDB1[("Edge Local DB<br/>PaymentIntent<br/>OutboxEvents")]
             Fwd1[["Local Outbox Forwarder"]]
+            PSP_Edge1["External PSP API<br/>(Synchronous Auth)"]
             
-            API1 -.-> IdemDB1
-            API1 --> EdgeDB1
+            %% Flow Splits inside Edge
+            API1 -.->|1. Idempotency Check| IdemDB1
+            API1 ===>|2a. Synchronous Auth Pass<br/>Shopper Present| PSP_Edge1
+            PSP_Edge1 ===>|2b. Persist Auth Response to local Outbox  as  EventEnvelope &lt;PaymentAuthorized&gt; | EdgeDB1
+            API1 -->|3.  Capture / Refund received from merchant <br/>Persisted to Outbox as  EventEnvelope &lt;CaptureRequested&gt; in edge db  without any psp interaction| EdgeDB1
             EdgeDB1 --> Fwd1
         end
 
         subgraph Edge2["Edge Cell 2"]
             direction TB
-            API2("Payment Acceptance Service<br/>(Authorization / Capture / Refund)")
+            API2["Payment Acceptance Service"]
             IdemDB2[("Idempotency DB<br/>IdempotencyRecord")]
             EdgeDB2[("Edge Local DB<br/>PaymentIntent<br/>OutboxEvents")]
             Fwd2[["Local Outbox Forwarder"]]
+            PSP_Edge2["External PSP API<br/>(Synchronous Auth)"]
             
-            API2 -.-> IdemDB2
-            API2 --> EdgeDB2
+            %% Flow Splits inside Edge
+            API2 -.->|1. Idempotency Check| IdemDB2
+            API2 ===>|2a. Synchronous Auth Pass<br/>Shopper Present| PSP_Edge2
+            PSP_Edge2 ===>|2b. Persist Auth Response to local Outbox  as  EventEnvelope &lt;PaymentAuthorized&gt; | EdgeDB2
+            API2 -->|3.  Capture / Refund received from merchant <br/>Persisted to  local Outbox as  EventEnvelope &lt;CaptureRequested&gt; in edge db  without any psp interaction| EdgeDB2
             EdgeDB2 --> Fwd2
         end
     end
@@ -306,37 +310,49 @@ graph TD
         
         subgraph Topics["Kafka Topics"]
             direction LR
-            CapTopic>"capture-execution-queue"]
-            TransTopic>"internal-transfer-queue"]
-            ResTopic>"psp-result-queue<br/>(Accepted: PaymentAuthorized,<br/>CaptureSuccessful)"]
+            CAPTURE_COMMANDS_TOPIC>"gateway.capture.commands<br/>(Accepted: EventEnvelope &lt;CaptureRequested&gt;)"]
+            JOURNAL_ENTRIES_RECORDED_TOPIC>"journal.entries.recorded<br/>(Accepted: EventEnvelope &lt;JournalEntriesRecorded&gt;)"]
+            CAPTURE_SUBMITTED_ACKS_TOPIC>"gateway.capture.submitted<br/>(Accepted: EventEnvelope &lt;CaptureSubmitted&gt;)"]
+            PSP_RESULTS_TOPIC>"payment.psp.results<br/>(Accepted: EventEnvelope &lt;PaymentAuthorized&gt; and EventEnvelope &lt;CaptureConfirmed&gt; )"]
         end
         
         CentralDB -->|Polls OutboxEvents| Relay
         
-        Relay -->|OutboxEvent&lt;CaptureReceived&gt;| CapTopic
-        Relay -->|OutboxEvent&lt;InternalTransferRequest&gt;| TransTopic
-        Relay -->|OutboxEvent&lt;PaymentAuthorized&gt;<br/>OutboxEvent&lt;CaptureSuccessful&gt;| ResTopic
+        Relay -->|EventEnvelope &lt;CaptureRequested&gt;| CAPTURE_COMMANDS_TOPIC
+        Relay -->|EventEnvelope &lt;CaptureSubmitted&gt;| CAPTURE_SUBMITTED_ACKS_TOPIC
+        Relay -->|EventEnvelope &lt;PaymentAuthorized&gt;| PSP_RESULTS_TOPIC
+        Relay -->|EventEnvelope &lt;CaptureConfirmed&gt;| PSP_RESULTS_TOPIC
+        Relay -->|EventEnvelope &lt;JournalEntriesRecorded&gt;| JOURNAL_ENTRIES_RECORDED_TOPIC
+        Relay -->|EventEnvelope &lt;InternalTransferRequested&gt;| INTERNAL_TRANSFERS_TOPIC
+
         
         subgraph Consumers["Payment Consumers (payment-consumers)"]
             direction TB
-            CapCons("CAPTURE COMMAND EXECUTOR<br/>Calls psp.capture()<br/>Stores OutboxEvent&lt;CapturePspPerformed&gt;")
-            TransCons("INTERNAL TRANSFER CONSUMER<br/>Records Internal Ledger Splits")
-            
-            ResCons("PSP RESULT CONSUMER<br/><b>PaymentAuthorized</b> -> createAuthTx, createAuthJournal<br/><b>CaptureSuccessful</b> -> createCaptureTx, createCaptureJournals<br/><i>*Appends OutboxEvent&lt;InternalTransferRequest&gt;*</i>")
+            CaptureCommandExecutor("CaptureCommandExecutor<br/> Consumes EventEnvelope &lt;CaptureRequested&gt;, Calls psp.capture() async endpoint<br/>Stores OutboxEvent EventEnvelope&lt;CaptureSubmitted&gt;")
+            MarketPlaceSplitInstructionConsumer("MarketPlaceSplitInstructionConsumer<br/> Consumes EventEnvelope &lt;JournalEntriesRecorded&gt;<br/>Checks journal entry with journatype=capture, and check the original Payment has a splits metada, then simply creaate an outbox event EventEnvelope &lt;InternalTransferRequested&gt;  for each element for splits array")
+            CapturePspPerformedConsumer("CapturePspPerformedConsumer<br/> Consumes EventEnvelope &lt;CaptureSubmitted&gt;<br/>")
+            InternalTransferRequestExecutor("InternalTransferRequestExecutor<br/> Consumes EventEnvelope &lt;InternalTransferRequested&gt;<br/> Create a InternalTransferTx,persist journalentry via JournalFactory.internalTransfer()   ")
+     
+            PspResultConsumer("PspResultConsumer<br/> Consumes EventEnvelope &lt;PaymentAuthorized&gt; and EventEnvelope &lt;CaptureConfirmed&gt;<br/><b>if EventEnvelope &lt;PaymentAuthorized&gt;</b> -> create an save a Payment with Authorized status, create a AuthorizationTx, persist journalentry  via JournalFactory.authHold() and append Outbox EventEnvelope &lt;JournalEntriesRecorded&gt; including journal entries persisted</b> <br/><b>. if  EventEnvelope &lt;CaptureConfirmed&gt;</b> -> update payment to CAPTURED, update captureTx status to SUCCESS, persist journalentry created via JournalFactory.capture()<br/><i>*Appends  EventEnvelope &lt;JournalEntriesRecorded&gt; including journal entries persisted*</i>")
         end
         
-        CapTopic --> CapCons
-        TransTopic --> TransCons
-        ResTopic --> ResCons
+        CAPTURE_COMMANDS_TOPIC --> CaptureCommandExecutor
+        CAPTURE_SUBMITTED_ACKS_TOPIC --> CapturePspPerformedConsumer
+        JOURNAL_ENTRIES_RECORDED_TOPIC --> MarketPlaceSplitInstructionConsumer 
+        INTERNAL_TRANSFERS_TOPIC --> InternalTransferRequestExecutor 
+        PSP_RESULTS_TOPIC --> PspResultConsumer
         
-        CapCons -->|Writes Result| CentralDB
-        TransCons -->|Writes Result| CentralDB
-        ResCons -->|Stores Txs & Journals| CentralDB
+        CaptureCommandExecutor -->|Calls external async psp capture, Writes a outbox EventEnvelope &lt;CaptureSubmitted&gt; | CentralDB
+        MarketPlaceSplitInstructionConsumer -->|Writes Result State| CentralDB
+        InternalTransferRequestExecutor -->|Writes Result State| CentralDB
+        PspResultConsumer -->|Upsert Txs & JournalEntries for the psp result & append an outbox event EventEnvelope &lt;JournalEntriesRecorded&gt; this JournalEntriesRecorded includes the journal entry or entries persisted together in same transaction | CentralDB
+        CapturePspPerformedConsumer -->|Writes Result State| CentralDB
+
     end
 
     %% Network Links
-    Fwd1 ===>|Forwards OutboxEvents| CentralDB
-    Fwd2 ===>|Forwards OutboxEvents| CentralDB
+    Fwd1 ===>|Forwards OutboxEvents Asynchronously| CentralDB
+    Fwd2 ===>|Forwards OutboxEvents Asynchronously| CentralDB
 
     %% Assign Classes
     class Edge1,Edge2 edgeCell
@@ -347,9 +363,10 @@ graph TD
     class CapTopic,TransTopic,ResTopic topic
     class CapCons,TransCons,ResCons consumer
 ```
+**Capture and Refund Request(Modifications )**  are  asychronous(opposite to the syncronous authorization operation) operations,so we simply receive the capture/refund request from merchant and simply just persist an Outbox<EventEnvelope<CaptureRequest>> in the local edge-db
+
 
 **Payment Platform** is an internal backend domain service that manages the complete payment lifecycle for a multi-seller marketplace platform. It operates as a Merchant-of-Record (MoR), handling all financial transactions between shoppers, sellers, and the platform. The platform is divided into three highly available tiers:
-
 - **The Edge Cell (Payment Service Pod)**: A strictly coupled Kubernetes Sidecar pattern that acts as an atomic "Machine". Each Pod contains the REST API for synchronous operations (authorization, intent creation), an isolated local Postgres database for zero-latency outbox commits, and a background worker (`payment-edge-workers`) for async forwarding to the Central DB. These containers must run on the exact same host to share storage and local networking loopback.
 - **Payment Central Relay (Central Node)**: A dedicated, non-blocking scheduler service (`payment-central-relay`) hosting the `OutboxRelayJob`. It polls the Central DB via `CentralOutboxRelayPort` up to the globally safe `T_Safe` watermark and publishes outbox events in-order to Kafka. **This workload does NOT apply the sidecar pattern** and is physically isolated from the consumers to ensure independent uptime; if the relay job fails, consumers continue running unaffected.
 - **Payment Consumers (Central Node)**: Purely asynchronous consumer application (`payment-consumers`) that handles global asynchronous operations (capture/refund execution, event processing, retry logic, and double-entry ledger bookkeeping). **This workload does NOT apply the sidecar pattern** and is scheduled on separate, independent physical hosts/pods to preserve asynchronous isolation and independent scaling.

@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.application.util
 
-import com.dogancaglar.paymentservice.application.events.LedgerEntryEventData
+import com.dogancaglar.paymentservice.application.events.JournalEntryEventData
 import com.dogancaglar.paymentservice.application.events.PostingDirection
 import com.dogancaglar.paymentservice.application.events.PostingEventData
 import com.dogancaglar.paymentservice.application.util.LedgerDomainEventEntityMapper.toDomain
@@ -11,7 +11,6 @@ import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalType
 import com.dogancaglar.paymentservice.domain.model.ledger.Posting
-import com.dogancaglar.common.time.Utc
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import java.time.Instant
@@ -39,7 +38,7 @@ class LedgerDomainEventEntityMapperTest {
         )
     }
 
-    private fun sampleJournalEntryEventData(): LedgerEntryEventData {
+    private fun sampleJournalEntryEventData(): JournalEntryEventData {
         val debitEvent = PostingEventData.create(
             accountCode = "MARKETPLACE_OPERATOR.SELLER-333.EUR",
             accountType = AccountType.MARKETPLACE_OPERATOR,
@@ -55,7 +54,7 @@ class LedgerDomainEventEntityMapperTest {
             direction = PostingDirection.CREDIT
         )
 
-        return LedgerEntryEventData.create(
+        return JournalEntryEventData.create(
             journalEntryId = "journal-9876",
             journalType = JournalType.CAPTURE,
             journalName = "capture",
@@ -73,7 +72,7 @@ class LedgerDomainEventEntityMapperTest {
         val eventData = LedgerDomainEventEntityMapper.toLedgerEntryEventData(journalEntry)
 
         Assertions.assertEquals(journalEntry.id, eventData.journalEntryId)
-        Assertions.assertEquals(journalEntry.txType, eventData.journalType)
+        Assertions.assertEquals(journalEntry.journalType, eventData.journalType)
 
         val postingEvent = eventData.postings.first()
         val postingDomain = journalEntry.postings.first()
@@ -111,7 +110,7 @@ class LedgerDomainEventEntityMapperTest {
         val domain = LedgerDomainEventEntityMapper.toDomain(eventData)
 
         assertEquals(eventData.journalEntryId, domain.id)
-        assertEquals(eventData.journalType, domain.txType)
+        assertEquals(eventData.journalType, domain.journalType)
 
         val postings = domain.postings
         Assertions.assertEquals(2, postings.size)

@@ -33,10 +33,9 @@ class ModificationOrchestrator(
 
     fun capturePayment(publicPaymentIntentId: String, request: CaptureRequestDTO): CaptureResponseDTO {
         logger.info("🔁 ModificationOrchestrator.capturePayment started")
-        val captureTxId = idGeneratorPort.nextPaymentId()
-        val cmd = PaymentRequestMapper.toCapturePaymentCommand(captureTxId, publicPaymentIntentId, request)
+        val cmd = PaymentRequestMapper.toCapturePaymentCommand(publicPaymentIntentId, request)
         val paymentIntent = capturePaymentUseCase.capture(cmd)
-        return PaymentRequestMapper.toCaptureResponseDto(paymentIntent, captureTxId)
+        return PaymentRequestMapper.toCaptureResponseDto(paymentIntent)
     }
 
 

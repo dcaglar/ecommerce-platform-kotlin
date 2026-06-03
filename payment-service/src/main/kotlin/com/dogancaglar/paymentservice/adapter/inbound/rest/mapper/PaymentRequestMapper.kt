@@ -45,9 +45,8 @@ object PaymentRequestMapper {
             paymentIntentId = PaymentIntentId(PublicIdFactory.toInternalId(publicPaymentIntentId)),
             paymentMethod = dto.paymentMethod?.let { toPaymentMethod(it) }
         )
-    fun toCapturePaymentCommand(captureTxId: Long, publicPaymentIntentId:String, dto: CaptureRequestDTO): CapturePaymentCommand =
+    fun toCapturePaymentCommand(publicPaymentIntentId:String, dto: CaptureRequestDTO): CapturePaymentCommand =
         CapturePaymentCommand(
-            captureTxId = captureTxId,
             paymentIntentId = PaymentIntentId(PublicIdFactory.toInternalId(publicPaymentIntentId)),
             merchantAccountId = dto.merchantAccountId ,
             amount = Amount.of(dto.amount.quantity, Currency(dto.amount.currency.name)))
@@ -67,9 +66,9 @@ object PaymentRequestMapper {
         )
     }
 
-    fun toCaptureResponseDto(paymentIntent: PaymentIntent, captureTxId: Long): CaptureResponseDTO {
+    fun toCaptureResponseDto(paymentIntent: PaymentIntent): CaptureResponseDTO {
         return CaptureResponseDTO(
-            captureId = captureTxId.toString(),
+            publicPaymentIntentId = paymentIntent.paymentIntentId.toPublicPaymentIntentId(),
             status = paymentIntent.status.name,
             createdAt = paymentIntent.createdAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
         )

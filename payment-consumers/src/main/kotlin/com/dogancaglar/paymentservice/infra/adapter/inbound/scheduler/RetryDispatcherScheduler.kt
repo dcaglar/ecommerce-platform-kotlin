@@ -1,10 +1,10 @@
 package com.dogancaglar.paymentservice.infra.adapter.inbound.scheduler
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.application.command.PaymentOrderCaptureCommand
 import com.dogancaglar.common.kafka.publisher.PaymentEventPublisher
 import com.dogancaglar.common.kafka.metadata.PaymentEventMetadataCatalog
-import com.dogancaglar.paymentservice.infra.adapter.outbound.redis.PaymentOrderRetryQueueAdapter
+import com.dogancaglar.paymentservice.application.events.CaptureRequested
+import com.dogancaglar.paymentservice.infra.adapter.outbound.redis.CaptureRetryQueueAdapter
 import io.micrometer.core.instrument.*
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 @Component
 class RetryDispatcherScheduler(
-    private val retryQueue: PaymentOrderRetryQueueAdapter,
+    private val retryQueue: CaptureRetryQueueAdapter,
     @param:Qualifier("batchPaymentEventPublisher") private val publisher: PaymentEventPublisher,
     private val meterRegistry: MeterRegistry,
     @param:Qualifier("retryDispatcherSpringScheduler") private val scheduler: ThreadPoolTaskScheduler
@@ -34,7 +34,7 @@ class RetryDispatcherScheduler(
     private val running = AtomicBoolean(false)
 
     // Static tag for your topic (so dashboards can filter/group)
-    private val topicTag = Tag.of("topic", PaymentEventMetadataCatalog.PaymentOrderCaptureCommandMetadata.topic)
+    private val topicTag = Tag.of("topic", PaymentEventMetadataCatalog.CaptureRequestedMetadata.topic)
 
     private val processedCounter = Counter.builder("redis_retry_events_total")
         .description("Total retry events successfully re-published")
@@ -103,11 +103,11 @@ class RetryDispatcherScheduler(
 
             try {
                 // Build the envelopes list for ONE atomic TX
-                val envs = ArrayList<EventEnvelope<PaymentOrderCaptureCommand>>(chunkCount)
+                val envs = ArrayList<EventEnvelope<CaptureRequested>>(chunkCount)
                 for (item in chunk) {
                     val t = Timer.start(meterRegistry)
                     @Suppress("UNCHECKED_CAST")
-                    val env = item.envelope as EventEnvelope<PaymentOrderCaptureCommand>
+                    val env = item.envelope as EventEnvelope<CaptureRequested>
                     envs.add(env)
                     t.stop(perEventTimer)
                 }

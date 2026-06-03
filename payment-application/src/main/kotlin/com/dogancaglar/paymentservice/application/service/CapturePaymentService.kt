@@ -1,11 +1,10 @@
 package com.dogancaglar.paymentservice.application.service
 
 import com.dogancaglar.common.event.EventEnvelopeFactory
-import com.dogancaglar.common.id.PublicIdFactory
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.command.CapturePaymentCommand
-import com.dogancaglar.paymentservice.application.events.CaptureReceived
+import com.dogancaglar.paymentservice.application.events.CaptureRequested
 import com.dogancaglar.paymentservice.application.util.toPublicPaymentIntentId
 import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
@@ -31,14 +30,9 @@ class CapturePaymentService(
         val paymentIntent = paymentIntentRepository.findById(cmd.paymentIntentId)
             ?: throw IllegalArgumentException("PaymentIntent not found for ${cmd.paymentIntentId.value}")
 
-        val captureEvent = CaptureReceived.from(
-            captureTxId = cmd.captureTxId,
-            paymentIntentId = paymentIntent.paymentIntentId.value.toString(),
-            publicPaymentIntentId = paymentIntent.paymentIntentId.toPublicPaymentIntentId(),
-            merchantAccountId = cmd.merchantAccountId,
-            amountValue = cmd.amount.quantity,
-            currency = cmd.amount.currency.currencyCode,
-            now = Utc.nowInstant()
+        val captureEvent = CaptureRequested.from(
+            paymentIntent = paymentIntent,
+            captureAmount = cmd.amount
         )
 
         val envelope = EventEnvelopeFactory.envelopeFor(

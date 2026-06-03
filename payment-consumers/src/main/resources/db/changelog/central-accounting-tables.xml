@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+        <!-- ========== JOURNAL ENTRIES TABLE ========== -->
+    <changeSet id="2025-10-27-ledger-entry-tables" author="dogancaglar">
+        <createTable tableName="payment_tx">
+            <column name="tx_id" type="BIGINT">
+                <constraints primaryKey="true"/>
+            </column>
+            <column name="tx_type" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="parent_tx_id" type="BIGINT"/>
+            <column name="payment_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(16)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="settle_status" type="VARCHAR(16)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="acquirer_batch_ref" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="settled_amount_value" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="acquirer_reference" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="amount_value" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="amount_currency" type="CHAR(3)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE" defaultValueComputed="(now() AT TIME ZONE 'UTC')">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint baseTableName="payment_tx" baseColumnNames="parent_tx_id"
+                                 constraintName="fk_payment_tx_parent"
+                                 referencedTableName="payment_tx" referencedColumnNames="tx_id"/>
+
+        <sql>
+            ALTER TABLE payment_tx ADD CONSTRAINT chk_tx_type CHECK (tx_type IN ('AUTHORIZATION', 'CAPTURE', 'REFUND', 'SETTLE'));
+            ALTER TABLE payment_tx ADD CONSTRAINT chk_tx_amount_positive CHECK (amount_value > 0);
+            ALTER TABLE payment_tx ADD CONSTRAINT chk_tx_currency CHECK (amount_currency ~ '^[A-Z]{3}$');
+            ALTER TABLE payment_tx ADD CONSTRAINT chk_tx_status CHECK (status IN ('PENDING', 'SUCCESS', 'FAILED'));
+            ALTER TABLE payment_tx ADD CONSTRAINT chk_tx_settle_status CHECK (settle_status IS NULL OR settle_status IN ('UNMATCHED', 'MATCHED', 'DISCREPANCY'));
+        </sql>
+
+        <createIndex tableName="payment_tx" indexName="idx_payment_tx_payment_id">
+            <column name="payment_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="create-journal-entries-table-v2" author="dogancaglar">
+        <createTable tableName="journal_entries">
+            <column name="id" type="VARCHAR(128)">
+                <constraints primaryKey="true" primaryKeyName="pk_journal_entries"/>
+            </column>
+            <column name="journal_type" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(128)"/>
+            <column name="payment_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="tx_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE" defaultValueComputed="(now() AT TIME ZONE 'UTC')">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="journal_entries"
+                baseColumnNames="tx_id"
+                referencedTableName="payment_tx"
+                referencedColumnNames="tx_id"
+                constraintName="fk_journal_entries_tx_id"
+                onDelete="CASCADE"/>
+
+        <createIndex tableName="journal_entries" indexName="idx_journal_entries_payment_id">
+            <column name="payment_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="create-postings-table-v2" author="dogancaglar">
+        <createTable tableName="postings">
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" primaryKeyName="pk_postings"/>
+            </column>
+            <column name="journal_id" type="VARCHAR(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="account_code" type="VARCHAR(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="account_type" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="amount" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="direction" type="VARCHAR(8)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="currency" type="VARCHAR(3)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE" defaultValueComputed="(now() AT TIME ZONE 'UTC')">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="postings"
+                baseColumnNames="journal_id"
+                referencedTableName="journal_entries"
+                referencedColumnNames="id"
+                constraintName="fk_postings_journal"
+                onDelete="CASCADE"/>
+
+        <addUniqueConstraint
+                tableName="postings"
+                columnNames="journal_id, account_code"
+                constraintName="uq_postings_journal_account"/>
+
+        <createIndex tableName="postings" indexName="idx_postings_account_code">
+            <column name="account_code"/>
+        </createIndex>
+    </changeSet>
+
+
+
+
+</databaseChangeLog>

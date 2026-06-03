@@ -11,13 +11,15 @@ import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentIntentEntity
-import com.dogancaglar.paymentservice.infra.adapter.outbound.serialization.JacksonUtil
 import com.fasterxml.jackson.core.type.TypeReference
+import com.fasterxml.jackson.databind.ObjectMapper
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
 
 @Component
-class PaymentIntentEntityMapper {
-    private val objectMapper = JacksonUtil.createObjectMapper()
+class PaymentIntentEntityMapper(
+    @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper
+) {
 
     fun toDomain(entity: PaymentIntentEntity): PaymentIntent {
         val splits: List<PaymentSplit> = if (entity.splitsJson.isNotBlank()) {

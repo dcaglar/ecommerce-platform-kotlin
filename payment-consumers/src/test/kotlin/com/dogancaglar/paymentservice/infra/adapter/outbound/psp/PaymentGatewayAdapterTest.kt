@@ -1,14 +1,9 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.psp
 
-import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.MeterRegistry
-import io.micrometer.core.instrument.Timer
-import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.BeforeEach
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
-import java.util.concurrent.Callable
-import java.util.concurrent.CompletableFuture
 
 class PaymentGatewayAdapterTest {
 
@@ -16,7 +11,7 @@ class PaymentGatewayAdapterTest {
     private lateinit var config: CaptureSimulationProperties
     private lateinit var pspExecutor: ThreadPoolTaskExecutor
     private lateinit var meterRegistry: MeterRegistry
-    private lateinit var adapter: PspModificationGatewayAdapter
+    private lateinit var adapter: SimulatedPspCaptureGatewayAdapter
 
     @BeforeEach
     fun setUp() {
@@ -65,6 +60,6 @@ class PaymentGatewayAdapterTest {
         // We use mockk for MeterRegistry because it's not initialized
         meterRegistry = mockk(relaxed = true)
 
-        adapter = PspModificationGatewayAdapter(simulator, config, refundSimulator, refundConfig, executor, meterRegistry)
+        adapter = SimulatedPspCaptureGatewayAdapter(simulator, config, refundSimulator, refundConfig, executor, meterRegistry)
     }
 }

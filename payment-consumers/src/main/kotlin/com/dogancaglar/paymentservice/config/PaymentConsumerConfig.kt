@@ -1,9 +1,14 @@
 package com.dogancaglar.paymentservice.config
 
 
-import com.dogancaglar.paymentservice.application.service.PspResultProcessingService
+import com.dogancaglar.paymentservice.application.service.ProcessPspResultProcessingService
+import com.dogancaglar.paymentservice.application.service.ProcessCaptureService
+import com.dogancaglar.paymentservice.application.events.CaptureRequested
+import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
+import com.dogancaglar.paymentservice.ports.outbound.PspCaptureGatewayPort
 import com.dogancaglar.paymentservice.application.service.AccountBalanceService
 import com.dogancaglar.paymentservice.application.service.AccountBalanceReadService
+import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.converter.PaymentEntityMapper
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
@@ -12,6 +17,7 @@ import com.dogancaglar.paymentservice.ports.outbound.CentralDbTransactionalFacad
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
 import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentTxPort
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -20,9 +26,10 @@ import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort
 @Configuration
 open class PaymentConsumerConfig {
 
-
-
-
+    @Bean
+    fun paymentEntityMapper(
+        @Qualifier("myObjectMapper") objectMapper: ObjectMapper
+    ): PaymentEntityMapper = PaymentEntityMapper(objectMapper)
 
     @Bean
     fun getAccountBalanceReadService(cachePort: AccountBalanceCachePort,snapshotPort: AccountBalanceSnapshotPort): AccountBalanceReadService{
@@ -41,8 +48,8 @@ open class PaymentConsumerConfig {
         paymentRepository: PaymentRepository,
         localOutboxWriterPort: LocalOutboxWriterPort,
         serializationPort: SerializationPort
-    ): PspResultProcessingService {
-        return PspResultProcessingService(
+    ): ProcessPspResultProcessingService {
+        return ProcessPspResultProcessingService(
             centralDbTransactionalFacadePort = centralDbTransactionalFacadePort,
             accountDirectory = accountDirectoryImpl,
             paymentTxPort = paymentTxPort,
@@ -63,6 +70,23 @@ open class PaymentConsumerConfig {
         return AccountBalanceService(
             snapshotPort =accountBalanceSnapshotAdapter,
             cachePort = accountBalanceRedisCacheAdapter
+        )
+    }
+
+    @Bean
+    fun processCaptureService(
+        pspCaptureGatewayPort: PspCaptureGatewayPort,
+        paymentRepository: PaymentRepository,
+        retryQueuePort: RetryQueuePort<CaptureRequested>,
+        localOutboxWriterPort: LocalOutboxWriterPort,
+        serializationPort: SerializationPort
+    ): ProcessCaptureService {
+        return ProcessCaptureService(
+            pspCaptureGatewayPort,
+            paymentRepository,
+            retryQueuePort,
+            localOutboxWriterPort,
+            serializationPort
         )
     }
 }

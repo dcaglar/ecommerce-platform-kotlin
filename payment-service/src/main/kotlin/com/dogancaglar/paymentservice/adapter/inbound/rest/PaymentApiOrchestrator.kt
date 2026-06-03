@@ -53,14 +53,6 @@ class PaymentApiOrchestrator(
         return PaymentRequestMapper.toPaymentResponseDto(paymentIntent)
     }
 
-    fun capturePayment(publicPaymentIntentId: String, request: CaptureRequestDTO): CaptureResponseDTO {
-        logger.info("🔁 PaymentApiOrchestrator.capturePayment started")
-        val captureTxId = idGeneratorPort.nextPaymentId()
-        val cmd = PaymentRequestMapper.toCapturePaymentCommand(captureTxId, publicPaymentIntentId, request)
-        val captureResponse = capturePaymentUseCase.capture(cmd)
-        return PaymentRequestMapper.toCaptureResponseDto(captureResponse, captureTxId)
-    }
-
     fun getPaymentIntent(publicPaymentIntentId: String): CreatePaymentIntentResponseDTO {
         val internalId = PublicIdFactory.toInternalId(publicPaymentIntentId)
         val paymentIntentId = PaymentIntentId(internalId)

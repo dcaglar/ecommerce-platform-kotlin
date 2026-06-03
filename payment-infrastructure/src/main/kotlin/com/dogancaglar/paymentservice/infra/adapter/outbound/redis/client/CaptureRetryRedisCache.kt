@@ -1,12 +1,11 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.redis.client
 
 import com.dogancaglar.common.event.EventEnvelope
-import com.dogancaglar.paymentservice.application.events.CaptureReceived
+import com.dogancaglar.paymentservice.application.events.CaptureRequested
 import com.dogancaglar.paymentservice.application.util.RetryItem
-import com.dogancaglar.paymentservice.infra.adapter.outbound.serialization.JacksonSerializationAdapter
-import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
-import com.fasterxml.jackson.core.type.TypeReference
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.data.redis.core.RedisCallback
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Repository
@@ -15,7 +14,7 @@ import kotlin.collections.plusAssign
 @Repository
 open class CaptureRetryRedisCache(
     private val redisTemplate: StringRedisTemplate,
-    private val serializationPort: SerializationPort // Clean Port
+    @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val queue = "capture_retry_queue"
@@ -101,16 +100,15 @@ open class CaptureRetryRedisCache(
             due
         }) ?: emptyList()
 
-        // Deserialize each ByteArray to EventEnvelope (like Kafka deserializer does)
+        // Deserialize each ByteArray to EventEnvelope<CaptureRequested>
         val items = mutableListOf<RetryItem>()
         for (raw in rawItems) {
             try {
-                val objectMapper = (serializationPort as JacksonSerializationAdapter).objectMapper
                 val type = objectMapper.typeFactory.constructParametricType(
-                    EventEnvelope::class.java, 
-                    CaptureReceived::class.java
+                    EventEnvelope::class.java,
+                    CaptureRequested::class.java
                 )
-                val envelope: EventEnvelope<CaptureReceived> = objectMapper.readValue(String(raw), type)
+                val envelope: EventEnvelope<CaptureRequested> = objectMapper.readValue(String(raw), type)
                 items += RetryItem(envelope, raw)
             } catch (e: Exception) {
                 // If we cannot deserialize, drop from inflight to avoid poison loops

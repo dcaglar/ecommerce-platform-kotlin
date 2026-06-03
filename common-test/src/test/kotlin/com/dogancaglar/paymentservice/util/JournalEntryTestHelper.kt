@@ -55,7 +55,7 @@ object JournalEntryTestHelper {
     }
 
     fun printEntry(entry: JournalEntry) {
-        println("JournalEntry(id=${entry.id}, type=${entry.txType})")
+        println("JournalEntry(id=${entry.id}, type=${entry.journalType})")
         entry.postings.forEach {
             println("  ${it::class.simpleName?.padEnd(6)} | ${it.account.accountCode.padEnd(30)} | ${it.amount.quantity}")
         }
