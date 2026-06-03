@@ -20,10 +20,10 @@ class JournalEntryTest {
     
     private val eur = Currency("EUR")
     val platformCashAccount = Account.create(AccountType.PLATFORM_CASH, "merchantId")
-    val merchantAccount = Account.create(AccountType.MERCHANT_PAYABLE, "merchantId")
-    val merchantGrossPool = Account.create(AccountType.MERCHANT_PAYABLE, "merchantId")
+    val merchantAccount = Account.create(AccountType.MARKETPLACE_OPERATOR, "merchantId")
+    val merchantGrossPool = Account.create(AccountType.MARKETPLACE_OPERATOR, "merchantId")
     val pspFeeExpenseAccount = Account.create(AccountType.PSP_FEE_EXPENSE, "GLOBAL")
-    val commissionRevenueAccount = Account.create(AccountType.PLATFORM_COMMISSION_REVENUE, "GLOBAL")
+    val commissionRevenueAccount = Account.create(AccountType.PLATFORM_OPERATIONAL_REVENUE, "GLOBAL")
     val authLiabilityAccount = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
     val authReceivableAccount = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
     val pspReceivableAccount = Account.create(AccountType.PSP_RECEIVABLES, "GLOBAL")
@@ -79,7 +79,7 @@ class JournalEntryTest {
         assertTrue(AccountType.PSP_RECEIVABLES in drAccounts)
         assertTrue(AccountType.AUTH_RECEIVABLE in crAccounts)
         assertTrue(AccountType.AUTH_LIABILITY in drAccounts)
-        assertTrue(AccountType.MERCHANT_PAYABLE in crAccounts)
+        assertTrue(AccountType.MARKETPLACE_OPERATOR in crAccounts)
         
         val netAmountByAccount = entry.postings
             .groupBy { it.account.accountCode }
@@ -120,7 +120,7 @@ class JournalEntryTest {
         val credit = entry.postings.filterIsInstance<Posting.Credit>().first()
 
         assertEquals(merchantAccount.type, debit.account.type)
-        assertEquals(AccountType.PLATFORM_COMMISSION_REVENUE, credit.account.type)
+        assertEquals(AccountType.PLATFORM_OPERATIONAL_REVENUE, credit.account.type)
     }
 
     @Test

@@ -71,7 +71,7 @@ payment-application/src/main/kotlin/com/dogancaglar/paymentservice/ports/outboun
 payment-application/src/main/kotlin/com/dogancaglar/paymentservice/ports/outbound/IdGeneratorPort.kt
 payment-application/src/main/kotlin/com/dogancaglar/paymentservice/ports/outbound/IdempotencyRecord.kt
 payment-application/src/main/kotlin/com/dogancaglar/paymentservice/ports/outbound/IdempotencyStorePort.kt
-payment-application/src/main/kotlin/com/dogancaglar/paymentservice/ports/outbound/LedgerEntryPort.kt
+payment-application/src/main/kotlin/com/dogancaglar/paymentservice/ports/outbound/CentralDbTransactionalFacadePort.kt
 payment-application/src/main/kotlin/com/dogancaglar/paymentservice/ports/outbound/OutboxEventRepository.kt
 payment-application/src/main/kotlin/com/dogancaglar/paymentservice/ports/outbound/PaymentIntentRepository.kt
 payment-application/src/main/kotlin/com/dogancaglar/paymentservice/ports/outbound/PaymentOrderModificationPort.kt
@@ -153,7 +153,7 @@ payment-infrastructure/src/main/kotlin/com/dogancaglar/paymentservice/infra/adap
 payment-infrastructure/src/main/kotlin/com/dogancaglar/paymentservice/infra/adapter/outbound/persistence/AccountBalanceSnapshotAdapter.kt
 payment-infrastructure/src/main/kotlin/com/dogancaglar/paymentservice/infra/adapter/outbound/persistence/AccountDirectoryImpl.kt
 payment-infrastructure/src/main/kotlin/com/dogancaglar/paymentservice/infra/adapter/outbound/persistence/IdempotencyStoreAdapter.kt
-payment-infrastructure/src/main/kotlin/com/dogancaglar/paymentservice/infra/adapter/outbound/persistence/LedgerEntryTxAdapter.kt
+payment-infrastructure/src/main/kotlin/com/dogancaglar/paymentservice/infra/adapter/outbound/persistence/CentralDbTransactionalFacadeAdapter.kt
 payment-infrastructure/src/main/kotlin/com/dogancaglar/paymentservice/infra/adapter/outbound/persistence/PaymentIntentOutboundAdapter.kt
 payment-infrastructure/src/main/kotlin/com/dogancaglar/paymentservice/infra/adapter/outbound/persistence/PaymentOrderModificationAdapter.kt
 payment-infrastructure/src/main/kotlin/com/dogancaglar/paymentservice/infra/adapter/outbound/persistence/PaymentOrderOutboundAdapter.kt

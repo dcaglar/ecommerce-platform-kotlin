@@ -1,8 +1,8 @@
 package com.dogancaglar.paymentservice.application.events
 
-import com.dogancaglar.paymentservice.application.util.toPublicPaymentId
-import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentIntentId
+import com.dogancaglar.paymentservice.domain.model.payment.Payment
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentStatus
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -24,16 +24,16 @@ data class PaymentCaptured private constructor(
         "$publicPaymentIntentId:$eventType"
 
     companion object {
-        const val EVENT_TYPE = "payment_order_captured"
+        const val EVENT_TYPE = "payment_captured"
 
-        fun from(order: PaymentOrder, now: Instant): PaymentCaptured {
-            require(order.status == PaymentOrderStatus.CAPTURED)
+        fun from(payment: Payment, now: Instant): PaymentCaptured {
+            require(payment.status == PaymentStatus.CAPTURED)
             return PaymentCaptured(
-                paymentIntentId = order.paymentId.value.toString(),
-                publicPaymentIntentId = order.paymentId.toPublicPaymentId(),
-                merchantAccountId = order.sellerId.value,
-                amountValue = order.amount.quantity,
-                currency = order.amount.currency.currencyCode,
+                paymentIntentId = payment.paymentIntentId.value.toString(),
+                publicPaymentIntentId = payment.paymentIntentId.toPublicPaymentIntentId(),
+                merchantAccountId = payment.merchantAccountId,
+                amountValue = payment.capturedAmount.quantity,
+                currency = payment.capturedAmount.currency.currencyCode,
                 timestamp = now
             )
         }

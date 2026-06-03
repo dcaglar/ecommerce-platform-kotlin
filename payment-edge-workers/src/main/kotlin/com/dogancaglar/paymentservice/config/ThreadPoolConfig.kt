@@ -49,32 +49,6 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
     }
 
 
-    @Bean("createPaymentIntentExecutor")
-    fun createPaymentIntentExecutor(decorator: TaskDecorator): ThreadPoolTaskExecutor =
-        ThreadPoolTaskExecutor().apply {
-            corePoolSize = 80          // Align with Tomcat max-threads
-            maxPoolSize = 200
-            queueCapacity = 50       // Minimal queue to ensure low latency
-            setThreadNamePrefix("po-psp-")
-            setTaskDecorator(decorator)
-            setRejectedExecutionHandler(ThreadPoolExecutor.DiscardPolicy())
-            initialize()
-        }
-
-
-    @Bean("authorizePaymentIntentExecutor")
-    fun authorizePaymentIntentExecutor(decorator: TaskDecorator): ThreadPoolTaskExecutor =
-        ThreadPoolTaskExecutor().apply {
-            corePoolSize = 80          // Align with Tomcat max-threads
-            maxPoolSize = 200
-            queueCapacity = 50       // Minimal queue to ensure low latency
-            setThreadNamePrefix("po-psp-")
-            setTaskDecorator(decorator)
-            setRejectedExecutionHandler(ThreadPoolExecutor.DiscardPolicy())
-            initialize()
-        }
-
-
     @Bean
     fun outboxEventPartitionMaintenanceScheduler(): ThreadPoolTaskScheduler {
         val scheduler = ThreadPoolTaskScheduler()

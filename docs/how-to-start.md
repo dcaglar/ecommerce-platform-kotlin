@@ -216,12 +216,12 @@ curl -i -X POST "$BASE_URL/api/v1/payments" \
   -d '{
     "orderId": "ORDER-1450",
     "buyerId": "BUYER-1450",
-    "merchantAccountId": "PLATFORM-MERCHANT-001",
+    "merchantAccountId": "MARKETPLACE-1",
     "processingModel": "MARKETPLACE",
     "totalAmount": { "quantity": 2900, "currency": "EUR" },
     "splits": [
-      { "targetAccountType": "MARKETPLACE_SUB_SELLER", "targetEntityId": "SELLER-111", "amount": { "quantity": 1450, "currency": "EUR" }},
-      { "targetAccountType": "MARKETPLACE_SUB_SELLER", "targetEntityId": "SELLER-222", "amount": { "quantity": 1450, "currency": "EUR" }}
+      { "targetAccountType": "MARKETPLACE_SUB_SELLER", "targetEntityId": "SELLER-1-1", "amount": { "quantity": 1450, "currency": "EUR" }},
+      { "targetAccountType": "MARKETPLACE_SUB_SELLER", "targetEntityId": "SELLER-1-2", "amount": { "quantity": 1450, "currency": "EUR" }}
     ]
   }'
 ```
@@ -480,8 +480,8 @@ curl -i -X GET "$BASE_URL/api/v1/sellers/me/balance" \
 {
   "balance": 50000,
   "currency": "EUR",
-  "accountCode": "MERCHANT_ACCOUNT.SELLER-111.EUR",
-  "sellerId": "SELLER-111"
+  "accountCode": "MARKETPLACE_SUB_SELLER.SELLER-1-1.EUR",
+  "sellerId": "SELLER-1-1"
 }
 ```
 

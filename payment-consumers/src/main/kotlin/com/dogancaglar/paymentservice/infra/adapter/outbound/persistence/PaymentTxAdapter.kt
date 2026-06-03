@@ -13,6 +13,7 @@ import com.dogancaglar.paymentservice.ports.outbound.PaymentTxPort
 import org.springframework.stereotype.Repository
 import java.time.Instant
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
+import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.converter.PaymentTxEntityMapper
 
 /**
  * PaymentTxAdapter
@@ -43,7 +44,7 @@ class PaymentTxAdapter(
 ) : PaymentTxPort {
 
     override fun save(tx: Tx) {
-        val entity = toEntity(tx)
+        val entity = PaymentTxEntityMapper.toEntity(tx)
         mapper.insert(entity)
     }
 
@@ -54,73 +55,6 @@ class PaymentTxAdapter(
     // Domain → Entity (downgrade to raw primitives for DB storage)
     // =========================================================================
 
-    private fun toEntity(domain: Tx): PaymentTxEntity = when (domain) {
-
-        is Tx.AuthorizationTx -> PaymentTxEntity(
-            txId              = domain.txId.value,
-            txType            = domain.txType,
-            paymentId         = domain.paymentId.value,
-            paymentIntentId   = domain.paymentIntentId.value,
-            parentTxId        = null,
-            acquirerReference = domain.acquirerReference,
-            amountValue       = domain.amount.quantity,
-            amountCurrency    = domain.amount.currency.currencyCode,
-            status            = domain.status.name,
-            settleStatus      = null,
-            acquirerBatchRef  = null,
-            settledAmountValue = null,
-            createdAt         = domain.createdAt
-        )
-
-        is Tx.CaptureTx -> PaymentTxEntity(
-            txId              = domain.txId.value,
-            txType            = domain.txType,
-            paymentId         = domain.paymentId.value,
-            paymentIntentId   = domain.paymentIntentId.value,
-            parentTxId        = domain.authorizationTxId.value,
-            acquirerReference = domain.acquirerReference,
-            amountValue       = domain.amount.quantity,
-            amountCurrency    = domain.amount.currency.currencyCode,
-            status            = domain.status.name,
-            settleStatus      = domain.settleStatus.name,
-            acquirerBatchRef  = null,
-            settledAmountValue = null,
-            createdAt         = domain.createdAt
-        )
-
-        is Tx.RefundTx -> PaymentTxEntity(
-            txId              = domain.txId.value,
-            txType            = domain.txType,
-            paymentId         = domain.paymentId.value,
-            paymentIntentId   = domain.paymentIntentId.value,
-            parentTxId        = domain.captureTxId.value,
-            acquirerReference = domain.acquirerReference,
-            amountValue       = domain.amount.quantity,
-            amountCurrency    = domain.amount.currency.currencyCode,
-            status            = domain.status.name,
-            settleStatus      = null,
-            acquirerBatchRef  = null,
-            settledAmountValue = null,
-            createdAt         = domain.createdAt
-        )
-
-        is Tx.SettleTx -> PaymentTxEntity(
-            txId               = domain.txId.value,
-            txType             = domain.txType,
-            paymentId          = domain.paymentId.value,
-            paymentIntentId    = domain.paymentIntentId.value,
-            parentTxId         = domain.captureTxId.value,
-            acquirerReference  = domain.acquirerBatchReference,
-            amountValue        = domain.amount.quantity,
-            amountCurrency     = domain.amount.currency.currencyCode,
-            status             = domain.status.name,
-            settleStatus       = if (domain.hasDiscrepancy) SettleStatus.DISCREPANCY.name
-                                 else SettleStatus.MATCHED.name,
-            acquirerBatchRef   = domain.acquirerBatchReference,
-            settledAmountValue = domain.settledAmount.quantity,
-            createdAt          = domain.createdAt
-        )
-    }
 
     // =========================================================================
     // Entity → Domain (lift raw primitives back to typed domain VOs)

@@ -25,6 +25,7 @@ import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CaptureRequestDTO
 import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.id.PublicIdFactory
 import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CaptureResponseDTO
 import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import com.fasterxml.jackson.databind.ObjectMapper
 
@@ -33,9 +34,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 class PaymentController(
     private val paymentApiOrchestrator: PaymentApiOrchestrator,
     private val idempotencyService: IdempotencyService,
-    private val outboxWriterPort: LocalOutboxWriterPort,
-    private val idGeneratorPort: IdGeneratorPort,
-    private val objectMapper: ObjectMapper
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -135,36 +133,11 @@ class PaymentController(
     fun capturePayment(
         @PathVariable("paymentIntentId") publicPaymentIntentId: String,
         @Valid @RequestBody request: CaptureRequestDTO
-    ): ResponseEntity<Void> {
+    ): ResponseEntity<CaptureResponseDTO> {
         logger.debug("📥 Received capture request for payment: $publicPaymentIntentId")
+       val responseDTO =  paymentApiOrchestrator.capturePayment(publicPaymentIntentId,request)
 
-        val captureEvent = CaptureReceived.from(
-            paymentIntentId = "", // Not needed for routing if public ID is known, but better use internal if we had it
-            publicPaymentIntentId = publicPaymentIntentId,
-            merchantAccountId = request.merchantAccountId,
-            amountValue = request.amount.quantity,
-            currency = request.amount.currency.name,
-            now = Utc.nowInstant()
-        )
 
-        val envelope = EventEnvelopeFactory.envelopeFor(
-            traceId = EventLogContext.getTraceId(),
-            data = captureEvent,
-            aggregateId = captureEvent.publicPaymentIntentId,
-            parentEventId = EventLogContext.getEventId()
-        )
-
-        val payload = objectMapper.writeValueAsString(envelope)
-
-        val outboxEvent = OutboxEvent.createNew(
-            oeid = idGeneratorPort.nextPaymentId(),
-            eventType = envelope.eventType,
-            aggregateId = envelope.aggregateId,
-            payload = payload
-        )
-        
-        outboxWriterPort.save(outboxEvent)
-
-        return ResponseEntity.accepted().build()
+        return ResponseEntity.status(HttpStatus.OK).body(responseDTO)
     }
 }

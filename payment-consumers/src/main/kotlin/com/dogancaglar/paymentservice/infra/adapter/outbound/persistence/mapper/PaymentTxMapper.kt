@@ -15,6 +15,8 @@ import org.apache.ibatis.annotations.Param
 interface PaymentTxMapper {
 
     fun insert(entity: PaymentTxEntity)
+    
+    fun upsert(entity: PaymentTxEntity)
 
     fun findByPaymentId(paymentId: Long): List<PaymentTxEntity>
 

@@ -10,10 +10,8 @@ import com.dogancaglar.paymentservice.domain.model.ledger.Account
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalType
-import com.dogancaglar.paymentservice.domain.model.ledger.LedgerEntry
 import com.dogancaglar.paymentservice.domain.model.ledger.Posting
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.domain.util.LedgerEntryFactory
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import java.time.Instant
@@ -24,15 +22,14 @@ import com.dogancaglar.paymentservice.domain.model.vo.TxId
 class LedgerDomainEventEntityMapperTest {
 
     private val fixedInstant = Instant.parse("2025-11-07T16:20:00Z")
-    private val ledgerEntryFactory = LedgerEntryFactory()
 
-    private fun sampleLedgerEntry(): LedgerEntry {
-        val merchantAccount = Account.Companion.mock(AccountType.MERCHANT_PAYABLE, "SELLER-333", "EUR")
+    private fun sampleJournalEntry(): JournalEntry {
+        val merchantAccount = Account.Companion.mock(AccountType.MARKETPLACE_OPERATOR, "SELLER-333", "EUR")
         val pspReceivable = Account.Companion.mock(AccountType.PSP_RECEIVABLES, "GLOBAL", "EUR")
         val debitPosting = Posting.Debit.create(merchantAccount, Amount.Companion.of(1000, Currency("EUR")))
         val creditPosting = Posting.Credit.create(pspReceivable, Amount.Companion.of(1000, Currency("EUR")))
 
-        val journal = JournalEntry.JournalFactory.fromPersistence(
+        return JournalEntry.JournalFactory.rehytrate(
             id = "journal-123",
             txType = JournalType.CAPTURE,
             name = "capture",
@@ -40,18 +37,12 @@ class LedgerDomainEventEntityMapperTest {
             txId = TxId(666L),
             postings = listOf(debitPosting, creditPosting)
         )
-
-        return ledgerEntryFactory.fromPersistence(
-            ledgerEntryId = 1234L,
-            journalEntry = journal,
-            createdAt = fixedInstant
-        )
     }
 
-    private fun sampleLedgerEntryEventData(): LedgerEntryEventData {
+    private fun sampleJournalEntryEventData(): LedgerEntryEventData {
         val debitEvent = PostingEventData.create(
-            accountCode = "MERCHANT_PAYABLE.SELLER-333.EUR",
-            accountType = AccountType.MERCHANT_PAYABLE,
+            accountCode = "MARKETPLACE_OPERATOR.SELLER-333.EUR",
+            accountType = AccountType.MARKETPLACE_OPERATOR,
             amount = 1000,
             currency = "EUR",
             direction = PostingDirection.DEBIT
@@ -65,7 +56,6 @@ class LedgerDomainEventEntityMapperTest {
         )
 
         return LedgerEntryEventData.create(
-            ledgerEntryId = 9876L,
             journalEntryId = "journal-9876",
             journalType = JournalType.CAPTURE,
             journalName = "capture",
@@ -77,18 +67,16 @@ class LedgerDomainEventEntityMapperTest {
     }
 
     @Test
-    fun `toLedgerEntryEventData maps domain ledger entry to event DTO`() {
-        val ledgerEntry = sampleLedgerEntry()
+    fun `toLedgerEntryEventData maps domain journal entry to event DTO`() {
+        val journalEntry = sampleJournalEntry()
 
-        val eventData = LedgerDomainEventEntityMapper.toLedgerEntryEventData(ledgerEntry)
+        val eventData = LedgerDomainEventEntityMapper.toLedgerEntryEventData(journalEntry)
 
-        Assertions.assertEquals(ledgerEntry.ledgerEntryId, eventData.ledgerEntryId)
-        Assertions.assertEquals(ledgerEntry.journalEntry.id, eventData.journalEntryId)
-        Assertions.assertEquals(ledgerEntry.journalEntry.txType, eventData.journalType)
-        Assertions.assertEquals(Utc.toInstant(ledgerEntry.createdAt), eventData.createdAt)
+        Assertions.assertEquals(journalEntry.id, eventData.journalEntryId)
+        Assertions.assertEquals(journalEntry.txType, eventData.journalType)
 
         val postingEvent = eventData.postings.first()
-        val postingDomain = ledgerEntry.journalEntry.postings.first()
+        val postingDomain = journalEntry.postings.first()
 
         Assertions.assertEquals(postingDomain.account.accountCode, postingEvent.accountCode)
         Assertions.assertEquals(postingDomain.account.type, postingEvent.accountType)
@@ -100,8 +88,8 @@ class LedgerDomainEventEntityMapperTest {
     @Test
     fun `PostingEventData toDomain round-trips account entity without duplicating currency`() {
         val postingEvent = PostingEventData.create(
-            accountCode = "MERCHANT_PAYABLE.SELLER-333.EUR",
-            accountType = AccountType.MERCHANT_PAYABLE,
+            accountCode = "MARKETPLACE_OPERATOR.SELLER-333.EUR",
+            accountType = AccountType.MARKETPLACE_OPERATOR,
             amount = 1000,
             currency = "EUR",
             direction = PostingDirection.CREDIT
@@ -109,30 +97,28 @@ class LedgerDomainEventEntityMapperTest {
 
         val postingDomain = postingEvent.toDomain()
 
-        Assertions.assertEquals("MERCHANT_PAYABLE.SELLER-333.EUR", postingDomain.account.accountCode)
+        Assertions.assertEquals("MARKETPLACE_OPERATOR.SELLER-333.EUR", postingDomain.account.accountCode)
         Assertions.assertEquals("SELLER-333", postingDomain.account.entityId)
-        Assertions.assertEquals(AccountType.MERCHANT_PAYABLE, postingDomain.account.type)
+        Assertions.assertEquals(AccountType.MARKETPLACE_OPERATOR, postingDomain.account.type)
         Assertions.assertEquals("EUR", postingDomain.account.currency.currencyCode)
         Assertions.assertTrue(postingDomain is Posting.Credit)
     }
 
     @Test
-    fun `toDomain recreates ledger entry with postings`() {
-        val eventData = sampleLedgerEntryEventData()
+    fun `toDomain recreates journal entry with postings`() {
+        val eventData = sampleJournalEntryEventData()
 
         val domain = LedgerDomainEventEntityMapper.toDomain(eventData)
 
-        assertEquals(eventData.ledgerEntryId, domain.ledgerEntryId)
-        assertEquals(eventData.journalEntryId, domain.journalEntry.id)
-        assertEquals(eventData.journalType, domain.journalEntry.txType)
-        assertEquals(Utc.fromInstant(eventData.createdAt), domain.createdAt)
+        assertEquals(eventData.journalEntryId, domain.id)
+        assertEquals(eventData.journalType, domain.txType)
 
-        val postings = domain.journalEntry.postings
+        val postings = domain.postings
         Assertions.assertEquals(2, postings.size)
 
         val debitPosting = postings.first { it is Posting.Debit }
-        Assertions.assertEquals("MERCHANT_PAYABLE.SELLER-333.EUR", debitPosting.account.accountCode)
-        Assertions.assertEquals(AccountType.MERCHANT_PAYABLE, debitPosting.account.type)
+        Assertions.assertEquals("MARKETPLACE_OPERATOR.SELLER-333.EUR", debitPosting.account.accountCode)
+        Assertions.assertEquals(AccountType.MARKETPLACE_OPERATOR, debitPosting.account.type)
         Assertions.assertEquals("SELLER-333", debitPosting.account.entityId)
         Assertions.assertEquals("EUR", debitPosting.account.currency.currencyCode)
         Assertions.assertEquals(1000, debitPosting.amount.quantity)

@@ -1,7 +1,6 @@
 package com.dogancaglar.paymentservice.domain.model.ledger
 
 import com.dogancaglar.paymentservice.domain.model.common.Amount
-import com.dogancaglar.paymentservice.domain.model.payment.BalanceAccountType
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.TxId
@@ -168,9 +167,9 @@ class JournalEntry private constructor(
          *   incorrect ledger postings.
          *
          * @param journalIdentifier    Base label for the journal IDs (e.g., paymentId + txId).
-         * @param merchantGrossPool    MERCHANT_GROSS_POOL account for the primary merchant.
+         * @param merchantGrossPool    MARKETPLACE_OPERATOR account for the primary merchant.
          * @param splits               The complete split routing matrix from the Payment aggregate.
-         * @param resolveTargetAccount Lambda that maps (BalanceAccountType, entityId) → Account.
+         * @param resolveTargetAccount Lambda that maps (AccountType, entityId) → Account.
          *                             Allows the caller (in the application layer) to resolve
          *                             ledger accounts from the Account directory without coupling
          *                             this domain factory to any infrastructure port.
@@ -182,7 +181,7 @@ class JournalEntry private constructor(
             journalIdentifier: String,
             merchantGrossPool: Account,
             splits: List<PaymentSplit>,
-            resolveTargetAccount: (BalanceAccountType, String) -> Account
+            resolveTargetAccount: (AccountType, String) -> Account
         ): List<JournalEntry> {
             require(splits.isNotEmpty()) {
                 "executeSubSellerSplit requires at least one PaymentSplit, but received an empty list"
@@ -364,7 +363,7 @@ class JournalEntry private constructor(
          * Used exclusively by the repository layer. No business validation runs here
          * beyond the init{} block invariants — assume the DB holds valid, balanced data.
          */
-        fun fromPersistence(
+        fun rehytrate(
             id: String,
             txType: JournalType,
             name: String,

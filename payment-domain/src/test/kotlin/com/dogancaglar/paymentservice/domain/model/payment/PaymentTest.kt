@@ -2,6 +2,7 @@ package com.dogancaglar.paymentservice.domain.model.payment
 
 import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.common.Currency
+import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
 import com.dogancaglar.paymentservice.domain.model.vo.*
 import kotlin.test.*
 
@@ -9,8 +10,8 @@ class PaymentTest {
 
     private val currency = Currency("EUR")
     private val buyerId = BuyerId("b1")
-    private val line1 = PaymentSplit.of(BalanceAccountType.MARKETPLACE_SUB_SELLER, "s1", Amount.of(500, currency))
-    private val line2 = PaymentSplit.of(BalanceAccountType.MARKETPLACE_SUB_SELLER, "s2", Amount.of(500, currency))
+    private val line1 = PaymentSplit.of(AccountType.MARKETPLACE_SUB_SELLER, "s1", Amount.of(500, currency))
+    private val line2 = PaymentSplit.of(AccountType.MARKETPLACE_SUB_SELLER, "s2", Amount.of(500, currency))
     private val lines = listOf(line1, line2)
     private val totalAmount = Amount.of(1000, currency)
 

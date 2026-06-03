@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.ports.outbound
 
-import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
-import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
+import com.dogancaglar.paymentservice.domain.model.payment.PspModificationStatus
 
 /**
  * Port for Payment Service Provider (PSP) operations.
@@ -9,7 +9,7 @@ import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
  */
 interface PspModificationGatewayPort {
 
-    fun capture(order: PaymentOrder): PaymentOrderStatus
+    fun capture(paymentIntent: PaymentIntent): PspModificationStatus
 
-    fun refund(order: PaymentOrder): PaymentOrderStatus
+    fun refund(paymentIntent: PaymentIntent): PspModificationStatus
 }

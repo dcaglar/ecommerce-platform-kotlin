@@ -8,6 +8,7 @@ import com.dogancaglar.paymentservice.application.events.PaymentBaseEvent
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class ExternalAsyncCaptureToPspPerformed private constructor(
+    val captureTxId: Long,
     override val paymentIntentId: String,
     override val publicPaymentIntentId: String,
     val merchantAccountId: String,
@@ -25,6 +26,7 @@ data class ExternalAsyncCaptureToPspPerformed private constructor(
         const val EVENT_TYPE = "external_async_capture_psp_performed"
 
         fun from(
+            captureTxId: Long,
             paymentIntentId: String,
             publicPaymentIntentId: String,
             merchantAccountId: String,
@@ -33,6 +35,7 @@ data class ExternalAsyncCaptureToPspPerformed private constructor(
             now: Instant
         ): ExternalAsyncCaptureToPspPerformed {
             return ExternalAsyncCaptureToPspPerformed(
+                captureTxId = captureTxId,
                 paymentIntentId = paymentIntentId,
                 publicPaymentIntentId = publicPaymentIntentId,
                 merchantAccountId = merchantAccountId,
@@ -44,6 +47,7 @@ data class ExternalAsyncCaptureToPspPerformed private constructor(
 
         @JsonCreator
         internal fun fromJson(
+            @JsonProperty("captureTxId") captureTxId: Long?,
             @JsonProperty("paymentIntentId") pId: String,
             @JsonProperty("publicPaymentIntentId") pubPId: String,
             @JsonProperty("merchantAccountId") merchantAccountId: String,
@@ -51,7 +55,7 @@ data class ExternalAsyncCaptureToPspPerformed private constructor(
             @JsonProperty("currency") currency: String,
             @JsonProperty("timestamp") timestamp: Instant
         ) = ExternalAsyncCaptureToPspPerformed(
-            pId, pubPId, merchantAccountId, amount, currency, timestamp
+            captureTxId ?: 0L, pId, pubPId, merchantAccountId, amount, currency, timestamp
         )
     }
 }

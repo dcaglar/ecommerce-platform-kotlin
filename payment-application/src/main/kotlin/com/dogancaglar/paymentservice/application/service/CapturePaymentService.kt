@@ -1,27 +1,65 @@
 package com.dogancaglar.paymentservice.application.service
 
+import com.dogancaglar.common.event.EventEnvelopeFactory
+import com.dogancaglar.common.id.PublicIdFactory
+import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.command.CapturePaymentCommand
-import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
+import com.dogancaglar.paymentservice.application.events.CaptureReceived
+import com.dogancaglar.paymentservice.application.util.toPublicPaymentIntentId
+import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
 import com.dogancaglar.paymentservice.ports.inbound.usecases.CapturePaymentUseCase
-import com.dogancaglar.paymentservice.ports.outbound.*
+import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
+import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort
+import com.dogancaglar.paymentservice.ports.outbound.PaymentIntentRepository
+import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import org.slf4j.LoggerFactory
 
-
 class CapturePaymentService(
-    private val psp: PspAuthorizationGatewayPort,
-    private val outboxEventPort: LocalOutboxWriterPort,
+    private val localOutboxWriterPort: LocalOutboxWriterPort,
     private val idGeneratorPort: IdGeneratorPort,
-    private val serializationPort: SerializationPort) : CapturePaymentUseCase {
+    private val serializationPort: SerializationPort,
+    private val paymentIntentRepository: PaymentIntentRepository
+) : CapturePaymentUseCase {
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
+    override fun capture(cmd: CapturePaymentCommand): PaymentIntent {
+        logger.info("CapturePaymentService.capture started for paymentIntentId=${cmd.paymentIntentId.value}")
+        
+        val paymentIntent = paymentIntentRepository.findById(cmd.paymentIntentId)
+            ?: throw IllegalArgumentException("PaymentIntent not found for ${cmd.paymentIntentId.value}")
 
-    override fun capture(cmd: CapturePaymentCommand): PaymentOrder? {
-        // 1️⃣check if authorization exist as pre-validation, check if thehere is paymentorder exist with status INTIATED_PENDING or not if not return bad-request.
-            //todo what validation are we gonna do here, are we gona check only if auth exist?
+        val captureEvent = CaptureReceived.from(
+            captureTxId = cmd.captureTxId,
+            paymentIntentId = paymentIntent.paymentIntentId.value.toString(),
+            publicPaymentIntentId = paymentIntent.paymentIntentId.toPublicPaymentIntentId(),
+            merchantAccountId = cmd.merchantAccountId,
+            amountValue = cmd.amount.quantity,
+            currency = cmd.amount.currency.currencyCode,
+            now = Utc.nowInstant()
+        )
 
-            // 2️⃣ Persist a OutboxEvent<PAymentORderCaptureCommand>, but how are we gonna check outbox event dowe ahve anought information
-                //return pending result
-        return null
+        val envelope = EventEnvelopeFactory.envelopeFor(
+            traceId = EventLogContext.getTraceId(),
+            data = captureEvent,
+            aggregateId = captureEvent.publicPaymentIntentId,
+            parentEventId = EventLogContext.getEventId()
+        )
+
+        val payload = serializationPort.toJson(envelope)
+
+        val outboxEvent = OutboxEvent.createNew(
+            oeid = idGeneratorPort.nextPaymentId(),
+            eventType = envelope.eventType,
+            aggregateId = envelope.aggregateId,
+            payload = payload
+        )
+
+        localOutboxWriterPort.saveAll(listOf(outboxEvent))
+        
+        return paymentIntent
     }
 }
+

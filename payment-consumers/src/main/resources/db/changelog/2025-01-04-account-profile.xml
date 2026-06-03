@@ -41,6 +41,7 @@
     <changeSet id="20251104-seed-account-directory" author="dogancaglar">
         <loadData
                 file="db/data/account_directory.csv"
+                relativeToChangelogFile="false"
                 separator=","
                 tableName="account_directory"/>
     </changeSet>

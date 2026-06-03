@@ -29,7 +29,7 @@ class BalanceService(
         logger.debug("Retrieving balance for seller: {}", sellerId)
         
         // Get account profile to determine account code and currency
-        val profile = accountDirectory.getAccountProfile(AccountType.MERCHANT_PAYABLE, sellerId)
+        val profile = accountDirectory.getAccountProfile(AccountType.MARKETPLACE_OPERATOR, sellerId)
         val accountCode = profile.accountCode
         
         // Get real-time balance (snapshot + Redis delta)

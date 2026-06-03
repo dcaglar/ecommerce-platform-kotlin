@@ -1,9 +1,8 @@
 package com.dogancaglar.paymentservice.application.dto
 
-import com.dogancaglar.paymentservice.domain.model.payment.BalanceAccountType
-import com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit
 import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.common.Currency
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
 
@@ -26,14 +25,14 @@ import com.fasterxml.jackson.annotation.JsonProperty
  * @param currency           ISO 4217 three-letter currency code (e.g., "EUR").
  */
 data class PaymentSplitDto @JsonCreator private constructor(
-    @JsonProperty("targetAccountType") val targetAccountType: BalanceAccountType,
+    @JsonProperty("targetAccountType") val targetAccountType: AccountTypeDto,
     @JsonProperty("targetEntityId")    val targetEntityId: String,
     @JsonProperty("amountValue")       val amountValue: Long,
     @JsonProperty("currency")          val currency: String
 ) {
     companion object {
         fun of(
-            targetAccountType: BalanceAccountType,
+            targetAccountType: AccountTypeDto,
             targetEntityId: String,
             amountValue: Long,
             currency: String
@@ -48,7 +47,7 @@ data class PaymentSplitDto @JsonCreator private constructor(
 
         /** Convert a domain PaymentSplit to its DTO representation for event serialization. */
         fun fromDomain(split: PaymentSplit): PaymentSplitDto = PaymentSplitDto(
-            targetAccountType = split.targetAccountType,
+            targetAccountType = AccountTypeDto.valueOf(split.targetAccountType.name),
             targetEntityId    = split.targetEntityId,
             amountValue       = split.amount.quantity,
             currency          = split.amount.currency.currencyCode
@@ -57,7 +56,7 @@ data class PaymentSplitDto @JsonCreator private constructor(
 
     /** Rehydrate this DTO back into the domain object, e.g. inside PspResultConsumer. */
     fun toDomain(): PaymentSplit = PaymentSplit.of(
-        targetAccountType = targetAccountType,
+        targetAccountType = targetAccountType.toDomain(),
         targetEntityId    = targetEntityId,
         amount            = Amount.of(amountValue, Currency(currency))
     )

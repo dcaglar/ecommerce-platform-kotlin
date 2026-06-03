@@ -113,6 +113,7 @@
                     <include>**/*.yml</include>
                     <include>**/*.properties</include>
                     <include>**/*.xml</include>
+                    <include>**/*.csv</include>
                 </includes>
             </resource>
         </resources>

@@ -190,6 +190,24 @@ sealed class Tx {
             acquirerBatchReference  = acquirerBatchReference,
             settledAmount           = settledAmount,
             amount                  = originalCaptureAmount
+
+        )
+
+
+        fun internalTransferTx(txId: TxId,paymentId: PaymentId,paymentIntentId: PaymentIntentId,captureTxId: TxId,acquirerReference: String
+        ,transferAmount: Amount,status: TxStatus= TxStatus.PENDING
         )
     }
+
+
+    /*
+       val internalTx = Tx.createInternalTransferTx(
+                    txId = TxId(internalTransferTxIdValue),
+                    paymentId = payment.paymentId,
+                    paymentIntentId = paymentIntentId,
+                    captureTxId = TxId(captureTxIdValue), // Using captureTx as parent
+                    amount = txAmount,
+                    status = TxStatus.SUCCESS
+                )
+     */
 }

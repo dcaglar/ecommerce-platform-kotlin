@@ -3,60 +3,12 @@ app:
     ttl-seconds: 3600  # 1 hour redis TTL for PSP result cache
   kafka: # Kafka configuration for dynamic consumers
     specs:
-      payment_order_created_topic:                { partitions: 48, replicas: 1, createDlq: true }
-      payment_order_capture_request_queue_topic:  { partitions: 48, replicas: 1, createDlq: true }
-      payment_order_succeeded_topic:              { partitions: 48, replicas: 1, createDlq: true }
-      payment_order_psp_result_updated_topic:     { partitions: 48, replicas: 1, createDlq: true }
-      payment_order_finalized_topic:              { partitions: 48, replicas: 1, createDlq: true }
-      payment_authorized_topic:                   { partitions: 12, replicas: 1, createDlq: true }
-      ledger_record_request_queue_topic:          { partitions: 24, replicas: 1, createDlq: true }
+      psp-result-queue:                           { partitions: 12, replicas: 1, createDlq: true }
       ledger_entries_recorded_topic:              { partitions: 24, replicas: 1, createDlq: true }
-    dynamic-consumers:
-      - id: psp-capture-executor
-        topic: capture_topic
-        group-id: psp-capture-executor-consumer-group
-        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PaymentOrderCaptureExecutor
-        concurrency: 8
-      - id: psp-refund-executor
-        topic: refund_topic
-        group-id: psp-refund-executor-consumer-group
-        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PspRefundExecutorConsumer
-        concurrency: 8
-      - id: psp-result-consumer
-        topic: psp_result_topic
-        group-id: psp-result-consumer-group
-        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PspResultConsumer
-        concurrency: 8
-      - id: payment-authorized-processor
-        topic: payment_authorized_topic
-        group-id: payment-authorized-processor-consumer-group
-        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PaymentAuthorizedConsumer
-        concurrency: 2
-      - id: payment-order-enqueuer
-        topic: payment_order_created_topic
-        group-id: payment-order-enqueuer-consumer-group
-        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PaymentOrderEnqueuer
-        concurrency: 8
-      - id: payment-order-psp-result-applier
-        topic: payment_order_psp_result_updated_topic
-        group-id: payment-order-psp-result-updated-consumer-group
-        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.PaymentOrderPspResultApplier
-        concurrency: 8
-      - id: ledger-recording-request-dispatcher
-        topic: payment_order_finalized_topic
-        group-id: ledger-recording-request-dispatcher-consumer-group
-        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.LedgerRecordingRequestDispatcher
-        concurrency: 4
-      - id: ledger-recording-consumer
-        topic: ledger_record_request_queue_topic
-        group-id: ledger-recording-consumer-group
-        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.LedgerRecordingConsumer
-        concurrency: 4
-      - id: account-balance-consumer
-        topic: ledger_entries_recorded_topic
-        group-id: account-balance-consumer-group
-        class-name: com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.listeners.AccountBalanceConsumer
-        concurrency: 4
+      capture-execution-queue:                    { partitions: 12, replicas: 1, createDlq: true }
+      capture_psp_performed_queue:                { partitions: 12, replicas: 1, createDlq: true }
+      internal-transfer-queue:                    { partitions: 12, replicas: 1, createDlq: true }
+
 
 server:
   port: 8080

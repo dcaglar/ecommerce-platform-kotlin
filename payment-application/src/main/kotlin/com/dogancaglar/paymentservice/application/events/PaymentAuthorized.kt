@@ -54,6 +54,7 @@ data class PaymentAuthorized private @JsonCreator constructor(
     @JsonProperty("currency")             override val currency: String,
     @JsonProperty("splits")               val splits: List<PaymentSplitDto>,
     @JsonProperty("authorizedAt")         override val timestamp: Instant = Utc.nowInstant(),
+    val isSale  :Boolean?=true
 ) : PaymentBaseEvent() {
 
     override val eventType: String

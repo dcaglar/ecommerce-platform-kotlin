@@ -94,6 +94,42 @@
         )
     </insert>
 
+    <insert id="upsert"
+            parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentTxEntity">
+        INSERT INTO payment_tx (
+            tx_id,
+            tx_type,
+            payment_id,
+            payment_intent_id,
+            parent_tx_id,
+            acquirer_reference,
+            amount_value,
+            amount_currency,
+            status,
+            settle_status,
+            acquirer_batch_ref,
+            settled_amount_value
+        ) VALUES (
+            #{txId},
+            #{txType},
+            #{paymentId},
+            #{paymentIntentId},
+            #{parentTxId},
+            #{acquirerReference},
+            #{amountValue},
+            #{amountCurrency},
+            #{status},
+            #{settleStatus},
+            #{acquirerBatchRef},
+            #{settledAmountValue}
+        )
+        ON CONFLICT (tx_id) DO UPDATE SET
+            status = EXCLUDED.status,
+            settle_status = EXCLUDED.settle_status,
+            acquirer_batch_ref = EXCLUDED.acquirer_batch_ref,
+            settled_amount_value = EXCLUDED.settled_amount_value
+    </insert>
+
     <!--
         UPDATE settle_status: called by the settlement batch job when a CAPTURE row
         is matched against an incoming acquirer settlement file.

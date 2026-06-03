@@ -1,18 +1,16 @@
 package com.dogancaglar.paymentservice.ports.outbound
 
-import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
+import com.dogancaglar.common.event.Event
 import com.dogancaglar.paymentservice.application.util.RetryItem
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentOrderId
 
-interface RetryQueuePort<T> {
+interface RetryQueuePort<T : Event> {
     fun scheduleRetry(
-        paymentOrder: PaymentOrder,
+        event: T,
         backOffMillis: Long
     )
 
-
-    fun getRetryCount(paymentOrderId: PaymentOrderId): Int
-    fun resetRetryCounter(paymentOrderId: PaymentOrderId)
+    fun getRetryCount(identifier: String): Int
+    fun resetRetryCounter(identifier: String)
     fun pollDueRetriesToInflight(maxBatchSize: Long): List<RetryItem>
 
 }

@@ -5,14 +5,13 @@ import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.command.AuthorizePaymentIntentCommand
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
-import com.dogancaglar.paymentservice.application.util.PaymentOrderDomainEventEntityMapper
 import com.dogancaglar.paymentservice.domain.exception.PaymentNotReadyException
 import com.dogancaglar.paymentservice.domain.exception.PspPermanentException
 import com.dogancaglar.paymentservice.domain.exception.PspTransientException
 import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntentStatus
-import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrder
+
 import com.dogancaglar.paymentservice.ports.inbound.usecases.AuthorizePaymentIntentUseCase
 import com.dogancaglar.paymentservice.ports.outbound.*
 import org.slf4j.LoggerFactory
@@ -174,20 +173,5 @@ class AuthorizePaymentIntentService(
         )
     }
 
-    private fun toOutboxPaymentOrderCaptureReceivedEvent(paymentOrder: PaymentOrder): OutboxEvent {
-        val paymentOrderCaptureReceived = PaymentOrderDomainEventEntityMapper.toPaymentOrderCaptureReceived(paymentOrder)
-        val envelope = EventEnvelopeFactory.envelopeFor(
-            traceId = EventLogContext.getTraceId(),
-            data = paymentOrderCaptureReceived,
-            aggregateId = paymentOrderCaptureReceived.paymentOrderId,
-            parentEventId = EventLogContext.getEventId()
-        )
 
-        return OutboxEvent.createNew(
-            oeid = paymentOrder.paymentOrderId.value,
-            eventType = envelope.eventType,
-            aggregateId = envelope.aggregateId,
-            payload = serializationPort.toJson(envelope),
-        )
-    }
 }

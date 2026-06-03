@@ -22,6 +22,16 @@
                 <constraints nullable="false"/>
             </column>
 
+            <column name="merchant_account_id" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="processing_model" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="psp_reference" type="VARCHAR(255)"/>
+
             <column name="total_amount_value" type="BIGINT">
                 <constraints nullable="false"/>
             </column>
@@ -35,7 +45,7 @@
             <column name="status" type="VARCHAR(50)">
                 <constraints nullable="false"/>
             </column>
-            <column name="payment_splits" type="jsonb"/>
+            <column name="splits_json" type="jsonb"/>
             <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE"
                     defaultValueComputed="(now() AT TIME ZONE 'UTC')">
                 <constraints nullable="false"/>
@@ -47,15 +57,21 @@
             </column>
         </createTable>
 
+        <createIndex tableName="payment_intents" indexName="idx_payment_intents_psp_reference">
+            <column name="psp_reference"/>
+        </createIndex>
+
         <!-- 2️⃣ Constraints via SQL (Liquibase-safe for all 4.x versions) -->
         <sql>
             ALTER TABLE payment_intents
             ADD CONSTRAINT chk_payment_intent_status_valid
             CHECK (status IN (
+            'CREATED_PENDING',
             'CREATED',
             'PENDING_AUTH',
             'AUTHORIZED',
             'DECLINED',
+            'FAILED',
             'CANCELLED'
             ));
         </sql>

@@ -17,7 +17,7 @@ class SnowflakeIdGeneratorAdapter(
 
     override fun nextPaymentIntentId(): Long = core.nextId(nodeId)
     override fun nextPaymentId(): Long = core.nextId(nodeId)
-    override fun nextPaymentOrderId(): Long = core.nextId(nodeId)
+    override fun nextCaptureId(): Long = core.nextId(nodeId)
 
     private fun parseNodeId(podName: String): Int {
         val parts = podName.split("-")

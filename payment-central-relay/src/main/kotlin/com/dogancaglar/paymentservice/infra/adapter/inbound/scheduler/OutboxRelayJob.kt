@@ -2,14 +2,11 @@ package com.dogancaglar.paymentservice.infra.adapter.inbound.scheduler
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
-import com.dogancaglar.paymentservice.application.events.PaymentOrderCaptureReceived
 import com.dogancaglar.paymentservice.application.events.CaptureReceived
 import com.dogancaglar.paymentservice.application.events.ExternalAsyncCaptureToPspPerformed
-import com.dogancaglar.paymentservice.application.events.PaymentOrderRefundReceived
-import com.dogancaglar.paymentservice.application.events.PaymentCaptured
-import com.dogancaglar.paymentservice.application.events.PaymentOrderRefunded
 import com.dogancaglar.paymentservice.application.events.CaptureSuccessful
 import com.dogancaglar.paymentservice.application.events.InternalTransferRequest
+import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
 
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.CentralOutboxRelayPort
@@ -89,10 +86,6 @@ class OutboxRelayJob(
                     val envelope = convertToPaymentAuthorizedEnvelope(entry)
                     kafkaPublisher.publishAsync(envelope)
                 }
-                OutboxEventType.payment_order_capture_received -> {
-                    val envelope = convertToPaymentOrderCaptureReceivedEnvelope(entry)
-                    kafkaPublisher.publishAsync(envelope)
-                }
                 OutboxEventType.capture_received -> {
                     val envelope = convertToCaptureReceivedEnvelope(entry)
                     kafkaPublisher.publishAsync(envelope)
@@ -101,24 +94,16 @@ class OutboxRelayJob(
                     val envelope = convertToExternalAsyncCaptureToPspPerformedEnvelope(entry)
                     kafkaPublisher.publishAsync(envelope)
                 }
-                OutboxEventType.payment_order_refund_received -> {
-                    val envelope = convertToPaymentOrderRefundReceivedEnvelope(entry)
-                    kafkaPublisher.publishAsync(envelope)
-                }
-                OutboxEventType.payment_order_captured -> {
-                    val envelope = convertToPaymentOrderCapturedEnvelope(entry)
-                    kafkaPublisher.publishAsync(envelope)
-                }
-                OutboxEventType.payment_order_refunded -> {
-                    val envelope = convertToPaymentOrderRefundedEnvelope(entry)
-                    kafkaPublisher.publishAsync(envelope)
-                }
                 OutboxEventType.capture_successful -> {
                     val envelope = convertToCaptureSuccessfulEnvelope(entry)
                     kafkaPublisher.publishAsync(envelope)
                 }
                 OutboxEventType.internal_transfer_request -> {
                     val envelope = convertToInternalTransferRequestEnvelope(entry)
+                    kafkaPublisher.publishAsync(envelope)
+                }
+                OutboxEventType.ledger_entries_recorded -> {
+                    val envelope = convertToLedgerEntriesRecordedEnvelope(entry)
                     kafkaPublisher.publishAsync(envelope)
                 }
                 else -> {
@@ -154,12 +139,6 @@ class OutboxRelayJob(
         return envelope
     }
 
-     private fun convertToPaymentOrderCaptureReceivedEnvelope(evt: OutboxEvent): EventEnvelope<PaymentOrderCaptureReceived> {
-        val envelopeType = objectMapper.typeFactory
-            .constructParametricType(EventEnvelope::class.java, PaymentOrderCaptureReceived::class.java)
-        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentOrderCaptureReceived>
-        return envelope
-    }
 
      private fun convertToCaptureReceivedEnvelope(evt: OutboxEvent): EventEnvelope<CaptureReceived> {
         val envelopeType = objectMapper.typeFactory
@@ -175,26 +154,8 @@ class OutboxRelayJob(
         return envelope
     }
 
-     private fun convertToPaymentOrderRefundReceivedEnvelope(evt: OutboxEvent): EventEnvelope<PaymentOrderRefundReceived> {
-        val envelopeType = objectMapper.typeFactory
-            .constructParametricType(EventEnvelope::class.java, PaymentOrderRefundReceived::class.java)
-        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentOrderRefundReceived>
-        return envelope
-    }
 
-     private fun convertToPaymentOrderCapturedEnvelope(evt: OutboxEvent): EventEnvelope<PaymentCaptured> {
-        val envelopeType = objectMapper.typeFactory
-            .constructParametricType(EventEnvelope::class.java, PaymentCaptured::class.java)
-        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentCaptured>
-        return envelope
-    }
 
-     private fun convertToPaymentOrderRefundedEnvelope(evt: OutboxEvent): EventEnvelope<PaymentOrderRefunded> {
-        val envelopeType = objectMapper.typeFactory
-            .constructParametricType(EventEnvelope::class.java, PaymentOrderRefunded::class.java)
-        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<PaymentOrderRefunded>
-        return envelope
-    }
 
      private fun convertToCaptureSuccessfulEnvelope(evt: OutboxEvent): EventEnvelope<CaptureSuccessful> {
         val envelopeType = objectMapper.typeFactory
@@ -207,6 +168,13 @@ class OutboxRelayJob(
         val envelopeType = objectMapper.typeFactory
             .constructParametricType(EventEnvelope::class.java, InternalTransferRequest::class.java)
         val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<InternalTransferRequest>
+        return envelope
+    }
+
+     private fun convertToLedgerEntriesRecordedEnvelope(evt: OutboxEvent): EventEnvelope<LedgerEntriesRecorded> {
+        val envelopeType = objectMapper.typeFactory
+            .constructParametricType(EventEnvelope::class.java, LedgerEntriesRecorded::class.java)
+        val envelope = objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<LedgerEntriesRecorded>
         return envelope
     }
 }

@@ -43,11 +43,7 @@
         ON CONFLICT (id) DO NOTHING
     </insert>
 
-    <insert id="insertLedgerEntry" parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.LedgerEntryEntity"
-            useGeneratedKeys="true" keyProperty="id" keyColumn="id">
-        INSERT INTO ledger_entries (journal_id, created_at)
-        VALUES (#{journalId}, #{createdAt})
-    </insert>
+
 
     <insert id="insertPosting" parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PostingEntity">
         INSERT INTO postings (journal_id, account_code, account_type, amount, direction, currency, created_at)

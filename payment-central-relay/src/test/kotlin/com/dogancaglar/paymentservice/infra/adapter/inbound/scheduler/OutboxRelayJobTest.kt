@@ -3,8 +3,8 @@ package com.dogancaglar.paymentservice.infra.adapter.inbound.scheduler
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
-import com.dogancaglar.paymentservice.application.events.PaymentOrderCaptureReceived
-import com.dogancaglar.paymentservice.application.events.PaymentOrderRefundReceived
+import com.dogancaglar.paymentservice.application.events.CaptureReceived
+import com.dogancaglar.paymentservice.application.events.PaymentCaptured
 import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
 import com.dogancaglar.paymentservice.infra.adapter.inbound.scheduler.OutboxRelayJob
 import com.dogancaglar.paymentservice.ports.outbound.CentralOutboxRelayPort
@@ -110,7 +110,7 @@ class OutboxRelayJobTest {
         )
         val event2 = OutboxEvent.rehydrate(
             oeid = 2L,
-            eventType = "payment_order_capture_received",
+            eventType = "capture_received",
             aggregateId = "seller-1",
             payload = "{\"paymentOrderId\":\"2\"}",
             status = "NEW",
@@ -119,7 +119,7 @@ class OutboxRelayJobTest {
         )
         val event3 = OutboxEvent.rehydrate(
             oeid = 3L,
-            eventType = "payment_order_refund_received",
+            eventType = "payment_captured",
             aggregateId = "seller-2",
             payload = "{\"paymentOrderId\":\"3\"}",
             status = "NEW",
@@ -136,12 +136,12 @@ class OutboxRelayJobTest {
         every { objectMapper.typeFactory } returns mockTypeFactory
         
         every { mockTypeFactory.constructParametricType(EventEnvelope::class.java, PaymentAuthorized::class.java) } returns mockJavaType
-        every { mockTypeFactory.constructParametricType(EventEnvelope::class.java, PaymentOrderCaptureReceived::class.java) } returns mockJavaType
-        every { mockTypeFactory.constructParametricType(EventEnvelope::class.java, PaymentOrderRefundReceived::class.java) } returns mockJavaType
+        every { mockTypeFactory.constructParametricType(EventEnvelope::class.java, CaptureReceived::class.java) } returns mockJavaType
+        every { mockTypeFactory.constructParametricType(EventEnvelope::class.java, PaymentCaptured::class.java) } returns mockJavaType
 
         val envelope1 = mockk<EventEnvelope<PaymentAuthorized>>()
-        val envelope2 = mockk<EventEnvelope<PaymentOrderCaptureReceived>>()
-        val envelope3 = mockk<EventEnvelope<PaymentOrderRefundReceived>>()
+        val envelope2 = mockk<EventEnvelope<CaptureReceived>>()
+        val envelope3 = mockk<EventEnvelope<PaymentCaptured>>()
 
         every { objectMapper.readValue<Any>(event1.payload, mockJavaType) } returns envelope1
         every { objectMapper.readValue<Any>(event2.payload, mockJavaType) } returns envelope2

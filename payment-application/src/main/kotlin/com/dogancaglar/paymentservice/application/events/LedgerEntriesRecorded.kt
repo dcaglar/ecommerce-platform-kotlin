@@ -8,10 +8,8 @@ import com.dogancaglar.paymentservice.application.events.PaymentBaseEvent
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class LedgerEntriesRecorded private constructor(
-    @JsonProperty("paymentOrderId") val paymentOrderId: String?,
-    @JsonProperty("publicPaymentOrderId") val publicPaymentOrderId: String?,
-    @JsonProperty("paymentId") override val paymentIntentId: String,
-    @JsonProperty("publicPaymentId") override val publicPaymentIntentId: String,
+    @JsonProperty("paymentIntentId")       override val paymentIntentId: String,
+    @JsonProperty("publicPaymentIntentId")  override val publicPaymentIntentId: String,
     @JsonProperty("sellerId") val sellerId: String?,
     @JsonProperty("amountValue") override val amountValue: Long,
     @JsonProperty("currency") override val currency: String,
@@ -45,8 +43,6 @@ data class LedgerEntriesRecorded private constructor(
             entries: List<LedgerEntryEventData>,
             now: Instant
         ) = LedgerEntriesRecorded(
-            paymentOrderId = if (cmd is PaymentCaptured) null else null, // Kept for compatibility mapping
-            publicPaymentOrderId = null,
             paymentIntentId = cmd.paymentIntentId,
             publicPaymentIntentId = cmd.publicPaymentIntentId,
             sellerId = if (cmd is PaymentCaptured) cmd.merchantAccountId else null,
@@ -62,10 +58,8 @@ data class LedgerEntriesRecorded private constructor(
          */
         @JsonCreator
         internal fun fromJson(
-            @JsonProperty("paymentOrderId") pOrderId: String,
-            @JsonProperty("publicPaymentOrderId") pubOrderId: String,
-            @JsonProperty("paymentId") pId: String,
-            @JsonProperty("publicPaymentId") pubPId: String,
+            @JsonProperty("paymentIntentId") pId: String,
+            @JsonProperty("publicPaymentIntentId") pubPId: String,
             @JsonProperty("sellerId") sellerId: String,
             @JsonProperty("amountValue") amountValue: Long,
             @JsonProperty("currency") currency: String,
@@ -73,8 +67,6 @@ data class LedgerEntriesRecorded private constructor(
             @JsonProperty("ledgerEntries") ledgerEntries: List<LedgerEntryEventData>,
             @JsonProperty("timestamp") timestamp: Instant
         ) = LedgerEntriesRecorded(
-            pOrderId,
-            pubOrderId,
             pId,
             pubPId,
             sellerId,

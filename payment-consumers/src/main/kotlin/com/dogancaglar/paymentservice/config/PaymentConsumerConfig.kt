@@ -3,18 +3,13 @@ package com.dogancaglar.paymentservice.config
 
 import com.dogancaglar.paymentservice.application.service.PspResultProcessingService
 import com.dogancaglar.paymentservice.application.service.AccountBalanceService
-import com.dogancaglar.common.kafka.publisher.PaymentEventPublisher
 import com.dogancaglar.paymentservice.application.service.AccountBalanceReadService
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.AccountDirectoryImpl
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.LedgerEntryTxAdapter
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
-import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
-import com.dogancaglar.paymentservice.ports.outbound.LedgerEntryPort
+import com.dogancaglar.paymentservice.ports.outbound.CentralDbTransactionalFacadePort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
-import com.dogancaglar.paymentservice.ports.outbound.PspAuthorizationGatewayPort
 import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentTxPort
 import org.springframework.beans.factory.annotation.Qualifier
@@ -39,7 +34,7 @@ open class PaymentConsumerConfig {
 
     @Bean
     fun pspResultProcessingService(
-        ledgerEntryPort: LedgerEntryPort,
+        centralDbTransactionalFacadePort: CentralDbTransactionalFacadePort,
         @Qualifier("accountDirectoryImpl") accountDirectoryImpl: AccountDirectoryPort,
         paymentTxPort: PaymentTxPort,
         idGeneratorPort: IdGeneratorPort,
@@ -48,7 +43,7 @@ open class PaymentConsumerConfig {
         serializationPort: SerializationPort
     ): PspResultProcessingService {
         return PspResultProcessingService(
-            ledgerWritePort = ledgerEntryPort,
+            centralDbTransactionalFacadePort = centralDbTransactionalFacadePort,
             accountDirectory = accountDirectoryImpl,
             paymentTxPort = paymentTxPort,
             idGeneratorPort = idGeneratorPort,

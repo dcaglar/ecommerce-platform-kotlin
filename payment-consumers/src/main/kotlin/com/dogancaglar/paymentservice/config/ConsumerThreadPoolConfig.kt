@@ -12,17 +12,17 @@ import java.util.concurrent.ThreadPoolExecutor
 
 
 @Configuration
-class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val decorator: MdcTaskDecorator) {
+class ConsumerThreadPoolConfig(private val meterRegistry: MeterRegistry, private val decorator: MdcTaskDecorator) {
 
-    @Bean("paymentOrderPspPool")
-    fun paymentOrderPspPool(decorator: TaskDecorator): ThreadPoolTaskExecutor =
+
+    @Bean("pspExecutionPool")
+    fun pspExecutionPool(decorator: TaskDecorator): ThreadPoolTaskExecutor =
         ThreadPoolTaskExecutor().apply {
-            corePoolSize = 8          // match per-pod listener concurrency
-            maxPoolSize = 8
-            queueCapacity = 64       // or 16; keeps back-pressure tight
-            setThreadNamePrefix("po-psp-")
+            corePoolSize = 50
+            maxPoolSize = 500
+            queueCapacity = 1000
+            setThreadNamePrefix("psp-")
             setTaskDecorator(decorator)
-            setRejectedExecutionHandler(ThreadPoolExecutor.AbortPolicy())
             initialize()
         }
 
