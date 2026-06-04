@@ -1,8 +1,8 @@
-package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.converter
+package com.dogancaglar.common.db.converter
 
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.JournalEntryEntity
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PostingEntity
+import com.dogancaglar.common.db.entity.JournalEntryEntity
+import com.dogancaglar.common.db.entity.PostingEntity
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
 import com.dogancaglar.paymentservice.domain.model.ledger.Posting
 

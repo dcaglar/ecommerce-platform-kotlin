@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper
 
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentEntity
+import com.dogancaglar.common.db.entity.PaymentEntity
 import org.apache.ibatis.annotations.Mapper
 
 /**

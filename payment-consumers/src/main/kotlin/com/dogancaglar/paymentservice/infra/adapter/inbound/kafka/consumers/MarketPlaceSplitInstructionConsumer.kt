@@ -27,7 +27,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
-import org.apache.kafka.clients.consumer.Consumer
 
 @Component
 class MarketPlaceSplitInstructionConsumer(
@@ -43,12 +42,11 @@ class MarketPlaceSplitInstructionConsumer(
 
     @KafkaListener(
         topics = [Topics.JOURNAL_ENTRIES_RECORDED],
-        containerFactory = "\${Topics.JOURNAL_ENTRIES_RECORDED}-factory",
+        containerFactory = CONSUMER_GROUPS.MARKETPLACE_SPLIT_INSTRUCTION_CONSUMER + "-factory",
         groupId = CONSUMER_GROUPS.MARKETPLACE_SPLIT_INSTRUCTION_CONSUMER
     )
     fun onLedgerEntriesRecorded(
-        record: ConsumerRecord<String, EventEnvelope<com.dogancaglar.common.event.Event>>,
-        consumer: Consumer<*, *>
+        record: ConsumerRecord<String, EventEnvelope<com.dogancaglar.common.event.Event>>
     ) {
         val envelope = record.value() as EventEnvelope<JournalEntriesRecorded>
         EventLogContext.with(envelope) {
@@ -67,7 +65,6 @@ class MarketPlaceSplitInstructionConsumer(
                 if (captureEntry == null) {
                     logger.debug("No CAPTURE journal entry in this batch. Ignoring.")
                     dedupe.markProcessed(eventId, 3600)
-                    consumer.commitSync()
                     return@with
                 }
                 val paymentIntentIdValue = event.paymentIntentId.toLongOrNull() ?: 0L
@@ -78,7 +75,6 @@ class MarketPlaceSplitInstructionConsumer(
                 if (payment.splits.isEmpty()) {
                     logger.debug("Payment has no splits. Ignoring.")
                     dedupe.markProcessed(eventId, 3600)
-                    consumer.commitSync()
                     return@with
                 }
 
@@ -126,7 +122,6 @@ class MarketPlaceSplitInstructionConsumer(
                 logger.info("💾 Internal split transfer outbox events persisted successfully for \${payment.splits.size} sub-sellers")
 
                 dedupe.markProcessed(eventId, 3600)
-                consumer.commitSync()
             } catch (e: Exception) {
                 logger.error("❌ Failed to process MarketPlace splits for paymentIntentId: \${event.publicPaymentIntentId}", e)
                 throw e

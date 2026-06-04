@@ -21,7 +21,7 @@
     </insert>
 
     <!-- Edge Watermark Operations -->
-    <insert id="upsert" parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.EdgeWatermarkEntity">
+    <insert id="upsert" parameterType="com.dogancaglar.common.db.entity.EdgeWatermarkEntity">
         INSERT INTO edge_watermarks (edge_node_id, forwarded_up_to)
         VALUES (#{edgeNodeId}, #{forwardedUpTo})
         ON CONFLICT (edge_node_id) DO UPDATE

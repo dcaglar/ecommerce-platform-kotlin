@@ -220,9 +220,9 @@ curl -i -X POST "$BASE_URL/api/v1/payments" \
     "processingModel": "MARKETPLACE",
     "totalAmount": { "quantity": 3000, "currency": "EUR" },
     "splits": [
-      { "targetAccountType": "MARKETPLACE_SUB_SELLER", "targetEntityId": "SELLER-111", "amount": { "quantity": 1400, "currency": "EUR" }},
-      { "targetAccountType": "MARKETPLACE_SUB_SELLER", "targetEntityId": "SELLER-222", "amount": { "quantity": 1400, "currency": "EUR" }},
-      { "targetAccountType": "PLATFORM_COMMISSION_ESCROW", "targetEntityId": "PLATFORM-1", "amount": { "quantity": 200, "currency": "EUR" }}
+      { "targetAccountType": "MARKETPLACE_SUB_SELLER", "targetEntityId": "SELLER-1-1", "amount": { "quantity": 1400, "currency": "EUR" }},
+      { "targetAccountType": "MARKETPLACE_SUB_SELLER", "targetEntityId": "SELLER-1-2", "amount": { "quantity": 1400, "currency": "EUR" }},
+      { "targetAccountType": "PLATFORM_COMMISSION_ESCROW", "targetEntityId": "MARKETPLACE-1", "amount": { "quantity": 200, "currency": "EUR" }}
     ]
   }'
 ```

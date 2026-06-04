@@ -31,7 +31,7 @@ class AccountBalanceConsumer(
 
     @KafkaListener(
         topics = [Topics.JOURNAL_ENTRIES_RECORDED],
-        containerFactory = "${Topics.JOURNAL_ENTRIES_RECORDED}-factory",
+        containerFactory = CONSUMER_GROUPS.ACCOUNT_BALANCE_CONSUMER + "-factory",
         groupId = CONSUMER_GROUPS.ACCOUNT_BALANCE_CONSUMER
     )
     fun onLedgerEntriesRecorded(

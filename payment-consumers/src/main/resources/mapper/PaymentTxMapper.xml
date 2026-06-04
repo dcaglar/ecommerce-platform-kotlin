@@ -14,7 +14,7 @@
 <mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentTxMapper">
 
     <resultMap id="PaymentTxResultMap"
-               type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentTxEntity">
+               type="com.dogancaglar.common.db.entity.PaymentTxEntity">
         <id  property="txId"               column="tx_id"/>
         <result property="txType"          column="tx_type"/>
         <result property="paymentId"       column="payment_id"/>
@@ -64,7 +64,7 @@
         where they do not apply.
     -->
     <insert id="insert"
-            parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentTxEntity">
+            parameterType="com.dogancaglar.common.db.entity.PaymentTxEntity">
         INSERT INTO payment_tx (
             tx_id,
             tx_type,
@@ -95,7 +95,7 @@
     </insert>
 
     <insert id="upsert"
-            parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentTxEntity">
+            parameterType="com.dogancaglar.common.db.entity.PaymentTxEntity">
         INSERT INTO payment_tx (
             tx_id,
             tx_type,

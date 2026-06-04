@@ -5,7 +5,7 @@
 <mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.OutboxEventMapper">
 
     <insert id="insertOutboxEvent"
-            parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.OutboxEventEntity">
+            parameterType="com.dogancaglar.common.db.entity.OutboxEventEntity">
         INSERT INTO outbox_event (
         oeid, event_type, aggregate_id, payload, status,
         created_at, updated_at, claimed_at, claimed_by

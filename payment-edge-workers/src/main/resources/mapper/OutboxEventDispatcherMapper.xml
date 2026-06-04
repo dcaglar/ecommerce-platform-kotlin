@@ -5,7 +5,7 @@
 <mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.OutboxEventDispatcherMapper">
 
     <resultMap id="OutboxEventResultMap"
-               type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.OutboxEventEntity">
+               type="com.dogancaglar.common.db.entity.OutboxEventEntity">
         <id property="oeid" column="oeid"/>
         <result property="eventType" column="event_type"/>
         <result property="aggregateId" column="aggregate_id"/>

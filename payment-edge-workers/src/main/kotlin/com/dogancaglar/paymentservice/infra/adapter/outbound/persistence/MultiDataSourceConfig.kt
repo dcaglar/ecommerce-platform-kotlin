@@ -21,15 +21,15 @@ class MultiDataSourceConfig {
     @Primary
     @LiquibaseDataSource
     @ConfigurationProperties("app.datasource.outbox")
-    fun outboxDataSource(): HikariDataSource = HikariDataSource()
+    fun outboxDataSource(): HikariDataSource = HikariDataSource().apply { poolName = "edge-outbox-pool" }
 
     @Bean("maintenanceDataSource")
     @ConfigurationProperties("app.datasource.maintenance")
-    fun maintenanceDataSource(): HikariDataSource = HikariDataSource()
+    fun maintenanceDataSource(): HikariDataSource = HikariDataSource().apply { poolName = "edge-maintenance-pool" }
 
     @Bean("centralDataSource")
     @ConfigurationProperties("app.datasource.central")
-    fun centralDataSource(): HikariDataSource = HikariDataSource()
+    fun centralDataSource(): HikariDataSource = HikariDataSource().apply { poolName = "central-edge-worker-pool" }
 
     // -------- TxManagers --------
 

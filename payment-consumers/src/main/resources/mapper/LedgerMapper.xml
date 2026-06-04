@@ -6,7 +6,7 @@
 <mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.LedgerMapper">
 
     <resultMap id="JournalEntryResultMap"
-               type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.JournalEntryEntity">
+               type="com.dogancaglar.common.db.entity.JournalEntryEntity">
         <id property="id" column="id"/>
         <result property="journalType" column="journal_type"/>
         <result property="name" column="name"/>
@@ -17,7 +17,7 @@
     </resultMap>
 
     <resultMap id="PostingResultMap"
-               type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PostingEntity">
+               type="com.dogancaglar.common.db.entity.PostingEntity">
         <id property="id" column="id"/>
         <result property="journalId" column="journal_id"/>
         <result property="accountCode" column="account_code"/>
@@ -29,13 +29,13 @@
                 typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
     </resultMap>
 
-    <insert id="insertJournalEntry" parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.JournalEntryEntity">
+    <insert id="insertJournalEntry" parameterType="com.dogancaglar.common.db.entity.JournalEntryEntity">
         INSERT INTO journal_entries (id, journal_type, name, payment_id, tx_id, created_at)
         VALUES (#{id}, #{journalType}, #{name}, #{paymentId}, #{txId}, #{createdAt})
         ON CONFLICT (id) DO NOTHING
     </insert>
 
-    <insert id="insertPosting" parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PostingEntity">
+    <insert id="insertPosting" parameterType="com.dogancaglar.common.db.entity.PostingEntity">
         INSERT INTO postings (journal_id, account_code, account_type, amount, direction, currency, created_at)
         VALUES (#{journalId}, #{accountCode}, #{accountType}, #{amount}, #{direction}, #{currency}, #{createdAt})
         ON CONFLICT (journal_id, account_code) DO NOTHING

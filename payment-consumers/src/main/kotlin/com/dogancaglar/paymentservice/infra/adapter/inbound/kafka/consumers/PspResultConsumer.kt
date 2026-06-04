@@ -31,7 +31,7 @@ class PspResultConsumer(
 
     @KafkaListener(
         topics = [Topics.PSP_RESULTS],
-        containerFactory = "${Topics.PSP_RESULTS}-factory",
+        containerFactory = CONSUMER_GROUPS.PSP_RESULT_CONSUMER + "-factory",
         groupId = CONSUMER_GROUPS.PSP_RESULT_CONSUMER
     )
     fun onPspResult(

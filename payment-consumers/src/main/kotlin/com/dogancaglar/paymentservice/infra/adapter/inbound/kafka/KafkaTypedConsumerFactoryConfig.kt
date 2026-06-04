@@ -7,6 +7,7 @@ import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.GenericLogFields
 import com.dogancaglar.common.kafka.serde.EventEnvelopeKafkaSerializer
 import com.dogancaglar.common.kafka.metadata.Topics
+import com.dogancaglar.common.kafka.metadata.CONSUMER_GROUPS
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -196,6 +197,7 @@ class KafkaTypedConsumerFactoryConfig(
             setRecordInterceptor(interceptor as RecordInterceptor<String, EventEnvelope<T>>)
             setCommonErrorHandler(errorHandler)
             setConcurrency(concurrency)
+            setAutoStartup(false)
 
             // enforce semantic type at the container level
             expectedEventType?.let {
@@ -211,7 +213,7 @@ class KafkaTypedConsumerFactoryConfig(
 
 
 
-    @Bean("\${Topics.PSP_RESULTS}-factory")
+    @Bean(CONSUMER_GROUPS.PSP_RESULT_CONSUMER + "-factory")
     fun pspResultFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
@@ -228,7 +230,24 @@ class KafkaTypedConsumerFactoryConfig(
         )
     }
 
-    @Bean("\${Topics.JOURNAL_ENTRIES_RECORDED}-factory")
+    @Bean(CONSUMER_GROUPS.MARKETPLACE_SPLIT_INSTRUCTION_CONSUMER + "-factory")
+    fun marketPlaceSplitConsumer(
+        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
+        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<Event>> {
+        return createFactory(
+            clientId = "split-instruction-consumer-group",
+            concurrency = 1,
+            interceptor = interceptor,
+            consumerFactory = customFactory,
+            errorHandler = errorHandler,
+            expectedEventType = null
+        )
+    }
+
+    @Bean(CONSUMER_GROUPS.ACCOUNT_BALANCE_CONSUMER + "-factory")
     fun journalEntriesRecordedFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
@@ -247,7 +266,7 @@ class KafkaTypedConsumerFactoryConfig(
 
 
 
-    @Bean("\${Topics.CAPTURE_COMMANDS}-factory")
+    @Bean(CONSUMER_GROUPS.CAPTURE_COMMAND_EXECUTOR + "-factory")
     fun captureCommandsFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
@@ -264,7 +283,7 @@ class KafkaTypedConsumerFactoryConfig(
         )
     }
 
-    @Bean("\${Topics.CAPTURE_SUBMITTED_ACKS}-factory")
+    @Bean(CONSUMER_GROUPS.CAPTURE_SUBMITTED_CONSUMER + "-factory")
     fun captureSubmittedAcksFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
@@ -281,7 +300,7 @@ class KafkaTypedConsumerFactoryConfig(
         )
     }
 
-    @Bean("\${Topics.INTERNAL_TRANSFERS}-factory")
+    @Bean(CONSUMER_GROUPS.INTERNAL_TRANSFER_CONSUMER + "-factory")
     fun internalTransfersFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")

@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence
 
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.LedgerMapper
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.converter.LedgerEntitiyMapper
+import com.dogancaglar.common.db.converter.LedgerEntitiyMapper
 
 import com.dogancaglar.paymentservice.domain.model.ledger.Tx
 import com.dogancaglar.paymentservice.domain.model.payment.Payment
@@ -15,8 +15,8 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
 
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.converter.PaymentEntityMapper
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.converter.PaymentTxEntityMapper
+import com.dogancaglar.common.db.converter.PaymentEntityMapper
+import com.dogancaglar.common.db.converter.PaymentTxEntityMapper
 
 @Repository
 open class CentralDbTransactionalFacadeAdapter(

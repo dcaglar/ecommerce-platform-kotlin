@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence
 
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.converter.PaymentIntentEntityMapper
+import com.dogancaglar.common.db.converter.PaymentIntentEntityMapper
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentIntentMapper
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId

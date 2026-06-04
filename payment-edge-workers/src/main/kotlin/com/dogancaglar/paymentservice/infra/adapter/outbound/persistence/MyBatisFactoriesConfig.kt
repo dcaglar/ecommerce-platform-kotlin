@@ -26,7 +26,7 @@ class MyBatisFactoriesConfig {
         sfb.setDataSource(ds)
         val resolver = PathMatchingResourcePatternResolver()
         sfb.setMapperLocations(*resolver.getResources("classpath*:mapper/**/*.xml"))
-        sfb.setTypeAliasesPackage("com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity")
+        sfb.setTypeAliasesPackage("com.dogancaglar.common.db.entity")
         return sfb.`object`!!
     }
 
@@ -44,7 +44,7 @@ class MyBatisFactoriesConfig {
         sfb.setDataSource(ds)
         val resolver = PathMatchingResourcePatternResolver()
         sfb.setMapperLocations(*resolver.getResources("classpath*:mapper/**/*.xml"))
-        sfb.setTypeAliasesPackage("com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity")
+        sfb.setTypeAliasesPackage("com.dogancaglar.common.db.entity")
         return sfb.`object`!!
     }
 

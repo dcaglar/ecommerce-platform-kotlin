@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional
  * and updates the edge watermark.
  */
 @Service
-@DependsOn("outboxPartitionCreator")
+@DependsOn("edgeOutboxPartitionCreator")
 class LocalOutboxForwarderJob(
     @param:Qualifier("outboxJobAdapter") private val outboxEventRepository: LocalOutboxEdgePort,
     private val centralOutboxRepository: CentralOutboxEdgePort,

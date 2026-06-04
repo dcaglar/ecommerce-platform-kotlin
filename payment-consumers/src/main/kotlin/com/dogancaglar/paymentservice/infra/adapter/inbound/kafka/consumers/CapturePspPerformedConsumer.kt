@@ -24,7 +24,7 @@ class CapturePspPerformedConsumer(
 
     @KafkaListener(
         topics = [Topics.CAPTURE_SUBMITTED_ACKS],
-        containerFactory = "\${Topics.CAPTURE_SUBMITTED_ACKS}-factory",
+        containerFactory = CONSUMER_GROUPS.CAPTURE_SUBMITTED_CONSUMER + "-factory",
         groupId = CONSUMER_GROUPS.CAPTURE_SUBMITTED_CONSUMER
     )
     fun consume(record: ConsumerRecord<String, EventEnvelope<CaptureSubmitted>>) {

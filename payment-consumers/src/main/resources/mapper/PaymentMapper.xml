@@ -16,7 +16,7 @@
 <mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentMapper">
 
     <resultMap id="PaymentResultMap"
-               type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentEntity">
+               type="com.dogancaglar.common.db.entity.PaymentEntity">
         <id  property="paymentId"           column="payment_id"/>
         <result property="paymentIntentId"   column="payment_intent_id"/>
         <result property="buyerId"           column="buyer_id"/>
@@ -83,7 +83,7 @@
          ================================================================ -->
 
     <insert id="insert"
-            parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentEntity">
+            parameterType="com.dogancaglar.common.db.entity.PaymentEntity">
         INSERT INTO payments (
             payment_id,
             payment_intent_id,
@@ -116,7 +116,7 @@
     </insert>
 
     <insert id="upsert"
-            parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentEntity">
+            parameterType="com.dogancaglar.common.db.entity.PaymentEntity">
         INSERT INTO payments (
             payment_id,
             payment_intent_id,
@@ -160,7 +160,7 @@
         immutable after creation and must NOT appear in UPDATE statements.
     -->
     <update id="update"
-            parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentEntity">
+            parameterType="com.dogancaglar.common.db.entity.PaymentEntity">
         UPDATE payments SET
             captured_amount_value = #{capturedAmountValue},
             refunded_amount_value = #{refundedAmountValue},

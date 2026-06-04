@@ -33,6 +33,7 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
+      pool-name: central-pool
       maximum-pool-size: 5
       minimum-idle: 1
       connection-timeout: 1500
@@ -147,10 +148,12 @@ management:
 
 mybatis:
   mapper-locations: classpath*:mapper/**/*.xml
-  type-aliases-package: com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity
+  type-aliases-package: com.dogancaglar.common.db.entity
   type-handlers-package: com.dogancaglar.common.db.typehandler
 
 psp:
+  gateway:
+    type: SIMULATED
   refund:
     simulation:
       scenarios:

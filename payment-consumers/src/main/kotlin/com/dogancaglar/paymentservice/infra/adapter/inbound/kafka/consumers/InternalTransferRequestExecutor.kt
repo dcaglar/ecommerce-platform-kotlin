@@ -21,7 +21,6 @@ import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
 import com.dogancaglar.paymentservice.ports.outbound.PaymentTxPort
-import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
@@ -40,12 +39,11 @@ class InternalTransferRequestExecutor(
 
     @KafkaListener(
         topics = [Topics.INTERNAL_TRANSFERS],
-        containerFactory = "\${Topics.INTERNAL_TRANSFERS}-factory",
+        containerFactory = CONSUMER_GROUPS.INTERNAL_TRANSFER_CONSUMER + "-factory",
         groupId = CONSUMER_GROUPS.INTERNAL_TRANSFER_CONSUMER
     )
     fun onInternalTransferRequested(
-        record: ConsumerRecord<String, EventEnvelope<InternalTransferRequested>>,
-        consumer: Consumer<*, *>
+        record: ConsumerRecord<String, EventEnvelope<InternalTransferRequested>>
     ) {
         val envelope = record.value()
         EventLogContext.with(envelope) {
@@ -124,7 +122,6 @@ class InternalTransferRequestExecutor(
                 logger.info("💾 Internal split transfer persisted successfully for sub-seller \${event.targetEntityId}")
 
                 dedupe.markProcessed(eventId, 3600)
-                consumer.commitSync()
             } catch (e: Exception) {
                 logger.error("❌ Failed to process internal transfer for target \${event.targetEntityId}", e)
                 throw e

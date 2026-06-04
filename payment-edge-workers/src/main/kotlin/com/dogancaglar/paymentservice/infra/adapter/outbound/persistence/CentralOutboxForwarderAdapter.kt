@@ -1,8 +1,8 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence
 
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.OutboxEventEntity
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.EdgeWatermarkEntity
+import com.dogancaglar.common.db.entity.OutboxEventEntity
+import com.dogancaglar.common.db.entity.EdgeWatermarkEntity
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.CentralOutboxForwarderMapper
 import com.dogancaglar.paymentservice.ports.outbound.CentralOutboxEdgePort
 import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent

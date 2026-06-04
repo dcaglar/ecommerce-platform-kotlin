@@ -8,7 +8,7 @@ import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
 import com.dogancaglar.paymentservice.ports.outbound.PspCaptureGatewayPort
 import com.dogancaglar.paymentservice.application.service.AccountBalanceService
 import com.dogancaglar.paymentservice.application.service.AccountBalanceReadService
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.converter.PaymentEntityMapper
+import com.dogancaglar.common.db.converter.PaymentEntityMapper
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
@@ -60,7 +60,20 @@ open class PaymentConsumerConfig {
         )
     }
 
-
+    @Bean
+    fun recordCaptureSubmissionService(
+        centralDbTransactionalFacadePort: CentralDbTransactionalFacadePort,
+        paymentRepository: PaymentRepository,
+        paymentTxPort: PaymentTxPort,
+        idGeneratorPort: IdGeneratorPort
+    ): com.dogancaglar.paymentservice.application.service.RecordCaptureSubmissionService {
+        return com.dogancaglar.paymentservice.application.service.RecordCaptureSubmissionService(
+            centralDbTransactionalFacadePort = centralDbTransactionalFacadePort,
+            paymentRepository = paymentRepository,
+            paymentTxPort = paymentTxPort,
+            idGeneratorPort = idGeneratorPort
+        )
+    }
 
     @Bean
     fun accountBalanceService(

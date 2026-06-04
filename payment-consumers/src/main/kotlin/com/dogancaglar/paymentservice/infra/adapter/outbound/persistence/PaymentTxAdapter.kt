@@ -7,13 +7,13 @@ import com.dogancaglar.paymentservice.domain.model.ledger.SettleStatus
 import com.dogancaglar.paymentservice.domain.model.ledger.TxStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.TxId
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentTxEntity
+import com.dogancaglar.common.db.entity.PaymentTxEntity
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentTxMapper
 import com.dogancaglar.paymentservice.ports.outbound.PaymentTxPort
 import org.springframework.stereotype.Repository
 import java.time.Instant
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.converter.PaymentTxEntityMapper
+import com.dogancaglar.common.db.converter.PaymentTxEntityMapper
 
 /**
  * PaymentTxAdapter

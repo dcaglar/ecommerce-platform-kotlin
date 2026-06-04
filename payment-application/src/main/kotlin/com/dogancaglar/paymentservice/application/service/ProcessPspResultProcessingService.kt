@@ -22,7 +22,7 @@ import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
 import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.id.PublicIdFactory
 import com.dogancaglar.paymentservice.application.events.CaptureConfirmed
-import com.dogancaglar.paymentservice.application.events.CaptureSubmitted
+import com.dogancaglar.paymentservice.application.events.CaptureRequested
 import com.dogancaglar.paymentservice.application.events.JournalEntriesRecorded
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
 import com.dogancaglar.paymentservice.application.util.LedgerDomainEventEntityMapper
@@ -95,10 +95,9 @@ open class ProcessPspResultProcessingService(
             authLiability = authLiability
         )
 
-        //4 default system should behave as if manual capture is received ad nd submitted, so wwe will simply creete outbox event with payload EventEnvelope<CaptureSubmitted>
+        //4 default system should behave as if manual capture is received ad nd submitted, so wwe will simply creete outbox event with payload EventEnvelope<CaptureRequested>
         //and pass also that outboxevent in side saveatomicallym ethod
-        val captureSubmitted = CaptureSubmitted(
-            pspReference = "SALE_AUTO_CAPTURE",
+        val captureRequested = CaptureRequested(
             paymentIntentId = event.paymentIntentId,
             publicPaymentIntentId = event.publicPaymentIntentId,
             merchantAccountId = event.merchantAccountId,
@@ -108,7 +107,7 @@ open class ProcessPspResultProcessingService(
 
         val captureEnvelope = EventEnvelopeFactory.envelopeFor(
             traceId = EventLogContext.getTraceId(),
-            data = captureSubmitted,
+            data = captureRequested,
             aggregateId = event.publicPaymentIntentId,
             parentEventId = EventLogContext.getEventId()
         )

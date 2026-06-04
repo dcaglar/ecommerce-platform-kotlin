@@ -38,7 +38,7 @@ object CONSUMER_GROUPS {
 
     /*
     const val PSP_RESULT_CONSUMER = "payment-core.psp-result-consumer"
-    const val CAPTURE_PSP_PERFORMED_CONSUMER = "payment-core.capture-psp-performed-consumer"
+    const val CAPT================================        URE_PSP_PERFORMED_CONSUMER = "payment-core.capture-psp-performed-consumer"
 
     // Gateway Worker consumers
     const val CAPTURE_COMMAND_EXECUTOR = "gateway-workers.capture-command-executor"

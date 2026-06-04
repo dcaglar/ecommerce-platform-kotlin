@@ -1,10 +1,10 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper
 
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.OutboxEventEntity
+import com.dogancaglar.common.db.entity.OutboxEventEntity
 import org.apache.ibatis.annotations.Mapper
 import java.time.Instant
 
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.EdgeWatermarkEntity
+import com.dogancaglar.common.db.entity.EdgeWatermarkEntity
 
 @Mapper
 interface CentralOutboxRelayMapper {
