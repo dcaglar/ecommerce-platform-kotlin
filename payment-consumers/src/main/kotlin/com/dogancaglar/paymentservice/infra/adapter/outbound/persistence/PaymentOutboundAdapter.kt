@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence
 
 import com.dogancaglar.paymentservice.domain.model.payment.Payment
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.converter.PaymentEntityMapper
+import com.dogancaglar.common.db.converter.PaymentEntityMapper
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentMapper
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
 import org.springframework.stereotype.Repository
@@ -19,14 +19,22 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
  * The Edge Cell (payment-service) does NOT write to this repository.
  * The edge only writes PaymentIntent, PaymentOrder, and OutboxEvent.
  */
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.core.type.TypeReference
+import org.springframework.beans.factory.annotation.Qualifier
+import com.dogancaglar.paymentservice.application.dto.PaymentSplitDto
+
 @Repository
 class PaymentOutboundAdapter(
     private val paymentMapper: PaymentMapper,
-    private val entityMapper: PaymentEntityMapper
+    @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper
 ) : PaymentRepository {
 
+    private val splitsTypeRef = object : TypeReference<List<PaymentSplitDto>>() {}
+
     override fun save(payment: Payment): Payment {
-        paymentMapper.insert(entityMapper.toEntity(payment))
+        val splitsJson = objectMapper.writeValueAsString(payment.splits.map { PaymentSplitDto.fromDomain(it) })
+        paymentMapper.insert(PaymentEntityMapper.toEntity(payment, splitsJson))
         return payment
     }
 
@@ -34,12 +42,14 @@ class PaymentOutboundAdapter(
         val entity = requireNotNull(paymentMapper.findById(paymentId.value)) {
             "Payment not found for paymentId=${paymentId.value}"
         }
-        return entityMapper.toDomain(entity)
+        val splits = objectMapper.readValue(entity.splitsJson, splitsTypeRef).map { it.toDomain() }
+        return PaymentEntityMapper.toDomain(entity, splits)
     }
 
     override fun findByPaymentIntentId(paymentIntentId: PaymentIntentId): Payment? {
-        val entity = paymentMapper.findByPaymentIntentId(paymentIntentId.value)
-        return entity?.let { entityMapper.toDomain(it) }
+        val entity = paymentMapper.findByPaymentIntentId(paymentIntentId.value) ?: return null
+        val splits = objectMapper.readValue(entity.splitsJson, splitsTypeRef).map { it.toDomain() }
+        return PaymentEntityMapper.toDomain(entity, splits)
     }
 
     override fun getMaxPaymentId(): PaymentId {
@@ -48,6 +58,7 @@ class PaymentOutboundAdapter(
     }
 
     override fun updatePayment(payment: Payment) {
-        paymentMapper.update(entityMapper.toEntity(payment))
+        val splitsJson = objectMapper.writeValueAsString(payment.splits.map { PaymentSplitDto.fromDomain(it) })
+        paymentMapper.update(PaymentEntityMapper.toEntity(payment, splitsJson))
     }
 }

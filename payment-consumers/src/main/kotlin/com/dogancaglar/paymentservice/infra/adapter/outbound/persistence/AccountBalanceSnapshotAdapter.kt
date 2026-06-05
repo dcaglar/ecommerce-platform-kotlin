@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence
 
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.AccountBalanceEntity
+import com.dogancaglar.common.db.entity.AccountBalanceEntity
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.AccountBalanceMapper
 import com.dogancaglar.paymentservice.domain.model.balance.AccountBalanceSnapshot
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort

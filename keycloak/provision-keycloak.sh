@@ -436,9 +436,9 @@ create_merchant_api_client() {
 }
 
 # Create merchant API clients for test sellers
-create_merchant_api_client "SELLER-111"
-create_merchant_api_client "SELLER-222"
-create_merchant_api_client "SELLER-333"
+create_merchant_api_client "SELLER-1-1"
+create_merchant_api_client "SELLER-1-2"
+create_merchant_api_client "SELLER-1-3"
 
 # --- Legacy: Keep seller-client for backward compatibility (optional) ---
 # This can be removed if you want to fully migrate to customer-area-frontend
@@ -562,9 +562,9 @@ create_test_user() {
 }
 
 # Create test sellers (continue even if some fail)
-create_test_user "seller-111" "SELLER-111" "seller123" || log "  ⚠️ Failed to create seller-111, continuing..."
-create_test_user "seller-222" "SELLER-222" "seller123" || log "  ⚠️ Failed to create seller-222, continuing..."
-create_test_user "seller-333" "SELLER-333" "seller123" || log "  ⚠️ Failed to create seller-333, continuing..."
+create_test_user "seller-1-1" "SELLER-1-1" "seller123" || log "  ⚠️ Failed to create seller-1-1, continuing..."
+create_test_user "seller-1-2" "SELLER-1-2" "seller123" || log "  ⚠️ Failed to create seller-1-2, continuing..."
+create_test_user "seller-1-3" "SELLER-1-3" "seller123" || log "  ⚠️ Failed to create seller-1-3, continuing..."
 
 log "🛠️ Creating internal finance/admin users..."
 create_internal_user "finance-ops" "finance123" "FINANCE" || log "  ⚠️ Failed to create finance-ops user"
@@ -573,9 +573,9 @@ create_internal_user "backoffice-admin" "admin123" "ADMIN" "FINANCE" || log "  �
 
 log "🔒 Client secrets written to $SECRETS_OUT"
 log "📝 Test users created:"
-log "   - seller-111 / seller123 (seller_id: SELLER-111)"
-log "   - seller-222 / seller123 (seller_id: SELLER-222)"
-log "   - seller-333 / seller123 (seller_id: SELLER-333)"
+log "   - seller-1-1 / seller123 (seller_id: SELLER-1-1)"
+log "   - seller-1-2 / seller123 (seller_id: SELLER-1-2)"
+log "   - seller-1-3 / seller123 (seller_id: SELLER-1-3)"
 log "📝 Internal users created:"
 log "   - finance-ops / finance123 (roles: FINANCE)"
 log "   - backoffice-admin / admin123 (roles: ADMIN, FINANCE)"

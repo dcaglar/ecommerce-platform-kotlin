@@ -1,14 +1,13 @@
 package com.dogancaglar.paymentservice.application.service
 
-import com.dogancaglar.paymentservice.domain.model.ledger.LedgerEntry
+import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
 import com.dogancaglar.paymentservice.ports.inbound.usecases.AccountBalanceUseCase
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import org.slf4j.LoggerFactory
 
 /**
- * Service for updating account balances from ledger entries.
- * Consumes domain-level LedgerEntry objects (not event DTOs).
+ * Service for updating account balances from journal entries.
  * Uses each Posting's signed amount logic for correctness.
  */
 class AccountBalanceService(
@@ -18,16 +17,16 @@ class AccountBalanceService(
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    override fun updateAccountBalancesBatch(ledgerEntries: List<LedgerEntry>): List<Long> {
-        if (ledgerEntries.isEmpty()) return emptyList()
+    override fun updateAccountBalancesBatch(entries: List<JournalEntry>): List<Long> {
+        if (entries.isEmpty()) return emptyList()
 
-        val postingsByAccount = ledgerEntries
+        val postingsByAccount = entries
             .flatMap { entry ->
-                entry.journalEntry.postings.map { posting ->
+                entry.postings.map { posting ->
                     Triple(
                         posting.account.accountCode,
                         posting.getSignedAmount().quantity,
-                        entry.ledgerEntryId
+                        entry.txId.value
                     )
                 }
             }
@@ -52,8 +51,8 @@ class AccountBalanceService(
             }
         }
 
-        logger.info("✅ Updated {} accounts with new deltas ({} ledger entries total)",
-            updatedIds.size, ledgerEntries.size)
+        logger.info("✅ Updated {} accounts with new deltas ({} journal entries total)",
+            updatedIds.size, entries.size)
         return updatedIds.toList()
     }
 }

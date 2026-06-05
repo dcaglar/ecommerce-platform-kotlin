@@ -26,6 +26,108 @@ spec:
       topologySpreadConstraints:
         {{- toYaml .Values.topologySpreadConstraints | nindent 8 }}
       {{- end }}
+      initContainers:
+        # 3. THE LOCAL DATABASE (Edge NVMe Storage) - Native Sidecar
+        - name: local-edge-db
+          image: "{{ .Values.edgeDb.image.repository }}:{{ .Values.edgeDb.image.tag }}"
+          restartPolicy: Always
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_NAME
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_POSTGRES_PASSWORD
+            - name: EDGE_DB_PAYMENT_SERVICE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_SERVICE_USERNAME
+            - name: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+            - name: EDGE_DB_DUTY_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_DUTY_USERNAME
+            - name: EDGE_DB_DUTY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_DUTY_PASSWORD
+          startupProbe:
+            exec:
+              command:
+                - pg_isready
+                - -h
+                - 127.0.0.1
+                - -U
+                - postgres
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            failureThreshold: 30
+          volumeMounts:
+            - name: edge-db-data
+              mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d/init-edge-db.sh
+              subPath: init-edge-db.sh
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+        # 4. LIQUIBASE JOB (Runs after DB is ready)
+        - name: payment-service-liquibase
+          image: "{{ .Values.paymentService.image.repository }}:{{ .Values.paymentService.image.tag }}"
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "liquibase-job"
+            - name: SPRING_MAIN_WEB_APPLICATION_TYPE
+              value: "none"
+            - name: EDGE_DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_NAME
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_URL
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_SERVICE_USERNAME
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+
       containers:
         # 1. THE WEB API (Accepts Traffic)
         - name: payment-service
@@ -69,6 +171,8 @@ spec:
                 secretKeyRef:
                   name: edge-db-credentials
                   key: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+            - name: SPRING_LIQUIBASE_ENABLED
+              value: "false"
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: kafka.payment.svc.cluster.local:9092
             - name: SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
@@ -149,65 +253,7 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12}}
 
-        # 3. THE LOCAL DATABASE (Edge NVMe Storage)
-        - name: local-edge-db
-          image: "{{ .Values.edgeDb.image.repository }}:{{ .Values.edgeDb.image.tag }}"
-          env:
-            - name: POSTGRES_DB
-              valueFrom:
-                configMapKeyRef:
-                  name: payment-platform-config
-                  key: EDGE_DB_NAME
-            - name: POSTGRES_USER
-              value: postgres
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: edge-db-credentials
-                  key: EDGE_DB_POSTGRES_PASSWORD
-            - name: EDGE_DB_PAYMENT_SERVICE_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: edge-db-credentials
-                  key: EDGE_DB_PAYMENT_SERVICE_USERNAME
-            - name: EDGE_DB_PAYMENT_SERVICE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: edge-db-credentials
-                  key: EDGE_DB_PAYMENT_SERVICE_PASSWORD
-            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: edge-db-credentials
-                  key: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
-            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: edge-db-credentials
-                  key: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
-            - name: EDGE_DB_DUTY_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: edge-db-credentials
-                  key: EDGE_DB_DUTY_USERNAME
-            - name: EDGE_DB_DUTY_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: edge-db-credentials
-                  key: EDGE_DB_DUTY_PASSWORD
-          volumeMounts:
-            - name: edge-db-data
-              mountPath: /var/lib/postgresql/data
-            - name: init-scripts
-              mountPath: /docker-entrypoint-initdb.d/init-edge-db.sh
-              subPath: init-edge-db.sh
-          resources:
-            requests:
-              cpu: 500m
-              memory: 512Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
+
 
       volumes:
         - name: init-scripts

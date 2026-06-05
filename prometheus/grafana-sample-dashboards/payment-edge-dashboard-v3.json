@@ -1,0 +1,366 @@
+{
+  "title": "Payment Gateway: Edge Cell & Central Relay Topology",
+  "uid": "payment-edge-arch-v3",
+  "refresh": "10s",
+  "schemaVersion": 36,
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus"
+      },
+      {
+        "name": "env",
+        "type": "query",
+        "query": "label_values(up, env)",
+        "refresh": 1
+      },
+      {
+        "name": "edge_cell",
+        "type": "query",
+        "query": "label_values(outbox_dispatched_total, pod)",
+        "refresh": 1,
+        "includeAll": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Edge Cell: API & PSP Health (payment-service)",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "id": 1
+    },
+    {
+      "id": 2,
+      "title": "API Checkout Throughput",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(http_server_requests_seconds_count{uri=\"/api/v1/payments\", pod=~\"$edge_cell.*\"}[1m]))",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "datasource": "${DS_PROMETHEUS}"
+    },
+    {
+      "id": 3,
+      "title": "PSP Capture & Refund Calls (Rate)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (result) (rate(psp_calls_total{pod=~\"$edge_cell.*\"}[1m]))",
+          "legendFormat": "Capture - {{result}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (result) (rate(psp_refund_calls_total{pod=~\"$edge_cell.*\"}[1m]))",
+          "legendFormat": "Refund - {{result}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "datasource": "${DS_PROMETHEUS}"
+    },
+    {
+      "id": 4,
+      "title": "PSP Gateway Latency (P95)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 16,
+        "y": 1,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(psp_execution_duration_seconds_bucket{pod=~\"$edge_cell.*\"}[1m])) by (le))",
+          "legendFormat": "Execution P95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(psp_queue_delay_seconds_bucket{pod=~\"$edge_cell.*\"}[1m])) by (le))",
+          "legendFormat": "Queue Delay P95",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "datasource": "${DS_PROMETHEUS}"
+    },
+    {
+      "type": "row",
+      "title": "Edge Cell: Local Outbox Forwarder (payment-edge-workers)",
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 1
+      },
+      "id": 5
+    },
+    {
+      "id": 6,
+      "title": "Local Forwarder Dispatched vs Failed (Rate)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(outbox_dispatched_total{pod=~\"$edge_cell.*\"}[1m]))",
+          "legendFormat": "Dispatched Events",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(outbox_dispatch_failed_total{pod=~\"$edge_cell.*\"}[1m]))",
+          "legendFormat": "Failed Dispatches",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "datasource": "${DS_PROMETHEUS}"
+    },
+    {
+      "id": 7,
+      "title": "Local Forwarder Poll Latency (P95)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(outbox_dispatcher_duration_seconds_bucket{pod=~\"$edge_cell.*\"}[1m])) by (le))",
+          "legendFormat": "Poll Latency P95",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "datasource": "${DS_PROMETHEUS}"
+    },
+    {
+      "type": "row",
+      "title": "Central Layer: Outbox Relay (payment-central-relay)",
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 1
+      },
+      "id": 8
+    },
+    {
+      "id": 9,
+      "title": "Central Relay Publish Rate",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(relay_published_total[1m]))",
+          "legendFormat": "Published to Kafka",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(relay_publish_failed_total[1m]))",
+          "legendFormat": "Publish Failed",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "datasource": "${DS_PROMETHEUS}"
+    },
+    {
+      "id": 10,
+      "title": "Central Relay Poll Latency (P95)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 19,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(relay_poll_duration_seconds_bucket[1m])) by (le))",
+          "legendFormat": "Poll Latency P95",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "datasource": "${DS_PROMETHEUS}"
+    },
+    {
+      "type": "row",
+      "title": "Central Layer: Payment Consumers (payment-consumers)",
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 24,
+        "h": 1
+      },
+      "id": 11
+    },
+    {
+      "id": 12,
+      "title": "Kafka Consumer Max Lag",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "max by (client_id, topic) (kafka_consumer_fetch_manager_records_lag_max{topic=~\"psp-result-queue|internal-transfer-queue|capture-execution-queue\"})",
+          "legendFormat": "{{client_id}} - {{topic}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "datasource": "${DS_PROMETHEUS}"
+    }
+  ]
+}

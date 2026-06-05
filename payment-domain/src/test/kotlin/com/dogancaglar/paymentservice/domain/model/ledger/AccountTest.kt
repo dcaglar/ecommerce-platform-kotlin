@@ -18,9 +18,9 @@ class AccountTest {
 
     @Test
     fun `create should create account with correct type and entityId`() {
-        val account = Account.create(AccountType.MERCHANT_PAYABLE, "seller-123")
+        val account = Account.create(AccountType.MARKETPLACE_OPERATOR, "seller-123")
 
-        assertEquals(AccountType.MERCHANT_PAYABLE, account.type)
+        assertEquals(AccountType.MARKETPLACE_OPERATOR, account.type)
         assertEquals("seller-123", account.entityId)
         assertEquals("EUR", account.currency.currencyCode) // Default currency
         assertEquals(AuthType.SALE, account.authType) // Default authType
@@ -36,16 +36,16 @@ class AccountTest {
 
     @Test
     fun `create should default to SALE authType`() {
-        val account = Account.create(AccountType.MERCHANT_PAYABLE, "seller-456")
+        val account = Account.create(AccountType.MARKETPLACE_OPERATOR, "seller-456")
 
         assertEquals(AuthType.SALE, account.authType)
     }
 
     @Test
     fun `accountCode should follow format TYPE_ENTITY_CURRENCY`() {
-        val account = Account.create(AccountType.MERCHANT_PAYABLE, "seller-789")
+        val account = Account.create(AccountType.MARKETPLACE_OPERATOR, "seller-789")
 
-        assertEquals("MERCHANT_PAYABLE.seller-789.EUR", account.accountCode)
+        assertEquals("MARKETPLACE_OPERATOR.seller-789.EUR", account.accountCode)
     }
 
     @Test
@@ -60,7 +60,7 @@ class AccountTest {
     @Test
     fun `create should reject empty entityId`() {
         val exception = assertThrows(IllegalArgumentException::class.java) {
-            Account.create(AccountType.MERCHANT_PAYABLE, "")
+            Account.create(AccountType.MARKETPLACE_OPERATOR, "")
         }
         assertTrue(exception.message?.contains("Entity id cant be empty") == true)
     }
@@ -76,21 +76,21 @@ class AccountTest {
     @Test
     fun `fromProfile should create account with profile properties`() {
         val profile = AccountProfile(
-            accountCode = "MERCHANT_PAYABLE.seller-999.EUR",
-            type = AccountType.MERCHANT_PAYABLE,
+            accountCode = "MARKETPLACE_OPERATOR.seller-999.EUR",
+            type = AccountType.MARKETPLACE_OPERATOR,
             entityId = "seller-999",
             currency = Currency("EUR"),
             category = AccountCategory.LIABILITY,
-            country = "US",
+            country = "NL",
             status = AccountStatus.ACTIVE
         )
 
         val account = Account.fromProfile(profile)
 
-        assertEquals(AccountType.MERCHANT_PAYABLE, account.type)
+        assertEquals(AccountType.MARKETPLACE_OPERATOR, account.type)
         assertEquals("seller-999", account.entityId)
         assertEquals(Currency("EUR"), account.currency)
-        assertEquals("MERCHANT_PAYABLE.seller-999.EUR", account.accountCode)
+        assertEquals("MARKETPLACE_OPERATOR.seller-999.EUR", account.accountCode)
     }
 
     @Test
@@ -122,10 +122,10 @@ class AccountTest {
 
     @Test
     fun `mock should allow custom entityId`() {
-        val account = Account.mock(AccountType.MERCHANT_PAYABLE, "custom-seller")
+        val account = Account.mock(AccountType.MARKETPLACE_OPERATOR, "custom-seller")
 
         assertEquals("custom-seller", account.entityId)
-        assertEquals("MERCHANT_PAYABLE.custom-seller.EUR", account.accountCode)
+        assertEquals("MARKETPLACE_OPERATOR.custom-seller.EUR", account.accountCode)
     }
 
     @Test
@@ -141,7 +141,7 @@ class AccountTest {
         val cashAccount = Account.create(AccountType.PLATFORM_CASH, "GLOBAL")
         val pspReceivableAccount = Account.create(AccountType.PSP_RECEIVABLES, "GLOBAL")
         val authReceivableAccount = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
-        val schemeFeesAccount = Account.create(AccountType.SCHEME_FEES, "GLOBAL")
+        val schemeFeesAccount = Account.create(AccountType.PSP_FEE_EXPENSE, "GLOBAL")
 
         assertTrue(cashAccount.isDebitAccount())
         assertTrue(pspReceivableAccount.isDebitAccount())
@@ -151,9 +151,9 @@ class AccountTest {
 
     @Test
     fun `isDebitAccount should return false for credit account types`() {
-        val merchantAccount = Account.create(AccountType.MERCHANT_PAYABLE, "seller-1")
+        val merchantAccount = Account.create(AccountType.MARKETPLACE_OPERATOR, "seller-1")
         val authLiabilityAccount = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
-        val processingFeeAccount = Account.create(AccountType.PLATFORM_COMMISSION_REVENUE, "GLOBAL")
+        val processingFeeAccount = Account.create(AccountType.PLATFORM_OPERATIONAL_REVENUE, "GLOBAL")
 
         assertFalse(merchantAccount.isDebitAccount())
         assertFalse(authLiabilityAccount.isDebitAccount())
@@ -162,9 +162,9 @@ class AccountTest {
 
     @Test
     fun `isCreditAccount should return true for credit account types`() {
-        val merchantAccount = Account.create(AccountType.MERCHANT_PAYABLE, "seller-2")
+        val merchantAccount = Account.create(AccountType.MARKETPLACE_OPERATOR, "seller-2")
         val authLiabilityAccount = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
-        val processingFeeAccount = Account.create(AccountType.PLATFORM_COMMISSION_REVENUE, "GLOBAL")
+        val processingFeeAccount = Account.create(AccountType.PLATFORM_OPERATIONAL_REVENUE, "GLOBAL")
 
         assertTrue(merchantAccount.isCreditAccount())
         assertTrue(authLiabilityAccount.isCreditAccount())
@@ -176,7 +176,7 @@ class AccountTest {
         val cashAccount = Account.create(AccountType.PLATFORM_CASH, "GLOBAL")
         val pspReceivableAccount = Account.create(AccountType.PSP_RECEIVABLES, "GLOBAL")
         val authReceivableAccount = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
-        val schemeFeesAccount = Account.create(AccountType.SCHEME_FEES, "GLOBAL")
+        val schemeFeesAccount = Account.create(AccountType.PSP_FEE_EXPENSE, "GLOBAL")
 
         assertFalse(cashAccount.isCreditAccount())
         assertFalse(pspReceivableAccount.isCreditAccount())
@@ -200,26 +200,26 @@ class AccountTest {
 
     @Test
     fun `accounts with same type entityId and currency should have same accountCode`() {
-        val account1 = Account.create(AccountType.MERCHANT_PAYABLE, "seller-123")
-        val account2 = Account.create(AccountType.MERCHANT_PAYABLE, "seller-123")
+        val account1 = Account.create(AccountType.MARKETPLACE_OPERATOR, "seller-123")
+        val account2 = Account.create(AccountType.MARKETPLACE_OPERATOR, "seller-123")
 
         assertEquals(account1.accountCode, account2.accountCode)
     }
 
     @Test
     fun `accounts with different currencies should have different accountCodes`() {
-        val usdAccount = Account.mock(AccountType.MERCHANT_PAYABLE, "seller-123", "USD")
-        val eurAccount = Account.mock(AccountType.MERCHANT_PAYABLE, "seller-123", "EUR")
+        val usdAccount = Account.mock(AccountType.MARKETPLACE_OPERATOR, "seller-123", "USD")
+        val eurAccount = Account.mock(AccountType.MARKETPLACE_OPERATOR, "seller-123", "EUR")
 
         assertNotEquals(usdAccount.accountCode, eurAccount.accountCode)
-        assertEquals("MERCHANT_PAYABLE.seller-123.USD", usdAccount.accountCode)
-        assertEquals("MERCHANT_PAYABLE.seller-123.EUR", eurAccount.accountCode)
+        assertEquals("MARKETPLACE_OPERATOR.seller-123.USD", usdAccount.accountCode)
+        assertEquals("MARKETPLACE_OPERATOR.seller-123.EUR", eurAccount.accountCode)
     }
 
     @Test
     fun `accounts with different entityIds should have different accountCodes`() {
-        val account1 = Account.create(AccountType.MERCHANT_PAYABLE, "seller-1")
-        val account2 = Account.create(AccountType.MERCHANT_PAYABLE, "seller-2")
+        val account1 = Account.create(AccountType.MARKETPLACE_OPERATOR, "seller-1")
+        val account2 = Account.create(AccountType.MARKETPLACE_OPERATOR, "seller-2")
 
         assertNotEquals(account1.accountCode, account2.accountCode)
     }

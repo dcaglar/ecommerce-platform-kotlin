@@ -15,9 +15,12 @@ import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter
 import org.springframework.security.web.SecurityFilterChain
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication
+
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
+@ConditionalOnWebApplication
 class SecurityConfig {
 
     @Bean

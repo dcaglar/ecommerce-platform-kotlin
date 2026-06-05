@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.CentralOutboxRelayMapper">
 
-    <resultMap id="CentralOutboxResultMap" type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.OutboxEventEntity">
+    <resultMap id="CentralOutboxResultMap" type="com.dogancaglar.common.db.entity.OutboxEventEntity">
         <id property="oeid" column="oeid"/>
         <result property="eventType" column="event_type"/>
         <result property="aggregateId" column="aggregate_id"/>
@@ -38,12 +38,6 @@
     </update>
 
     <!-- Edge Watermark Operations -->
-    <insert id="upsert" parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.EdgeWatermarkEntity">
-        INSERT INTO edge_watermarks (edge_node_id, forwarded_up_to)
-        VALUES (#{edgeNodeId}, #{forwardedUpTo})
-        ON CONFLICT (edge_node_id) DO UPDATE
-        SET forwarded_up_to = EXCLUDED.forwarded_up_to
-    </insert>
 
     <select id="computeTSafe" resultType="java.time.Instant">
         SELECT MIN(forwarded_up_to) FROM edge_watermarks

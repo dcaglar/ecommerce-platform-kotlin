@@ -6,9 +6,8 @@ import com.dogancaglar.common.event.Event
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.common.logging.GenericLogFields
 import com.dogancaglar.common.kafka.serde.EventEnvelopeKafkaSerializer
-import com.dogancaglar.paymentservice.application.events.LedgerEntriesRecorded
-import com.dogancaglar.common.kafka.metadata.PaymentEventMetadataCatalog
 import com.dogancaglar.common.kafka.metadata.Topics
+import com.dogancaglar.common.kafka.metadata.CONSUMER_GROUPS
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -54,17 +53,12 @@ import java.io.StringWriter
 
 @Configuration
 class KafkaTypedConsumerFactoryConfig(
-    private val dynamicProps: DynamicKafkaConsumersProperties,
     private val bootKafkaProps: KafkaProperties,
     private val meterRegistry: MeterRegistry
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(KafkaTypedConsumerFactoryConfig::class.java)
         private const val HDR_VALUE_BYTES = "springDeserializerExceptionValue"
-    }
-
-    init {
-        logger.info("Loaded dynamicConsumers: {}", dynamicProps.dynamicConsumers.map { it.topic })
     }
 
     @Bean("custom-kafka-consumer-factory-for-micrometer")
@@ -187,10 +181,8 @@ class KafkaTypedConsumerFactoryConfig(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         consumerFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler,
-        ackMode: ContainerProperties.AckMode = ContainerProperties.AckMode.RECORD,
         expectedEventType: String? = null,
-        ackDiscarded: Boolean = true,
-        batchMode: Boolean = false
+        ackDiscarded: Boolean = true
     ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>> =
         ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>>().apply {
             this.consumerFactory = consumerFactory
@@ -204,9 +196,8 @@ class KafkaTypedConsumerFactoryConfig(
             @Suppress("UNCHECKED_CAST")
             setRecordInterceptor(interceptor as RecordInterceptor<String, EventEnvelope<T>>)
             setCommonErrorHandler(errorHandler)
-            containerProperties.ackMode = ackMode
             setConcurrency(concurrency)
-            isBatchListener = batchMode
+            setAutoStartup(false)
 
             // enforce semantic type at the container level
             expectedEventType?.let {
@@ -222,51 +213,113 @@ class KafkaTypedConsumerFactoryConfig(
 
 
 
-    @Bean("psp-result-factory")
+    @Bean(CONSUMER_GROUPS.PSP_RESULT_CONSUMER + "-factory")
     fun pspResultFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
         customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler
     ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<Event>> {
-        val cfg = cfgFor(Topics.PAYMENT_AUTHORIZED, "psp-result-factory")
         return createFactory(
             clientId = "psp-result-consumer",
-            concurrency = cfg.concurrency,
+            concurrency = 1,
             interceptor = interceptor,
             consumerFactory = customFactory,
             errorHandler = errorHandler,
-            ackMode = ContainerProperties.AckMode.MANUAL,
-            expectedEventType = null,
-            batchMode = false
+            expectedEventType = null
         )
     }
 
-
-
-    @Bean("${Topics.LEDGER_ENTRIES_RECORDED}-factory")
-    fun ledgerEntriesRecordedFactory(
+    @Bean(CONSUMER_GROUPS.MARKETPLACE_SPLIT_INSTRUCTION_CONSUMER + "-factory")
+    fun marketPlaceSplitConsumer(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
         customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler
-    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<LedgerEntriesRecorded>> {
-        val cfg = cfgFor(
-            PaymentEventMetadataCatalog.LedgerEntriesRecordedMetadata.topic,
-            "${Topics.LEDGER_ENTRIES_RECORDED}-factory"
-        )
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<Event>> {
         return createFactory(
-            clientId = cfg.id,
-            concurrency = cfg.concurrency,
+            clientId = "split-instruction-consumer-group",
+            concurrency = 1,
             interceptor = interceptor,
             consumerFactory = customFactory,
             errorHandler = errorHandler,
-            ackMode = ContainerProperties.AckMode.MANUAL,
-            expectedEventType = PaymentEventMetadataCatalog.LedgerEntriesRecordedMetadata.eventType,
-            ackDiscarded = true,
-            batchMode = true
+            expectedEventType = null
         )
     }
+
+    @Bean(CONSUMER_GROUPS.ACCOUNT_BALANCE_CONSUMER + "-factory")
+    fun journalEntriesRecordedFactory(
+        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
+        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<Event>> {
+        return createFactory(
+            clientId = "journal-entries-consumer",
+            concurrency = 3,
+            interceptor = interceptor,
+            consumerFactory = customFactory,
+            errorHandler = errorHandler,
+            expectedEventType = null
+        )
+    }
+
+
+
+    @Bean(CONSUMER_GROUPS.CAPTURE_COMMAND_EXECUTOR + "-factory")
+    fun captureCommandsFactory(
+        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
+        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<Event>> {
+        return createFactory(
+            clientId = "capture-command-executor",
+            concurrency = 3,
+            interceptor = interceptor,
+            consumerFactory = customFactory,
+            errorHandler = errorHandler,
+            expectedEventType = null
+        )
+    }
+
+    @Bean(CONSUMER_GROUPS.CAPTURE_SUBMITTED_CONSUMER + "-factory")
+    fun captureSubmittedAcksFactory(
+        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
+        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<Event>> {
+        return createFactory(
+            clientId = "capture-psp-performed-consumer",
+            concurrency = 3,
+            interceptor = interceptor,
+            consumerFactory = customFactory,
+            errorHandler = errorHandler,
+            expectedEventType = null
+        )
+    }
+
+    @Bean(CONSUMER_GROUPS.INTERNAL_TRANSFER_CONSUMER + "-factory")
+    fun internalTransfersFactory(
+        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
+        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<Event>> {
+        return createFactory(
+            clientId = "internal-transfer-executor",
+            concurrency = 3,
+            interceptor = interceptor,
+            consumerFactory = customFactory,
+            errorHandler = errorHandler,
+            expectedEventType = null
+        )
+    }
+
+
+
+
 
 
     @Bean
@@ -289,9 +342,7 @@ class KafkaTypedConsumerFactoryConfig(
         }
 
 
-    private fun cfgFor(topic: String, beanName: String): DynamicKafkaConsumersProperties.DynamicConsumer =
-        dynamicProps.dynamicConsumers.firstOrNull { it.topic == topic }
-            ?: error("Missing app.kafka.dynamic-consumers entry for topic '$topic' (required by bean '$beanName').")
+
 
 }
 

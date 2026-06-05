@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.application.util.psp
 
-import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
+import com.dogancaglar.paymentservice.domain.model.payment.PspModificationStatus
+
 
 /**
  * Maps PSP capture (seller-level) responses to internal PaymentOrderStatus.
@@ -8,28 +9,28 @@ import com.dogancaglar.paymentservice.domain.model.payment.PaymentOrderStatus
  */
 object PSPCaptureStatusMapper {
 
-    fun fromPspCaptureResponseCode(code: String): PaymentOrderStatus = when (code.uppercase()) {
+    fun fromPspCaptureResponseCode(code: String): PspModificationStatus = when (code.uppercase()) {
         // Final successful state
-        "CAPTURE_SUCCESS", "SUCCESSFUL_FINAL" -> PaymentOrderStatus.CAPTURED
+        "CAPTURE_SUCCESS", "SUCCESSFUL_FINAL" -> PspModificationStatus.CAPTURED
 
         // Final non-retryable failure states
-        "CAPTURE_FAILED_FINAL", "CAPTURE_DECLINED_FINAL" -> PaymentOrderStatus.CAPTURE_FAILED
+        "CAPTURE_FAILED_FINAL", "CAPTURE_DECLINED_FINAL" -> PspModificationStatus.CAPTURE_FAILED
 
         // Transient (retryable) errors
         "TRANSIENT_NETWORK_ERROR",
             "PENDING_CAPTURE",
-        "TIMEOUT_EXCEEDED_1S_TRANSIENT" -> PaymentOrderStatus.PENDING_CAPTURE // will be retried
+        "TIMEOUT_EXCEEDED_1S_TRANSIENT" -> PspModificationStatus.PENDING_CAPTURE // will be retried
 
 
-        else -> PaymentOrderStatus.CAPTURE_FAILED
+        else -> PspModificationStatus.CAPTURE_FAILED
     }
 
-    fun requiresRetry(status: PaymentOrderStatus): Boolean {
+    fun requiresRetry(status: PspModificationStatus): Boolean {
         return status in retryableStatuses
     }
 
     private val retryableStatuses = setOf(
-        PaymentOrderStatus.PENDING_CAPTURE // transient retry bucket
+        PspModificationStatus.PENDING_CAPTURE // transient retry bucket
     )
 
 }

@@ -1,57 +1,45 @@
 package com.dogancaglar.paymentservice.application.util
 
 import com.dogancaglar.common.time.Utc
-import com.dogancaglar.paymentservice.application.events.LedgerEntryEventData
+import com.dogancaglar.paymentservice.application.events.JournalEntryEventData
 import com.dogancaglar.paymentservice.application.events.PostingDirection
 import com.dogancaglar.paymentservice.application.events.PostingEventData
 import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.common.Currency
 import com.dogancaglar.paymentservice.domain.model.ledger.Account
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
-import com.dogancaglar.paymentservice.domain.model.ledger.LedgerEntry
 import com.dogancaglar.paymentservice.domain.model.ledger.Posting
-import com.dogancaglar.paymentservice.domain.util.LedgerEntryFactory
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.TxId
 
 object LedgerDomainEventEntityMapper {
 
-    private val ledgerEntryFactory = LedgerEntryFactory()
-
     /**
-     * Maps LedgerEntry domain model to LedgerEntryEventData DTO.
+     * Maps JournalEntry domain model to JournalEntryEventData DTO.
      */
-    fun toLedgerEntryEventData(ledgerEntry: LedgerEntry): LedgerEntryEventData {
-        val journal = ledgerEntry.journalEntry
-        return LedgerEntryEventData.create(
-            ledgerEntryId = ledgerEntry.ledgerEntryId,
+    fun toLedgerEntryEventData(journal: JournalEntry): JournalEntryEventData {
+        return JournalEntryEventData.create(
             journalEntryId = journal.id,
-            journalType = journal.txType,
+            journalType = journal.journalType,
             journalName = journal.name,
             paymentId = journal.paymentId.value,
             txId = journal.txId.value,
-            createdAt = Utc.toInstant(ledgerEntry.createdAt),
+            createdAt = Utc.nowInstant(), // or a passed-in timestamp
             postings = journal.postings.map { toPostingEventData(it) }
         )
     }
 
 
-    fun toDomain(ledgerEntryEvent: LedgerEntryEventData): LedgerEntry {
+    fun toDomain(ledgerEntryEvent: JournalEntryEventData): JournalEntry {
         val postingsDomain = ledgerEntryEvent.postings.map { it.toDomain() }
 
-        val journal = JournalEntry.fromPersistence(
+        return JournalEntry.rehytrate(
             id = ledgerEntryEvent.journalEntryId,
             txType = ledgerEntryEvent.journalType,
             name = ledgerEntryEvent.journalName ?: "Ledger Entry",
             paymentId = PaymentId(ledgerEntryEvent.paymentId),
             txId = TxId(ledgerEntryEvent.txId),
             postings = postingsDomain
-        )
-
-        return ledgerEntryFactory.fromPersistence(
-            ledgerEntryId = ledgerEntryEvent.ledgerEntryId,
-            journalEntry = journal,
-            createdAt = ledgerEntryEvent.createdAt,
         )
     }
 

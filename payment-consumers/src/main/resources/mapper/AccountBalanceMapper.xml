@@ -7,7 +7,7 @@
 
 
     <resultMap id="AccountBalanceResultMap"
-               type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.AccountBalanceEntity">
+               type="com.dogancaglar.common.db.entity.AccountBalanceEntity">
         <id property="accountCode" column="account_code"/>
         <result property="balance" column="balance"/>
         <result property="lastAppliedEntryId" column="last_applied_entry_id"/>

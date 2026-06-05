@@ -4,7 +4,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentIntentMapper">
     <resultMap id="PaymentIntentResultMap"
-               type="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentIntentEntity">
+               type="com.dogancaglar.common.db.entity.PaymentIntentEntity">
         <id property="paymentIntentId" column="payment_intent_id"/>
         <result property="pspReference" column="psp_reference"/>
         <result property="buyerId" column="buyer_id"/>
@@ -27,7 +27,7 @@
 
 
     <insert id="insert"
-            parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentIntentEntity"
+            parameterType="com.dogancaglar.common.db.entity.PaymentIntentEntity"
     >
         INSERT INTO payment_intents (
         payment_intent_id,
@@ -80,7 +80,7 @@
     </delete>
 
     <update id="update"
-            parameterType="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentIntentEntity">
+            parameterType="com.dogancaglar.common.db.entity.PaymentIntentEntity">
         UPDATE payment_intents SET
         psp_reference = #{pspReference},
         order_id = #{orderId},

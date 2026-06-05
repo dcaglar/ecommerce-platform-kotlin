@@ -1,7 +1,7 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper
 
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.OutboxEventEntity
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.EdgeWatermarkEntity
+import com.dogancaglar.common.db.entity.OutboxEventEntity
+import com.dogancaglar.common.db.entity.EdgeWatermarkEntity
 import org.apache.ibatis.annotations.Mapper
 import java.time.Instant
 
@@ -11,6 +11,5 @@ interface CentralOutboxForwarderMapper {
     
     // Edge Watermark operations
     fun upsert(entity: EdgeWatermarkEntity)
-    fun computeTSafe(): Instant?
     fun deleteWatermark(edgeNodeId: String)
 }

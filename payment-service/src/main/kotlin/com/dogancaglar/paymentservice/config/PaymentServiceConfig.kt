@@ -16,7 +16,6 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import java.util.concurrent.Executor
 
 @Configuration
 class PaymentServiceConfig {
@@ -37,11 +36,11 @@ class PaymentServiceConfig {
 
     @Bean
     fun capturePaymentService(
-                              psp: PspAuthorizationGatewayPort,
-                              @Qualifier("outboxWebAdapter")  outboxWebAdapter: LocalOutboxWriterPort,
-                              idGeneratorPort: IdGeneratorPort,
-                              serializationPort: SerializationPort): CapturePaymentService {
-        return CapturePaymentService(psp,outboxWebAdapter,idGeneratorPort,serializationPort)
+        @Qualifier("localOutboxWriterAdapter")  localOutboxWriterPort: LocalOutboxWriterPort,
+        idGeneratorPort: IdGeneratorPort,
+        paymentIntentRepository: PaymentIntentRepository,
+        serializationPort: SerializationPort): CapturePaymentService {
+        return CapturePaymentService(localOutboxWriterPort, idGeneratorPort, serializationPort, paymentIntentRepository)
     }
 
 

@@ -2,7 +2,7 @@ package com.dogancaglar.paymentservice.util
 
 import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.common.Currency
-import com.dogancaglar.paymentservice.domain.model.payment.BalanceAccountType
+import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
 import com.dogancaglar.paymentservice.domain.model.payment.ProcessingModel
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit
@@ -32,7 +32,7 @@ object PaymentTestHelper {
             totalAmount = amount,
             splits = if (processingModel == ProcessingModel.MARKETPLACE) listOf(
                 PaymentSplit.of(
-                    targetAccountType = BalanceAccountType.MARKETPLACE_SUB_SELLER,
+                    targetAccountType = AccountType.MARKETPLACE_SUB_SELLER,
                     targetEntityId = sellerId,
                     amount = amount
                 )

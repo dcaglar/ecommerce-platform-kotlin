@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.adapter.inbound.rest
 import com.dogancaglar.common.id.PublicIdFactory
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.AuthorizationRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CaptureRequestDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CaptureResponseDTO
 import com.dogancaglar.paymentservice.application.validator.PaymentValidator
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
@@ -16,6 +17,7 @@ import com.dogancaglar.paymentservice.ports.inbound.usecases.CapturePaymentUseCa
 import com.dogancaglar.paymentservice.ports.inbound.usecases.CreatePaymentIntentUseCase
 import com.dogancaglar.paymentservice.ports.inbound.usecases.GetPaymentIntentUseCase
 import com.dogancaglar.paymentservice.ports.inbound.usecases.UpdatePaymentIntentUseCase
+import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import com.stripe.model.Event
 import com.stripe.model.PaymentIntent
 import org.slf4j.LoggerFactory
@@ -29,6 +31,7 @@ class PaymentApiOrchestrator(
     private val updatePaymentIntentUseCase: UpdatePaymentIntentUseCase,
     private val capturePaymentUseCase: CapturePaymentUseCase,
     private val paymentValidator: PaymentValidator,
+    private val idGeneratorPort: IdGeneratorPort,
 ) {
     private val logger = LoggerFactory.getLogger(PaymentApiOrchestrator::class.java)
 
@@ -48,12 +51,6 @@ class PaymentApiOrchestrator(
         logger.info("⚡ [Orchestrator] Calling authorizePaymentIntentUseCase.authorize for internal long numeric ID: ${cmd.paymentIntentId}")
         val paymentIntent = authorizePaymentIntentUseCase.authorize(cmd)
         return PaymentRequestMapper.toPaymentResponseDto(paymentIntent)
-    }
-
-    fun capturePayment(publicPaymentId: String, request: CaptureRequestDTO): CreatePaymentIntentResponseDTO? {
-        logger.info("🔁 PaymentApiOrchestrator.capturePayment srarted")
-        return null
-       //
     }
 
     fun getPaymentIntent(publicPaymentIntentId: String): CreatePaymentIntentResponseDTO {

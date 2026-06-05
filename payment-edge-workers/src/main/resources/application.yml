@@ -20,7 +20,7 @@ spring:
 
 mybatis:
   mapper-locations: classpath:mapper/**/*.xml
-  type-aliases-package: com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity
+  type-aliases-package: com.dogancaglar.common.db.entity
   type-handlers-package: com.dogancaglar.common.db.typehandler
 
 management:
@@ -80,6 +80,9 @@ app:
   datasource:
     outbox:
       driver-class-name: org.postgresql.Driver
+      jdbc-url: ${SPRING_DATASOURCE_EDGE_URL}
+      username: ${SPRING_DATASOURCE_EDGE_USERNAME}
+      password: ${SPRING_DATASOURCE_EDGE_PASSWORD}
       pool-name: edge-outbox-pool
       maximum-pool-size: 6
       minimum-idle: 3
@@ -89,6 +92,9 @@ app:
       max-lifetime: 1800000
     maintenance:
       driver-class-name: org.postgresql.Driver
+      jdbc-url: ${SPRING_DATASOURCE_EDGE_URL}
+      username: ${SPRING_DATASOURCE_MAINTENANCE_USERNAME}
+      password: ${SPRING_DATASOURCE_MAINTENANCE_PASSWORD}
       pool-name: edge-maint-pool
       maximum-pool-size: 1
       minimum-idle: 0
@@ -98,6 +104,9 @@ app:
       max-lifetime: 1800000
     central:
       driver-class-name: org.postgresql.Driver
+      jdbc-url: ${SPRING_DATASOURCE_CENTRAL_URL}
+      username: ${SPRING_DATASOURCE_CENTRAL_USERNAME}
+      password: ${SPRING_DATASOURCE_CENTRAL_PASSWORD}
       pool-name: central-writer-pool
       maximum-pool-size: 6
       minimum-idle: 3

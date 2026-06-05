@@ -3,6 +3,7 @@ package com.dogancaglar.paymentservice.domain.model.payment
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.common.Currency
+import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
 import com.dogancaglar.paymentservice.domain.model.vo.*
 import kotlin.test.*
 
@@ -11,8 +12,8 @@ class PaymentIntentTest {
     private val buyerId = BuyerId("buyer-1")
     private val orderId = OrderId("order-1")
     private val currency = Currency("EUR")
-    private val line1 = PaymentSplit.of(BalanceAccountType.MARKETPLACE_SUB_SELLER, "s1", Amount.of(1000, currency))
-    private val line2 = PaymentSplit.of(BalanceAccountType.MARKETPLACE_SUB_SELLER, "s2", Amount.of(2000, currency))
+    private val line1 = PaymentSplit.of(AccountType.MARKETPLACE_SUB_SELLER, "s1", Amount.of(1000, currency))
+    private val line2 = PaymentSplit.of(AccountType.MARKETPLACE_SUB_SELLER, "s2", Amount.of(2000, currency))
     private val lines = listOf(line1, line2)
     private val totalAmount = Amount.of(3000, currency)
     private val processingModel = ProcessingModel.MARKETPLACE

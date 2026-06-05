@@ -1,20 +1,21 @@
 package com.dogancaglar.paymentservice.ports.inbound.usecases
 
-import com.dogancaglar.paymentservice.domain.model.ledger.LedgerEntry
+import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
 
 /**
- * Use case for updating account balances from ledger entries.
+ * AccountBalanceUseCase
+ * 
+ * Mandate: Maintains account balance aggregations (snapshot + delta) optimized
+ * for high-throughput reads and eventual consistency.
  */
 interface AccountBalanceUseCase {
-    /**
-     * Updates account balances from a batch of ledger entries.
-     * Performs idempotency checks and updates Redis deltas.
-     * 
-     * @param ledgerEntries List of ledger entries to process
-     * @return List of processed ledger entry IDs (already persisted, safe to mark as processed)
-     */
-    fun updateAccountBalancesBatch(
-        ledgerEntries: List<LedgerEntry>
-    ): List<Long>
-}
 
+    /**
+     * Updates account balances in-memory or in Redis (cache layer) based on the
+     * provided journal entries.
+     * 
+     * @param entries Domain-level JournalEntry list containing the postings to apply.
+     * @return List of successfully updated Account IDs (for cache invalidation/monitoring).
+     */
+    fun updateAccountBalancesBatch(entries: List<JournalEntry>): List<Long>
+}

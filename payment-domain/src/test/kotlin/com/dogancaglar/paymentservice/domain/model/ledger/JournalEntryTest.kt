@@ -2,6 +2,7 @@ package com.dogancaglar.paymentservice.domain.model.ledger
 
 import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.common.Currency
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.TxId
 import kotlin.test.Test
@@ -14,169 +15,229 @@ import kotlin.test.assertTrue
  * Verifies:
  * - All journal entries are balanced (debits = credits)
  * - Correct accounts are used for each transaction type
- * - Postings are properly configured
+ * - Exact postings are generated as expected
  */
 class JournalEntryTest {
     
     private val eur = Currency("EUR")
-    val platformCashAccount = Account.create(AccountType.PLATFORM_CASH, "merchantId")
-    val merchantAccount = Account.create(AccountType.MERCHANT_PAYABLE, "merchantId")
-    val merchantGrossPool = Account.create(AccountType.MERCHANT_PAYABLE, "merchantId")
-    val pspFeeExpenseAccount = Account.create(AccountType.PSP_FEE_EXPENSE, "GLOBAL")
-    val commissionRevenueAccount = Account.create(AccountType.PLATFORM_COMMISSION_REVENUE, "GLOBAL")
-    val authLiabilityAccount = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
-    val authReceivableAccount = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
-    val pspReceivableAccount = Account.create(AccountType.PSP_RECEIVABLES, "GLOBAL")
+    private val paymentId = PaymentId(100L)
+    private val txId = TxId(1L)
+    private val journalId = "PAY-1"
+
+    private val platformCashAccount = Account.create(AccountType.PLATFORM_CASH, "GLOBAL")
+    private val merchantAccount = Account.create(AccountType.MARKETPLACE_OPERATOR, "merchantId")
+    private val merchantGrossPool = Account.create(AccountType.MARKETPLACE_OPERATOR, "merchantId")
+    private val subSellerAccount = Account.create(AccountType.MARKETPLACE_SUB_SELLER, "subSellerId")
+    private val pspFeeExpenseAccount = Account.create(AccountType.PSP_FEE_EXPENSE, "GLOBAL")
+    private val commissionRevenueAccount = Account.create(AccountType.PLATFORM_OPERATIONAL_REVENUE, "GLOBAL")
+    private val commissionEscrowAccount = Account.create(AccountType.PLATFORM_COMMISSION_ESCROW, "GLOBAL")
+    private val authLiabilityAccount = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
+    private val authReceivableAccount = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
+    private val pspReceivableAccount = Account.create(AccountType.PSP_RECEIVABLES, "GLOBAL")
+
+    private fun assertBalanced(entry: JournalEntry) {
+        val totalDebits = entry.postings.filterIsInstance<Posting.Debit>().sumOf { it.amount.quantity }
+        val totalCredits = entry.postings.filterIsInstance<Posting.Credit>().sumOf { it.amount.quantity }
+        assertEquals(totalDebits, totalCredits, "Journal entry is not balanced")
+        assertTrue(totalDebits > 0, "Journal entry has zero amount")
+    }
+
+    private fun assertPostingContains(entry: JournalEntry, account: Account, isDebit: Boolean, expectedAmount: Long) {
+        val matchingPostings = entry.postings.filter { it.account == account && ((isDebit && it is Posting.Debit) || (!isDebit && it is Posting.Credit)) }
+        assertTrue(matchingPostings.isNotEmpty(), "Expected ${if(isDebit) "Debit" else "Credit"} for account ${account.type} not found")
+        assertEquals(expectedAmount, matchingPostings.sumOf { it.amount.quantity }, "Amount mismatch for account ${account.type}")
+    }
 
     @Test
-    fun `authHold should create balanced entry with AUTH_RECEIVABLE debit and AUTH_LIABILITY credit`() {
+    fun `authHold creates correct postings and balances`() {
         val amount = Amount.of(10_000, eur)
-        val result = JournalEntry.authHold(
-            paymentId = PaymentId(100L),
-            txId = TxId(1L),
-            journalIdentifier = "PAY-1",
+        val entries = JournalEntry.authHold(
+            paymentId = paymentId,
+            txId = txId,
+            journalIdentifier = journalId,
             authorizedAmount = amount,
             authReceivable = authReceivableAccount,
             authLiability = authLiabilityAccount
         )
-        val entryList = result
-        val entry = entryList.first()
         
-        val totalDebitAmount = entry.postings.filterIsInstance<Posting.Debit>().sumOf { it.amount.quantity }
-        val totalCreditAmount = entry.postings.filterIsInstance<Posting.Credit>().sumOf { it.amount.quantity }
-        val netBalanceByAccount = entry.postings
-            .groupBy { it.account.accountCode }
-            .mapValues { (_, postings) -> postings.sumOf { it.getSignedAmount().quantity } }
+        assertEquals(1, entries.size)
+        val entry = entries.first()
         
-        assertTrue(entry.postings.isNotEmpty())
-        assertEquals(totalDebitAmount, totalCreditAmount, "Entry must be balanced")
-        assertTrue(entry.postings.any { it.account.type == AccountType.AUTH_RECEIVABLE })
-        assertTrue(entry.postings.any { it.account.type == AccountType.AUTH_LIABILITY })
-        assertEquals(10_000, netBalanceByAccount[authLiabilityAccount.accountCode])
-        assertEquals(10_000, netBalanceByAccount[authReceivableAccount.accountCode])
+        assertBalanced(entry)
+        assertEquals(JournalType.AUTH_HOLD, entry.journalType)
+        assertPostingContains(entry, authReceivableAccount, isDebit = true, expectedAmount = 10_000)
+        assertPostingContains(entry, authLiabilityAccount, isDebit = false, expectedAmount = 10_000)
     }
 
     @Test
-    fun `captureGrossAsset should balance and shift from auth to psp receivables, and increase merchant payable`() {
+    fun `captureGrossAsset creates correct postings and balances`() {
         val amount = Amount.of(10_000, eur)
-        val result = JournalEntry.captureGrossAsset(
-            paymentId = PaymentId(100L),
-            txId = TxId(2L),
-            journalIdentifier = "PAY-2",
+        val entries = JournalEntry.captureGrossAsset(
+            paymentId = paymentId,
+            txId = txId,
+            journalIdentifier = journalId,
             capturedAmount = amount,
             authReceivable = authReceivableAccount,
             authLiability = authLiabilityAccount,
             merchantGrossPool = merchantGrossPool,
             pspReceivable = pspReceivableAccount
         )
-        val entryList = result
-        val entry = entryList.first()
         
-        val drAccounts = entry.postings.filterIsInstance<Posting.Debit>().map { it.account.type }
-        val crAccounts = entry.postings.filterIsInstance<Posting.Credit>().map { it.account.type }
+        assertEquals(1, entries.size)
+        val entry = entries.first()
         
-        assertTrue(entry.postings.isNotEmpty())
-        assertTrue(AccountType.PSP_RECEIVABLES in drAccounts)
-        assertTrue(AccountType.AUTH_RECEIVABLE in crAccounts)
-        assertTrue(AccountType.AUTH_LIABILITY in drAccounts)
-        assertTrue(AccountType.MERCHANT_PAYABLE in crAccounts)
-        
-        val netAmountByAccount = entry.postings
-            .groupBy { it.account.accountCode }
-            .mapValues { (_, postings) -> postings.sumOf { it.getSignedAmount().quantity } }
-        
-        // Global balance should be zero
-        assertEquals(0L, entry.postings.sumOf { it.getSignedAmount().quantity })
-        // Merchant payable up
-        assertEquals(10000, netAmountByAccount[merchantGrossPool.accountCode])
-        // PSP receivable up
-        assertEquals(10000, netAmountByAccount[pspReceivableAccount.accountCode])
-        // Balance out auths
-        assertEquals(-10_000, netAmountByAccount[authLiabilityAccount.accountCode])
-        assertEquals(-10_000, netAmountByAccount[authReceivableAccount.accountCode])
+        assertBalanced(entry)
+        assertEquals(JournalType.CAPTURE, entry.journalType)
+        assertPostingContains(entry, authLiabilityAccount, isDebit = true, expectedAmount = 10_000)
+        assertPostingContains(entry, authReceivableAccount, isDebit = false, expectedAmount = 10_000)
+        assertPostingContains(entry, pspReceivableAccount, isDebit = true, expectedAmount = 10_000)
+        assertPostingContains(entry, merchantGrossPool, isDebit = false, expectedAmount = 10_000)
     }
 
     @Test
-    fun `settlement should increase cash account by settled amount and also record psp fee as expense and balance psp receivable`() {
-        val gross = Amount.of(10_000, Currency("EUR"))
-        val settledAmount = Amount.of(9500, Currency("EUR"))
-        val entryList = JournalEntry.settlement(PaymentId(100L), TxId(3L), "PAY-3", gross, settledAmount,platformCashAccount,pspFeeExpenseAccount,pspReceivableAccount)
-        val entry = entryList.first()
-
-        assertEquals(0L, entry.postings.sumOf { it.getSignedAmount().quantity })
-        assertTrue(entry.postings.any { it.account.type == AccountType.PLATFORM_CASH })
-        assertTrue(entry.postings.any { it.account.type == AccountType.PSP_RECEIVABLES })
-        assertTrue(entry.postings.any { it.account.type == AccountType.PSP_FEE_EXPENSE })
-    }
-
-    @Test
-    fun `commissionFeeRegistered should reduce merchant liability and record commission revenue`() {
-        val commissionFee = Amount.of(200, Currency("EUR"))
-        val entryList = JournalEntry.commissionFeeRegistered(PaymentId(100L), TxId(4L), "PAY-4", commissionFee, commissionRevenueAccount,merchantAccount)
-        val entry = entryList.first()
-
-        assertEquals(0L, entry.postings.sumOf { it.getSignedAmount().quantity })
-        val debit = entry.postings.filterIsInstance<Posting.Debit>().first()
-        val credit = entry.postings.filterIsInstance<Posting.Credit>().first()
-
-        assertEquals(merchantAccount.type, debit.account.type)
-        assertEquals(AccountType.PLATFORM_COMMISSION_REVENUE, credit.account.type)
-    }
-
-    @Test
-    fun `payout should decrease platform cash and merchant payable`() {
-        val payout = Amount.of(9_800, Currency("EUR"))
-        val entryList = JournalEntry.payout(PaymentId(100L), TxId(5L), "MERCHANT-1", payout, merchantAccount, platformCashAccount)
-        val entry = entryList.first()
+    fun `executeSubSellerSplit creates correct postings for multiple splits and balances`() {
+        val split1 = PaymentSplit.of(AccountType.MARKETPLACE_SUB_SELLER, "subSellerId", Amount.of(8_000, eur))
+        val split2 = PaymentSplit.of(AccountType.PLATFORM_COMMISSION_ESCROW, "GLOBAL", Amount.of(2_000, eur))
         
-        val netByAccount = entry.postings
-            .groupBy { it.account.accountCode }
-            .mapValues { (_, posts) -> posts.sumOf { it.getSignedAmount().quantity } }
-
-        assertEquals(-9800, netByAccount[merchantAccount.accountCode])
-        assertEquals(-9800, netByAccount[platformCashAccount.accountCode])
-
-        assertTrue(entry.postings.any { it.account.accountCode == merchantAccount.accountCode })
-        assertTrue(entry.postings.any { it.account.accountCode == platformCashAccount.accountCode })
+        val entries = JournalEntry.executeSubSellerSplit(
+            paymentId = paymentId,
+            txId = txId,
+            journalIdentifier = journalId,
+            merchantGrossPool = merchantGrossPool,
+            splits = listOf(split1, split2),
+            resolveTargetAccount = { type, id -> if (type == AccountType.MARKETPLACE_SUB_SELLER) subSellerAccount else commissionEscrowAccount }
+        )
+        
+        assertEquals(2, entries.size)
+        
+        // Check first entry (Sub-Seller)
+        val entry1 = entries[0]
+        assertBalanced(entry1)
+        assertEquals(JournalType.INTERNAL_TRANSFER, entry1.journalType)
+        assertPostingContains(entry1, merchantGrossPool, isDebit = true, expectedAmount = 8_000)
+        assertPostingContains(entry1, subSellerAccount, isDebit = false, expectedAmount = 8_000)
+        
+        // Check second entry (Commission Escrow)
+        val entry2 = entries[1]
+        assertBalanced(entry2)
+        assertEquals(JournalType.INTERNAL_TRANSFER, entry2.journalType)
+        assertPostingContains(entry2, merchantGrossPool, isDebit = true, expectedAmount = 2_000)
+        assertPostingContains(entry2, commissionEscrowAccount, isDebit = false, expectedAmount = 2_000)
     }
 
     @Test
-    fun `fullFlow should net platform commission fee as profit and merchant payable cleared`() {
-        val capturedAmount = Amount.of(10_000, eur)//100 gross
-        val settledAmount = Amount.of(9800, eur) // 2 psp fee as expense
-        val commissionFeeRevenue = Amount.of(400, eur) //our commission as reevenue
-        val payout = capturedAmount-commissionFeeRevenue
+    fun `internalTransfer creates correct postings for a single transfer and balances`() {
+        val amount = Amount.of(5_000, eur)
+        val entries = JournalEntry.internalTransfer(
+            paymentId = paymentId,
+            txId = txId,
+            journalIdentifier = journalId,
+            amount = amount,
+            merchantGrossPool = merchantGrossPool,
+            targetAccount = subSellerAccount,
+            targetAccountType = AccountType.MARKETPLACE_SUB_SELLER,
+            targetEntityId = "subSellerId"
+        )
+        
+        assertEquals(1, entries.size)
+        val entry = entries.first()
+        
+        assertBalanced(entry)
+        assertEquals(JournalType.INTERNAL_TRANSFER, entry.journalType)
+        assertPostingContains(entry, merchantGrossPool, isDebit = true, expectedAmount = 5_000)
+        assertPostingContains(entry, subSellerAccount, isDebit = false, expectedAmount = 5_000)
+    }
 
-        val captureResult = JournalEntry.captureGrossAsset(
-            paymentId = PaymentId(100L),
-            txId = TxId(5L),
-            journalIdentifier = "PAY-5",
-            capturedAmount = capturedAmount,
+    @Test
+    fun `refund creates correct postings and balances`() {
+        val amount = Amount.of(10_000, eur)
+        val entries = JournalEntry.refund(
+            paymentId = paymentId,
+            txId = txId,
+            journalIdentifier = journalId,
+            refundedAmount = amount,
             authReceivable = authReceivableAccount,
             authLiability = authLiabilityAccount,
             merchantGrossPool = merchantGrossPool,
             pspReceivable = pspReceivableAccount
         )
-        val entryLists = listOf(
-            captureResult,
-            JournalEntry.settlement(PaymentId(100L), TxId(6L), "PAY-5", capturedAmount, settledAmount, platformCashAccount,pspFeeExpenseAccount,pspReceivableAccount),
-            JournalEntry.commissionFeeRegistered(PaymentId(100L), TxId(7L), "PAY-5", commissionFeeRevenue, commissionRevenueAccount,merchantAccount),
-            JournalEntry.payout(PaymentId(100L), TxId(8L), "MERCHANT-1", capturedAmount-commissionFeeRevenue, merchantAccount, platformCashAccount)
-        )
-        val allPostings = entryLists.flatMap { entryList -> entryList.flatMap { it.postings } }
-
-        val totalDebits = allPostings.filterIsInstance<Posting.Debit>().sumOf { it.amount.quantity }
-        val totalCredits = allPostings.filterIsInstance<Posting.Credit>().sumOf { it.amount.quantity }
         
-        val netByAccount = allPostings
-            .groupBy { it.account.accountCode }
-            .mapValues { (_, posts) -> posts.sumOf { it.getSignedAmount().quantity } }
+        assertEquals(1, entries.size)
+        val entry = entries.first()
+        
+        assertBalanced(entry)
+        assertEquals(JournalType.REFUND, entry.journalType)
+        assertPostingContains(entry, authLiabilityAccount, isDebit = true, expectedAmount = 10_000)
+        assertPostingContains(entry, authReceivableAccount, isDebit = false, expectedAmount = 10_000)
+        assertPostingContains(entry, merchantGrossPool, isDebit = true, expectedAmount = 10_000)
+        assertPostingContains(entry, pspReceivableAccount, isDebit = false, expectedAmount = 10_000)
+    }
 
-        assertEquals(totalDebits, totalCredits, "Global double-entry check failed")
+    @Test
+    fun `settlement creates correct postings and balances`() {
+        val gross = Amount.of(10_000, eur)
+        val settledAmount = Amount.of(9_500, eur)
+        
+        val entries = JournalEntry.settlement(
+            paymentId = paymentId,
+            txId = txId,
+            journalIdentifier = journalId,
+            capturedAmount = gross,
+            settledAmount = settledAmount,
+            platformCashAccount = platformCashAccount,
+            pspFeeExpenseAccount = pspFeeExpenseAccount,
+            pspReceivable = pspReceivableAccount
+        )
+        
+        assertEquals(1, entries.size)
+        val entry = entries.first()
+        
+        assertBalanced(entry)
+        assertEquals(JournalType.SETTLEMENT, entry.journalType)
+        assertPostingContains(entry, pspFeeExpenseAccount, isDebit = true, expectedAmount = 500)
+        assertPostingContains(entry, platformCashAccount, isDebit = true, expectedAmount = 9_500)
+        assertPostingContains(entry, pspReceivableAccount, isDebit = false, expectedAmount = 10_000)
+    }
 
-        assertEquals(200, netByAccount[platformCashAccount.accountCode]) // profit 200
-        assertEquals(200L, netByAccount[pspFeeExpenseAccount.accountCode]) // psp fee expense 200
-        assertEquals(400, netByAccount[commissionRevenueAccount.accountCode]) // revenue= 400
+    @Test
+    fun `commissionFeeRegistered creates correct postings and balances`() {
+        val amount = Amount.of(200, eur)
+        val entries = JournalEntry.commissionFeeRegistered(
+            paymentId = paymentId,
+            txId = txId,
+            journalIdentifier = journalId,
+            commissionFee = amount,
+            commissionFeeAccount = commissionRevenueAccount,
+            merchantAccount = merchantAccount
+        )
+        
+        assertEquals(1, entries.size)
+        val entry = entries.first()
+        
+        assertBalanced(entry)
+        assertEquals(JournalType.COMMISSION_FEE, entry.journalType)
+        assertPostingContains(entry, merchantAccount, isDebit = true, expectedAmount = 200)
+        assertPostingContains(entry, commissionRevenueAccount, isDebit = false, expectedAmount = 200)
+    }
+
+    @Test
+    fun `payout creates correct postings and balances`() {
+        val amount = Amount.of(9_800, eur)
+        val entries = JournalEntry.payout(
+            paymentId = paymentId,
+            txId = txId,
+            journalIdentifier = journalId,
+            payoutAmount = amount,
+            merchantAccount = merchantAccount,
+            platformCashAccount = platformCashAccount
+        )
+        
+        assertEquals(1, entries.size)
+        val entry = entries.first()
+        
+        assertBalanced(entry)
+        assertEquals(JournalType.PAYOUT, entry.journalType)
+        assertPostingContains(entry, merchantAccount, isDebit = true, expectedAmount = 9_800)
+        assertPostingContains(entry, platformCashAccount, isDebit = false, expectedAmount = 9_800)
     }
 }
-

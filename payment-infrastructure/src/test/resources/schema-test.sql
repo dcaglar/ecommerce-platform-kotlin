@@ -76,6 +76,7 @@ CREATE TABLE payment_intents (
         'PENDING_AUTH',
         'AUTHORIZED',
         'DECLINED',
+        'FAILED',
         'CANCELLED'
     )),
     CONSTRAINT chk_payment_intent_currency_3 CHECK (currency ~ '^[A-Z]{3}$'),

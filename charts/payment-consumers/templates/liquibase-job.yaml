@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "payment-consumers.fullname" . }}-liquibase
+  labels:
+    {{- include "payment-consumers.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "payment-consumers.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: liquibase-job
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "liquibase-job"
+            - name: SPRING_MAIN_WEB_APPLICATION_TYPE
+              value: "none"
+            - name: SPRING_DATASOURCE_URL
+              valueFrom: { configMapKeyRef: { name: payment-platform-config, key: CENTRAL_DB_URL } }
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: central-db-credentials
+                  key: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: central-db-credentials
+                  key: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD
+            # Disable kafka listeners so they don't try to connect
+            - name: SPRING_KAFKA_LISTENER_AUTO_STARTUP
+              value: "false"

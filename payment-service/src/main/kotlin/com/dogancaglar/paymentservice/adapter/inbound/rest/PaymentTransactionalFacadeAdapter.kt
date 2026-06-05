@@ -12,12 +12,12 @@ import org.springframework.transaction.annotation.Transactional
 @Component
 class PaymentTransactionalFacadeAdapter(
     private val paymentIntentRepository: PaymentIntentRepository,
-    @param:Qualifier("outboxWebAdapter") private val outboxEventRepository: LocalOutboxWriterPort
+    @Qualifier("localOutboxWriterAdapter") private val  localOutboxWriterPort: LocalOutboxWriterPort,
 ) : PaymentTransactionalFacadePort {
 
     @Transactional(timeout = 2)
     override fun handleAuthorized(authorizedPaymentIntent: PaymentIntent, paymentAuthorizedOutboxEvent: OutboxEvent) {
         paymentIntentRepository.updatePaymentIntent(authorizedPaymentIntent)
-        outboxEventRepository.saveAll(listOf(paymentAuthorizedOutboxEvent))
+        localOutboxWriterPort.saveAll(listOf(paymentAuthorizedOutboxEvent))
     }
 }

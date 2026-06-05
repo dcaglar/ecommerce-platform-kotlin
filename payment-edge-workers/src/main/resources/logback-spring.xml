@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true">
+
+    <!-- ──────────────────────────────── -->
+    <!-- Shared bits (apply in all envs) -->
+    <!-- ──────────────────────────────── -->
+    <timestamp key="date" datePattern="yyyy-MM-dd"/>
+    <!-- DEFAULT ROOT (used when *no* active Spring profile matches below) -->
+
+    <!-- ──────────────────────────────── -->
+    <!--  ►  Container / Kubernetes JSON  -->
+    <!-- ──────────────────────────────── -->
+    <!--  You said you pass  -spring.profiles.active=local  inside k8s,
+          so make the *local* profile output JSON suited for Filebeat.      -->
+    <springProfile name="local,gke">
+        <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                <providers>
+                    <!-- @timestamp is Elasticsearch’s standard field name -->
+                    <timestamp>
+                        <fieldName>@timestamp</fieldName>
+                        <timeZone>Europe/Amsterdam</timeZone> <!-- 👈 added -->
+                        <pattern>yyyy-MM-dd'T'HH:mm:ss.SSSXXX</pattern>
+                    </timestamp>
+                    <logLevel/>
+                    <threadName/>
+                    <loggerName/>
+                    <message/>
+                    <!-- Export your MDC keys (e.g. traceId, userId) up to top level -->
+                    <mdc includes="traceId,eventId,parentEventId,aggregateId,eventType,
+               retryCount,retryBackoffMillis,retryReason,retryErrorMessage"/>
+                    <stackTrace/>
+                    <globalCustomFields>{"app":"payment-edge-workers"}</globalCustomFields>
+                </providers>
+            </encoder>
+        </appender>
+
+        <!-- Suppress verbose Kafka client logs -->
+        <logger name="org.apache.kafka" level="WARN"/>
+        <logger name="org.apache.kafka.clients.producer.ProducerConfig" level="WARN"/>
+        <logger name="org.apache.kafka.clients.producer.KafkaProducer" level="WARN"/>
+        <logger name="org.apache.kafka.clients.consumer.ConsumerConfig" level="WARN"/>
+        <logger name="org.apache.kafka.clients.consumer.KafkaConsumer" level="WARN"/>
+        <logger name="org.apache.kafka.common.telemetry" level="WARN"/>
+        <logger name="org.apache.kafka.common.utils.AppInfoParser" level="WARN"/>
+        <logger name="org.apache.kafka.clients.producer.internals.TransactionManager" level="WARN"/>
+        <logger name="org.apache.kafka.clients.consumer.internals" level="WARN"/>
+        
+        <!-- Suppress verbose Spring Kafka logs (keep errors/warnings) -->
+        <logger name="org.springframework.kafka" level="WARN"/>
+        
+        <!-- Keep application logs at INFO -->
+        <logger name="com.dogancaglar" level="INFO"/>
+
+        <!-- Root logger at INFO for containers -->
+        <root level="INFO">
+            <appender-ref ref="JSON"/>
+        </root>
+    </springProfile>
+
+
+</configuration>

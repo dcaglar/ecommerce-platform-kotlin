@@ -190,6 +190,39 @@ sealed class Tx {
             acquirerBatchReference  = acquirerBatchReference,
             settledAmount           = settledAmount,
             amount                  = originalCaptureAmount
+
         )
+
+        fun createInternalTransferTx(
+            txId: TxId,
+            paymentId: PaymentId,
+            paymentIntentId: PaymentIntentId,
+            captureTxId: TxId,
+            amount: Amount,
+            status: TxStatus = TxStatus.SUCCESS
+        ): CaptureTx = CaptureTx(
+            txId              = txId,
+            paymentId         = paymentId,
+            paymentIntentId   = paymentIntentId,
+            authorizationTxId = captureTxId, // map captureTxId to authorizationTxId for InternalTransfer since we don't have InternalTransferTx type yet and MarketPlaceSplitInstructionConsumer uses it.
+            acquirerReference = "INTERNAL",
+            amount            = amount,
+            status            = status
+        )
+
+
+
     }
+
+
+    /*
+       val internalTx = Tx.createInternalTransferTx(
+                    txId = TxId(internalTransferTxIdValue),
+                    paymentId = payment.paymentId,
+                    paymentIntentId = paymentIntentId,
+                    captureTxId = TxId(captureTxIdValue), // Using captureTx as parent
+                    amount = txAmount,
+                    status = TxStatus.SUCCESS
+                )
+     */
 }

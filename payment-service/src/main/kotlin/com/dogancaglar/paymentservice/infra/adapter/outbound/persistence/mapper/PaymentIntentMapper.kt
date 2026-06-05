@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper
 
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.entity.PaymentIntentEntity
+import com.dogancaglar.common.db.entity.PaymentIntentEntity
 import org.apache.ibatis.annotations.Mapper
 import java.time.Instant
 

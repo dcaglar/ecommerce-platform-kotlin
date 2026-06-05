@@ -12,7 +12,7 @@
     <!-- ──────────────────────────────── -->
     <!--  You said you pass  -spring.profiles.active=local  inside k8s,
           so make the *local* profile output JSON suited for Filebeat.      -->
-    <springProfile name="local,gke">
+    <springProfile name="local,gke,liquibase-job">
         <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
             <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
                 <providers>

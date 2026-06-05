@@ -4,12 +4,11 @@
         xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
-    <include file="2025-10-27-ledger-entry-tables.xml" relativeToChangelogFile="true"/>
-    <include file="2025-11-01-account-balances-table.xml" relativeToChangelogFile="true"/>
-    <include file="2025-01-04-account-profile.xml" relativeToChangelogFile="true"/>
-    <include file="2026-05-26-edge-to-ledger.xml" relativeToChangelogFile="true"/>
-    <include file="payment-outbox-changelog.xml" relativeToChangelogFile="true"/>
+    <include file="central-payment-outbox-changelog.xml" relativeToChangelogFile="true"/>
+    <include file="central-payments-table.xml" relativeToChangelogFile="true"/>
+    <include file="central-accounting-tables.xml" relativeToChangelogFile="true"/>
+    <include file="central-account-profile.xml" relativeToChangelogFile="true"/>
+    <include file="central-account-balances-table.xml" relativeToChangelogFile="true"/>
     <!-- Epic 1: Payment aggregate moves to Central DB; payment_tx refactored -->
-    <include file="2026-05-31-central-payments-table.xml" relativeToChangelogFile="true"/>
-    <include file="2026-05-31-payment-tx-refactor.xml" relativeToChangelogFile="true"/>
+
 </databaseChangeLog>

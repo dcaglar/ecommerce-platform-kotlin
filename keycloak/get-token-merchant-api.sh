@@ -32,8 +32,8 @@ wait_for_keycloak() {
   fi
 }
 
-# Default to SELLER-111, can be overridden
-SELLER_ID="$(echo "${1:-SELLER-111}" | xargs)"
+# Default to SELLER-1-1, can be overridden
+SELLER_ID="$(echo "${1:-SELLER-1-1}" | xargs)"
 KC_URL_OVERRIDE="${2:-}"
 TTL_HOURS="${3:-}"
 
@@ -61,7 +61,7 @@ CLIENT_SECRET=$(grep "^${SECRET_ENV_VAR}=" "$SECRETS_FILE" 2>/dev/null | cut -d=
 if [ -z "$CLIENT_SECRET" ]; then
   echo "❌ Could not find ${SECRET_ENV_VAR} in $SECRETS_FILE"
   echo "💡 Make sure you've run ./keycloak/provision-keycloak.sh first"
-  echo "💡 Available merchant API clients: merchant-api-SELLER-111, merchant-api-SELLER-222, merchant-api-SELLER-333"
+  echo "💡 Available merchant API clients: merchant-api-SELLER-1-1, merchant-api-SELLER-1-2, merchant-api-SELLER-1-3"
   exit 1
 fi
 
@@ -96,7 +96,7 @@ if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ]; then
   echo "$RESPONSE"
   echo ""
   echo "💡 Make sure you've run ./keycloak/provision-keycloak.sh first"
-  echo "💡 Available merchant API clients: merchant-api-SELLER-111, merchant-api-SELLER-222, merchant-api-SELLER-333"
+  echo "💡 Available merchant API clients: merchant-api-SELLER-1-1, merchant-api-SELLER-1-2, merchant-api-SELLER-1-3"
   exit 1
 fi
 
