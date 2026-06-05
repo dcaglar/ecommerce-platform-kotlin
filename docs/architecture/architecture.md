@@ -273,7 +273,7 @@ graph TD
             API1["Payment Acceptance Service"]
             IdemDB1[("Idempotency DB<br/>IdempotencyRecord")]
             EdgeDB1[("Edge Local DB<br/>PaymentIntent<br/>OutboxEvents")]
-            Fwd1[["Local Outbox Forwarder"]]
+            Fwd1[["LocalOutboxStoreAndForwardJob"]]
             PSP_Edge1["External PSP API<br/>(Synchronous Auth)"]
             
             %% Flow Splits inside Edge
@@ -289,7 +289,7 @@ graph TD
             API2["Payment Acceptance Service"]
             IdemDB2[("Idempotency DB<br/>IdempotencyRecord")]
             EdgeDB2[("Edge Local DB<br/>PaymentIntent<br/>OutboxEvents")]
-            Fwd2[["Local Outbox Forwarder"]]
+            Fwd2[["LocalOutboxStoreAndForwardJob"]]
             PSP_Edge2["External PSP API<br/>(Synchronous Auth)"]
             
             %% Flow Splits inside Edge
@@ -410,26 +410,28 @@ graph TD
     subgraph PaymentPhase ["Edge Ingestion Phase (Asynchronous)"]
         direction TB
         PI3 -->|POST /captures| CAP1[Edge DB Outbox<br/>CaptureReceived]
+        CAP1 -->|Forwarded by<br/>LocalOutboxStoreAndForwardJob| CENT1[Central DB Outbox<br/>CaptureReceived]
     end
 
     subgraph ExecutionPhase ["Execution & Relay"]
         direction TB
-        CAP1 -->|Relayed by OutboxRelayJob| CAP2["CaptureCommandExecutor"]
+        CENT1 -->|Relayed by OutboxRelayJob| CAP2["CaptureCommandExecutor"]
         
         CAP2 -->|PSP Capture Call| PSP1{PSP Result}
         
         PSP1 -->|Append to Central Outbox| PSP2[OutboxEvent: ExternalAsyncCaptureToPspPerformed]
-        PSP2 -->|Relayed to psp-result-queue| PSP3["PspResultConsumer"]
+        PSP2 -->|Relayed to psp-result-queue| PSP3["CapturePspPerformedConsumer"]
         
         PSP3 -->|Wait for Webhook| WEB1[Edge DB Outbox<br/>CaptureSuccessful]
-        WEB1 -->|Relayed to psp-result-queue| WEB2["PspResultConsumer"]
+        WEB1 -->|Forwarded by<br/>LocalOutboxStoreAndForwardJob| CENT2[Central DB Outbox<br/>CaptureSuccessful]
+        CENT2 -->|Relayed to psp-result-queue<br/>by OutboxRelayJob| WEB2["PspResultConsumer"]
     end
 
     WEB2 -->|Updates Ledger| P3[Payment<br/>Status: CAPTURED<br/>MARKETPLACE_OPERATOR updated]
     WEB2 -->|Creates| P1[Payment<br/>Status: AUTHORIZED<br/>If first webhook]
     
     P3 -.->|If MARKETPLACE| SPLIT1[OutboxEvent: InternalTransferRequest]
-    SPLIT1 -->|Relayed to internal-transfer-queue| SPLIT2["InternalTransferConsumer"]
+    SPLIT1 -->|Relayed to internal-transfer-queue| SPLIT2["InternalTransferRequestExecutor"]
     SPLIT2 -->|Sub-Seller Distribution| SPLIT3[JournalType.INTERNAL_TRANSFER]
 
     class IdemCheck,ReturnStored idem
@@ -455,7 +457,7 @@ Historically, consumers would read an event, process it (e.g. call a PSP), and t
 **The New Pattern (Outbox-Driven Consumers):**
 1. **Intents (Capture/Refund Received)**: `CaptureReceived` events denote that an intent to capture has been recorded in the database edge outbox.
 2. **Executors (`CaptureCommandExecutor`)**: These components listen to `capture-execution-queue`. They perform the synchronous call to the external PSP Gateway. Upon receiving a terminal or retryable result, they **do not publish back to Kafka directly**. Instead, they write a `ExternalAsyncCaptureToPspPerformed` event into the Central Database Outbox.
-3. **Outbox Relay**: The `OutboxRelayJob` reads these results from the database outbox and publishes them asynchronously to the `psp-result-queue`.
+3. **Outbox Relay**: The `OutboxRelayJob` reads these results from the database outbox and publishes them asynchronously to their respective Kafka topics (e.g., `psp-result-queue`, `capture-execution-queue`, `internal-transfer-queue`, `journal.entries.recorded`) based on the event type.
 4. **Result Processing (`PspResultConsumer`)**: Listens to the `psp-result-queue` to apply the results to the central database, finalize payment statuses, trigger internal double-entry ledger bookkeeping, and schedule any required internal transfers.
 
 ### Authorization/Idempotency Sequence Diagram
@@ -586,7 +588,7 @@ sequenceDiagram
 
     box rgb(255, 250, 240) "Payment Consumers"
         participant PspResult as PspResultConsumer
-        participant Transfer as InternalTransferConsumer
+        participant Transfer as InternalTransferRequestExecutor
     end
 
     box rgb(245, 245, 245) "Central Relay Node"
@@ -629,14 +631,13 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     box rgb(255, 250, 240) "Payment Consumers (Central)"
-        participant Ledger as LedgerRecordingConsumer
         participant Consumer as AccountBalanceConsumer
         participant Service as AccountBalanceService
         participant Job as AccountBalanceSnapshotJob
     end
 
     box rgb(230, 230, 250) "Message Broker"
-        participant Kafka as ledger_entries_recorded_topic
+        participant Kafka as journal_entries_recorded_topic
     end
 
     box rgb(255, 228, 225) "In-Memory Store"
@@ -647,12 +648,12 @@ sequenceDiagram
         participant DB as PostgreSQL (Snapshots)
     end
 
-    Ledger->>Kafka: Publish LedgerEntriesRecorded (sellerId key)
+    PspResultConsumer->>Kafka: Publish JournalEntriesRecorded
     Kafka->>Consumer: Consume batch (100-500 events)
-    Consumer->>Service: updateAccountBalancesBatch(ledgerEntries)
+    Consumer->>Service: updateAccountBalancesBatch(journalEntries)
     Service->>Service: Extract postings, compute signed amounts per account
     Service->>DB: Load current snapshots (batch query: findByAccountCodes)
-    Service->>Service: Filter postings by watermark (ledgerEntryId > lastAppliedEntryId)
+    Service->>Service: Filter postings by watermark (journalEntryId > lastAppliedEntryId)
     Service->>Service: Compute delta = sum(signed_amounts) for filtered postings
     Service->>Redis: addDeltaAndWatermark (Lua: HINCRBY delta + HSET watermark + SADD dirty)
     Note over Redis: TTL set on hash (5 min), dirty set marked
