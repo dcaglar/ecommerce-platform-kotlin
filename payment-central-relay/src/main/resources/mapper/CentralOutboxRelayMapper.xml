@@ -38,12 +38,6 @@
     </update>
 
     <!-- Edge Watermark Operations -->
-    <insert id="upsert" parameterType="com.dogancaglar.common.db.entity.EdgeWatermarkEntity">
-        INSERT INTO edge_watermarks (edge_node_id, forwarded_up_to)
-        VALUES (#{edgeNodeId}, #{forwardedUpTo})
-        ON CONFLICT (edge_node_id) DO UPDATE
-        SET forwarded_up_to = EXCLUDED.forwarded_up_to
-    </insert>
 
     <select id="computeTSafe" resultType="java.time.Instant">
         SELECT MIN(forwarded_up_to) FROM edge_watermarks

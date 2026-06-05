@@ -11,6 +11,5 @@ interface CentralOutboxForwarderMapper {
     
     // Edge Watermark operations
     fun upsert(entity: EdgeWatermarkEntity)
-    fun computeTSafe(): Instant?
     fun deleteWatermark(edgeNodeId: String)
 }

@@ -3,6 +3,8 @@ package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.LedgerMapper
 import com.dogancaglar.common.db.converter.LedgerEntitiyMapper
+import com.dogancaglar.common.db.converter.PaymentEntityMapper
+import com.dogancaglar.common.db.converter.PaymentTxEntityMapper
 
 import com.dogancaglar.paymentservice.domain.model.ledger.Tx
 import com.dogancaglar.paymentservice.domain.model.payment.Payment
@@ -10,23 +12,23 @@ import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentMapper
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentTxMapper
 import com.dogancaglar.paymentservice.ports.outbound.CentralDbTransactionalFacadePort
-import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
 
-import com.dogancaglar.common.db.converter.PaymentEntityMapper
-import com.dogancaglar.common.db.converter.PaymentTxEntityMapper
+import com.fasterxml.jackson.databind.ObjectMapper
+import org.springframework.beans.factory.annotation.Qualifier
+import com.dogancaglar.paymentservice.application.dto.PaymentSplitDto
+import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.CentralOutboxWriterMapper
 
 @Repository
 open class CentralDbTransactionalFacadeAdapter(
     private val ledgerMapper: LedgerMapper,
     private val paymentMapper: PaymentMapper,
     private val txMapper: PaymentTxMapper,
-    private val paymentEntityMapper: PaymentEntityMapper,
-    private val localOutboxWriterPort: LocalOutboxWriterPort
+    private val centralOutboxWriterMapper: CentralOutboxWriterMapper,
+    @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper
 ) : CentralDbTransactionalFacadePort {
-
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @Transactional(timeout = 5)
@@ -37,7 +39,8 @@ open class CentralDbTransactionalFacadeAdapter(
         outboxEvents: List<OutboxEvent>
     ) {
         if (payment != null) {
-            val paymentEntity = paymentEntityMapper.toEntity(payment)
+            val splitsJson = objectMapper.writeValueAsString(payment.splits.map { PaymentSplitDto.fromDomain(it) })
+            val paymentEntity = PaymentEntityMapper.toEntity(payment, splitsJson)
             paymentMapper.upsert(paymentEntity)
         }
 
@@ -67,7 +70,8 @@ open class CentralDbTransactionalFacadeAdapter(
         }
 
         if (outboxEvents.isNotEmpty()) {
-            localOutboxWriterPort.saveAll(outboxEvents)
+            val outboxEntities = outboxEvents.map { com.dogancaglar.common.db.converter.OutboxEventEntityMapper.toEntity(it) }
+            centralOutboxWriterMapper.insertAllOutboxEvents(outboxEntities)
             logger.info("💾 Outbox batch persisted with {} events", outboxEvents.size)
         }
     }

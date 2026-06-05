@@ -88,6 +88,9 @@ app:
   datasource:
     web:
       driver-class-name: org.postgresql.Driver
+      jdbc-url: ${SPRING_DATASOURCE_URL}
+      username: ${SPRING_DATASOURCE_USERNAME}
+      password: ${SPRING_DATASOURCE_PASSWORD}
       pool-name: web-pool
       maximum-pool-size: 12
       minimum-idle: 6
@@ -117,6 +120,7 @@ db:
 
 stripe:
   api:
+    api-key: ${STRIPE_API_KEY:sk_test_123}
     connect-timeout: 5000
     read-timeout: 30000
 

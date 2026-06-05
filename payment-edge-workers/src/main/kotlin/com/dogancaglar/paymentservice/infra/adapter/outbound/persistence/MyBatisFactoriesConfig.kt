@@ -1,6 +1,5 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence
 
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.OutboxEventDispatcherMapper
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.CentralOutboxForwarderMapper
 import org.apache.ibatis.session.ExecutorType
 import org.apache.ibatis.session.SqlSessionFactory
@@ -53,20 +52,21 @@ class MyBatisFactoriesConfig {
         @Qualifier("centralSqlSessionFactory") factory: SqlSessionFactory
     ): SqlSessionTemplate = SqlSessionTemplate(factory, ExecutorType.BATCH)
 
-    @Bean
-    fun outboxEventDispatcherMapper(
-        @Qualifier("outboxSqlSessionTemplate") template: SqlSessionTemplate
-    ): MapperFactoryBean<OutboxEventDispatcherMapper> {
-        val factory = MapperFactoryBean(OutboxEventDispatcherMapper::class.java)
-        factory.setSqlSessionTemplate(template)
-        return factory
-    }
 
     @Bean
     fun centralOutboxForwarderMapper(
         @Qualifier("centralSqlSessionTemplate") template: SqlSessionTemplate
     ): MapperFactoryBean<CentralOutboxForwarderMapper> {
         val factory = MapperFactoryBean(CentralOutboxForwarderMapper::class.java)
+        factory.setSqlSessionTemplate(template)
+        return factory
+    }
+
+    @Bean
+    fun localOutboxMapperForEdgeWorker(
+        @Qualifier("outboxSqlSessionTemplate") template: SqlSessionTemplate
+    ): MapperFactoryBean<com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.LocalOutboxMapperForEdgeWorker> {
+        val factory = MapperFactoryBean(com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.LocalOutboxMapperForEdgeWorker::class.java)
         factory.setSqlSessionTemplate(template)
         return factory
     }

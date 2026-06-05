@@ -11,43 +11,10 @@ import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.common.db.entity.PaymentEntity
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.ObjectMapper
 
-/**
- * PaymentEntityMapper
- *
- * The exclusive bridge between the [Payment] domain aggregate and the
- * flat [PaymentEntity] DB POJO. Lives in payment-consumers because
- * the Payment aggregate is a Central Core concern.
- *
- * Strict separation rules:
- *  - The domain [Payment] has ZERO knowledge of persistence or Jackson.
- *  - The [PaymentEntity] has ZERO knowledge of domain logic.
- *  - This mapper is the ONLY place where conversion between the two occurs.
- *
- * Split serialization:
- *  - [Payment.splits] (List<PaymentSplit>) is serialized to a JSON column
- *    via [PaymentSplitDto] (application-layer DTO carrying Jackson annotations).
- *    The domain [PaymentSplit] remains annotation-free.
- *  - On read, [splitsJson] is deserialized into List<PaymentSplitDto> and
- *    converted back to domain objects via [PaymentSplitDto.toDomain()].
- */
-class PaymentEntityMapper(
-    private val objectMapper: ObjectMapper
-) {
+object PaymentEntityMapper {
 
-    private val splitsTypeRef = object : TypeReference<List<PaymentSplitDto>>() {}
-
-    /**
-     * toDomain — Converts a flat [PaymentEntity] row into the [Payment] domain aggregate.
-     * All type lifting (Long → PaymentId, String → enum, JSON → List<PaymentSplit>) happens here.
-     */
-    fun toDomain(entity: PaymentEntity): Payment {
-        val splits = objectMapper
-            .readValue(entity.splitsJson, splitsTypeRef)
-            .map { it.toDomain() }
-
+    fun toDomain(entity: PaymentEntity, splits: List<com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit>): Payment {
         return Payment.rehydrate(
             paymentId         = PaymentId(entity.paymentId),
             paymentIntentId   = PaymentIntentId(entity.paymentIntentId),
@@ -64,15 +31,7 @@ class PaymentEntityMapper(
         )
     }
 
-    /**
-     * toEntity — Converts a [Payment] domain aggregate into a flat [PaymentEntity] POJO
-     * ready for MyBatis INSERT or UPDATE.
-     * All type flattening (PaymentId → Long, PaymentStatus → String, List<PaymentSplit> → JSON) happens here.
-     */
-    fun toEntity(domain: Payment): PaymentEntity {
-        val splitsJson = objectMapper.writeValueAsString(
-            domain.splits.map { PaymentSplitDto.fromDomain(it) }
-        )
+    fun toEntity(domain: Payment, splitsJson: String): PaymentEntity {
         return PaymentEntity(
             paymentId           = domain.paymentId.value,
             paymentIntentId     = domain.paymentIntentId.value,

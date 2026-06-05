@@ -23,7 +23,7 @@ import com.dogancaglar.common.db.partitioning.AbstractOutboxPartitionCreator
 
 @Component
 class CentralOutboxPartitionCreator(
-    jdbcTemplate: JdbcTemplate,
+    @Qualifier("maintenanceJdbcTemplate") jdbcTemplate: JdbcTemplate,
     @param:Qualifier("centralOutboxEventPartitionMaintenanceScheduler") private val taskScheduler: ThreadPoolTaskScheduler
 ) : AbstractOutboxPartitionCreator(jdbcTemplate) {
 

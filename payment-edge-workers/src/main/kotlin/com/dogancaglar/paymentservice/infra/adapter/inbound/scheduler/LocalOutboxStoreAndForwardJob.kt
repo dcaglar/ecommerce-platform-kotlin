@@ -2,8 +2,8 @@ package com.dogancaglar.paymentservice.infra.adapter.inbound.scheduler
 
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
-import com.dogancaglar.paymentservice.ports.outbound.CentralOutboxEdgePort
-import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxEdgePort
+import com.dogancaglar.paymentservice.ports.outbound.CentralOutboxForwarderPort
+import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxStoreAndForwardPort
 
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * LocalOutboxForwarderJob - The Edge Local Forwarder Job.
+ * LocalOutboxStoreAndForwardJob - The Edge Local Forwarder Job.
  * Created from scratch as a forwarder to replace the original OutboxDispatcherJob's dispatcher role.
  * 
  * Instead of publishing directly to Kafka, this job polls the local edge database,
@@ -27,9 +27,9 @@ import org.springframework.transaction.annotation.Transactional
  */
 @Service
 @DependsOn("edgeOutboxPartitionCreator")
-class LocalOutboxForwarderJob(
-    @param:Qualifier("outboxJobAdapter") private val outboxEventRepository: LocalOutboxEdgePort,
-    private val centralOutboxRepository: CentralOutboxEdgePort,
+class LocalOutboxStoreAndForwardJob(
+    @param:Qualifier("localOutboxStoreAndForwardPort") private val localOutboxStoreAndForwardPort: LocalOutboxStoreAndForwardPort,
+    private val centralOutboxRepository: CentralOutboxForwarderPort,
     @param:Qualifier("outboxJobTaskScheduler") private val taskScheduler: ThreadPoolTaskScheduler,
     @param:Value("\${outbox-dispatcher.thread-count:2}") private val threadCount: Int,
     @param:Value("\${outbox-dispatcher.batch-size:250}") private val batchSize: Int,
@@ -50,7 +50,7 @@ class LocalOutboxForwarderJob(
     @Scheduled(initialDelay = 30000, fixedDelay = 120000)
     @Transactional(transactionManager = "outboxTxManager", timeout = 5)
     fun reclaimStuck() {
-        val reclaimed = outboxEventRepository
+        val reclaimed = localOutboxStoreAndForwardPort
             .reclaimStuck(60 * 10)
         if (reclaimed > 0) {
             logger.warn("Reclaimer reset {} stuck outbox events to NEW", reclaimed)
@@ -59,7 +59,7 @@ class LocalOutboxForwarderJob(
 
     @Transactional(transactionManager = "outboxTxManager", timeout = 2)
     fun claimBatch(batchSize: Int, workerId: String): List<OutboxEvent> {
-        return outboxEventRepository.findEligible(batchSize, workerId)
+        return localOutboxStoreAndForwardPort.findEligible(batchSize, workerId)
     }
 
     @Transactional(transactionManager = "centralTxManager", timeout = 5)
@@ -87,14 +87,14 @@ class LocalOutboxForwarderJob(
     @Transactional(transactionManager = "outboxTxManager", timeout = 5)
     fun persistResults(succeeded: List<OutboxEvent>) {
         if (succeeded.isNotEmpty()) {
-            outboxEventRepository.markDispatched(succeeded)
+            localOutboxStoreAndForwardPort.markDispatched(succeeded)
         }
     }
 
     @Transactional(transactionManager = "outboxTxManager", timeout = 2)
     fun unclaimFailedNow(workerId: String, failed: List<OutboxEvent>) {
         if (failed.isEmpty()) return
-        val adapter = outboxEventRepository
+        val adapter = localOutboxStoreAndForwardPort
         val n = adapter.unclaimFailed(workerId, failed.map { it.oeid })
         if (n > 0) {
             logger.warn("Unclaimed {} failed outbox rows for worker={}", n, workerId)

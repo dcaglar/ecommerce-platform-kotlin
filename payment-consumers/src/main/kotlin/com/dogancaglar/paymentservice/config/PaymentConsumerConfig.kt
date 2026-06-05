@@ -8,7 +8,6 @@ import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
 import com.dogancaglar.paymentservice.ports.outbound.PspCaptureGatewayPort
 import com.dogancaglar.paymentservice.application.service.AccountBalanceService
 import com.dogancaglar.paymentservice.application.service.AccountBalanceReadService
-import com.dogancaglar.common.db.converter.PaymentEntityMapper
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
@@ -21,15 +20,12 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort
+import com.dogancaglar.paymentservice.ports.outbound.CentralOutboxWriterPort
 
 @Configuration
 open class PaymentConsumerConfig {
 
-    @Bean
-    fun paymentEntityMapper(
-        @Qualifier("myObjectMapper") objectMapper: ObjectMapper
-    ): PaymentEntityMapper = PaymentEntityMapper(objectMapper)
+
 
     @Bean
     fun getAccountBalanceReadService(cachePort: AccountBalanceCachePort,snapshotPort: AccountBalanceSnapshotPort): AccountBalanceReadService{
@@ -46,7 +42,6 @@ open class PaymentConsumerConfig {
         paymentTxPort: PaymentTxPort,
         idGeneratorPort: IdGeneratorPort,
         paymentRepository: PaymentRepository,
-        localOutboxWriterPort: LocalOutboxWriterPort,
         serializationPort: SerializationPort
     ): ProcessPspResultProcessingService {
         return ProcessPspResultProcessingService(
@@ -55,7 +50,6 @@ open class PaymentConsumerConfig {
             paymentTxPort = paymentTxPort,
             idGeneratorPort = idGeneratorPort,
             paymentRepository = paymentRepository,
-            localOutboxWriterPort = localOutboxWriterPort,
             serializationPort = serializationPort
         )
     }
@@ -91,14 +85,14 @@ open class PaymentConsumerConfig {
         pspCaptureGatewayPort: PspCaptureGatewayPort,
         paymentRepository: PaymentRepository,
         retryQueuePort: RetryQueuePort<CaptureRequested>,
-        localOutboxWriterPort: LocalOutboxWriterPort,
+        @Qualifier("centralOutboxWriterAdapter") centralOutboxWriterPort: CentralOutboxWriterPort,
         serializationPort: SerializationPort
     ): ProcessCaptureService {
         return ProcessCaptureService(
             pspCaptureGatewayPort,
             paymentRepository,
             retryQueuePort,
-            localOutboxWriterPort,
+            centralOutboxWriterPort,
             serializationPort
         )
     }

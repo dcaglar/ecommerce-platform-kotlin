@@ -5,7 +5,7 @@ import org.apache.ibatis.annotations.Mapper
 import org.apache.ibatis.annotations.Param
 
 @Mapper
-interface OutboxEventDispatcherMapper {
+interface LocalOutboxMapperForEdgeWorker {
     fun findByStatus(status: String): List<OutboxEventEntity>
     fun countByStatus(status: String): Long
 

@@ -36,7 +36,6 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.paymentservice.domain.model.vo.TxId
 import com.dogancaglar.paymentservice.ports.inbound.usecases.ProcessPspResultUseCase
-import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort
 import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 
 open class ProcessPspResultProcessingService(
@@ -45,7 +44,6 @@ open class ProcessPspResultProcessingService(
     private val paymentTxPort: PaymentTxPort,
     private val idGeneratorPort: IdGeneratorPort,
     private val paymentRepository: PaymentRepository,
-    private val localOutboxWriterPort: LocalOutboxWriterPort,
     private val serializationPort: SerializationPort
 ) : ProcessPspResultUseCase{
 

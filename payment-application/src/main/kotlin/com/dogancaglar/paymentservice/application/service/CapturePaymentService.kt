@@ -2,14 +2,13 @@ package com.dogancaglar.paymentservice.application.service
 
 import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.logging.EventLogContext
-import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.command.CapturePaymentCommand
 import com.dogancaglar.paymentservice.application.events.CaptureRequested
-import com.dogancaglar.paymentservice.application.util.toPublicPaymentIntentId
 import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
 import com.dogancaglar.paymentservice.ports.inbound.usecases.CapturePaymentUseCase
 import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
+
 import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentIntentRepository
 import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
@@ -50,7 +49,7 @@ class CapturePaymentService(
             aggregateId = envelope.aggregateId,
             payload = payload
         )
-
+        //write tolocal outbox
         localOutboxWriterPort.saveAll(listOf(outboxEvent))
         
         return paymentIntent

@@ -8,7 +8,6 @@ import com.dogancaglar.paymentservice.application.events.CaptureRequested
 import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
 import com.dogancaglar.paymentservice.ports.outbound.CentralOutboxRelayPort
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
-import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import com.fasterxml.jackson.databind.JavaType
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.type.TypeFactory
@@ -35,10 +34,10 @@ class OutboxRelayJobTest {
 
     @BeforeEach
     fun setUp() {
-        centralOutboxRepository = mockk(relaxed = true)
-        kafkaPublisher = mockk(relaxed = true)
-        executor = mockk(relaxed = true)
-        objectMapper = mockk(relaxed = true)
+        centralOutboxRepository = mockk<CentralOutboxRelayPort>(relaxed = true)
+        kafkaPublisher = mockk<EventPublisherPort>(relaxed = true)
+        executor = mockk<ThreadPoolTaskExecutor>(relaxed = true)
+        objectMapper = mockk<ObjectMapper>(relaxed = true)
 
 
         // Make mock executor run tasks synchronously in tests, wrapping in try-catch to mimic background thread isolation

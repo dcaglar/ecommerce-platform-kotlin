@@ -8,7 +8,7 @@ import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
 import com.dogancaglar.paymentservice.domain.model.payment.PspCaptureGatewayResponse
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.paymentservice.ports.inbound.usecases.ExecuteCaptureUseCase
-import com.dogancaglar.paymentservice.ports.outbound.LocalOutboxWriterPort
+import com.dogancaglar.paymentservice.ports.outbound.CentralOutboxWriterPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
 import com.dogancaglar.paymentservice.ports.outbound.PspCaptureGatewayPort
 import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
@@ -23,7 +23,7 @@ open class ProcessCaptureService(
     private val pspCaptureGatewayPort: PspCaptureGatewayPort,
     private val paymentRepository: PaymentRepository,
     private val retryQueuePort: RetryQueuePort<CaptureRequested>,
-    private val localOutboxWriterPort: LocalOutboxWriterPort,
+    private val centralOutboxWriterPort: CentralOutboxWriterPort,
     private val serializationPort: SerializationPort
 ) : ExecuteCaptureUseCase {
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -47,7 +47,7 @@ open class ProcessCaptureService(
 
             // 3.store an outbox event
             val outboxEvent = toOutboxCaptureSubmittedEvent(captureRequested, pspResponse)
-            localOutboxWriterPort.save(outboxEvent)
+            centralOutboxWriterPort.save(outboxEvent)
 
             logger.info("Capture transaction state and outbox events safely persisted atomically.")
 

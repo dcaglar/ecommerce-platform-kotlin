@@ -13,7 +13,6 @@ interface CentralOutboxRelayMapper {
     fun markDispatched(oeid: Long)
     
     // Edge Watermark operations (consolidated into outbox mapper)
-    fun upsert(entity: EdgeWatermarkEntity)
     fun computeTSafe(): Instant?
     fun deleteWatermark(edgeNodeId: String)
 }

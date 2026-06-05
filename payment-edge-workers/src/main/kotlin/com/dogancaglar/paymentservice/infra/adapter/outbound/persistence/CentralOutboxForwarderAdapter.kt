@@ -4,7 +4,7 @@ import com.dogancaglar.common.time.Utc
 import com.dogancaglar.common.db.entity.OutboxEventEntity
 import com.dogancaglar.common.db.entity.EdgeWatermarkEntity
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.CentralOutboxForwarderMapper
-import com.dogancaglar.paymentservice.ports.outbound.CentralOutboxEdgePort
+import com.dogancaglar.paymentservice.ports.outbound.CentralOutboxForwarderPort
 import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
 import org.springframework.stereotype.Repository
 
@@ -13,7 +13,7 @@ import java.time.Instant
 @Repository
 class CentralOutboxForwarderAdapter(
     private val mapper: CentralOutboxForwarderMapper
-) : CentralOutboxEdgePort {
+) : CentralOutboxForwarderPort {
 
     override fun insertBatch(edgeNodeId: String, entries: List<OutboxEvent>) {
         if (entries.isEmpty()) return

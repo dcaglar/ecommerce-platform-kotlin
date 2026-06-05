@@ -64,6 +64,16 @@ management:
       kafka.producer.io.wait.time.total: true
       kafka.producer.bufferpool.wait.ratio: true
       kafka.producer.bufferpool.wait.time.total: true
+  data:
+    redis:
+      url: ${SPRING_DATA_REDIS_URL:redis://localhost:6379}
+      timeout: 10s
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+          max-wait: 5000ms
 
 mybatis:
   mapper-locations: classpath*:mapper/**/*.xml
@@ -73,3 +83,18 @@ mybatis:
 outbox-relay:
   batch-size: 500
   poll-interval: 5000
+
+app:
+  datasource:
+    maintenance:
+      driver-class-name: org.postgresql.Driver
+      jdbc-url: ${SPRING_DATASOURCE_URL}
+      username: ${SPRING_DATASOURCE_MAINTENANCE_USERNAME}
+      password: ${SPRING_DATASOURCE_MAINTENANCE_PASSWORD}
+      pool-name: central-maint-pool
+      maximum-pool-size: 1
+      minimum-idle: 0
+      connection-timeout: 1500
+      validation-timeout: 1500
+      idle-timeout: 60000
+      max-lifetime: 1800000

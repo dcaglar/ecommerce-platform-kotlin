@@ -43,6 +43,8 @@ spec:
               value: "{{ .Values.jvmOpts }}"
             - name: SPRING_PROFILES_ACTIVE
               value: "{{ .Values.spring.profile }}"
+            - name: SPRING_DATA_REDIS_URL
+              value: redis://redis-master:6379
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: kafka.payment.svc.cluster.local:9092
             - name: SPRING_DATASOURCE_URL
@@ -57,6 +59,16 @@ spec:
                 secretKeyRef:
                   name: central-db-credentials
                   key: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_PASSWORD
+            - name: SPRING_DATASOURCE_MAINTENANCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: central-db-credentials
+                  key: CENTRAL_DB_DUTY_USERNAME
+            - name: SPRING_DATASOURCE_MAINTENANCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: central-db-credentials
+                  key: CENTRAL_DB_DUTY_PASSWORD
           startupProbe:
             httpGet: { path: /actuator/health/liveness, port: management }
             initialDelaySeconds: 20

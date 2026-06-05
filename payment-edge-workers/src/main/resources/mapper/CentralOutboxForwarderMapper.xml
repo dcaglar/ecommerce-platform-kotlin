@@ -28,10 +28,6 @@
         SET forwarded_up_to = EXCLUDED.forwarded_up_to
     </insert>
 
-    <select id="computeTSafe" resultType="java.time.Instant">
-        SELECT MIN(forwarded_up_to) FROM edge_watermarks
-    </select>
-
     <delete id="deleteWatermark" parameterType="string">
         DELETE FROM edge_watermarks WHERE edge_node_id = #{edgeNodeId}
     </delete>

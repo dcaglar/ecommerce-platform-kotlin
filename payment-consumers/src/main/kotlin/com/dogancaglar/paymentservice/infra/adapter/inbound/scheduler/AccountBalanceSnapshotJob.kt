@@ -1,14 +1,12 @@
 package com.dogancaglar.paymentservice.infra.adapter.inbound.scheduler
 
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.balance.AccountBalanceSnapshot
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
-import com.dogancaglar.common.time.Utc
-import java.time.Duration
 
 @Service
 class AccountBalanceSnapshotJob(
