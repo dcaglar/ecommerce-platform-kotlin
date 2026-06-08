@@ -7,11 +7,11 @@ enum class NormalBalance{
     CREDIT
 }
 enum class AccountCategory{
-    ASSET,
-    EXPENSE,
-    LIABILITY,
-    EQUITY,
-    REVENUE
+    ASSET,//dr
+    EXPENSE,//dr
+    LIABILITY,//cr
+    EQUITY,//cr
+    REVENUE //cr
 }
 
 enum class AuthType{
@@ -20,8 +20,8 @@ enum class AuthType{
 }
 enum class AccountType(val normalBalance: NormalBalance, val category: AccountCategory) {
     // === ASSETS ===
-    PLATFORM_CASH(NormalBalance.DEBIT, AccountCategory.ASSET),
-    PSP_RECEIVABLES(NormalBalance.DEBIT, AccountCategory.ASSET),
+    PLATFORM_CASH(NormalBalance.DEBIT, AccountCategory.ASSET), //which is a real bank account where PSp send the money to
+    PSP_RECEIVABLES(NormalBalance.DEBIT, AccountCategory.ASSET),     //which is a virtual account n our platform  which does track the moeny  expected from PSP soon
     AUTH_RECEIVABLE(NormalBalance.DEBIT, AccountCategory.ASSET),
 
     // === LIABILITIES ===
@@ -30,8 +30,10 @@ enum class AccountType(val normalBalance: NormalBalance, val category: AccountCa
     MARKETPLACE_SUB_SELLER(NormalBalance.CREDIT, AccountCategory.LIABILITY),
     PLATFORM_COMMISSION_ESCROW(NormalBalance.CREDIT, AccountCategory.LIABILITY),
 
-    // === REVENUE & EXPENSE ===
+    // === REVENUE this keeo track of  the money
     PLATFORM_OPERATIONAL_REVENUE(NormalBalance.CREDIT, AccountCategory.REVENUE),
+
+   // EXPENSE ===
     PSP_FEE_EXPENSE(NormalBalance.DEBIT, AccountCategory.EXPENSE)
 }
 

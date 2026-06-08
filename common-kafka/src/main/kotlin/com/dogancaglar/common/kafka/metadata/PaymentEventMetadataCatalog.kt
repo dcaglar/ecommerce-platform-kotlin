@@ -8,7 +8,9 @@ import com.dogancaglar.paymentservice.application.events.CaptureRequested
 import com.dogancaglar.paymentservice.application.events.CaptureConfirmed
 import com.dogancaglar.paymentservice.application.events.EventType
 import com.dogancaglar.paymentservice.application.events.CaptureSubmitted
+import com.dogancaglar.paymentservice.application.events.InternalTransferCommand
 import com.dogancaglar.paymentservice.application.events.InternalTransferRequested
+import com.dogancaglar.paymentservice.application.events.JournalEntriesRecorded
 
 object PaymentEventMetadataCatalog {
 
@@ -48,14 +50,22 @@ object PaymentEventMetadataCatalog {
         // Use publicPaymentIntentId here to ensure it lands in the exact same partition as PaymentAuthorized
         override val partitionKey = { evt: CaptureConfirmed -> evt.publicPaymentIntentId }
     }
+        //publish LEdgerEntriesRecorded
+    object JournalEntriesRecordedMetadata : EventMetadata<JournalEntriesRecorded> {
+        override val topic = Topics.JOURNAL_ENTRIES_RECORDED
+        override val eventType = EventType.JOURNAL_ENTRIES_RECORDED
+        override val clazz = JournalEntriesRecorded::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<JournalEntriesRecorded>>() {}
+        override val partitionKey = { evt: JournalEntriesRecorded -> evt.sellerId!! }
+    }
 
-    // 5. Routes to INTERNAL_TRANSFERS
-    object InternalTransferRequestedMetadata : EventMetadata<InternalTransferRequested> {
-        override val topic = Topics.INTERNAL_TRANSFERS
-        override val eventType = EventType.INTERNAL_TRANSFER_REQUESTED
-        override val clazz = InternalTransferRequested::class.java
-        override val typeRef = object : TypeReference<EventEnvelope<InternalTransferRequested>>() {}
-        override val partitionKey = { evt: InternalTransferRequested -> evt.targetEntityId }
+    // 5. Routes to PSP RESULT
+    object InternalTransferCommandMetadata : EventMetadata<InternalTransferCommand> {
+        override val topic = Topics.PSP_RESULTS
+        override val eventType = EventType.INTERNAL_TRANSFER_COMMAND
+        override val clazz = InternalTransferCommand::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<InternalTransferCommand>>() {}
+        override val partitionKey = { evt: InternalTransferCommand -> evt.targetEntityId }
     }
 
     val all: List<EventMetadata<*>> = listOf(
@@ -63,7 +73,8 @@ object PaymentEventMetadataCatalog {
         CaptureRequestedMetadata,
         CaptureSubmittedMetadata,
         CaptureConfirmedMetadata,
-        InternalTransferRequestedMetadata
+        InternalTransferCommandMetadata,
+        JournalEntriesRecordedMetadata
     )
 
 }

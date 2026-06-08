@@ -20,7 +20,7 @@ data class JournalEntriesRecorded(
     // deterministicEventId() inherited from base: "$publicPaymentIntentId:$eventType"
 
     companion object {
-        const val EVENT_TYPE = EventType.LEDGER_ENTRIES_RECORDED
+        const val EVENT_TYPE = EventType.JOURNAL_ENTRIES_RECORDED
 
         /**
          * Factory for use by RecordLedgerEntriesService.

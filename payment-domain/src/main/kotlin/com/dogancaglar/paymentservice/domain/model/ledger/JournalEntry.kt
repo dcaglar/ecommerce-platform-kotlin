@@ -85,7 +85,7 @@ class JournalEntry private constructor(
     companion object JournalFactory {
 
         // =====================================================================
-        // AUTH_HOLD
+        // AUTHORIZATION  is succesful in sync api call
         // =====================================================================
 
         fun authHold(
@@ -98,7 +98,7 @@ class JournalEntry private constructor(
         ): List<JournalEntry> = listOf(
             JournalEntry(
                 id        = "AUTH:$journalIdentifier",
-                journalType    = JournalType.AUTH_HOLD,
+                journalType    = JournalType.AUTHORIZATION,
                 name      = "AuthorizationTx Hold",
                 paymentId = paymentId,
                 txId      = txId,
@@ -109,8 +109,9 @@ class JournalEntry private constructor(
             )
         )
 
+
         // =====================================================================
-        // CAPTURE — Gross Asset Settlement
+        // CAPTURE — This journal entry is recorded when external PSP notifies Mor-DC platform regarding the final status of capture, money is still not in Mor-DC account, but PSP confrms that it will send within 3 or 5 days
         // =====================================================================
         fun captureGrossAsset(
             paymentId: PaymentId, // <-- Added!

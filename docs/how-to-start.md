@@ -253,7 +253,7 @@ If Stripe API call is still processing, you'll receive:
 
 ```bash
 # Step 2: Authorize the payment intent
-curl -i -X POST "$BASE_URL/api/v1/payments/pi_AcdDJCmCcAA/authorize" \
+curl -i -X POST "$BASE_URL/api/v1/payments/pi_Ap60WDQCAAA/authorize" \
   -H "Host: $HOST" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \

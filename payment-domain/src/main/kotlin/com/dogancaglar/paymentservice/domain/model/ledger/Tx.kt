@@ -2,33 +2,21 @@ package com.dogancaglar.paymentservice.domain.model.ledger
 
 import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.domain.model.vo.TxId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
+import com.dogancaglar.paymentservice.domain.model.vo.TxId
 import java.time.Instant
 
 /**
  * Tx
  *
- * Sealed hierarchy representing every financial transaction record
- * persisted in the Central DB. Each subclass maps to a discrete
- * gateway or internal operation event.
+ * Sealed hierarchy representing every financial transaction record persisted in the Central DB.
+ * Each subclass maps to a discrete gateway event, internal ledger adjustment, or payout disbursement.
  *
  * Design constraints (Golden Rules):
  *  - These are PURE DATA RECORDS. No domain logic, no side effects.
- *  - All IDs use the canonical typed value wrappers (PaymentId, TxId),
- *    never raw Long primitives, to prevent primitive obsession bugs
- *    (e.g., passing paymentId where txId is expected).
- *  - [status] uses the [TxStatus] enum so that all code paths handle
- *    PENDING, SUCCESS, and FAILED explicitly; no boolean flags.
- *  - [acquirerReference] is the external PSP/acquirer transaction reference.
- *    It is non-nullable on all terminal transactions; nullable only on
- *    AuthorizationTx where the reference may not yet be assigned.
- *
- * Subclasses:
- *  - [AuthorizationTx]: Records the AUTH_HOLD on the shopper's instrument.
- *  - [CaptureTx]:       Records a capture attempt against the authorization.
- *  - [RefundTx]:        Records a refund against a prior capture.
- *  - [SettleTx]:        Records the final acquirer settlement matching a capture.
+ *  - All IDs use the canonical typed value wrappers (PaymentId, TxId, PaymentIntentId).
+ *  - [status] uses the [TxStatus] enum so that all code paths handle PENDING, SUCCESS, and FAILED explicitly.
+ *  - [acquirerReference] is non-nullable on terminal gateway transactions.
  */
 sealed class Tx {
 
@@ -41,9 +29,8 @@ sealed class Tx {
     abstract val createdAt: Instant
 
     // -------------------------------------------------------------------------
-    // AuthorizationTx
+    // 1. AuthorizationTx — Card Network Hold Placement
     // -------------------------------------------------------------------------
-
     data class AuthorizationTx(
         override val txId: TxId,
         override val paymentId: PaymentId,
@@ -57,9 +44,8 @@ sealed class Tx {
     }
 
     // -------------------------------------------------------------------------
-    // CaptureTx
+    // 2. CaptureTx — Gross Collection Trigger From Gateway
     // -------------------------------------------------------------------------
-
     data class CaptureTx(
         override val txId: TxId,
         override val paymentId: PaymentId,
@@ -75,9 +61,40 @@ sealed class Tx {
     }
 
     // -------------------------------------------------------------------------
-    // RefundTx
+    // 3. InternalTransferTx — Virtual Balance Re-allocation / Split Matrix
     // -------------------------------------------------------------------------
+    data class InternalTransferTx(
+        override val txId: TxId,
+        override val paymentId: PaymentId,
+        override val paymentIntentId: PaymentIntentId,
+        val parentCaptureTxId: TxId,
+        val targetEntityId: String,
+        val targetAccountType: AccountType,
+        override val amount: Amount,
+        override val status: TxStatus = TxStatus.SUCCESS,
+        override val createdAt: Instant = Instant.now()
+    ) : Tx() {
+        override val txType = "INTERNAL_TRANSFER"
+    }
 
+    // -------------------------------------------------------------------------
+    // 4. PspFeeTx — Explicit Processing Cost Assessments
+    // -------------------------------------------------------------------------
+    data class PspFeeTx(
+        override val txId: TxId,
+        override val paymentId: PaymentId,
+        override val paymentIntentId: PaymentIntentId,
+        val parentTxId: TxId, // Can point to a CaptureTx or a SettleTx batch entry
+        override val amount: Amount,
+        override val status: TxStatus = TxStatus.SUCCESS,
+        override val createdAt: Instant = Instant.now()
+    ) : Tx() {
+        override val txType = "PSP_FEE"
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. RefundTx — Transaction Reversal
+    // -------------------------------------------------------------------------
     data class RefundTx(
         override val txId: TxId,
         override val paymentId: PaymentId,
@@ -92,9 +109,8 @@ sealed class Tx {
     }
 
     // -------------------------------------------------------------------------
-    // SettleTx
+    // 6. SettleTx — Reconciliation of Incoming Cash Batches From Acquirer
     // -------------------------------------------------------------------------
-
     data class SettleTx(
         override val txId: TxId,
         override val paymentId: PaymentId,
@@ -102,24 +118,35 @@ sealed class Tx {
         val captureTxId: TxId,
         val acquirerBatchReference: String,
         val settledAmount: Amount,
-        override val amount: Amount,          // original capture amount for cross-check
+        override val amount: Amount, // Original capture gross amount for safety audits
         override val status: TxStatus = TxStatus.SUCCESS,
         override val createdAt: Instant = Instant.now()
     ) : Tx() {
         override val txType = "SETTLE"
 
-        /**
-         * Whether the settled amount matches the originally captured amount exactly.
-         * A mismatch signals a discrepancy that requires an ADJUSTMENT journal entry.
-         */
         val hasDiscrepancy: Boolean
             get() = settledAmount != amount
     }
 
     // -------------------------------------------------------------------------
-    // Factory companion
+    // 7. PayoutTx — Outbound Bank Disbursals to Verified Sellers
     // -------------------------------------------------------------------------
+    data class PayoutTx(
+        override val txId: TxId,
+        override val paymentId: PaymentId,
+        override val paymentIntentId: PaymentIntentId,
+        val merchantEntityId: String,
+        val payoutBatchReference: String,
+        override val amount: Amount,
+        override val status: TxStatus = TxStatus.PENDING,
+        override val createdAt: Instant = Instant.now()
+    ) : Tx() {
+        override val txType = "PAYOUT"
+    }
 
+    // -------------------------------------------------------------------------
+    // Companion Object Clean Factory Methods
+    // -------------------------------------------------------------------------
     companion object {
 
         fun createAuthTx(
@@ -130,12 +157,12 @@ sealed class Tx {
             amount: Amount,
             status: TxStatus = TxStatus.SUCCESS
         ): AuthorizationTx = AuthorizationTx(
-            txId               = txId,
-            paymentId          = paymentId,
-            paymentIntentId    = paymentIntentId,
-            acquirerReference  = acquirerReference,
-            amount             = amount,
-            status             = status
+            txId = txId,
+            paymentId = paymentId,
+            paymentIntentId = paymentIntentId,
+            acquirerReference = acquirerReference,
+            amount = amount,
+            status = status
         )
 
         fun createCaptureTx(
@@ -147,13 +174,49 @@ sealed class Tx {
             amount: Amount,
             status: TxStatus = TxStatus.PENDING
         ): CaptureTx = CaptureTx(
-            txId              = txId,
-            paymentId         = paymentId,
-            paymentIntentId   = paymentIntentId,
+            txId = txId,
+            paymentId = paymentId,
+            paymentIntentId = paymentIntentId,
             authorizationTxId = authorizationTxId,
             acquirerReference = acquirerReference,
-            amount            = amount,
-            status            = status
+            amount = amount,
+            status = status
+        )
+
+        fun createInternalTransferTx(
+            txId: TxId,
+            paymentId: PaymentId,
+            paymentIntentId: PaymentIntentId,
+            parentCaptureTxId: TxId,
+            targetEntityId: String,
+            targetAccountType: AccountType,
+            amount: Amount,
+            status: TxStatus = TxStatus.SUCCESS
+        ): InternalTransferTx = InternalTransferTx(
+            txId = txId,
+            paymentId = paymentId,
+            paymentIntentId = paymentIntentId,
+            parentCaptureTxId = parentCaptureTxId,
+            targetEntityId = targetEntityId,
+            targetAccountType = targetAccountType,
+            amount = amount,
+            status = status
+        )
+
+        fun createPspFeeTx(
+            txId: TxId,
+            paymentId: PaymentId,
+            paymentIntentId: PaymentIntentId,
+            parentTxId: TxId,
+            amount: Amount,
+            status: TxStatus = TxStatus.SUCCESS
+        ): PspFeeTx = PspFeeTx(
+            txId = txId,
+            paymentId = paymentId,
+            paymentIntentId = paymentIntentId,
+            parentTxId = parentTxId,
+            amount = amount,
+            status = status
         )
 
         fun createRefundTx(
@@ -165,13 +228,13 @@ sealed class Tx {
             amount: Amount,
             status: TxStatus = TxStatus.PENDING
         ): RefundTx = RefundTx(
-            txId              = txId,
-            paymentId         = paymentId,
-            paymentIntentId   = paymentIntentId,
-            captureTxId       = captureTxId,
+            txId = txId,
+            paymentId = paymentId,
+            paymentIntentId = paymentIntentId,
+            captureTxId = captureTxId,
             acquirerReference = acquirerReference,
-            amount            = amount,
-            status            = status
+            amount = amount,
+            status = status
         )
 
         fun createSettleTx(
@@ -183,46 +246,31 @@ sealed class Tx {
             settledAmount: Amount,
             originalCaptureAmount: Amount
         ): SettleTx = SettleTx(
-            txId                    = txId,
-            paymentId               = paymentId,
-            paymentIntentId         = paymentIntentId,
-            captureTxId             = captureTxId,
-            acquirerBatchReference  = acquirerBatchReference,
-            settledAmount           = settledAmount,
-            amount                  = originalCaptureAmount
-
+            txId = txId,
+            paymentId = paymentId,
+            paymentIntentId = paymentIntentId,
+            captureTxId = captureTxId,
+            acquirerBatchReference = acquirerBatchReference,
+            settledAmount = settledAmount,
+            amount = originalCaptureAmount
         )
 
-        fun createInternalTransferTx(
+        fun createPayoutTx(
             txId: TxId,
             paymentId: PaymentId,
             paymentIntentId: PaymentIntentId,
-            captureTxId: TxId,
+            merchantEntityId: String,
+            payoutBatchReference: String,
             amount: Amount,
-            status: TxStatus = TxStatus.SUCCESS
-        ): CaptureTx = CaptureTx(
-            txId              = txId,
-            paymentId         = paymentId,
-            paymentIntentId   = paymentIntentId,
-            authorizationTxId = captureTxId, // map captureTxId to authorizationTxId for InternalTransfer since we don't have InternalTransferTx type yet and MarketPlaceSplitInstructionConsumer uses it.
-            acquirerReference = "INTERNAL",
-            amount            = amount,
-            status            = status
+            status: TxStatus = TxStatus.PENDING
+        ): PayoutTx = PayoutTx(
+            txId = txId,
+            paymentId = paymentId,
+            paymentIntentId = paymentIntentId,
+            merchantEntityId = merchantEntityId,
+            payoutBatchReference = payoutBatchReference,
+            amount = amount,
+            status = status
         )
-
-
-
     }
-
-
-    /*
-       val internalTx = Tx.createInternalTransferTx(
-                    txId = TxId(internalTransferTxIdValue),
-                    paymentId = payment.paymentId,
-                    paymentIntentId = paymentIntentId,
-                    captureTxId = TxId(captureTxIdValue), // Using captureTx as parent
-                    amount = txAmount,
-                    status = TxStatus.SUCCESS
-                )
-     */
 }

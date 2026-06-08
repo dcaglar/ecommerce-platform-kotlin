@@ -6,16 +6,11 @@ import com.dogancaglar.common.kafka.metadata.Topics
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.events.JournalEntriesRecorded
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalType
-import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
-import com.dogancaglar.paymentservice.domain.model.ledger.Tx
 import com.dogancaglar.paymentservice.domain.model.ledger.TxStatus
-import com.dogancaglar.paymentservice.domain.model.ledger.Account
 import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
+import com.dogancaglar.paymentservice.domain.model.payment.InternalTransferStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
-import com.dogancaglar.paymentservice.domain.model.common.Currency
-import com.dogancaglar.common.event.EventEnvelopeFactory
-import com.dogancaglar.paymentservice.application.events.InternalTransferRequested
-import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
+import com.dogancaglar.paymentservice.ports.inbound.usecases.RecordInternalTransferSubmissionUseCase
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
 import com.dogancaglar.paymentservice.ports.outbound.PaymentTxPort
@@ -35,8 +30,9 @@ class MarketPlaceSplitInstructionConsumer(
     private val accountDirectory: AccountDirectoryPort,
     private val centralDbTransactionalFacadePort: CentralDbTransactionalFacadePort,
     private val dedupe: EventDeduplicationPort,
-    private val objectMapper: ObjectMapper,
-    private val idGeneratorPort: IdGeneratorPort
+    private val objectMapsper: ObjectMapper,
+    private val idGeneratorPort: IdGeneratorPort,
+    private val recordInternalTransferSubmissionUseCase: RecordInternalTransferSubmissionUseCase
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -46,7 +42,7 @@ class MarketPlaceSplitInstructionConsumer(
         groupId = CONSUMER_GROUPS.MARKETPLACE_SPLIT_INSTRUCTION_CONSUMER
     )
     fun onLedgerEntriesRecorded(
-        record: ConsumerRecord<String, EventEnvelope<com.dogancaglar.common.event.Event>>
+        record: ConsumerRecord<String, EventEnvelope<JournalEntriesRecorded>>
     ) {
         val envelope = record.value() as EventEnvelope<JournalEntriesRecorded>
         EventLogContext.with(envelope) {
@@ -81,45 +77,25 @@ class MarketPlaceSplitInstructionConsumer(
                 // At this point we know we have a CAPTURE and we have splits.
                 logger.info("MARKETPLACE transaction, executing internal transfers for \${payment.splits.size} splits")
 
-                val outboxEvents = mutableListOf<OutboxEvent>()
+                val txs = paymentTxPort.findByPaymentId(payment.paymentId.value)
+                val captureTx = txs.find { it.txType == "CAPTURE" && it.status == TxStatus.SUCCESS }
+                    ?: throw IllegalStateException("Successful CaptureTx not found for paymentId=\${payment.paymentId.value}")
+
                 val now = com.dogancaglar.common.time.Utc.nowInstant()
 
                 payment.splits.forEachIndexed { _, split ->
-                    val transferRequested = InternalTransferRequested.from(
-                        paymentIntentId = event.paymentIntentId,
+                    recordInternalTransferSubmissionUseCase.recordSubmission(
+                        paymentId = payment.paymentId,
+                        paymentIntentId = paymentIntentId,
                         publicPaymentIntentId = event.publicPaymentIntentId,
-                        sourceAccountType = AccountType.MARKETPLACE_OPERATOR.name,
-                        sourceAccountId = event.sellerId ?: "UNKNOWN",
-                        targetAccountType = split.targetAccountType.name,
-                        targetEntityId = split.targetEntityId,
-                        amountValue = split.amount.quantity,
-                        currency = split.amount.currency.currencyCode,
-                        now = now
+                        captureTxId = captureTx.txId,
+                        sourceAccountType = AccountType.MARKETPLACE_OPERATOR,
+                        sourceEntityId = payment.merchantAccountId,
+                        split = split
                     )
-
-                    val transferEnvelope = EventEnvelopeFactory.envelopeFor(
-                        traceId = EventLogContext.getTraceId(),
-                        data = transferRequested,
-                        aggregateId = split.targetEntityId,
-                        parentEventId = eventId
-                    )
-
-                    val outboxEvent = OutboxEvent.createNew(
-                        oeid = idGeneratorPort.nextPaymentId(),
-                        eventType = transferEnvelope.eventType,
-                        aggregateId = transferEnvelope.aggregateId,
-                        payload = objectMapper.writeValueAsString(transferEnvelope)
-                    )
-                    outboxEvents.add(outboxEvent)
                 }
 
-                centralDbTransactionalFacadePort.saveAtomically(
-                    payment = null,
-                    tx = null,
-                    journalEntries = emptyList(),
-                    outboxEvents = outboxEvents
-                )
-                logger.info("💾 Internal split transfer outbox events persisted successfully for \${payment.splits.size} sub-sellers")
+                logger.info("💾 Internal split transfers staged and outbox events persisted successfully for \${payment.splits.size} sub-sellers")
 
                 dedupe.markProcessed(eventId, 3600)
             } catch (e: Exception) {
@@ -129,3 +105,4 @@ class MarketPlaceSplitInstructionConsumer(
         }
     }
 }
+

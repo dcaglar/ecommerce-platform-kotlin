@@ -37,6 +37,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.paymentservice.domain.model.vo.TxId
 import com.dogancaglar.paymentservice.ports.inbound.usecases.ProcessPspResultUseCase
 import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
+import com.dogancaglar.paymentservice.ports.outbound.TransferRepository
 
 open class ProcessPspResultProcessingService(
     private val centralDbTransactionalFacadePort: CentralDbTransactionalFacadePort,
@@ -44,6 +45,7 @@ open class ProcessPspResultProcessingService(
     private val paymentTxPort: PaymentTxPort,
     private val idGeneratorPort: IdGeneratorPort,
     private val paymentRepository: PaymentRepository,
+    private val transferRepository: TransferRepository,
     private val serializationPort: SerializationPort
 ) : ProcessPspResultUseCase{
 
@@ -58,8 +60,8 @@ open class ProcessPspResultProcessingService(
             accountDirectory.getAccountProfile(AccountType.AUTH_LIABILITY, "GLOBAL")
         )
 
-        val paymentIdValue = idGeneratorPort.nextPaymentId()
-        val txIdValue = idGeneratorPort.nextTxId()
+        val paymentIdValue = idGeneratorPort.generateId()
+        val txIdValue = idGeneratorPort.generateId()
 
         // 1. Generate Payment
         val splits = event.splits.map { it.toDomain() }
@@ -111,7 +113,7 @@ open class ProcessPspResultProcessingService(
         )
 
         val captureOutboxEvent = OutboxEvent.createNew(
-            oeid = idGeneratorPort.nextPaymentId(),
+            oeid = idGeneratorPort.generateId(),
             eventType = captureEnvelope.eventType,
             aggregateId = captureEnvelope.aggregateId,
             payload = serializationPort.toJson(captureEnvelope)
@@ -134,14 +136,20 @@ open class ProcessPspResultProcessingService(
         )
 
         val ledgerOutboxEvent = OutboxEvent.createNew(
-            oeid = idGeneratorPort.nextPaymentId(),
+            oeid = idGeneratorPort.generateId(),
             eventType = ledgerEnvelope.eventType,
             aggregateId = ledgerEnvelope.aggregateId,
             payload = serializationPort.toJson(ledgerEnvelope)
         )
 
         // 6. Persist all
-        centralDbTransactionalFacadePort.saveAtomically(payment, transaction, journalEntries, listOf(captureOutboxEvent, ledgerOutboxEvent))
+        // 6. Persist all
+        centralDbTransactionalFacadePort.recordPaymentOperationInLedger(
+            payment = payment,
+            tx = transaction,
+            journalEntries = journalEntries,
+            outboxEvents = listOf(captureOutboxEvent, ledgerOutboxEvent)
+        )
     }
 
     override fun processCaptureConfirmed(event: CaptureConfirmed) {
@@ -201,13 +209,64 @@ open class ProcessPspResultProcessingService(
         )
 
         val outboxEvent = OutboxEvent.createNew(
-            oeid = idGeneratorPort.nextPaymentId(),
+            oeid = idGeneratorPort.generateId(),
             eventType = envelope.eventType,
             aggregateId = envelope.aggregateId,
             payload = serializationPort.toJson(envelope)
         )
 
-        centralDbTransactionalFacadePort.saveAtomically(capturedPayment, updatedTx, journalEntries, listOf(outboxEvent))
+        centralDbTransactionalFacadePort.recordPaymentOperationInLedger(
+            payment = capturedPayment,
+            tx = updatedTx,
+            journalEntries = journalEntries,
+            outboxEvents = listOf(outboxEvent)
+        )
+    }
+
+
+    override fun processInternalTransferCommand(event: com.dogancaglar.paymentservice.application.events.InternalTransferCommand) {
+        val amount = Amount.of(event.amountValue, Currency(event.currency))
+
+        // 1. Resolve accounts
+        val merchantGrossPool = Account.fromProfile(accountDirectory.getAccountProfile(AccountType.valueOf(event.sourceAccountType), event.sourceEntityId))
+        val targetAccount = Account.fromProfile(accountDirectory.getAccountProfile(AccountType.valueOf(event.targetAccountType), event.targetEntityId))
+
+        // 2. Load InternalTransfer and Tx
+        val transferId = com.dogancaglar.paymentservice.domain.model.vo.InternalTransferId(event.transferId)
+        val transfer = transferRepository.findById(transferId)
+            ?: throw IllegalStateException("InternalTransfer not found for transferId=${event.transferId}")
+
+        val updatedTransfer = transfer.markTransferred()
+
+        val paymentIntentId = PaymentIntentId(event.paymentIntentId.toLongOrNull() ?: 0L)
+        val payment = paymentRepository.findByPaymentIntentId(paymentIntentId)
+            ?: throw IllegalStateException("Payment not found for paymentIntentId=${event.paymentIntentId}")
+
+        val txs = paymentTxPort.findByPaymentId(payment.paymentId.value)
+        val internalTransferTx = txs.find { it.txId.value == event.internalTransferTxId }
+            ?: throw IllegalStateException("Pending InternalTransfer Tx not found for txId=${event.internalTransferTxId}")
+
+        val updatedTx = internalTransferTx.markAsSuccess()
+
+        // 3. Create JournalEntry
+        val journalIdentifier = "${event.publicPaymentIntentId}-${event.internalTransferTxId}"
+        val journalEntries = JournalEntry.internalTransfer(
+            paymentId = payment.paymentId,
+            txId = updatedTx.txId,
+            journalIdentifier = journalIdentifier,
+            amount = amount,
+            merchantGrossPool = merchantGrossPool,
+            targetAccount = targetAccount,
+            targetAccountType = AccountType.valueOf(event.targetAccountType),
+            targetEntityId = event.targetEntityId
+        )
+
+        // 4. Persist
+        centralDbTransactionalFacadePort.recordInternalTransferOperationInLedger(
+            internalTransfer = updatedTransfer,
+            tx = updatedTx,
+            journalEntries = journalEntries
+        )
     }
 
 }

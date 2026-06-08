@@ -7,10 +7,17 @@ import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
 
 interface CentralDbTransactionalFacadePort {
 
-    fun saveAtomically(
-        payment: Payment?,
-        tx: Tx?,
-        journalEntries: List<JournalEntry>,
+    fun recordPaymentOperationInLedger(
+        payment: Payment,
+        tx: Tx? = null,
+        journalEntries: List<JournalEntry> = emptyList(),
+        outboxEvents: List<OutboxEvent> = emptyList()
+    )
+
+    fun recordInternalTransferOperationInLedger(
+        internalTransfer: com.dogancaglar.paymentservice.domain.model.payment.InternalTransfer,
+        tx: Tx? = null,
+        journalEntries: List<JournalEntry> = emptyList(),
         outboxEvents: List<OutboxEvent> = emptyList()
     )
 }

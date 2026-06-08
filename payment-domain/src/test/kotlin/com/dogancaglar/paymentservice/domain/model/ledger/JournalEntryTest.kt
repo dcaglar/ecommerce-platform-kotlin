@@ -64,7 +64,7 @@ class JournalEntryTest {
         val entry = entries.first()
         
         assertBalanced(entry)
-        assertEquals(JournalType.AUTH_HOLD, entry.journalType)
+        assertEquals(JournalType.AUTHORIZATION, entry.journalType)
         assertPostingContains(entry, authReceivableAccount, isDebit = true, expectedAmount = 10_000)
         assertPostingContains(entry, authLiabilityAccount, isDebit = false, expectedAmount = 10_000)
     }

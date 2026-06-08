@@ -27,28 +27,52 @@ open class CentralDbTransactionalFacadeAdapter(
     private val paymentMapper: PaymentMapper,
     private val txMapper: PaymentTxMapper,
     private val centralOutboxWriterMapper: CentralOutboxWriterMapper,
+    private val transferMapper: com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.TransferMapper,
     @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper
 ) : CentralDbTransactionalFacadePort {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @Transactional(timeout = 5)
-    override fun saveAtomically(
-        payment: Payment?,
+    override fun recordPaymentOperationInLedger(
+        payment: Payment,
         tx: Tx?,
         journalEntries: List<JournalEntry>,
         outboxEvents: List<OutboxEvent>
     ) {
-        if (payment != null) {
-            val splitsJson = objectMapper.writeValueAsString(payment.splits.map { PaymentSplitDto.fromDomain(it) })
-            val paymentEntity = PaymentEntityMapper.toEntity(payment, splitsJson)
-            paymentMapper.upsert(paymentEntity)
-        }
+        val splitsJson = objectMapper.writeValueAsString(payment.splits.map { PaymentSplitDto.fromDomain(it) })
+        val paymentEntity = PaymentEntityMapper.toEntity(payment, splitsJson)
+        paymentMapper.upsert(paymentEntity)
 
         if (tx != null) {
             val txEntity = PaymentTxEntityMapper.toEntity(tx)
             txMapper.upsert(txEntity)
         }
 
+        saveJournalAndOutbox(journalEntries, outboxEvents)
+    }
+
+    @Transactional(timeout = 5)
+    override fun recordInternalTransferOperationInLedger(
+        internalTransfer: com.dogancaglar.paymentservice.domain.model.payment.InternalTransfer,
+        tx: Tx?,
+        journalEntries: List<JournalEntry>,
+        outboxEvents: List<OutboxEvent>
+    ) {
+        val transferEntity = com.dogancaglar.common.db.converter.TransferEntityMapper.toEntity(internalTransfer)
+        transferMapper.upsert(transferEntity)
+
+        if (tx != null) {
+            val txEntity = PaymentTxEntityMapper.toEntity(tx)
+            txMapper.upsert(txEntity)
+        }
+
+        saveJournalAndOutbox(journalEntries, outboxEvents)
+    }
+
+    private fun saveJournalAndOutbox(
+        journalEntries: List<JournalEntry>,
+        outboxEvents: List<OutboxEvent>
+    ) {
         if (journalEntries.isNotEmpty()) {
             journalEntries.forEach { entry ->
                 // 1. Insert journal entry (idempotent via ON CONFLICT)
@@ -63,7 +87,7 @@ open class CentralDbTransactionalFacadeAdapter(
                 LedgerEntitiyMapper.toPostingEntities(entry).forEach { posting ->
                     ledgerMapper.insertPosting(posting)
                 }
-                
+
                 logger.debug("💾 Journal entry persisted with id={}", journalEntity.id)
             }
             logger.info("💾 Journal batch persisted with {} entries", journalEntries.size)

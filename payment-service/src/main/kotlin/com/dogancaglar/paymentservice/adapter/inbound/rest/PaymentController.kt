@@ -65,7 +65,7 @@ class PaymentController(
 
         val responseDTO = result.response
         // Return 201/200/202 Created with Location header (best practice for resource creation)
-        logger.info("📥 Received payment request for order: \${responseDTO.orderId}, payment id is \${responseDTO.paymentIntentId}")
+        logger.info("📥 Received payment request for order: ${responseDTO.orderId}, payment id is ${responseDTO.paymentIntentId}")
         return when (result.status) {
 
             IdempotencyExecutionStatus.CREATED -> {
@@ -73,13 +73,13 @@ class PaymentController(
                 if (responseDTO.status == "CREATED_PENDING") {
                     ResponseEntity
                         .status(HttpStatus.ACCEPTED)  // 202
-                        .header("Location", "/api/v1/payments/\${responseDTO.paymentIntentId}")
+                        .header("Location", "/api/v1/payments/${responseDTO.paymentIntentId}")
                         .header("Retry-After", "2")
                         .body(responseDTO)  // clientSecret will be null/empty
                 } else {
                     ResponseEntity
                         .status(HttpStatus.CREATED)  // 201
-                        .header("Location", "/api/v1/payments/\${responseDTO.paymentIntentId}")
+                        .header("Location", "/api/v1/payments/${responseDTO.paymentIntentId}")
                         .body(responseDTO)  // clientSecret should be present
                 }
             }
@@ -87,7 +87,7 @@ class PaymentController(
             IdempotencyExecutionStatus.REPLAYED -> ResponseEntity
                 .status(HttpStatus.OK)
                 .header("Idempotent-Replayed", "true")
-                .header("Location", "/api/v1/payments/\${responseDTO.paymentIntentId}")
+                .header("Location", "/api/v1/payments/${responseDTO.paymentIntentId}")
                 .body(responseDTO)
         }
     }
