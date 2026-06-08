@@ -1,10 +1,14 @@
 package com.dogancaglar.paymentservice.domain.model.ledger
 
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.payment.Payment
+import com.dogancaglar.paymentservice.domain.model.payment.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.paymentservice.domain.model.vo.TxId
 import java.time.Instant
+import java.time.LocalDateTime
 
 /**
  * Tx
@@ -75,6 +79,28 @@ sealed class Tx {
         override val createdAt: Instant = Instant.now()
     ) : Tx() {
         override val txType = "INTERNAL_TRANSFER"
+
+
+        fun markAsSuccess(): InternalTransferTx {
+            require(status == TxStatus.PENDING) {
+                "Can only mark SUCCESS from PENDING (current=$status)"
+            }
+            return copy(status = TxStatus.SUCCESS)
+        }
+
+        private fun copy(
+            status: TxStatus
+        ): InternalTransferTx = InternalTransferTx(
+            txId = txId,
+            paymentId = paymentId,
+            paymentIntentId = paymentIntentId,
+            parentCaptureTxId = parentCaptureTxId,
+            targetEntityId = targetEntityId,
+            targetAccountType = targetAccountType,
+            amount = amount,
+            status = status
+        )
+
     }
 
     // -------------------------------------------------------------------------

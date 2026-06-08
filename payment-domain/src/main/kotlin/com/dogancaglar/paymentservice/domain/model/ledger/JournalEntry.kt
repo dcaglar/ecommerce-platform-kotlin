@@ -142,66 +142,7 @@ class JournalEntry private constructor(
         // INTERNAL_TRANSFER — Sub-Seller Split Distribution
         // =====================================================================
 
-        /**
-         * executeSubSellerSplit
-         *
-         * Generates a list of INTERNAL_TRANSFER JournalEntries that redistribute
-         * funds from the primary merchant's MERCHANT_GROSS_POOL to each sub-seller's
-         * designated [BalanceAccountType] account.
-         *
-         * One JournalEntry is produced per [PaymentSplit] instruction.
-         *
-         * Postings per entry:
-         *   DR MERCHANT_GROSS_POOL (debit the primary merchant's pool)
-         *   CR <split.targetAccountType account> (credit the sub-seller / platform bucket)
-         *
-         * Mathematical guarantee:
-         *   Because the [splits] array was validated at Payment creation time to
-         *   sum exactly to [totalAmount], the aggregate of all INTERNAL_TRANSFER
-         *   entries will exactly drain the MERCHANT_GROSS_POOL of the captured amount,
-         *   leaving the pool at zero for a fully distributed MARKETPLACE payment.
-         *
-         * IMPORTANT — CALLER RESPONSIBILITY:
-         *   This method MUST only be called when processingModel == MARKETPLACE.
-         *   The caller (PspResultConsumer) is responsible for the guard. Calling this
-         *   on a DIRECT_MERCHANT payment is a programming error and will result in
-         *   incorrect ledger postings.
-         *
-         * @param journalIdentifier    Base label for the journal IDs (e.g., paymentId + txId).
-         * @param merchantGrossPool    MARKETPLACE_OPERATOR account for the primary merchant.
-         * @param splits               The complete split routing matrix from the Payment aggregate.
-         * @param resolveTargetAccount Lambda that maps (AccountType, entityId) → Account.
-         *                             Allows the caller (in the application layer) to resolve
-         *                             ledger accounts from the Account directory without coupling
-         *                             this domain factory to any infrastructure port.
-         * @return                     One [JournalEntry] per split instruction.
-         */
-        fun executeSubSellerSplit(
-            paymentId: PaymentId, // <-- Added!
-            txId: TxId,           // <-- Added! (Points back to the CaptureTx that triggered the split)
-            journalIdentifier: String,
-            merchantGrossPool: Account,
-            splits: List<PaymentSplit>,
-            resolveTargetAccount: (AccountType, String) -> Account
-        ): List<JournalEntry> {
-            require(splits.isNotEmpty()) {
-                "executeSubSellerSplit requires at least one PaymentSplit, but received an empty list"
-            }
-            return splits.mapIndexed { index, split ->
-                val targetAccount = resolveTargetAccount(split.targetAccountType, split.targetEntityId)
-                JournalEntry(
-                    id        = "INTERNAL_TRANSFER:${journalIdentifier}:$index",
-                    journalType    = JournalType.INTERNAL_TRANSFER,
-                    name      = "Sub-Seller Split — ${split.targetAccountType} / ${split.targetEntityId}",
-                    paymentId = paymentId,
-                    txId      = txId,
-                    postings  = listOf(
-                        Posting.Debit.create(merchantGrossPool, split.amount),
-                        Posting.Credit.create(targetAccount, split.amount)
-                    )
-                )
-            }
-        }
+
 
         /**
          * internalTransfer

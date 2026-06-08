@@ -246,13 +246,14 @@ open class ProcessPspResultProcessingService(
         val internalTransferTx = txs.find { it.txId.value == event.internalTransferTxId }
             ?: throw IllegalStateException("Pending InternalTransfer Tx not found for txId=${event.internalTransferTxId}")
 
-        val updatedTx = internalTransferTx.markAsSuccess()
+
+        val updatedTransferTx = (internalTransferTx as Tx.InternalTransferTx).markAsSuccess()
 
         // 3. Create JournalEntry
         val journalIdentifier = "${event.publicPaymentIntentId}-${event.internalTransferTxId}"
         val journalEntries = JournalEntry.internalTransfer(
             paymentId = payment.paymentId,
-            txId = updatedTx.txId,
+            txId = updatedTransferTx.txId,
             journalIdentifier = journalIdentifier,
             amount = amount,
             merchantGrossPool = merchantGrossPool,
@@ -264,7 +265,7 @@ open class ProcessPspResultProcessingService(
         // 4. Persist
         centralDbTransactionalFacadePort.recordInternalTransferOperationInLedger(
             internalTransfer = updatedTransfer,
-            tx = updatedTx,
+            tx = updatedTransferTx,
             journalEntries = journalEntries
         )
     }
