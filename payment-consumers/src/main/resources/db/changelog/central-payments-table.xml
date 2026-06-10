@@ -14,7 +14,7 @@
 
         Key design decisions reflected in this schema:
           - NO order_id: Payment is decoupled from e-commerce order.
-          - merchant_account_id: primary MoR entity, mandatory.
+          - merchant_account: primary MoR entity, mandatory.
           - processing_model: DIRECT_MERCHANT | MARKETPLACE, locked at auth time.
           - splits_json (jsonb): immutable routing matrix written once at birth.
           - status domain: AUTHORIZED → SENT_FOR_SETTLE → CAPTURED etc.
@@ -43,7 +43,7 @@
 
             <!-- Primary merchant-of-record entity identifier.
                  Replaces the old order_id column from the Edge schema. -->
-            <column name="merchant_account_id" type="VARCHAR(255)">
+            <column name="merchant_account" type="VARCHAR(255)">
                 <constraints nullable="false"/>
             </column>
 
@@ -155,8 +155,8 @@
             <column name="payment_intent_id"/>
         </createIndex>
 
-        <createIndex tableName="payments" indexName="idx_payments_merchant_account_id">
-            <column name="merchant_account_id"/>
+        <createIndex tableName="payments" indexName="idx_payments_merchant_account">
+            <column name="merchant_account"/>
         </createIndex>
 
         <createIndex tableName="payments" indexName="idx_payments_status">

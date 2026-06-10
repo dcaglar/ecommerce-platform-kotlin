@@ -31,7 +31,7 @@ class CreatePaymentIntentService(
             paymentIntentId = paymentIntentId,
             buyerId = cmd.buyerId,
             orderId = cmd.orderId,
-            merchantAccountId = cmd.merchantAccountId,
+            merchantAccount = cmd.merchantAccount,
             processingModel = cmd.processingModel,
             totalAmount = cmd.totalAmount,
             splits = cmd.paymentSplits

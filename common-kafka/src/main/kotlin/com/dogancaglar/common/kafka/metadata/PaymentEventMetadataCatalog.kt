@@ -9,7 +9,6 @@ import com.dogancaglar.paymentservice.application.events.CaptureConfirmed
 import com.dogancaglar.paymentservice.application.events.EventType
 import com.dogancaglar.paymentservice.application.events.CaptureSubmitted
 import com.dogancaglar.paymentservice.application.events.InternalTransferCommand
-import com.dogancaglar.paymentservice.application.events.InternalTransferRequested
 import com.dogancaglar.paymentservice.application.events.JournalEntriesRecorded
 
 object PaymentEventMetadataCatalog {
@@ -65,7 +64,7 @@ object PaymentEventMetadataCatalog {
         override val eventType = EventType.INTERNAL_TRANSFER_COMMAND
         override val clazz = InternalTransferCommand::class.java
         override val typeRef = object : TypeReference<EventEnvelope<InternalTransferCommand>>() {}
-        override val partitionKey = { evt: InternalTransferCommand -> evt.targetEntityId }
+        override val partitionKey = { evt: InternalTransferCommand -> evt.targetAccount }
     }
 
     val all: List<EventMetadata<*>> = listOf(

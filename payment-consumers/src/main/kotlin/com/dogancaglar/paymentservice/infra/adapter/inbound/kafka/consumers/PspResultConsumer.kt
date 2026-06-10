@@ -2,7 +2,6 @@ package com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.consumers
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
-import com.dogancaglar.paymentservice.application.service.ProcessPspResultProcessingService
 import com.dogancaglar.common.kafka.metadata.CONSUMER_GROUPS
 import com.dogancaglar.common.kafka.metadata.Topics
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
@@ -64,7 +63,7 @@ class PspResultConsumer(
                     }
 
                     is InternalTransferCommand -> {
-                        logger.info("🎬 Processing InternalTransferCommand event for target: ${event.targetEntityId}")
+                        logger.info("🎬 Processing InternalTransferCommand event for target: ${event.targetAccount}")
                         processPspResultUseCase.processInternalTransferCommand(event)
                     }
 

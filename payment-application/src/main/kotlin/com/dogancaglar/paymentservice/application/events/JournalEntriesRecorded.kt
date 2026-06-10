@@ -33,7 +33,7 @@ data class JournalEntriesRecorded(
         ) = JournalEntriesRecorded(
             paymentIntentId = cmd.paymentIntentId,
             publicPaymentIntentId = cmd.publicPaymentIntentId,
-            sellerId = if (cmd is CaptureConfirmed) cmd.merchantAccountId else null,
+            sellerId = if (cmd is CaptureConfirmed) cmd.merchantAccount else null,
             amountValue = cmd.amountValue,
             currency = cmd.currency,
             ledgerBatchId = batchId,

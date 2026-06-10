@@ -19,9 +19,9 @@ import java.time.LocalDateTime
  * @param amount              Total amount transferred. Immutable after creation.
  * @param reversedAmount      Running total of reversed funds. Starts at zero.
  * @param targetAccountType   The type of the destination account.
- * @param targetEntityId      The specific entity ID of the destination account.
+ * @param targetAccount      The specific entity ID of the destination account.
  * @param sourceAccountType   The type of the source account.
- * @param sourceEntityId      The specific entity ID of the source account.
+ * @param sourceAccount      The specific entity ID of the source account.
  * @param status              Current lifecycle state of this transfer.
  * @param createdAt           Timestamp of aggregate creation (UTC).
  * @param updatedAt           Timestamp of last state mutation (UTC).
@@ -31,10 +31,9 @@ class InternalTransfer private constructor(
     val sourceTransactionId: TxId,
     val amount: Amount,
     val reversedAmount: Amount,
-    val targetAccountType: AccountType,
-    val targetEntityId: String,
-    val sourceAccountType: AccountType,
-    val sourceEntityId: String,
+    val targetAccount: String,
+    val sourceAccount: String,
+    val transferType: String,
     val status: InternalTransferStatus,
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime
@@ -45,10 +44,10 @@ class InternalTransfer private constructor(
     // =========================================================================
 
     init {
-        require(targetEntityId.isNotBlank()) {
+        require(targetAccount.isNotBlank()) {
             "targetEntityId must not be blank"
         }
-        require(sourceEntityId.isNotBlank()) {
+        require(sourceAccount.isNotBlank()) {
             "sourceEntityId must not be blank"
         }
         require(amount.isPositive()) {
@@ -96,10 +95,9 @@ class InternalTransfer private constructor(
         sourceTransactionId = sourceTransactionId,
         amount              = amount,
         reversedAmount      = reversedAmount,
-        targetAccountType   = targetAccountType,
-        targetEntityId      = targetEntityId,
-        sourceAccountType   = sourceAccountType,
-        sourceEntityId      = sourceEntityId,
+        targetAccount      = targetAccount,
+        sourceAccount      = sourceAccount,
+        transferType        = transferType,
         status              = status,
         createdAt           = createdAt,
         updatedAt           = updatedAt
@@ -111,8 +109,8 @@ class InternalTransfer private constructor(
 
     override fun toString(): String =
         "InternalTransfer(transferId=${transferId.value}, sourceTransactionId=${sourceTransactionId.value}, " +
-        "amount=$amount, reversedAmount=$reversedAmount, target=$targetAccountType/$targetEntityId, " +
-        "source=$sourceAccountType/$sourceEntityId, status=$status, createdAt=$createdAt, updatedAt=$updatedAt)"
+        "amount=$amount, reversedAmount=$reversedAmount, target=$targetAccount/$targetAccount, " +
+        "source=$sourceAccount/$sourceAccount, status=$status, transferType= $transferType createdAt=$createdAt, updatedAt=$updatedAt)"
 
     // =========================================================================
     // Factory Methods
@@ -129,10 +127,9 @@ class InternalTransfer private constructor(
             transferId: InternalTransferId,
             sourceTransactionId: TxId,
             amount: Amount,
-            targetAccountType: AccountType,
-            targetEntityId: String,
-            sourceAccountType: AccountType,
-            sourceEntityId: String,
+            sourceAccount: String,
+            targetAccount: String,
+            transferType :String,
             now: LocalDateTime = Utc.nowLocalDateTime()
         ): InternalTransfer {
             return InternalTransfer(
@@ -140,10 +137,9 @@ class InternalTransfer private constructor(
                 sourceTransactionId = sourceTransactionId,
                 amount              = amount,
                 reversedAmount      = Amount.zero(amount.currency),
-                targetAccountType   = targetAccountType,
-                targetEntityId      = targetEntityId,
-                sourceAccountType   = sourceAccountType,
-                sourceEntityId      = sourceEntityId,
+                targetAccount      = targetAccount,
+                sourceAccount      = sourceAccount,
+                transferType = transferType,
                 status              = InternalTransferStatus.CREATED_PENDING,
                 createdAt           = now,
                 updatedAt           = now
@@ -160,10 +156,120 @@ class InternalTransfer private constructor(
             sourceTransactionId: TxId,
             amount: Amount,
             reversedAmount: Amount,
-            targetAccountType: AccountType,
-            targetEntityId: String,
-            sourceAccountType: AccountType,
-            sourceEntityId: String,
+            targetAccount: String,
+            sourceAccount: String,
+            status: InternalTransferStatus,
+            transferType : String,
+            createdAt: LocalDateTime,
+            updatedAt: LocalDateTime
+        ): InternalTransfer = InternalTransfer(
+            transferId          = transferId,
+            sourceTransactionId = sourceTransactionId,
+            amount              = amount,
+            reversedAmount      = reversedAmount,
+            targetAccount      = targetAccount,
+            sourceAccount      = sourceAccount,
+            transferType = transferType,
+            status              = status,
+            createdAt           = createdAt,
+            updatedAt           = updatedAt
+        )
+    }
+}
+
+
+
+
+/*
+// FILE: com/dogancaglar/paymentservice/domain/model/payment/InternalTransfer.kt
+package com.dogancaglar.paymentservice.domain.model.payment
+
+import com.dogancaglar.common.time.Utc
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.vo.InternalTransferId
+import com.dogancaglar.paymentservice.domain.model.vo.TxId
+import java.time.LocalDateTime
+
+class InternalTransfer private constructor(
+    val transferId: InternalTransferId,
+    val sourceTransactionId: TxId,
+    val amount: Amount,
+    val reversedAmount: Amount,
+    val targetAccount: String,
+    val sourceAccount: String,
+    val transferType: String, // ◄ 🎯 Added to aggregate instance configuration
+    val status: InternalTransferStatus,
+    val createdAt: LocalDateTime,
+    val updatedAt: LocalDateTime
+) {
+
+    init {
+        require(targetAccount.isNotBlank()) { "targetEntityId must not be blank" }
+        require(sourceAccount.isNotBlank()) { "sourceEntityId must not be blank" }
+        require(transferType.isNotBlank()) { "transferType must not be blank" } // ◄ Invariant validation
+        require(amount.isPositive()) { "amount must be positive" }
+        require(reversedAmount >= Amount.zero(amount.currency)) { "reversedAmount cannot be negative" }
+        require(reversedAmount <= amount) { "reversedAmount cannot exceed total amount" }
+    }
+
+    fun markSentForTransfer(now: LocalDateTime = Utc.nowLocalDateTime()): InternalTransfer {
+        require(status == InternalTransferStatus.CREATED_PENDING) { "Invalid state shift from $status" }
+        return copy(status = InternalTransferStatus.SENT_FOR_TRANSFER, updatedAt = now)
+    }
+
+    fun markTransferred(now: LocalDateTime = Utc.nowLocalDateTime()): InternalTransfer {
+        require(status == InternalTransferStatus.SENT_FOR_TRANSFER) { "Invalid state shift from $status" }
+        return copy(status = InternalTransferStatus.TRANSFERRED, updatedAt = now)
+    }
+
+    private fun copy(
+        status: InternalTransferStatus = this.status,
+        updatedAt: LocalDateTime = Utc.nowLocalDateTime()
+    ): InternalTransfer = InternalTransfer(
+        transferId          = transferId,
+        sourceTransactionId = sourceTransactionId,
+        amount              = amount,
+        reversedAmount      = reversedAmount,
+        targetAccount       = targetAccount,
+        sourceAccount       = sourceAccount,
+        transferType        = transferType, // ◄ Propagated safely
+        status              = status,
+        createdAt           = createdAt,
+        updatedAt           = updatedAt
+    )
+
+    companion object {
+        fun createNew(
+            transferId: InternalTransferId,
+            sourceTransactionId: TxId,
+            amount: Amount,
+            sourceAccount: String,
+            targetAccount: String,
+            transferType: String, // ◄ 🎯 Added to primary initialization track
+            now: LocalDateTime = Utc.nowLocalDateTime()
+        ): InternalTransfer {
+            return InternalTransfer(
+                transferId          = transferId,
+                sourceTransactionId = sourceTransactionId,
+                amount              = amount,
+                reversedAmount      = Amount.zero(amount.currency),
+                targetAccount       = targetAccount,
+                sourceAccount       = sourceAccount,
+                transferType        = transferType,
+                status              = InternalTransferStatus.CREATED_PENDING,
+                createdAt           = now,
+                updatedAt           = now
+            )
+        }
+
+        fun rehydrate(
+            transferId: InternalTransferId,
+            sourceTransactionId: TxId,
+            amount: Amount,
+            reversedAmount: Amount,
+            targetAccount: String,
+            sourceAccount: String,
+            transferType: String, // ◄ Added to persistence rehydration
             status: InternalTransferStatus,
             createdAt: LocalDateTime,
             updatedAt: LocalDateTime
@@ -172,13 +278,13 @@ class InternalTransfer private constructor(
             sourceTransactionId = sourceTransactionId,
             amount              = amount,
             reversedAmount      = reversedAmount,
-            targetAccountType   = targetAccountType,
-            targetEntityId      = targetEntityId,
-            sourceAccountType   = sourceAccountType,
-            sourceEntityId      = sourceEntityId,
+            targetAccount       = targetAccount,
+            sourceAccount       = sourceAccount,
+            transferType        = transferType,
             status              = status,
             createdAt           = createdAt,
             updatedAt           = updatedAt
         )
     }
 }
+ */

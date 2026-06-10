@@ -48,7 +48,7 @@ import java.time.LocalDateTime
  * @param paymentId         Snowflake-generated identifier for this Payment record.
  * @param paymentIntentId   Reference to the originating PaymentIntent (for traceability).
  * @param buyerId           Identifier of the purchasing party.
- * @param merchantAccountId Primary merchant-of-record entity identifier.
+ * @param merchantAccount Primary merchant-of-record entity identifier.
  * @param processingModel   Routing model locked in at authorization time.
  * @param totalAmount       Total authorized amount. Immutable after creation.
  * @param capturedAmount    Running total of confirmed captures. Starts at zero.
@@ -62,7 +62,7 @@ class Payment private constructor(
     val paymentId: PaymentId,
     val paymentIntentId: PaymentIntentId,
     val buyerId: BuyerId,
-    val merchantAccountId: String,
+    val merchantAccount: String,
     val processingModel: ProcessingModel,
     val totalAmount: Amount,
     val capturedAmount: Amount,
@@ -78,8 +78,8 @@ class Payment private constructor(
     // =========================================================================
 
     init {
-        require(merchantAccountId.isNotBlank()) {
-            "merchantAccountId must not be blank"
+        require(merchantAccount.isNotBlank()) {
+            "merchantAccount must not be blank"
         }
         require(totalAmount.isPositive()) {
             "totalAmount must be positive, but was ${totalAmount.quantity}"
@@ -272,7 +272,7 @@ class Payment private constructor(
         paymentId         = paymentId,
         paymentIntentId   = paymentIntentId,
         buyerId           = buyerId,
-        merchantAccountId = merchantAccountId,
+        merchantAccount = merchantAccount,
         processingModel   = processingModel,
         totalAmount       = totalAmount,
         capturedAmount    = capturedAmount,
@@ -289,7 +289,7 @@ class Payment private constructor(
 
     override fun toString(): String =
         "Payment(paymentId=${paymentId.value}, paymentIntentId=${paymentIntentId.value}, " +
-        "buyerId=${buyerId.value}, merchantAccountId=$merchantAccountId, " +
+        "buyerId=${buyerId.value}, merchantAccount=$merchantAccount, " +
         "processingModel=$processingModel, totalAmount=$totalAmount, " +
         "capturedAmount=$capturedAmount, refundedAmount=$refundedAmount, " +
         "status=$status, splits=${splits.size}, createdAt=$createdAt, updatedAt=$updatedAt)"
@@ -321,7 +321,7 @@ class Payment private constructor(
          * @param paymentId           Snowflake ID assigned by the Edge Cell.
          * @param paymentIntentId     ID of the originating PaymentIntent.
          * @param buyerId             Purchasing party identifier.
-         * @param merchantAccountId   Primary MoR merchant entity identifier.
+         * @param merchantAccount   Primary MoR merchant entity identifier.
          * @param processingModel     Routing model (DIRECT_MERCHANT or MARKETPLACE).
          * @param totalAmount         Total authorized amount.
          * @param splits              Routing instructions from the PaymentAuthorized event.
@@ -332,20 +332,20 @@ class Payment private constructor(
             paymentId: PaymentId,
             paymentIntentId: PaymentIntentId,
             buyerId: BuyerId,
-            merchantAccountId: String,
+            merchantAccount: String,
             processingModel: ProcessingModel,
             totalAmount: Amount,
             splits: List<PaymentSplit>,
             now: LocalDateTime = Utc.nowLocalDateTime()
         ): Payment {
-            require(merchantAccountId.isNotBlank()) {
-                "merchantAccountId must not be blank when initializing a Payment"
+            require(merchantAccount.isNotBlank()) {
+                "merchantAccount must not be blank when initializing a Payment"
             }
             return Payment(
                 paymentId         = paymentId,
                 paymentIntentId   = paymentIntentId,
                 buyerId           = buyerId,
-                merchantAccountId = merchantAccountId,
+                merchantAccount = merchantAccount,
                 processingModel   = processingModel,
                 totalAmount       = totalAmount,
                 capturedAmount    = Amount.zero(totalAmount.currency),
@@ -368,7 +368,7 @@ class Payment private constructor(
             paymentId: PaymentId,
             paymentIntentId: PaymentIntentId,
             buyerId: BuyerId,
-            merchantAccountId: String,
+            merchantAccount: String,
             processingModel: ProcessingModel,
             totalAmount: Amount,
             capturedAmount: Amount,
@@ -381,7 +381,7 @@ class Payment private constructor(
             paymentId         = paymentId,
             paymentIntentId   = paymentIntentId,
             buyerId           = buyerId,
-            merchantAccountId = merchantAccountId,
+            merchantAccount = merchantAccount,
             processingModel   = processingModel,
             totalAmount       = totalAmount,
             capturedAmount    = capturedAmount,

@@ -12,7 +12,7 @@ const SCENARIOS = {
     smoke: {
         executor: 'constant-vus',
         vus: 1,
-        duration: '1m',
+        duration: '10m',
         tags: { test_type: 'smoke' },
     },
     // B. Average Load Test: Simulates expected day-to-day typical user traffic
@@ -104,6 +104,49 @@ function randomId(prefix) {
     return `${prefix}-${Math.floor(Math.random() * 1e8)}`;
 }
 
+const MARKETPLACE = "MARKETPLACE-1";
+const SELLERS = Array.from({length: 10}, (_, i) => `SELLER-1-${i+1}`);
+
+function getUniqueSellers(count) {
+    const shuffled = SELLERS.slice().sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+}
+
+function generateRandomOrder() {
+    const totalQuantity = Math.floor(Math.random() * 9000) + 1000;
+    const numSellers = Math.floor(Math.random() * 3) + 2;
+    const sellers = getUniqueSellers(numSellers);
+    
+    const splits = [];
+    let remaining = totalQuantity;
+    
+    if (Math.random() > 0.5) {
+        const commissionPct = (Math.floor(Math.random() * 8) + 2) / 100;
+        const commissionAmt = Math.floor(totalQuantity * commissionPct);
+        splits.push({ type: "Commission", amount: { quantity: commissionAmt, currency: "EUR" } });
+        remaining -= commissionAmt;
+    }
+    
+    for (let i = 0; i < numSellers; i++) {
+        if (i === numSellers - 1) {
+            splits.push({ type: "BalanceAccount", account: sellers[i], amount: { quantity: remaining, currency: "EUR" } });
+        } else {
+            // Ensure we leave at least enough for the remaining sellers (minimum 1 each)
+            let maxChunk = remaining - (numSellers - 1 - i);
+            let chunk = Math.floor(Math.random() * (maxChunk * 0.6));
+            if (chunk < 1) chunk = 1;
+            
+            splits.push({ type: "BalanceAccount", account: sellers[i], amount: { quantity: chunk, currency: "EUR" } });
+            remaining -= chunk;
+        }
+    }
+    
+    return {
+        totalAmount: { quantity: totalQuantity, currency: "EUR" },
+        splits: splits
+    };
+}
+
 // --- 4. Main User Journey ---
 export default function () {
     const baseUrl = endpoints.base_url;
@@ -116,14 +159,15 @@ export default function () {
 
     // --- STEP A: Create a Payment Intent ---
     const createUrl = `${baseUrl}/api/v1/payments`;
+    const orderData = generateRandomOrder();
+
     const createPayload = JSON.stringify({
         orderId: randomId('ORD'),
-        buyerId: 'BUYER-1450',
-        totalAmount: { quantity: 2900, currency: 'EUR' },
-        paymentOrders: [
-            { sellerId: 'SELLER-111', amount: { quantity: 1450, currency: 'EUR' } },
-            { sellerId: 'SELLER-222', amount: { quantity: 1450, currency: 'EUR' } }
-        ]
+        buyerId: randomId('BUYER'),
+        merchantAccount: MARKETPLACE,
+        processingModel: "MARKETPLACE",
+        totalAmount: orderData.totalAmount,
+        splits: orderData.splits
     });
 
     const createParams = {

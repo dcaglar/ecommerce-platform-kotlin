@@ -26,7 +26,7 @@ interface PaymentMapper {
 
     /**
      * Updates only mutable state: capturedAmountValue, refundedAmountValue,
-     * status, updatedAt. Immutable fields (paymentId, merchantAccountId,
+     * status, updatedAt. Immutable fields (paymentId, merchantAccount,
      * processingModel, splitsJson, etc.) are never mutated after INSERT.
      */
     fun update(payment: PaymentEntity): Int

@@ -3,6 +3,9 @@ package com.dogancaglar.paymentservice.application.validator
 import com.dogancaglar.paymentservice.adapter.inbound.rest.mapper.AmountMapper
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.ProcessingModelDto
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentSplitRequestDTO
+import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
+import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
 import org.springframework.stereotype.Service
 
 @Service
@@ -12,6 +15,7 @@ class PaymentValidator {
         validateTotals(request)
         validateCurrencies(request)
     }
+
 
     private fun validateProcessingModel(request: CreatePaymentIntentRequestDTO) {
         val processingModel = request.processingModel
@@ -37,10 +41,15 @@ class PaymentValidator {
         val paymentCurrency = AmountMapper.toDomain(request.totalAmount).currency
 
         request.splits?.forEach { split ->
+            val account = when(split) {
+                is PaymentSplitRequestDTO.BalanceAccount -> split.account
+                is PaymentSplitRequestDTO.Commission -> "commission"
+            }
             require(AmountMapper.toDomain(split.amount).currency == paymentCurrency) {
-                "PaymentOrder for seller ${split.targetEntityId} has ${split.amount.currency}, " +
+                "PaymentOrder for seller ${account} has ${split.amount.currency}, " +
                         "but payment currency is $paymentCurrency"
             }
         }
     }
+
 }

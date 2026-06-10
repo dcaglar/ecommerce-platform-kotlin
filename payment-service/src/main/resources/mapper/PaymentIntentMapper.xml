@@ -17,7 +17,7 @@
         <result property="updatedAt" column="updated_at"
                 typeHandler="com.dogancaglar.common.db.typehandler.InstantTypeHandler"/>
         <result property="splitsJson"        column="splits_json" jdbcType="VARCHAR"/>
-        <result property="merchantAccountId" column="merchant_account_id"/>
+        <result property="merchantAccount" column="merchant_account"/>
         <result property="processingModel" column="processing_model"/>
     </resultMap>
 
@@ -34,7 +34,7 @@
         psp_reference,
         buyer_id,
         order_id,
-        merchant_account_id,
+        merchant_account,
         processing_model,
         total_amount_value,
         currency,
@@ -47,7 +47,7 @@
         #{pspReference},
         #{buyerId},
         #{orderId},
-        #{merchantAccountId},
+        #{merchantAccount},
         #{processingModel},
         #{totalAmountValue},
         #{currency},
@@ -63,7 +63,7 @@
         psp_reference,
         buyer_id,
         order_id,
-        merchant_account_id,
+        merchant_account,
         processing_model,
         total_amount_value,
         currency,
@@ -85,7 +85,7 @@
         psp_reference = #{pspReference},
         order_id = #{orderId},
         buyer_id = #{buyerId},
-        merchant_account_id = #{merchantAccountId},
+        merchant_account = #{merchantAccount},
         processing_model = #{processingModel},
         total_amount_value = #{totalAmountValue},
         currency = #{currency},

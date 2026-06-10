@@ -9,7 +9,7 @@ data class CaptureSubmitted(
     val pspReference: String,
     override val paymentIntentId: String,
     override val publicPaymentIntentId: String,
-    val merchantAccountId: String,
+    val merchantAccount: String,
     override val amountValue: Long,
     override val currency: String,
     override val timestamp: Instant = Utc.nowInstant()
@@ -23,7 +23,7 @@ data class CaptureSubmitted(
             pspReference = pspReference,
             paymentIntentId = request.paymentIntentId,
             publicPaymentIntentId = request.publicPaymentIntentId,
-            merchantAccountId = request.merchantAccountId,
+            merchantAccount = request.merchantAccount,
             amountValue = request.amountValue,
             currency = request.currency,
             timestamp = timestamp

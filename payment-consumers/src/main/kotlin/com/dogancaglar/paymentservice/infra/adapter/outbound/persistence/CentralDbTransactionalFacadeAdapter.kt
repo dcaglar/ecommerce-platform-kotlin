@@ -35,37 +35,29 @@ open class CentralDbTransactionalFacadeAdapter(
     @Transactional(timeout = 5)
     override fun recordPaymentOperationInLedger(
         payment: Payment,
-        tx: Tx?,
+        tx: Tx,
         journalEntries: List<JournalEntry>,
         outboxEvents: List<OutboxEvent>
     ) {
         val splitsJson = objectMapper.writeValueAsString(payment.splits.map { PaymentSplitDto.fromDomain(it) })
         val paymentEntity = PaymentEntityMapper.toEntity(payment, splitsJson)
         paymentMapper.upsert(paymentEntity)
-
-        if (tx != null) {
-            val txEntity = PaymentTxEntityMapper.toEntity(tx)
-            txMapper.upsert(txEntity)
-        }
-
+        val txEntity = PaymentTxEntityMapper.toEntity(tx)
+        txMapper.upsert(txEntity)
         saveJournalAndOutbox(journalEntries, outboxEvents)
     }
 
     @Transactional(timeout = 5)
     override fun recordInternalTransferOperationInLedger(
         internalTransfer: com.dogancaglar.paymentservice.domain.model.payment.InternalTransfer,
-        tx: Tx?,
+        tx: Tx,
         journalEntries: List<JournalEntry>,
         outboxEvents: List<OutboxEvent>
     ) {
         val transferEntity = com.dogancaglar.common.db.converter.TransferEntityMapper.toEntity(internalTransfer)
         transferMapper.upsert(transferEntity)
-
-        if (tx != null) {
-            val txEntity = PaymentTxEntityMapper.toEntity(tx)
-            txMapper.upsert(txEntity)
-        }
-
+        val txEntity = PaymentTxEntityMapper.toEntity(tx)
+        txMapper.upsert(txEntity)
         saveJournalAndOutbox(journalEntries, outboxEvents)
     }
 

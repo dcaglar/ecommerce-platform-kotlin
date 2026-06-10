@@ -26,9 +26,9 @@ class DomainEventFactoryTest {
                     buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer_1"),
                     orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order_1"),
                     processingModel = com.dogancaglar.paymentservice.domain.model.payment.ProcessingModel.DIRECT_MERCHANT,
-                    merchantAccountId = "m_1",
+                    merchantAccount = "m_1",
                     totalAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
-                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SUB_SELLER, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
+                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
                 ),
                 captureAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
                 timestamp = now
@@ -61,9 +61,9 @@ class DomainEventFactoryTest {
                     buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer_1"),
                     orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order_1"),
                     processingModel = com.dogancaglar.paymentservice.domain.model.payment.ProcessingModel.DIRECT_MERCHANT,
-                    merchantAccountId = "m_1",
+                    merchantAccount = "m_1",
                     totalAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
-                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SUB_SELLER, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
+                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
                 ),
                 captureAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
                 timestamp = now
@@ -89,9 +89,9 @@ class DomainEventFactoryTest {
                     buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer_1"),
                     orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order_1"),
                     processingModel = com.dogancaglar.paymentservice.domain.model.payment.ProcessingModel.DIRECT_MERCHANT,
-                    merchantAccountId = "m_1",
+                    merchantAccount = "m_1",
                     totalAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
-                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SUB_SELLER, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
+                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
                 ),
                 captureAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
                 timestamp = now
@@ -108,9 +108,9 @@ class DomainEventFactoryTest {
                     buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer_1"),
                     orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order_1"),
                     processingModel = com.dogancaglar.paymentservice.domain.model.payment.ProcessingModel.DIRECT_MERCHANT,
-                    merchantAccountId = "m_1",
+                    merchantAccount = "m_1",
                     totalAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
-                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SUB_SELLER, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
+                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
                 ),
                 captureAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
                 timestamp = now
@@ -142,9 +142,9 @@ class DomainEventFactoryTest {
                     buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer_1"),
                     orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order_1"),
                     processingModel = com.dogancaglar.paymentservice.domain.model.payment.ProcessingModel.DIRECT_MERCHANT,
-                    merchantAccountId = "m_1",
+                    merchantAccount = "m_1",
                     totalAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
-                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SUB_SELLER, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
+                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
                 ),
                 captureAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
                 timestamp = now
@@ -179,9 +179,9 @@ class DomainEventFactoryTest {
                     buyerId = com.dogancaglar.paymentservice.domain.model.vo.BuyerId("buyer_1"),
                     orderId = com.dogancaglar.paymentservice.domain.model.vo.OrderId("order_1"),
                     processingModel = com.dogancaglar.paymentservice.domain.model.payment.ProcessingModel.DIRECT_MERCHANT,
-                    merchantAccountId = "m_1",
+                    merchantAccount = "m_1",
                     totalAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
-                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SUB_SELLER, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
+                    splits = listOf(com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit.of(com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, "m_1", com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR"))))
                 ),
                 captureAmount = com.dogancaglar.paymentservice.domain.model.common.Amount.of(1000L, com.dogancaglar.paymentservice.domain.model.common.Currency("EUR")),
                 timestamp = now

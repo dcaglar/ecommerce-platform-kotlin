@@ -23,7 +23,7 @@ import java.time.Instant
  *  paymentId           → payments.payment_id           (Snowflake Long, PK)
  *  paymentIntentId     → payments.payment_intent_id    (traceability FK to edge payment_intents)
  *  buyerId             → payments.buyer_id
- *  merchantAccountId   → payments.merchant_account_id  (primary MoR merchant entity)
+ *  merchantAccount   → payments.merchant_account  (primary MoR merchant entity)
  *  processingModel     → payments.processing_model     (DIRECT_MERCHANT | MARKETPLACE)
  *  totalAmountValue    → payments.total_amount_value   (smallest unit, e.g. cents)
  *  currency            → payments.currency             (ISO 4217, e.g. "EUR")
@@ -38,7 +38,7 @@ data class PaymentEntity(
     val paymentId: Long,
     val paymentIntentId: Long,
     val buyerId: String,
-    val merchantAccountId: String,
+    val merchantAccount: String,
     val processingModel: String,
     val totalAmountValue: Long,
     val currency: String,

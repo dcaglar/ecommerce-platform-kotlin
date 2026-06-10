@@ -29,7 +29,7 @@ CREATE TABLE payments (
     payment_id BIGINT PRIMARY KEY,
     payment_intent_id BIGINT NOT NULL,
     buyer_id VARCHAR(255) NOT NULL,
-    merchant_account_id VARCHAR(255) NOT NULL,
+    merchant_account VARCHAR(255) NOT NULL,
     processing_model VARCHAR(32) NOT NULL,
     total_amount_value BIGINT NOT NULL,
     captured_amount_value BIGINT NOT NULL DEFAULT 0,
@@ -47,7 +47,7 @@ CREATE TABLE payments (
     CONSTRAINT chk_payments_refunded_le_captured CHECK (refunded_amount_value >= 0 AND refunded_amount_value <= captured_amount_value)
 );
 CREATE INDEX IF NOT EXISTS idx_payments_payment_intent_id ON payments(payment_intent_id);
-CREATE INDEX IF NOT EXISTS idx_payments_merchant_account_id ON payments(merchant_account_id);
+CREATE INDEX IF NOT EXISTS idx_payments_merchant_account ON payments(merchant_account);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
 
 DROP TABLE IF EXISTS payment_tx CASCADE;
@@ -56,6 +56,7 @@ CREATE TABLE payment_tx (
     tx_type VARCHAR(32) NOT NULL,
     parent_tx_id BIGINT,
     payment_id BIGINT NOT NULL,
+    payment_intent_id BIGINT,
     status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
     settle_status VARCHAR(16),
     acquirer_batch_ref VARCHAR(255),
@@ -79,6 +80,7 @@ CREATE TABLE journal_entries (
     journal_type VARCHAR(32) NOT NULL,
     name VARCHAR(128),
     payment_id BIGINT NOT NULL,
+    payment_intent_id BIGINT,
     tx_id BIGINT NOT NULL,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
     CONSTRAINT fk_journal_entries_tx_id FOREIGN KEY (tx_id) REFERENCES payment_tx(tx_id) ON DELETE CASCADE

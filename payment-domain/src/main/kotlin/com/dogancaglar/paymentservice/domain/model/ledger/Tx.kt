@@ -1,14 +1,10 @@
 package com.dogancaglar.paymentservice.domain.model.ledger
 
-import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.common.Amount
-import com.dogancaglar.paymentservice.domain.model.payment.Payment
-import com.dogancaglar.paymentservice.domain.model.payment.PaymentStatus
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.paymentservice.domain.model.vo.TxId
 import java.time.Instant
-import java.time.LocalDateTime
 
 /**
  * Tx
@@ -72,13 +68,13 @@ sealed class Tx {
         override val paymentId: PaymentId,
         override val paymentIntentId: PaymentIntentId,
         val parentCaptureTxId: TxId,
-        val targetEntityId: String,
-        val targetAccountType: AccountType,
+        val sourceAccount: String,
+        val targetAccount: String,
         override val amount: Amount,
         override val status: TxStatus = TxStatus.SUCCESS,
-        override val createdAt: Instant = Instant.now()
+        override val createdAt: Instant = Instant.now(),
+        override val txType: String
     ) : Tx() {
-        override val txType = "INTERNAL_TRANSFER"
 
 
         fun markAsSuccess(): InternalTransferTx {
@@ -95,10 +91,11 @@ sealed class Tx {
             paymentId = paymentId,
             paymentIntentId = paymentIntentId,
             parentCaptureTxId = parentCaptureTxId,
-            targetEntityId = targetEntityId,
-            targetAccountType = targetAccountType,
+            sourceAccount = sourceAccount,
+            targetAccount = targetAccount,
             amount = amount,
-            status = status
+            status = status,
+            txType = txType
         )
 
     }
@@ -214,19 +211,21 @@ sealed class Tx {
             paymentId: PaymentId,
             paymentIntentId: PaymentIntentId,
             parentCaptureTxId: TxId,
-            targetEntityId: String,
-            targetAccountType: AccountType,
+            sourceAccount: String,
+            targetAccount: String,
             amount: Amount,
-            status: TxStatus = TxStatus.SUCCESS
+            txType: String,
+            status: TxStatus = TxStatus.SUCCESS,
         ): InternalTransferTx = InternalTransferTx(
             txId = txId,
             paymentId = paymentId,
             paymentIntentId = paymentIntentId,
             parentCaptureTxId = parentCaptureTxId,
-            targetEntityId = targetEntityId,
-            targetAccountType = targetAccountType,
+            sourceAccount = sourceAccount,
+            targetAccount = targetAccount,
             amount = amount,
-            status = status
+            txType =  txType,
+            status = status,
         )
 
         fun createPspFeeTx(
@@ -300,3 +299,5 @@ sealed class Tx {
         )
     }
 }
+
+

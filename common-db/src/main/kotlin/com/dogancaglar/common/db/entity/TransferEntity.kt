@@ -8,10 +8,9 @@ data class TransferEntity(
     val amountValue: Long,
     val currency: String,
     val reversedAmountValue: Long,
-    val targetAccountType: String,
-    val targetEntityId: String,
-    val sourceAccountType: String,
-    val sourceEntityId: String,
+    val targetAccount: String,
+    val sourceAccount: String,
+    val transferType: String,
     val status: String,
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime

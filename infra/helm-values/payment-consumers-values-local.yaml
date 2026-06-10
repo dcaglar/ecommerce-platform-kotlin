@@ -40,7 +40,7 @@ autoscaling:
           value: 50
           periodSeconds: 60
 serviceMonitor:
-  enabled: true
+  enabled: false
   path: /actuator/prometheus
   interval: 15s
   scrapeTimeout: 10s

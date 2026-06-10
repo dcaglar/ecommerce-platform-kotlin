@@ -23,7 +23,7 @@ class LedgerDomainEventEntityMapperTest {
     private val fixedInstant = Instant.parse("2025-11-07T16:20:00Z")
 
     private fun sampleJournalEntry(): JournalEntry {
-        val merchantAccount = Account.Companion.mock(AccountType.MARKETPLACE_OPERATOR, "SELLER-333", "EUR")
+        val merchantAccount = Account.Companion.mock(AccountType.MERCHANT_GROSS_CAPTURE_SUSPENSE, "SELLER-333", "EUR")
         val pspReceivable = Account.Companion.mock(AccountType.PSP_RECEIVABLES, "GLOBAL", "EUR")
         val debitPosting = Posting.Debit.create(merchantAccount, Amount.Companion.of(1000, Currency("EUR")))
         val creditPosting = Posting.Credit.create(pspReceivable, Amount.Companion.of(1000, Currency("EUR")))
@@ -40,8 +40,8 @@ class LedgerDomainEventEntityMapperTest {
 
     private fun sampleJournalEntryEventData(): JournalEntryEventData {
         val debitEvent = PostingEventData.create(
-            accountCode = "MARKETPLACE_OPERATOR.SELLER-333.EUR",
-            accountType = AccountType.MARKETPLACE_OPERATOR,
+            accountCode = "MERCHANT_GROSS_CAPTURE_SUSPENSE.SELLER-333.EUR",
+            accountType = AccountType.MERCHANT_GROSS_CAPTURE_SUSPENSE,
             amount = 1000,
             currency = "EUR",
             direction = PostingDirection.DEBIT
@@ -87,8 +87,8 @@ class LedgerDomainEventEntityMapperTest {
     @Test
     fun `PostingEventData toDomain round-trips account entity without duplicating currency`() {
         val postingEvent = PostingEventData.create(
-            accountCode = "MARKETPLACE_OPERATOR.SELLER-333.EUR",
-            accountType = AccountType.MARKETPLACE_OPERATOR,
+            accountCode = "MERCHANT_GROSS_CAPTURE_SUSPENSE.SELLER-333.EUR",
+            accountType = AccountType.MERCHANT_GROSS_CAPTURE_SUSPENSE,
             amount = 1000,
             currency = "EUR",
             direction = PostingDirection.CREDIT
@@ -96,9 +96,9 @@ class LedgerDomainEventEntityMapperTest {
 
         val postingDomain = postingEvent.toDomain()
 
-        Assertions.assertEquals("MARKETPLACE_OPERATOR.SELLER-333.EUR", postingDomain.account.accountCode)
-        Assertions.assertEquals("SELLER-333", postingDomain.account.entityId)
-        Assertions.assertEquals(AccountType.MARKETPLACE_OPERATOR, postingDomain.account.type)
+        Assertions.assertEquals("MERCHANT_GROSS_CAPTURE_SUSPENSE.SELLER-333.EUR", postingDomain.account.accountCode)
+
+        Assertions.assertEquals(AccountType.MERCHANT_GROSS_CAPTURE_SUSPENSE, postingDomain.account.type)
         Assertions.assertEquals("EUR", postingDomain.account.currency.currencyCode)
         Assertions.assertTrue(postingDomain is Posting.Credit)
     }
@@ -116,16 +116,16 @@ class LedgerDomainEventEntityMapperTest {
         Assertions.assertEquals(2, postings.size)
 
         val debitPosting = postings.first { it is Posting.Debit }
-        Assertions.assertEquals("MARKETPLACE_OPERATOR.SELLER-333.EUR", debitPosting.account.accountCode)
-        Assertions.assertEquals(AccountType.MARKETPLACE_OPERATOR, debitPosting.account.type)
-        Assertions.assertEquals("SELLER-333", debitPosting.account.entityId)
+        Assertions.assertEquals("MERCHANT_GROSS_CAPTURE_SUSPENSE.SELLER-333.EUR", debitPosting.account.accountCode)
+        Assertions.assertEquals(AccountType.MERCHANT_GROSS_CAPTURE_SUSPENSE, debitPosting.account.type)
+
         Assertions.assertEquals("EUR", debitPosting.account.currency.currencyCode)
         Assertions.assertEquals(1000, debitPosting.amount.quantity)
 
         val creditPosting = postings.first { it is Posting.Credit }
         Assertions.assertEquals("PSP_RECEIVABLES.GLOBAL.EUR", creditPosting.account.accountCode)
         Assertions.assertEquals(AccountType.PSP_RECEIVABLES, creditPosting.account.type)
-        Assertions.assertEquals("GLOBAL", creditPosting.account.entityId)
+
         Assertions.assertEquals("EUR", creditPosting.account.currency.currencyCode)
         Assertions.assertEquals(1000, creditPosting.amount.quantity)
     }

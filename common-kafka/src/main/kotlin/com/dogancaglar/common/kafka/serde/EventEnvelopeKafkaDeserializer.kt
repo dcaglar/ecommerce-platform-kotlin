@@ -19,8 +19,8 @@ class EventEnvelopeKafkaDeserializer : Deserializer<EventEnvelope<*>> {
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 
-    private val topicTypeMap: Map<String, TypeReference<out EventEnvelope<*>>> =
-        PaymentEventMetadataCatalog.all.associate { it.topic to it.typeRef }
+    private val eventTypeMap: Map<String, TypeReference<out EventEnvelope<*>>> =
+        PaymentEventMetadataCatalog.all.associate { it.eventType to it.typeRef }
 
     override fun deserialize(topic: String?, data: ByteArray?): EventEnvelope<*>? {
         return deserialize(topic, null, data)
@@ -29,10 +29,14 @@ class EventEnvelopeKafkaDeserializer : Deserializer<EventEnvelope<*>> {
     override fun deserialize(topic: String?, headers: Headers?, data: ByteArray?): EventEnvelope<*>? {
         if (data == null || data.isEmpty()) return null
 
-        val typeRef = topicTypeMap[topic]
-            ?: throw IllegalArgumentException("No EventMetadata mapping found for topic: $topic")
+        val jsonNode = objectMapper.readTree(data)
+        val eventType = jsonNode.get("eventType")?.asText()
+            ?: throw IllegalArgumentException("Missing 'eventType' in EventEnvelope JSON for topic: $topic")
 
-        return objectMapper.readValue(data, typeRef)
+        val typeRef = eventTypeMap[eventType]
+            ?: throw IllegalArgumentException("No EventMetadata mapping found for eventType: $eventType")
+
+        return objectMapper.treeToValue(jsonNode, typeRef)
     }
 
     override fun close() {

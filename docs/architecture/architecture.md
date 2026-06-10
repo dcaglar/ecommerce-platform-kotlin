@@ -223,8 +223,8 @@ Represents a **financial account** in the internal ledger, such as:
 - PSP_RECEIVABLES
 - AUTH_RECEIVABLE
 - AUTH_LIABILITY
-- MARKETPLACE_OPERATOR
-- MARKETPLACE_SUB_SELLER
+- MERCHANT_GROSS_CAPTURE_SUSPENSE
+- BALANCE_ACCOUNT
 - PLATFORM_COMMISSION_ESCROW
 - PLATFORM_OPERATIONAL_REVENUE
 - PSP_FEE_EXPENSE
@@ -321,7 +321,7 @@ graph TD
         CENT2 -->|Relayed to psp-result-queue<br/>by OutboxRelayJob| WEB2["PspResultConsumer"]
     end
 
-    WEB2 -->|Updates Ledger| P3[Payment<br/>Status: CAPTURED<br/>MARKETPLACE_OPERATOR updated]
+    WEB2 -->|Updates Ledger| P3[Payment<br/>Status: CAPTURED<br/>MERCHANT_GROSS_CAPTURE_SUSPENSE updated]
     WEB2 -->|Creates| P1[Payment<br/>Status: AUTHORIZED<br/>If first webhook]
     
     P3 -.->|If MARKETPLACE| SPLIT1[OutboxEvent: InternalTransferRequest]

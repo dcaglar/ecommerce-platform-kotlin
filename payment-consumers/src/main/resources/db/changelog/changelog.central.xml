@@ -9,6 +9,7 @@
     <include file="central-accounting-tables.xml" relativeToChangelogFile="true"/>
     <include file="central-account-profile.xml" relativeToChangelogFile="true"/>
     <include file="central-account-balances-table.xml" relativeToChangelogFile="true"/>
+    <include file="central-transfers-table.xml" relativeToChangelogFile="true"/>
     <!-- Epic 1: Payment aggregate moves to Central DB; payment_tx refactored -->
 
 </databaseChangeLog>

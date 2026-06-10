@@ -7,7 +7,7 @@ data class PaymentIntentEntity(
     val pspReference: String?="",
     val buyerId: String,
     val orderId: String,
-    val merchantAccountId: String,
+    val merchantAccount: String,
     val processingModel: String,
     val totalAmountValue: Long,
     val currency: String,

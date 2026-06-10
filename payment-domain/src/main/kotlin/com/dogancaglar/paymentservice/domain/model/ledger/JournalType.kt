@@ -11,7 +11,7 @@ enum class JournalType {
     SETTLEMENT,         // Multi-payment batch processing from PSP file (clears receivables into platform bank)
     PSP_FEE,
     COMMISSION_FEE,     // DR MERCHANT_GROSS_POOL / CR PLATFORM_COMMISSION_ESCROW
-    REVENUE_RECOGNITION,// DR PLATFORM_COMMISSION_ESCROW / CR PLATFORM_OPERATIONAL_REVENUE
+    REVENUE_RECOGNITION,
     PAYOUT,             // DR MERCHANT or SELLER balance / CR PLATFORM_CASH (Physical transfer out)
     ADJUSTMENT          // Handling settlement discrepancies
 }

@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.ports.inbound.usecases
 
-import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.ledger.JournalType
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
@@ -12,8 +13,9 @@ interface RecordInternalTransferSubmissionUseCase {
         paymentIntentId: PaymentIntentId,
         publicPaymentIntentId: String,
         captureTxId: TxId,
-        sourceAccountType: AccountType,
-        sourceEntityId: String,
-        split: PaymentSplit
+        sourceAccount: String,
+        targetAccount: String,
+        journalType: JournalType,
+        transferAmount : Amount
     )
 }

@@ -1,9 +1,9 @@
 package com.dogancaglar.paymentservice.application.service
 
 import com.dogancaglar.common.event.EventEnvelopeFactory
-import com.dogancaglar.paymentservice.application.events.EventType
 import com.dogancaglar.paymentservice.application.events.InternalTransferCommand
-import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
+import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.ledger.JournalType
 import com.dogancaglar.paymentservice.domain.model.ledger.Tx
 import com.dogancaglar.paymentservice.domain.model.ledger.TxStatus
 import com.dogancaglar.paymentservice.domain.model.payment.InternalTransfer
@@ -18,13 +18,10 @@ import com.dogancaglar.paymentservice.ports.outbound.CentralDbTransactionalFacad
 import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import org.slf4j.LoggerFactory
-import org.springframework.stereotype.Service
 
-@Service
 class RecordInternalTransferSubmissionService(
     private val centralDbTransactionalFacadePort: CentralDbTransactionalFacadePort,
     private val idGeneratorPort: IdGeneratorPort,
-    private val eventEnvelopeFactory: EventEnvelopeFactory,
     private val serializationPort: SerializationPort
 ) : RecordInternalTransferSubmissionUseCase {
 
@@ -35,9 +32,10 @@ class RecordInternalTransferSubmissionService(
         paymentIntentId: PaymentIntentId,
         publicPaymentIntentId: String,
         captureTxId: TxId,
-        sourceAccountType: AccountType,
-        sourceEntityId: String,
-        split: PaymentSplit
+        sourceAccount: String,
+        targetAccount: String,
+        journalType: JournalType,
+        transferAmount : Amount
     ) {
         val transferId = InternalTransferId(idGeneratorPort.generateId()) // using same generator for simplicity
 
@@ -45,11 +43,10 @@ class RecordInternalTransferSubmissionService(
         val internalTransfer = InternalTransfer.createNew(
             transferId = transferId,
             sourceTransactionId = captureTxId,
-            amount = split.amount,
-            targetAccountType = split.targetAccountType,
-            targetEntityId = split.targetEntityId,
-            sourceAccountType = sourceAccountType,
-            sourceEntityId = sourceEntityId
+            amount = transferAmount,
+            sourceAccount = sourceAccount,
+            targetAccount = targetAccount,
+            transferType =journalType.name
         ).markSentForTransfer()
 
         // 2. Create InternalTransferTx PENDING
@@ -59,9 +56,10 @@ class RecordInternalTransferSubmissionService(
             paymentId = paymentId,
             paymentIntentId = paymentIntentId,
             parentCaptureTxId = captureTxId,
-            amount = split.amount,
-            targetAccountType = split.targetAccountType,
-            targetEntityId = split.targetEntityId,
+            amount = transferAmount,
+            sourceAccount = sourceAccount,
+            targetAccount = targetAccount,
+            txType = journalType.name,
             status = TxStatus.PENDING
         )
 
@@ -70,7 +68,8 @@ class RecordInternalTransferSubmissionService(
             transfer = internalTransfer,
             txId = txId.value,
             paymentIntentId = paymentIntentId.value.toString(),
-            publicPaymentIntentId = publicPaymentIntentId
+            publicPaymentIntentId = publicPaymentIntentId,
+            journalType = journalType.name,
         )
         val envelope = EventEnvelopeFactory.envelopeFor(
             data = command,
@@ -90,7 +89,8 @@ class RecordInternalTransferSubmissionService(
         centralDbTransactionalFacadePort.recordInternalTransferOperationInLedger(
             internalTransfer = internalTransfer,
             tx = internalTransferTx,
-            outboxEvents = listOf(outboxEvent)
+            outboxEvents = listOf(outboxEvent),
+            journalEntries = emptyList()
         )
     }
 }

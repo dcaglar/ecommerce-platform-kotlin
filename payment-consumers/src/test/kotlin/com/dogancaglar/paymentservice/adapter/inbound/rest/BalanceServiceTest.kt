@@ -33,10 +33,10 @@ class BalanceServiceTest {
         val accountCode = "MERCHANT_PAYABLE.seller-123.EUR"
         val balance = 50000L // €500.00
 
-        every { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_OPERATOR, sellerId) } returns AccountProfile(
+        every { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, sellerId) } returns AccountProfile(
             accountCode = accountCode,
-            type = AccountType.MARKETPLACE_OPERATOR,
-            entityId = sellerId,
+            type = AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT,
+            masterAccountCode = sellerId,
             currency = Currency("EUR"),
             category = AccountCategory.LIABILITY,
             country = "NL",
@@ -54,7 +54,7 @@ class BalanceServiceTest {
         assertEquals(accountCode, result.accountCode)
         assertEquals(sellerId, result.sellerId)
 
-        verify(exactly = 1) { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_OPERATOR, sellerId) }
+        verify(exactly = 1) { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, sellerId) }
         verify(exactly = 1) { accountBalanceReadUseCase.getRealTimeBalance(accountCode) }
     }
 
@@ -65,10 +65,10 @@ class BalanceServiceTest {
         val accountCode = "MERCHANT_PAYABLE.seller-456.USD"
         val balance = 123456L // $1,234.56
 
-        every { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_OPERATOR, sellerId) } returns AccountProfile(
+        every { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, sellerId) } returns AccountProfile(
             accountCode = accountCode,
-            type = AccountType.MARKETPLACE_OPERATOR,
-            entityId = sellerId,
+            type = AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT,
+            masterAccountCode = sellerId,
             currency = Currency("USD"),
             category = AccountCategory.LIABILITY,
             country = "US",
@@ -93,10 +93,10 @@ class BalanceServiceTest {
         val accountCode = "MERCHANT_PAYABLE.seller-789.EUR"
         val balance = 0L
 
-        every { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_OPERATOR, sellerId) } returns AccountProfile(
+        every { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, sellerId) } returns AccountProfile(
             accountCode = accountCode,
-            type = AccountType.MARKETPLACE_OPERATOR,
-            entityId = sellerId,
+            type = AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT,
+            masterAccountCode = sellerId,
             currency = Currency("EUR"),
             category = AccountCategory.LIABILITY,
             country = "NL",
@@ -119,10 +119,10 @@ class BalanceServiceTest {
         val accountCode = "MERCHANT_PAYABLE.seller-999.EUR"
         val balance = -5000L // -€50.00 (overdraft scenario)
 
-        every { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_OPERATOR, sellerId) } returns AccountProfile(
+        every { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, sellerId) } returns AccountProfile(
             accountCode = accountCode,
-            type = AccountType.MARKETPLACE_OPERATOR,
-            entityId = sellerId,
+            type = AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT,
+            masterAccountCode = sellerId,
             currency = Currency("EUR"),
             category = AccountCategory.LIABILITY,
             country = "NL",
@@ -143,7 +143,7 @@ class BalanceServiceTest {
         // Given
         val sellerId = "non-existent-seller"
 
-        every { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_OPERATOR, sellerId) } throws
+        every { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, sellerId) } throws
             IllegalArgumentException("Account not found: MERCHANT_PAYABLE.$sellerId")
 
         // When/Then
@@ -152,7 +152,7 @@ class BalanceServiceTest {
         }
         assertTrue(exception.message?.contains("Account not found") == true)
 
-        verify(exactly = 1) { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_OPERATOR, sellerId) }
+        verify(exactly = 1) { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, sellerId) }
         verify(exactly = 0) { accountBalanceReadUseCase.getRealTimeBalance(any()) }
     }
 
@@ -163,10 +163,10 @@ class BalanceServiceTest {
         val accountCode = "MERCHANT_PAYABLE.seller-GBP.GBP"
         val balance = 75000L // £750.00
 
-        every { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_OPERATOR, sellerId) } returns AccountProfile(
+        every { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, sellerId) } returns AccountProfile(
             accountCode = accountCode,
-            type = AccountType.MARKETPLACE_OPERATOR,
-            entityId = sellerId,
+            type = AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT,
+            masterAccountCode = sellerId,
             currency = Currency("GBP"),
             category = AccountCategory.LIABILITY,
             country = "GB",
@@ -191,10 +191,10 @@ class BalanceServiceTest {
         val accountCode = "MERCHANT_PAYABLE.seller-123.EUR"
         val realTimeBalance = 123456L
 
-        every { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_OPERATOR, sellerId) } returns AccountProfile(
+        every { accountDirectory.getAccountProfile(AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, sellerId) } returns AccountProfile(
             accountCode = accountCode,
-            type = AccountType.MARKETPLACE_OPERATOR,
-            entityId = sellerId,
+            type = AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT,
+            masterAccountCode = sellerId,
             currency = Currency("EUR"),
             category = AccountCategory.LIABILITY,
             country = "NL",

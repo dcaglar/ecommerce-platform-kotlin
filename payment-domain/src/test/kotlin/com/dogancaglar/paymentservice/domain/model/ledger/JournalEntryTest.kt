@@ -2,7 +2,6 @@ package com.dogancaglar.paymentservice.domain.model.ledger
 
 import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.common.Currency
-import com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.TxId
 import kotlin.test.Test
@@ -24,16 +23,16 @@ class JournalEntryTest {
     private val txId = TxId(1L)
     private val journalId = "PAY-1"
 
-    private val platformCashAccount = Account.create(AccountType.PLATFORM_CASH, "GLOBAL")
-    private val merchantAccount = Account.create(AccountType.MARKETPLACE_OPERATOR, "merchantId")
-    private val merchantGrossPool = Account.create(AccountType.MARKETPLACE_OPERATOR, "merchantId")
-    private val subSellerAccount = Account.create(AccountType.MARKETPLACE_SUB_SELLER, "subSellerId")
-    private val pspFeeExpenseAccount = Account.create(AccountType.PSP_FEE_EXPENSE, "GLOBAL")
-    private val commissionRevenueAccount = Account.create(AccountType.PLATFORM_OPERATIONAL_REVENUE, "GLOBAL")
-    private val commissionEscrowAccount = Account.create(AccountType.PLATFORM_COMMISSION_ESCROW, "GLOBAL")
-    private val authLiabilityAccount = Account.create(AccountType.AUTH_LIABILITY, "GLOBAL")
-    private val authReceivableAccount = Account.create(AccountType.AUTH_RECEIVABLE, "GLOBAL")
-    private val pspReceivableAccount = Account.create(AccountType.PSP_RECEIVABLES, "GLOBAL")
+    private val platformCashAccount = Account.create(AccountType.PLATFORM_CASH, "PLATFORM_CASH.GLOBAL.EUR")
+    private val merchantAccount = Account.create(AccountType.MERCHANT_GROSS_CAPTURE_SUSPENSE, "MERCHANT_GROSS_CAPTURE_SUSPENSE.merchantId.EUR")
+    private val merchantGrossPool = Account.create(AccountType.MERCHANT_GROSS_CAPTURE_SUSPENSE, "MERCHANT_GROSS_CAPTURE_SUSPENSE.merchantId.EUR")
+    private val subSellerAccount = Account.create(AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, "subSellerId.EUR")
+    private val pspFeeExpenseAccount = Account.create(AccountType.PSP_FEE_EXPENSE, "PSP_FEE_EXPENSE.GLOBAL.EUR")
+    private val commissionRevenueAccount = Account.create(AccountType.PLATFORM_OPERATIONAL_REVENUE, "PLATFORM_OPERATIONAL_REVENUE.GLOBAL.EUR")
+    private val commissionEscrowAccount = Account.create(AccountType.PLATFORM_COMMISSION_ESCROW, "PLATFORM_COMMISSION_ESCROW.merchantId.EUR")
+    private val authLiabilityAccount = Account.create(AccountType.AUTH_LIABILITY, "AUTH_LIABILITY.GLOBAL.EUR")
+    private val authReceivableAccount = Account.create(AccountType.AUTH_RECEIVABLE, "AUTH_RECEIVABLE.GLOBAL.EUR")
+    private val pspReceivableAccount = Account.create(AccountType.PSP_RECEIVABLES, "PSP_RECEIVABLES.GLOBAL.EUR")
 
     private fun assertBalanced(entry: JournalEntry) {
         val totalDebits = entry.postings.filterIsInstance<Posting.Debit>().sumOf { it.amount.quantity }
@@ -94,36 +93,6 @@ class JournalEntryTest {
         assertPostingContains(entry, merchantGrossPool, isDebit = false, expectedAmount = 10_000)
     }
 
-    @Test
-    fun `executeSubSellerSplit creates correct postings for multiple splits and balances`() {
-        val split1 = PaymentSplit.of(AccountType.MARKETPLACE_SUB_SELLER, "subSellerId", Amount.of(8_000, eur))
-        val split2 = PaymentSplit.of(AccountType.PLATFORM_COMMISSION_ESCROW, "GLOBAL", Amount.of(2_000, eur))
-        
-        val entries = JournalEntry.executeSubSellerSplit(
-            paymentId = paymentId,
-            txId = txId,
-            journalIdentifier = journalId,
-            merchantGrossPool = merchantGrossPool,
-            splits = listOf(split1, split2),
-            resolveTargetAccount = { type, id -> if (type == AccountType.MARKETPLACE_SUB_SELLER) subSellerAccount else commissionEscrowAccount }
-        )
-        
-        assertEquals(2, entries.size)
-        
-        // Check first entry (Sub-Seller)
-        val entry1 = entries[0]
-        assertBalanced(entry1)
-        assertEquals(JournalType.INTERNAL_TRANSFER, entry1.journalType)
-        assertPostingContains(entry1, merchantGrossPool, isDebit = true, expectedAmount = 8_000)
-        assertPostingContains(entry1, subSellerAccount, isDebit = false, expectedAmount = 8_000)
-        
-        // Check second entry (Commission Escrow)
-        val entry2 = entries[1]
-        assertBalanced(entry2)
-        assertEquals(JournalType.INTERNAL_TRANSFER, entry2.journalType)
-        assertPostingContains(entry2, merchantGrossPool, isDebit = true, expectedAmount = 2_000)
-        assertPostingContains(entry2, commissionEscrowAccount, isDebit = false, expectedAmount = 2_000)
-    }
 
     @Test
     fun `internalTransfer creates correct postings for a single transfer and balances`() {
@@ -133,10 +102,8 @@ class JournalEntryTest {
             txId = txId,
             journalIdentifier = journalId,
             amount = amount,
-            merchantGrossPool = merchantGrossPool,
-            targetAccount = subSellerAccount,
-            targetAccountType = AccountType.MARKETPLACE_SUB_SELLER,
-            targetEntityId = "subSellerId"
+            sourceAccount = merchantGrossPool,
+            targetAccount = subSellerAccount
         )
         
         assertEquals(1, entries.size)
@@ -174,18 +141,20 @@ class JournalEntryTest {
     }
 
     @Test
-    fun `settlement creates correct postings and balances`() {
+    fun `settlementLineItem creates correct postings and balances`() {
         val gross = Amount.of(10_000, eur)
         val settledAmount = Amount.of(9_500, eur)
+        val feeAmount = Amount.of(500, eur)
         
-        val entries = JournalEntry.settlement(
+        val entries = JournalEntry.settlementLineItem(
             paymentId = paymentId,
-            txId = txId,
+            settlementTxId = txId,
             journalIdentifier = journalId,
-            capturedAmount = gross,
-            settledAmount = settledAmount,
-            platformCashAccount = platformCashAccount,
-            pspFeeExpenseAccount = pspFeeExpenseAccount,
+            grossAmount = gross,
+            netCashAmount = settledAmount,
+            pspFeeAmount = feeAmount,
+            platformCash = platformCashAccount,
+            pspFeeExpense = pspFeeExpenseAccount,
             pspReceivable = pspReceivableAccount
         )
         
@@ -207,8 +176,8 @@ class JournalEntryTest {
             txId = txId,
             journalIdentifier = journalId,
             commissionFee = amount,
-            commissionFeeAccount = commissionRevenueAccount,
-            merchantAccount = merchantAccount
+            commissionEscrowAccount = commissionEscrowAccount,
+            merchantGrossPool = merchantAccount
         )
         
         assertEquals(1, entries.size)
@@ -217,7 +186,7 @@ class JournalEntryTest {
         assertBalanced(entry)
         assertEquals(JournalType.COMMISSION_FEE, entry.journalType)
         assertPostingContains(entry, merchantAccount, isDebit = true, expectedAmount = 200)
-        assertPostingContains(entry, commissionRevenueAccount, isDebit = false, expectedAmount = 200)
+        assertPostingContains(entry, commissionEscrowAccount, isDebit = false, expectedAmount = 200)
     }
 
     @Test
@@ -228,8 +197,8 @@ class JournalEntryTest {
             txId = txId,
             journalIdentifier = journalId,
             payoutAmount = amount,
-            merchantAccount = merchantAccount,
-            platformCashAccount = platformCashAccount
+            sourceBalanceAccount = merchantAccount,
+            platformCash = platformCashAccount
         )
         
         assertEquals(1, entries.size)

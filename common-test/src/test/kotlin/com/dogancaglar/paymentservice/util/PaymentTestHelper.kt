@@ -19,7 +19,7 @@ object PaymentTestHelper {
         totalAmount: Long = 10_000,
         currency: String = "EUR",
         sellerId: String = "seller-789",
-        merchantAccountId: String = "merchant-001",
+        merchantAccount: String = "merchant-001",
         processingModel: ProcessingModel = ProcessingModel.DIRECT_MERCHANT
     ): PaymentIntent {
         val amount = Amount.of(totalAmount, Currency(currency))
@@ -27,13 +27,13 @@ object PaymentTestHelper {
             paymentIntentId = PaymentIntentId(paymentIntentId),
             buyerId = BuyerId(buyerId),
             orderId = OrderId(orderId),
-            merchantAccountId = merchantAccountId,
+            merchantAccount = merchantAccount,
             processingModel = processingModel,
             totalAmount = amount,
             splits = if (processingModel == ProcessingModel.MARKETPLACE) listOf(
                 PaymentSplit.of(
-                    targetAccountType = AccountType.MARKETPLACE_SUB_SELLER,
-                    targetEntityId = sellerId,
+                    accountType = AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT,
+                    account = sellerId,
                     amount = amount
                 )
             ) else emptyList()

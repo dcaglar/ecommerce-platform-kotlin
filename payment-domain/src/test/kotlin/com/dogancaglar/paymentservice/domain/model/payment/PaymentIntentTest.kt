@@ -12,12 +12,12 @@ class PaymentIntentTest {
     private val buyerId = BuyerId("buyer-1")
     private val orderId = OrderId("order-1")
     private val currency = Currency("EUR")
-    private val line1 = PaymentSplit.of(AccountType.MARKETPLACE_SUB_SELLER, "s1", Amount.of(1000, currency))
-    private val line2 = PaymentSplit.of(AccountType.MARKETPLACE_SUB_SELLER, "s2", Amount.of(2000, currency))
+    private val line1 = PaymentSplit.of(AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, "s1", Amount.of(1000, currency))
+    private val line2 = PaymentSplit.of(AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT, "s2", Amount.of(2000, currency))
     private val lines = listOf(line1, line2)
     private val totalAmount = Amount.of(3000, currency)
     private val processingModel = ProcessingModel.MARKETPLACE
-    private val merchantAccountId = "merchant-1"
+    private val merchantAccount = "merchant-1"
 
     @Test
     fun `createNew should enforce amount equals sum of payment lines`() {
@@ -26,7 +26,7 @@ class PaymentIntentTest {
             buyerId = buyerId,
             orderId = orderId,
             processingModel = processingModel,
-            merchantAccountId = merchantAccountId,
+            merchantAccount = merchantAccount,
             totalAmount = totalAmount,
             splits = lines
         )
@@ -48,7 +48,7 @@ class PaymentIntentTest {
                 buyerId = buyerId,
                 orderId = orderId,
                 processingModel = processingModel,
-                merchantAccountId = merchantAccountId,
+                merchantAccount = merchantAccount,
                 totalAmount = wrongTotal,
                 splits = lines
             )
@@ -58,7 +58,7 @@ class PaymentIntentTest {
     @Test
     fun `markAsCreated transitions from CREATED_PENDING to CREATED`() {
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         )
 
         assertEquals(PaymentIntentStatus.CREATED_PENDING, intent.status)
@@ -70,7 +70,7 @@ class PaymentIntentTest {
     @Test
     fun `markAsCreated should fail when current status is not CREATED_PENDING`() {
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
 
         assertFailsWith<IllegalArgumentException> {
@@ -81,7 +81,7 @@ class PaymentIntentTest {
     @Test
     fun `markAsCreatedWithPspReferenceAndClientSecret transitions and sets fields`() {
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         )
 
         assertEquals(PaymentIntentStatus.CREATED_PENDING, intent.status)
@@ -101,7 +101,7 @@ class PaymentIntentTest {
     @Test
     fun `startAuthorization only allowed from CREATED`() {
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
 
         val pending = intent.markAuthorizedPending()
@@ -111,7 +111,7 @@ class PaymentIntentTest {
     @Test
     fun `startAuthorization should fail when current status is not CREATED`() {
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
             .markAuthorizedPending()
 
@@ -123,7 +123,7 @@ class PaymentIntentTest {
     @Test
     fun `startAuthorization should fail from CREATED_PENDING`() {
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         )
 
         assertFailsWith<IllegalArgumentException> {
@@ -134,7 +134,7 @@ class PaymentIntentTest {
     @Test
     fun `markAuthorized allowed only from PENDING_AUTH`() {
         val pending = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
             .markAuthorizedPending()
 
@@ -145,7 +145,7 @@ class PaymentIntentTest {
     @Test
     fun `markAuthorized fails from wrong state`() {
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         )
 
         assertFailsWith<IllegalArgumentException> {
@@ -161,7 +161,7 @@ class PaymentIntentTest {
     @Test
     fun `markDeclined transitions correctly`() {
         val pending = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE").markAuthorizedPending()
 
         val declined = pending.markDeclined()
@@ -171,7 +171,7 @@ class PaymentIntentTest {
     @Test
     fun `cancel allowed from CREATED or PENDING_AUTH`() {
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         )
 
         // Cancel should fail from CREATED_PENDING
@@ -191,7 +191,7 @@ class PaymentIntentTest {
     @Test
     fun `cancel should fail after AUTHORIZED`() {
         val authorized = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         ).markAsCreatedWithPspReferenceAndClientSecret("ST_PI_1234","SECRET_FROM_STRIPE")
             .markAuthorizedPending()
             .markAuthorized()
@@ -212,7 +212,7 @@ class PaymentIntentTest {
             pspReference = pspRef,
             buyerId = buyerId,
             orderId = orderId,
-            merchantAccountId = merchantAccountId,
+            merchantAccount = merchantAccount,
             processingModel = processingModel,
             totalAmount = totalAmount,
             splits = lines,
@@ -233,7 +233,7 @@ class PaymentIntentTest {
     @Test
     fun `CREATED_PENDING requires pspReference to be null`() {
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         )
         
         assertEquals(PaymentIntentStatus.CREATED_PENDING, intent.status)
@@ -250,7 +250,7 @@ class PaymentIntentTest {
                 pspReference = "pi_123", // Should be null for CREATED_PENDING
                 buyerId = buyerId,
                 orderId = orderId,
-                merchantAccountId = merchantAccountId,
+                merchantAccount = merchantAccount,
                 processingModel = processingModel,
                 totalAmount = totalAmount,
                 splits = lines,
@@ -264,7 +264,7 @@ class PaymentIntentTest {
     @Test
     fun `CREATED requires pspReference to be non-null and non-blank`() {
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         ).markAsCreatedWithPspReferenceAndClientSecret("pi_123", "secret")
         
         assertEquals(PaymentIntentStatus.CREATED, intent.status)
@@ -281,7 +281,7 @@ class PaymentIntentTest {
                 pspReference = null, // Should not be null for CREATED
                 buyerId = buyerId,
                 orderId = orderId,
-                merchantAccountId = merchantAccountId,
+                merchantAccount = merchantAccount,
                 processingModel = processingModel,
                 totalAmount = totalAmount,
                 splits = lines,
@@ -302,7 +302,7 @@ class PaymentIntentTest {
                 pspReference = "", // Should not be blank for CREATED
                 buyerId = buyerId,
                 orderId = orderId,
-                merchantAccountId = merchantAccountId,
+                merchantAccount = merchantAccount,
                 processingModel = processingModel,
                 totalAmount = totalAmount,
                 splits = lines,
@@ -316,7 +316,7 @@ class PaymentIntentTest {
     @Test
     fun `PENDING_AUTH requires pspReference to be non-null and non-blank`() {
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         ).markAsCreatedWithPspReferenceAndClientSecret("pi_123", "secret")
             .markAuthorizedPending()
         
@@ -327,7 +327,7 @@ class PaymentIntentTest {
     @Test
     fun `AUTHORIZED requires pspReference to be non-null and non-blank`() {
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         ).markAsCreatedWithPspReferenceAndClientSecret("pi_123", "secret")
             .markAuthorizedPending()
             .markAuthorized()
@@ -339,7 +339,7 @@ class PaymentIntentTest {
     @Test
     fun `DECLINED requires pspReference to be non-null and non-blank`() {
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         ).markAsCreatedWithPspReferenceAndClientSecret("pi_123", "secret")
             .markAuthorizedPending()
             .markDeclined()
@@ -351,7 +351,7 @@ class PaymentIntentTest {
     @Test
     fun `hasPspReference returns true when pspReference is set`() {
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         ).markAsCreatedWithPspReferenceAndClientSecret("pi_123", "secret")
         
         assertTrue(intent.hasPspReference())
@@ -360,7 +360,7 @@ class PaymentIntentTest {
     @Test
     fun `hasPspReference returns false when pspReference is null`() {
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         )
         
         assertFalse(intent.hasPspReference())
@@ -370,7 +370,7 @@ class PaymentIntentTest {
     fun `pspReferenceOrThrow returns pspReference when set`() {
         val pspRef = "pi_123"
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         ).markAsCreatedWithPspReferenceAndClientSecret(pspRef, "secret")
         
         assertEquals(pspRef, intent.pspReferenceOrThrow())
@@ -379,7 +379,7 @@ class PaymentIntentTest {
     @Test
     fun `pspReferenceOrThrow throws when pspReference is null`() {
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         )
         
         assertFailsWith<IllegalArgumentException> {
@@ -390,7 +390,7 @@ class PaymentIntentTest {
     @Test
     fun `markAsCreatedWithPspReferenceAndClientSecret fails if pspReference is blank`() {
         val intent = PaymentIntent.createNew(
-            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccountId, totalAmount, lines
+            PaymentIntentId(1), buyerId, orderId, processingModel, merchantAccount, totalAmount, lines
         )
         
         assertFailsWith<IllegalArgumentException> {

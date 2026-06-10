@@ -32,7 +32,7 @@ object CONSUMER_GROUPS {
     const val PSP_RESULT_CONSUMER = "payment-core.psp-result-consumer"
     const val CAPTURE_COMMAND_EXECUTOR = "gateway-workers.capture-command-executor"
     const val CAPTURE_SUBMITTED_CONSUMER = "payment-core.capture-submitted"
-    const val MARKETPLACE_SPLIT_INSTRUCTION_CONSUMER= "marketplace.split-instruction-consumer-group"
+    const val GROSS_CAPTURE_ALLOCATION_CONSUMER= "payment.gross-capture-allocation-consumer-group"
     const val INTERNAL_TRANSFER_CONSUMER = "ledger-engine.internal-transfer-consumer"
     const val ACCOUNT_BALANCE_CONSUMER = "ledger-engine.account-balance-consumer"
 

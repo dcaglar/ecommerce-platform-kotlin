@@ -7,6 +7,7 @@ import com.dogancaglar.paymentservice.application.events.PostingEventData
 import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.common.Currency
 import com.dogancaglar.paymentservice.domain.model.ledger.Account
+import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
 import com.dogancaglar.paymentservice.domain.model.ledger.JournalEntry
 import com.dogancaglar.paymentservice.domain.model.ledger.Posting
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
@@ -62,12 +63,7 @@ object LedgerDomainEventEntityMapper {
     }
 
     fun PostingEventData.toDomain(): Posting {
-        val entityId = run {
-            val afterType = accountCode.substringAfter('.', "GLOBAL")
-            val beforeCurrency = afterType.substringBeforeLast('.', afterType)
-            if (beforeCurrency.isBlank()) "GLOBAL" else beforeCurrency
-        }
-        val account = Account.Companion.create(accountType, entityId)
+        val account = Account.Companion.create(accountType, accountCode)
         val amountVo = Amount.Companion.of(amount, Currency(currency))
         return when (direction) {
             PostingDirection.DEBIT -> Posting.Debit.create(account, amountVo)

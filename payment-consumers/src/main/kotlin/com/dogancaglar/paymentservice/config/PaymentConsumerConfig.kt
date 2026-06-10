@@ -8,6 +8,7 @@ import com.dogancaglar.paymentservice.ports.outbound.RetryQueuePort
 import com.dogancaglar.paymentservice.ports.outbound.PspCaptureGatewayPort
 import com.dogancaglar.paymentservice.application.service.AccountBalanceService
 import com.dogancaglar.paymentservice.application.service.AccountBalanceReadService
+import com.dogancaglar.paymentservice.ports.inbound.usecases.ProcessPspResultUseCase
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceCachePort
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import com.dogancaglar.paymentservice.ports.outbound.AccountDirectoryPort
@@ -42,14 +43,16 @@ open class PaymentConsumerConfig {
         paymentTxPort: PaymentTxPort,
         idGeneratorPort: IdGeneratorPort,
         paymentRepository: PaymentRepository,
+        transferRepository: com.dogancaglar.paymentservice.ports.outbound.TransferRepository,
         serializationPort: SerializationPort
-    ): ProcessPspResultProcessingService {
+    ): ProcessPspResultUseCase{
         return ProcessPspResultProcessingService(
             centralDbTransactionalFacadePort = centralDbTransactionalFacadePort,
             accountDirectory = accountDirectoryImpl,
             paymentTxPort = paymentTxPort,
             idGeneratorPort = idGeneratorPort,
             paymentRepository = paymentRepository,
+            transferRepository = transferRepository,
             serializationPort = serializationPort
         )
     }
@@ -66,6 +69,19 @@ open class PaymentConsumerConfig {
             paymentRepository = paymentRepository,
             paymentTxPort = paymentTxPort,
             idGeneratorPort = idGeneratorPort
+        )
+    }
+
+    @Bean
+    fun recordInternalTransferSubmissionService(
+        centralDbTransactionalFacadePort: CentralDbTransactionalFacadePort,
+        idGeneratorPort: IdGeneratorPort,
+        serializationPort: SerializationPort
+    ): com.dogancaglar.paymentservice.application.service.RecordInternalTransferSubmissionService {
+        return com.dogancaglar.paymentservice.application.service.RecordInternalTransferSubmissionService(
+            centralDbTransactionalFacadePort = centralDbTransactionalFacadePort,
+            idGeneratorPort = idGeneratorPort,
+            serializationPort = serializationPort
         )
     }
 

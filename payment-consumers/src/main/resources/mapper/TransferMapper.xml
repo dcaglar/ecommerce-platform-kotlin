@@ -10,10 +10,9 @@
         <result property="amountValue" column="amount_value"/>
         <result property="currency" column="currency"/>
         <result property="reversedAmountValue" column="reversed_amount_value"/>
-        <result property="targetAccountType" column="target_account_type"/>
-        <result property="targetEntityId" column="target_entity_id"/>
-        <result property="sourceAccountType" column="source_account_type"/>
-        <result property="sourceEntityId" column="source_entity_id"/>
+        <result property="targetAccount" column="target_account"/>
+        <result property="sourceAccount" column="source_account"/>
+        <result property="transferType" column="transfer_type"/>
         <result property="status" column="status"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
@@ -22,11 +21,11 @@
     <insert id="insert" parameterType="com.dogancaglar.common.db.entity.TransferEntity">
         INSERT INTO transfers (
             transfer_id, source_transaction_id, amount_value, currency, reversed_amount_value,
-            target_account_type, target_entity_id, source_account_type, source_entity_id,
+            target_account, source_account, transfer_type,
             status, created_at, updated_at
         ) VALUES (
             #{transferId}, #{sourceTransactionId}, #{amountValue}, #{currency}, #{reversedAmountValue},
-            #{targetAccountType}, #{targetEntityId}, #{sourceAccountType}, #{sourceEntityId},
+            #{targetAccount}, #{sourceAccount}, #{transferType},
             #{status}, #{createdAt}, #{updatedAt}
         )
     </insert>
@@ -34,11 +33,11 @@
     <insert id="upsert" parameterType="com.dogancaglar.common.db.entity.TransferEntity">
         INSERT INTO transfers (
             transfer_id, source_transaction_id, amount_value, currency, reversed_amount_value,
-            target_account_type, target_entity_id, source_account_type, source_entity_id,
+            target_account, source_account, transfer_type,
             status, created_at, updated_at
         ) VALUES (
             #{transferId}, #{sourceTransactionId}, #{amountValue}, #{currency}, #{reversedAmountValue},
-            #{targetAccountType}, #{targetEntityId}, #{sourceAccountType}, #{sourceEntityId},
+            #{targetAccount}, #{sourceAccount}, #{transferType},
             #{status}, #{createdAt}, #{updatedAt}
         )
         ON CONFLICT (transfer_id) DO UPDATE SET

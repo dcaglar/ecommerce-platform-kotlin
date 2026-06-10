@@ -13,7 +13,7 @@
             <column name="account_type" type="VARCHAR(64)">
                 <constraints nullable="false"/>
             </column>
-            <column name="entity_id" type="VARCHAR(64)">
+            <column name="master_account_code" type="VARCHAR(64)">
                 <constraints nullable="false"/>
             </column>
             <column name="currency" type="CHAR(3)">
@@ -33,7 +33,7 @@
         </createTable>
 
         <createIndex tableName="account_directory" indexName="idx_account_directory_entity">
-            <column name="entity_id"/>
+            <column name="master_account_code"/>
         </createIndex>
     </changeSet>
 

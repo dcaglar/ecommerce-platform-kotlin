@@ -5,7 +5,7 @@ import com.dogancaglar.paymentservice.domain.model.common.Currency
 data class AccountProfile(
     val accountCode: String,
     val type: AccountType,
-    val entityId: String,
+    val masterAccountCode: String,
     val currency: Currency,
     val category: AccountCategory,
     val country: String?,
