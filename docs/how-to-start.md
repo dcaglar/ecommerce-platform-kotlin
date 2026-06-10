@@ -216,13 +216,14 @@ curl -i -X POST "$BASE_URL/api/v1/payments" \
   -d '{
     "orderId": "ORDER-1450",
     "buyerId": "BUYER-1450",
-    "merchantAccountId": "MARKETPLACE-1",
+    "merchantAccount": "MARKETPLACE-1",
     "processingModel": "MARKETPLACE",
     "totalAmount": { "quantity": 3000, "currency": "EUR" },
     "splits": [
-      { "targetAccountType": "MARKETPLACE_SUB_SELLER", "targetEntityId": "SELLER-1-1", "amount": { "quantity": 1400, "currency": "EUR" }},
-      { "targetAccountType": "MARKETPLACE_SUB_SELLER", "targetEntityId": "SELLER-1-2", "amount": { "quantity": 1400, "currency": "EUR" }},
-      { "targetAccountType": "PLATFORM_COMMISSION_ESCROW", "targetEntityId": "MARKETPLACE-1", "amount": { "quantity": 200, "currency": "EUR" }}
+      { "type": "BalanceAccount", "account": "SELLER-1-1", "amount": { "quantity": 1400, "currency": "EUR" }},
+       { "type": "Commission", "amount": { "quantity": 100, "currency": "EUR" }},
+      { "type": "BalanceAccount", "account": "SELLER-1-2", "amount": { "quantity": 1400, "currency": "EUR" }},
+      { "type": "Commission", "amount": { "quantity": 100, "currency": "EUR" }}
     ]
   }'
 ```
@@ -253,7 +254,7 @@ If Stripe API call is still processing, you'll receive:
 
 ```bash
 # Step 2: Authorize the payment intent
-curl -i -X POST "$BASE_URL/api/v1/payments/pi_AcdDJCmCcAA/authorize" \
+curl -i -X POST "$BASE_URL/api/v1/payments/pi_AqPKfE1CAAA/authorize" \
   -H "Host: $HOST" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
@@ -481,7 +482,7 @@ curl -i -X GET "$BASE_URL/api/v1/sellers/me/balance" \
 {
   "balance": 50000,
   "currency": "EUR",
-  "accountCode": "MARKETPLACE_SUB_SELLER.SELLER-1-1.EUR",
+  "accountCode": "MARKETPLACE_SELLER_BALANCE_ACCOUNT.SELLER-1-1.EUR",
   "sellerId": "SELLER-1-1"
 }
 ```

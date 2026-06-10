@@ -8,8 +8,8 @@ enum class OutboxEventTypes(val eventClass: Class<*>) {
     // 3. The Mor-DC network worker gets a 202 ACK from Adyen/Stripe
     CAPTURE_SUBMITTED(CaptureSubmitted::class.java), // this repsresent an outboxevent  which is persisted to central-db outbox event   when  CapturePspPerformedConsumer calls the external psp.capture async endpoint in payment-consuemrs
     CAPTURE_CONFIRMED(CaptureConfirmed::class.java),  // this repsresent an outboxevent  which is persisted to edge-db outbox event   when  External Psp notifies us about the final result of async capture  via a webhook  in payment-service
-    LEDGER_ENTRIES_RECORDED(JournalEntriesRecorded::class.java),
-    INTERNAL_TRANSFER_REQUESTED(InternalTransferRequested::class.java);
+    JOURNAL_ENTRIES_RECORDED(JournalEntriesRecorded::class.java),
+    INTERNAL_TRANSFER_COMMAND(InternalTransferCommand::class.java);
 
     //todo implem,ent paymentresultconsumer
     // extend doutboxrelayjob so it can also prtocess new event types,

@@ -11,22 +11,37 @@
         SELECT
         account_code,
         account_type AS type,
-        entity_id,
+        master_account_code,
         currency,
         category,
         country,
         status
         FROM account_directory
         WHERE account_type = #{accountType}
-        AND entity_id = #{entityId}
+        AND master_account_code = #{masterAccountCode}
+    </select>
+
+    <select id="findByAccountCode"
+            parameterType="string"
+            resultType="com.dogancaglar.paymentservice.domain.model.ledger.AccountProfile">
+        SELECT
+        account_code,
+        account_type AS type,
+        master_account_code,
+        currency,
+        category,
+        country,
+        status
+        FROM account_directory
+        WHERE account_code = #{accountCode}
     </select>
 
     <insert id="insertAccount" parameterType="map">
         INSERT INTO account_directory(
-        account_code, account_type, entity_id, currency, category, country, status
+        account_code, account_type, master_account_code, currency, category, country, status
         )
         VALUES (
-        #{accountCode}, #{accountType}, #{entityId}, #{currency}, #{category}, #{country}, 'ACTIVE'
+        #{accountCode}, #{accountType}, #{masterAccountCode}, #{currency}, #{category}, #{country}, 'ACTIVE'
         )
         ON CONFLICT (account_code) DO NOTHING
     </insert>

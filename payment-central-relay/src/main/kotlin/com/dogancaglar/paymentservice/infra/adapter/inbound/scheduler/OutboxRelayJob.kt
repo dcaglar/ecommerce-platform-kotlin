@@ -5,7 +5,7 @@ import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
 import com.dogancaglar.paymentservice.application.events.CaptureRequested
 import com.dogancaglar.paymentservice.application.events.CaptureSubmitted
 import com.dogancaglar.paymentservice.application.events.CaptureConfirmed
-import com.dogancaglar.paymentservice.application.events.InternalTransferRequested
+import com.dogancaglar.paymentservice.application.events.InternalTransferCommand
 import com.dogancaglar.paymentservice.application.events.JournalEntriesRecorded
 import com.dogancaglar.paymentservice.application.events.OutboxEventTypes
 import com.dogancaglar.paymentservice.application.events.PaymentBaseEvent
@@ -88,8 +88,8 @@ class OutboxRelayJob(
                 OutboxEventTypes.CAPTURE_REQUESTED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, CaptureRequested::class.java))
                 OutboxEventTypes.CAPTURE_SUBMITTED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, CaptureSubmitted::class.java))
                 OutboxEventTypes.CAPTURE_CONFIRMED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, CaptureConfirmed::class.java))
-                OutboxEventTypes.INTERNAL_TRANSFER_REQUESTED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, InternalTransferRequested::class.java))
-                OutboxEventTypes.LEDGER_ENTRIES_RECORDED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, JournalEntriesRecorded::class.java))
+                OutboxEventTypes.JOURNAL_ENTRIES_RECORDED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, JournalEntriesRecorded::class.java))
+                OutboxEventTypes.INTERNAL_TRANSFER_COMMAND -> kafkaPublisher.publishAsync(convertToEnvelope(entry, InternalTransferCommand::class.java))
                 else -> {
                     logger.warn("❓ Unknown outbox event type=${entry.eventType}, skipping oeid=${entry.oeid}")
                     CompletableFuture.completedFuture(null)

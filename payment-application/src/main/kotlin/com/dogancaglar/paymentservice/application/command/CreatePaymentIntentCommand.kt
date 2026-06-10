@@ -9,7 +9,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.OrderId
 data class CreatePaymentIntentCommand(
     val orderId: OrderId,
     val buyerId: BuyerId,
-    val merchantAccountId: String,
+    val merchantAccount: String,
     val processingModel: ProcessingModel,
     val totalAmount: Amount,
     val paymentSplits: List<PaymentSplit>

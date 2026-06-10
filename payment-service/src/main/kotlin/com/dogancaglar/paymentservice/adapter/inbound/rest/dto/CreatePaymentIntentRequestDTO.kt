@@ -22,13 +22,13 @@ import jakarta.validation.constraints.NotNull
  * Key constraints:
  *  - No order lines, cart items, or product references.
  *  - processingModel is mandatory and drives downstream routing logic.
- *  - merchantAccountId identifies the primary merchant-of-record entity.
+ *  - merchantAccount identifies the primary merchant-of-record entity.
  *  - splits is nullable: omitted for DIRECT_MERCHANT, required for MARKETPLACE.
  *    Cross-field validation (splits present iff MARKETPLACE) is enforced in
  *    the use-case layer where full context is available.
  *
  * @param buyerId            Identifier of the purchasing party.
- * @param merchantAccountId  Identifier of the primary merchant (MoR entity).
+ * @param merchantAccount  Identifier of the primary merchant (MoR entity).
  * @param totalAmount        Total transaction amount in smallest currency unit.
  * @param processingModel    Routing model; determines whether splits are processed.
  * @param splits             Optional list of [PaymentSplitRequestDTO]; required for MARKETPLACE.
@@ -38,7 +38,7 @@ data class CreatePaymentIntentRequestDTO(
     val buyerId: String,
 
     @field:NotBlank
-    val merchantAccountId: String,
+    val merchantAccount: String,
 
     @field:NotNull
     val processingModel: ProcessingModelDto,

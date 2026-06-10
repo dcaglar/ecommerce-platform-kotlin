@@ -11,7 +11,7 @@ import java.time.Instant
 data class CaptureRequested(
     override val paymentIntentId: String,
     override val publicPaymentIntentId: String,
-    val merchantAccountId: String,
+    val merchantAccount: String,
     override val amountValue: Long,
     override val currency: String,
     val attempt: Int = 1,
@@ -29,7 +29,7 @@ data class CaptureRequested(
         fun from(paymentIntent: PaymentIntent, captureAmount: Amount, timestamp: Instant = Utc.nowInstant()) = CaptureRequested(
             paymentIntentId = paymentIntent.paymentIntentId.value.toString(),
             publicPaymentIntentId = paymentIntent.paymentIntentId.toPublicPaymentIntentId(),
-            merchantAccountId = paymentIntent.merchantAccountId,
+            merchantAccount = paymentIntent.merchantAccount,
             amountValue = captureAmount.quantity,
             currency = captureAmount.currency.currencyCode,
             attempt = 1,

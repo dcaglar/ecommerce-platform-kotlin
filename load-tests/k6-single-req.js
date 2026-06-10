@@ -10,12 +10,46 @@ export const options = {
     iterations: 1,
 };
 
+const MARKETPLACE = "MARKETPLACE-1";
+const SELLERS = Array.from({length: 10}, (_, i) => `SELLER-1-${i+1}`);
+
 // Helper: Shuffles an array and returns the first N elements to ensure uniqueness
 function getUniqueSellers(count) {
-    const sellers = ["SELLER-111", "SELLER-222", "SELLER-333"];
-    // Shuffle using sort and random
-    const shuffled = sellers.sort(() => 0.5 - Math.random());
+    const shuffled = SELLERS.slice().sort(() => 0.5 - Math.random());
     return shuffled.slice(0, count);
+}
+
+function generateRandomOrder() {
+    const totalQuantity = Math.floor(Math.random() * 9000) + 1000; // Between 1000 and 10000
+    const numSellers = Math.floor(Math.random() * 3) + 2; // 2 to 4 sellers
+    const sellers = getUniqueSellers(numSellers);
+    
+    const splits = [];
+    let remaining = totalQuantity;
+    
+    // Add a commission 50% of the time (between 2% and 10%)
+    if (Math.random() > 0.5) {
+        const commissionPct = (Math.floor(Math.random() * 8) + 2) / 100;
+        const commissionAmt = Math.floor(totalQuantity * commissionPct);
+        splits.push({ type: "Commission", amount: { quantity: commissionAmt, currency: "EUR" } });
+        remaining -= commissionAmt;
+    }
+    
+    // Distribute the rest among sellers
+    for (let i = 0; i < numSellers; i++) {
+        if (i === numSellers - 1) {
+            splits.push({ type: "BalanceAccount", account: sellers[i], amount: { quantity: remaining, currency: "EUR" } });
+        } else {
+            const chunk = Math.floor(Math.random() * (remaining * 0.6)) + 100; // Take up to 60% of remaining
+            splits.push({ type: "BalanceAccount", account: sellers[i], amount: { quantity: chunk, currency: "EUR" } });
+            remaining -= chunk;
+        }
+    }
+    
+    return {
+        totalAmount: { quantity: totalQuantity, currency: "EUR" },
+        splits: splits
+    };
 }
 
 const randomId = (prefix) => `${prefix}-${Math.floor(Math.random() * 1e12)}`;
@@ -25,17 +59,15 @@ const randomId = (prefix) => `${prefix}-${Math.floor(Math.random() * 1e12)}`;
 function createPaymentIntent() {
     const url = `${endpoints.base_url}/api/v1/payments`;
 
-    // Pick 2 UNIQUE sellers
-    const selectedSellers = getUniqueSellers(2);
+    const orderData = generateRandomOrder();
 
     const payload = JSON.stringify({
         orderId: randomId('ORDER'),
         buyerId: randomId('BUYER'),
-        totalAmount: { quantity: 2000, currency: "EUR" },
-        paymentOrders: [
-            { sellerId: selectedSellers[0], amount: { quantity: 1000, currency: "EUR" } },
-            { sellerId: selectedSellers[1], amount: { quantity: 1000, currency: "EUR" } }
-        ]
+        merchantAccount: MARKETPLACE,
+        processingModel: "MARKETPLACE",
+        totalAmount: orderData.totalAmount,
+        splits: orderData.splits
     });
 
     const params = {

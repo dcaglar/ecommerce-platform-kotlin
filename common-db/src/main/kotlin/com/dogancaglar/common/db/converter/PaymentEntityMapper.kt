@@ -15,15 +15,30 @@ import com.dogancaglar.common.db.entity.PaymentEntity
 object PaymentEntityMapper {
 
     fun toDomain(entity: PaymentEntity, splits: List<com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit>): Payment {
+        val currency = Currency(entity.currency)
+        val total = Amount.of(entity.totalAmountValue, currency)
+        
+        val captured = if (entity.capturedAmountValue == 0L) {
+            Amount.zero(currency)
+        } else {
+            Amount.of(entity.capturedAmountValue, currency)
+        }
+        
+        val refunded = if (entity.refundedAmountValue == 0L) {
+            Amount.zero(currency)
+        } else {
+            Amount.of(entity.refundedAmountValue, currency)
+        }
+
         return Payment.rehydrate(
             paymentId         = PaymentId(entity.paymentId),
             paymentIntentId   = PaymentIntentId(entity.paymentIntentId),
             buyerId           = BuyerId(entity.buyerId),
-            merchantAccountId = entity.merchantAccountId,
+            merchantAccount = entity.merchantAccount,
             processingModel   = ProcessingModel.valueOf(entity.processingModel),
-            totalAmount       = Amount.of(entity.totalAmountValue, Currency(entity.currency)),
-            capturedAmount    = Amount.of(entity.capturedAmountValue, Currency(entity.currency)),
-            refundedAmount    = Amount.of(entity.refundedAmountValue, Currency(entity.currency)),
+            totalAmount       = total,
+            capturedAmount    = captured,
+            refundedAmount    = refunded,
             status            = PaymentStatus.valueOf(entity.status),
             splits            = splits,
             createdAt         = Utc.fromInstant(entity.createdAt),
@@ -36,7 +51,7 @@ object PaymentEntityMapper {
             paymentId           = domain.paymentId.value,
             paymentIntentId     = domain.paymentIntentId.value,
             buyerId             = domain.buyerId.value,
-            merchantAccountId   = domain.merchantAccountId,
+            merchantAccount   = domain.merchantAccount,
             processingModel     = domain.processingModel.name,
             totalAmountValue    = domain.totalAmount.quantity,
             currency            = domain.totalAmount.currency.currencyCode,

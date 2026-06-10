@@ -7,6 +7,7 @@ import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CaptureResponseDT
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentRequestDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentMethodDTO
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CreatePaymentIntentResponseDTO
+import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.PaymentSplitRequestDTO
 import com.dogancaglar.paymentservice.application.command.AuthorizePaymentIntentCommand
 import com.dogancaglar.paymentservice.application.command.CapturePaymentCommand
 import com.dogancaglar.paymentservice.application.command.CreatePaymentIntentCommand
@@ -28,15 +29,22 @@ object PaymentRequestMapper {
         CreatePaymentIntentCommand(
             orderId = OrderId(dto.orderId),
             buyerId = BuyerId(dto.buyerId),
-            merchantAccountId = dto.merchantAccountId,
+            merchantAccount = dto.merchantAccount,
             processingModel = ProcessingModel.valueOf(dto.processingModel.name),
             totalAmount = Amount.of(dto.totalAmount.quantity, Currency(dto.totalAmount.currency.name)),
-            paymentSplits = dto.splits?.map {
-                PaymentSplit.of(
-                    targetAccountType = AccountType.valueOf(it.targetAccountType.name),
-                    targetEntityId = it.targetEntityId,
-                    amount = Amount.of(it.amount.quantity, Currency(it.amount.currency.name))
-                )
+            paymentSplits = dto.splits?.map { split ->
+                when (split) {
+                    is PaymentSplitRequestDTO.BalanceAccount -> PaymentSplit.of(
+                        accountType = AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT,
+                        account = split.account,
+                        amount = Amount.of(split.amount.quantity, Currency(split.amount.currency.name))
+                    )
+                    is PaymentSplitRequestDTO.Commission -> PaymentSplit.of(
+                        accountType = AccountType.MARKETPLACE_COMMISSION_REVENUE_BALANCE_ACCOUNT,
+                        account = dto.merchantAccount,
+                        amount = Amount.of(split.amount.quantity, Currency(split.amount.currency.name))
+                    )
+                }
             } ?: emptyList()
         )
 
@@ -48,7 +56,7 @@ object PaymentRequestMapper {
     fun toCapturePaymentCommand(publicPaymentIntentId:String, dto: CaptureRequestDTO): CapturePaymentCommand =
         CapturePaymentCommand(
             paymentIntentId = PaymentIntentId(PublicIdFactory.toInternalId(publicPaymentIntentId)),
-            merchantAccountId = dto.merchantAccountId ,
+            merchantAccount = dto.merchantAccount ,
             amount = Amount.of(dto.amount.quantity, Currency(dto.amount.currency.name)))
 
 

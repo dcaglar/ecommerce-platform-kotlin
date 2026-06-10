@@ -197,7 +197,7 @@ class KafkaTypedConsumerFactoryConfig(
             setRecordInterceptor(interceptor as RecordInterceptor<String, EventEnvelope<T>>)
             setCommonErrorHandler(errorHandler)
             setConcurrency(concurrency)
-            setAutoStartup(false)
+            setAutoStartup(true)
 
             // enforce semantic type at the container level
             expectedEventType?.let {
@@ -230,7 +230,7 @@ class KafkaTypedConsumerFactoryConfig(
         )
     }
 
-    @Bean(CONSUMER_GROUPS.MARKETPLACE_SPLIT_INSTRUCTION_CONSUMER + "-factory")
+    @Bean(CONSUMER_GROUPS.GROSS_CAPTURE_ALLOCATION_CONSUMER + "-factory")
     fun marketPlaceSplitConsumer(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")

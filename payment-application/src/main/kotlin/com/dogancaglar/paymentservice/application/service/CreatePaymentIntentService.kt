@@ -26,12 +26,12 @@ class CreatePaymentIntentService(
     override fun create(cmd: CreatePaymentIntentCommand): PaymentIntent {
         // 1. Generate ID and create PaymentIntent
         logger.info("CreatePaymentIntentService.create took started")
-        val paymentIntentId = PaymentIntentId(idGeneratorPort.nextPaymentIntentId())
+        val paymentIntentId = PaymentIntentId(idGeneratorPort.generateId())
         val paymentIntent = PaymentIntent.createNew(
             paymentIntentId = paymentIntentId,
             buyerId = cmd.buyerId,
             orderId = cmd.orderId,
-            merchantAccountId = cmd.merchantAccountId,
+            merchantAccount = cmd.merchantAccount,
             processingModel = cmd.processingModel,
             totalAmount = cmd.totalAmount,
             splits = cmd.paymentSplits

@@ -22,7 +22,7 @@
                 <constraints nullable="false"/>
             </column>
 
-            <column name="merchant_account_id" type="VARCHAR(255)">
+            <column name="merchant_account" type="VARCHAR(255)">
                 <constraints nullable="false"/>
             </column>
 

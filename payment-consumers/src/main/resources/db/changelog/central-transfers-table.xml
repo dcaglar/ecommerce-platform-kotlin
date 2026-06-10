@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="2026-06-09-create-transfers-table" author="dogancaglar">
+        <createTable tableName="transfers">
+            <column name="transfer_id" type="BIGINT">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="source_transaction_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="amount_value" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="currency" type="CHAR(3)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="reversed_amount_value" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="target_account" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_account" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="transfer_type" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE"
+                    defaultValueComputed="(now() AT TIME ZONE 'UTC')">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITHOUT TIME ZONE"
+                    defaultValueComputed="(now() AT TIME ZONE 'UTC')">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        
+        <sql>
+            ALTER TABLE transfers ADD CONSTRAINT chk_transfers_amount_positive CHECK (amount_value >= 0);
+            ALTER TABLE transfers ADD CONSTRAINT chk_transfers_currency_3 CHECK (currency ~ '^[A-Z]{3}$');
+        </sql>
+
+        <createIndex tableName="transfers" indexName="idx_transfers_target_account">
+            <column name="target_account"/>
+        </createIndex>
+        
+        <createIndex tableName="transfers" indexName="idx_transfers_source_account">
+            <column name="source_account"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,7 +1,6 @@
 package com.dogancaglar.paymentservice.domain.model.ledger
 
 import com.dogancaglar.paymentservice.domain.model.common.Amount
-import com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.TxId
 
@@ -20,35 +19,6 @@ import com.dogancaglar.paymentservice.domain.model.vo.TxId
  * Direct construction is prohibited (private constructor).
  *
  * ============================================================
- * CAPTURE JOURNAL DESIGN (US 1.4)
- * ============================================================
- *
- * The old [capture] factory method has been renamed to [captureGrossAsset].
- * This rename is intentional and carries semantic weight:
- *
- *  - captureGrossAsset:
- *      Allocates 100% of the captured amount to the PRIMARY MERCHANT'S
- *      MERCHANT_GROSS_POOL account, regardless of whether the payment is
- *      DIRECT_MERCHANT or MARKETPLACE. The split distribution happens AFTER
- *      this entry, in separate INTERNAL_TRANSFER postings.
- *
- *  - executeSubSellerSplit:
- *      Generates one [JournalType.INTERNAL_TRANSFER] JournalEntry per split
- *      instruction. Each entry debits the merchant's MERCHANT_GROSS_POOL and
- *      credits the sub-seller's BalanceAccountType-designated account.
- *      This method is ONLY called for MARKETPLACE payments.
- *      The caller (PspResultConsumer) is responsible for checking processingModel
- *      before invoking this method.
- *
- * Why this two-step design?
- *  - It preserves a complete, auditable record: the gross settlement asset
- *    always lands in MERCHANT_GROSS_POOL first, making it trivial to reconcile
- *    captures against acquirer settlement batches without complicating the
- *    split accounting.
- *  - INTERNAL_TRANSFER entries are clearly labelled and isolated from the
- *    gateway-facing CAPTURE entry, so the ledger is human-readable.
- *  - If split distribution fails partway through, only the failed transfers
- *    are missing; the gross capture is never corrupted.
  */
 class JournalEntry private constructor(
     val id: String,
@@ -85,7 +55,7 @@ class JournalEntry private constructor(
     companion object JournalFactory {
 
         // =====================================================================
-        // AUTH_HOLD
+        // AUTHORIZATION  is succesful in sync api call
         // =====================================================================
 
         fun authHold(
@@ -98,7 +68,7 @@ class JournalEntry private constructor(
         ): List<JournalEntry> = listOf(
             JournalEntry(
                 id        = "AUTH:$journalIdentifier",
-                journalType    = JournalType.AUTH_HOLD,
+                journalType    = JournalType.AUTHORIZATION,
                 name      = "AuthorizationTx Hold",
                 paymentId = paymentId,
                 txId      = txId,
@@ -109,12 +79,16 @@ class JournalEntry private constructor(
             )
         )
 
+
+
+
         // =====================================================================
-        // CAPTURE — Gross Asset Settlement
+        // CAPTURE — This journal entry is recorded when external PSP notifies Mor-DC platform regarding the final status of capture, money is still not in Mor-DC account, but PSP confrms that it will send within 3 or 5 days
         // =====================================================================
+
         fun captureGrossAsset(
-            paymentId: PaymentId, // <-- Added!
-            txId: TxId,           // (This is the ID of the CaptureTx)
+            paymentId: PaymentId,
+            txId: TxId,
             journalIdentifier: String,
             capturedAmount: Amount,
             authReceivable: Account,
@@ -123,12 +97,12 @@ class JournalEntry private constructor(
             pspReceivable: Account
         ): List<JournalEntry> = listOf(
             JournalEntry(
-                id        = "CAPTURE:$journalIdentifier",
+                id             = "CAPTURE:$journalIdentifier",
                 journalType    = JournalType.CAPTURE,
-                name      = "Gross Asset CaptureTx — Primary Merchant Pool",
-                paymentId = paymentId,
-                txId      = txId,
-                postings  = listOf(
+                name           = "Gross Asset Capture Pool on ${merchantGrossPool.accountCode}",
+                paymentId      = paymentId,
+                txId           = txId,
+                postings       = listOf(
                     Posting.Debit.create(authLiability, capturedAmount),
                     Posting.Credit.create(authReceivable, capturedAmount),
                     Posting.Debit.create(pspReceivable, capturedAmount),
@@ -141,92 +115,37 @@ class JournalEntry private constructor(
         // INTERNAL_TRANSFER — Sub-Seller Split Distribution
         // =====================================================================
 
-        /**
-         * executeSubSellerSplit
-         *
-         * Generates a list of INTERNAL_TRANSFER JournalEntries that redistribute
-         * funds from the primary merchant's MERCHANT_GROSS_POOL to each sub-seller's
-         * designated [BalanceAccountType] account.
-         *
-         * One JournalEntry is produced per [PaymentSplit] instruction.
-         *
-         * Postings per entry:
-         *   DR MERCHANT_GROSS_POOL (debit the primary merchant's pool)
-         *   CR <split.targetAccountType account> (credit the sub-seller / platform bucket)
-         *
-         * Mathematical guarantee:
-         *   Because the [splits] array was validated at Payment creation time to
-         *   sum exactly to [totalAmount], the aggregate of all INTERNAL_TRANSFER
-         *   entries will exactly drain the MERCHANT_GROSS_POOL of the captured amount,
-         *   leaving the pool at zero for a fully distributed MARKETPLACE payment.
-         *
-         * IMPORTANT — CALLER RESPONSIBILITY:
-         *   This method MUST only be called when processingModel == MARKETPLACE.
-         *   The caller (PspResultConsumer) is responsible for the guard. Calling this
-         *   on a DIRECT_MERCHANT payment is a programming error and will result in
-         *   incorrect ledger postings.
-         *
-         * @param journalIdentifier    Base label for the journal IDs (e.g., paymentId + txId).
-         * @param merchantGrossPool    MARKETPLACE_OPERATOR account for the primary merchant.
-         * @param splits               The complete split routing matrix from the Payment aggregate.
-         * @param resolveTargetAccount Lambda that maps (AccountType, entityId) → Account.
-         *                             Allows the caller (in the application layer) to resolve
-         *                             ledger accounts from the Account directory without coupling
-         *                             this domain factory to any infrastructure port.
-         * @return                     One [JournalEntry] per split instruction.
-         */
-        fun executeSubSellerSplit(
-            paymentId: PaymentId, // <-- Added!
-            txId: TxId,           // <-- Added! (Points back to the CaptureTx that triggered the split)
-            journalIdentifier: String,
-            merchantGrossPool: Account,
-            splits: List<PaymentSplit>,
-            resolveTargetAccount: (AccountType, String) -> Account
-        ): List<JournalEntry> {
-            require(splits.isNotEmpty()) {
-                "executeSubSellerSplit requires at least one PaymentSplit, but received an empty list"
-            }
-            return splits.mapIndexed { index, split ->
-                val targetAccount = resolveTargetAccount(split.targetAccountType, split.targetEntityId)
-                JournalEntry(
-                    id        = "INTERNAL_TRANSFER:${journalIdentifier}:$index",
-                    journalType    = JournalType.INTERNAL_TRANSFER,
-                    name      = "Sub-Seller Split — ${split.targetAccountType} / ${split.targetEntityId}",
-                    paymentId = paymentId,
-                    txId      = txId,
-                    postings  = listOf(
-                        Posting.Debit.create(merchantGrossPool, split.amount),
-                        Posting.Credit.create(targetAccount, split.amount)
-                    )
-                )
-            }
-        }
+
 
         /**
          * internalTransfer
          *
          * Generates a single INTERNAL_TRANSFER JournalEntry that redistributes
-         * funds from the primary merchant's MERCHANT_GROSS_POOL to a target account.
-         * Used by decoupled InternalTransferRequestExecutor processing single split requests.
+         * funds from the source account to a target account.
+         * Used by decoupled GrossCaptureAllocationConsumer
+         * MERCHANT_GROSS_CAPTURE_SUSPENSE -> MARKETPLACE_DIRECT_REVENUE_BALANCE_ACCOUNT (if it is a direct payment no seller involved no split)
+          MERCHANT_GROSS_CAPTURE_SUSPENSE -> MARKETPLACE_SELLER_BALANCE_ACCOUNT (if it is a  market place and account type  is balance accoiunt in split
+         *MERCHANT_GROSS_CAPTURE_SUSPENSE -> MARKETPLACE_COMMISSION_REVENUE_BALANCE_ACCOUNT (if it is a  market place and account type  is balance accoiunt in split
+         * by moving to seller's balance account, marketpplaceplatform's commission revenue account or
+         * if it is direct payment, then move to  MARKETPLACE_DIRECT_REVENUE_BALANCE_ACCOUNT
+         * i believe this is till nmot real money ?
          */
         fun internalTransfer(
             paymentId: PaymentId,
             txId: TxId,
             journalIdentifier: String,
             amount: Amount,
-            merchantGrossPool: Account,
-            targetAccount: Account,
-            targetAccountType: AccountType,
-            targetEntityId: String
+            sourceAccount: Account,
+            targetAccount: Account
         ): List<JournalEntry> = listOf(
             JournalEntry(
                 id        = "INTERNAL_TRANSFER:${journalIdentifier}",
                 journalType    = JournalType.INTERNAL_TRANSFER,
-                name      = "Sub-Seller Split — $targetAccountType / $targetEntityId",
+                name      = "Transfer from ${sourceAccount.accountCode} — to  ${targetAccount.accountCode}",
                 paymentId = paymentId,
                 txId      = txId,
                 postings  = listOf(
-                    Posting.Debit.create(merchantGrossPool, amount),
+                    Posting.Debit.create(sourceAccount, amount),
                     Posting.Credit.create(targetAccount, amount)
                 )
             )
@@ -251,7 +170,7 @@ class JournalEntry private constructor(
          * Called by: PspResultConsumer, processing a PaymentRefunded webhook event.
          */
         fun refund(
-            paymentId: PaymentId, // <-- Added!
+            paymentId: PaymentId,
             txId: TxId,
             journalIdentifier: String,
             refundedAmount: Amount,
@@ -261,123 +180,182 @@ class JournalEntry private constructor(
             pspReceivable: Account
         ): List<JournalEntry> = listOf(
             JournalEntry(
-                id            = "REFUND:$journalIdentifier",
-                journalType        = JournalType.REFUND,
-                name          = "Payment RefundTx",
-                paymentId = paymentId,
-                txId= txId,
-                postings      = listOf(
-                    Posting.Debit.create(authLiability, refundedAmount),
-                    Posting.Credit.create(authReceivable, refundedAmount),
+                id             = "REFUND:$journalIdentifier",
+                journalType    = JournalType.REFUND,
+                name           = "Payment Refund",
+                paymentId      = paymentId,
+                txId           = txId,
+                postings       = listOf(
                     Posting.Debit.create(merchantGrossPool, refundedAmount),
-                    Posting.Credit.create(pspReceivable, refundedAmount)
+                    Posting.Credit.create(pspReceivable, refundedAmount),
+                    Posting.Debit.create(authLiability, refundedAmount),
+                    Posting.Credit.create(authReceivable, refundedAmount)
                 )
             )
         )
 
-        // =====================================================================
-        // SETTLEMENT
-        // =====================================================================
 
+// =====================================================================
+// 5. SETTLEMENT (Processed Line-by-Line From Psp's Settlement Report)
+// =====================================================================
         /**
-         * settlement
+         * settlementLineItem
          *
-         * Records funds received from the acquirer into the platform's cash account.
-         * The difference between capturedAmount and settledAmount represents PSP fees.
-         *
-         * Postings:
-         *   DR PSP_FEE_EXPENSE   (PSP fee absorbed by platform)
-         *   DR PLATFORM_CASH     (net funds received)
-         *   CR PSP_RECEIVABLE    (clears the receivable)
+         * Records the official clearing of an individual capture transaction.
+         * Converts the abstract gateway receivable into physical platform cash liquidity,
+         * while isolating the exact processing expense levied by the network for this payment.
          */
-        fun settlement(
-            paymentId: PaymentId,
-            txId: TxId,
-            journalIdentifier: String,
-            capturedAmount: Amount,
-            settledAmount: Amount,
-            platformCashAccount: Account,
-            pspFeeExpenseAccount: Account,
-            pspReceivable: Account
-        ): List<JournalEntry> = listOf(
-            JournalEntry(
-                id            = "SETTLEMENT:$journalIdentifier",
-                journalType        = JournalType.SETTLEMENT,
-                name          = "Acquirer Funds Settlement",
-                paymentId     = paymentId,
-                txId          = txId,
-                postings      = listOf(
-                    Posting.Debit.create(pspFeeExpenseAccount, capturedAmount - settledAmount),
-                    Posting.Debit.create(platformCashAccount, settledAmount),
-                    Posting.Credit.create(pspReceivable, capturedAmount)
+        fun settlementLineItem(
+            paymentId: PaymentId,             // 🎯 The true, original Payment identifier
+            settlementTxId: TxId,            // The fresh unique ID for this settlement event
+            journalIdentifier: String,       // e.g., "ADYEN_SDR_LINE_998124"
+            grossAmount: Amount,             // Original capture volume (e.g., €3,000)
+            netCashAmount: Amount,           // Cash deposited after fees (e.g., €2,940)
+            pspFeeAmount: Amount,            // Exact fees taken out (e.g., €60)
+            platformCash: Account,           // PLATFORM_CASH.GLOBAL.EUR
+            pspReceivable: Account,          // PSP_RECEIVABLES.GLOBAL.EUR
+            pspFeeExpense: Account           // {PSP_FEE_EXPENSE}.GLOBAL.EUR
+        ): List<JournalEntry> {
+
+            return listOf(
+                JournalEntry(
+                    id             = "SETTLE:$journalIdentifier",
+                    journalType    = JournalType.SETTLEMENT,
+                    name           = "Acquirer Network Line-Item Reconciled Settlement",
+                    paymentId      = paymentId,   // 🟢 No longer a blind sentinel! Absolute audit trail.
+                    txId           = settlementTxId,
+                    postings       = listOf(
+                        Posting.Debit.create(platformCash, netCashAmount),    // Physical vault asset increase 🟢
+                        Posting.Debit.create(pspFeeExpense, pspFeeAmount),   // Direct operational fee expense 🟢
+                        Posting.Credit.create(pspReceivable, grossAmount)    // Reconciles outstanding gateway IOU to zero 🔴
+                    )
                 )
             )
-        )
+        }
 
         // =====================================================================
-        // COMMISSION FEE
-        // =====================================================================
-
+// 6. MOR-DC PLATFORM COMMISSION REGISTERED (Isolated Per Tenant)
+// =====================================================================
         /**
+         * [Adyen Capture Webhook]
+         *        │
+         *        ▼
+         * 1. PspResultConsumer writes CAPTURE entry
+         *        │
+         *        ▼ (Publishes Kafka Event)
+         * 2. GrossCaptureAllocationConsumer wakes up
+         *        │
+         *        ├──► Path A: Direct Sale -> Moves 100% to DIRECT_REVENUE
+         *        │                            │
+         *        │                            ▼ (In same DB transaction)
+         *        │                            ⚡ Run commissionFeeRegistered()
+         *        │
+         *        └──► Path B: Marketplace -> Moves splits to BALANCE_ACCOUNTs
+         *                                     │
+         *                                     ▼ (In same DB transaction)
+         *                                     ⚡ Run commissionFeeRegistered()
          * commissionFeeRegistered
          *
-         * Records the platform's commission charge against the merchant account.
+         * Carves out Mor-DC's infrastructure fee from the merchant's gross pool
+         * and locks it into a merchant-specific escrow container to manage chargeback risk.
          *
-         * Postings:
-         *   DR MERCHANT_GROSS_POOL         (reduces merchant balance by commission)
-         *   CR PLATFORM_COMMISSION_ESCROW  (records the commission receivable)
+         * @param commissionEscrowAccount Must be AccountType.PLATFORM_COMMISSION_ESCROW for the tenant
+         * @param merchantGrossPool Must be AccountType.MERCHANT_GROSS_CAPTURE_SUSPENSE or MARKETPLACE_COMMISSION_REVENUE_BALANCE_ACCOUNT
          */
         fun commissionFeeRegistered(
             paymentId: PaymentId,
             txId: TxId,
             journalIdentifier: String,
             commissionFee: Amount,
-            commissionFeeAccount: Account,
-            merchantAccount: Account
-        ): List<JournalEntry> = listOf(
-            JournalEntry(
-                id       = "COMMISSION_FEE:$journalIdentifier",
-                journalType   = JournalType.COMMISSION_FEE,
-                name     = "Platform Commission Fee",
-                paymentId = paymentId,
-                txId     = txId,
-                postings = listOf(
-                    Posting.Debit.create(merchantAccount, commissionFee),
-                    Posting.Credit.create(commissionFeeAccount, commissionFee)
+            commissionEscrowAccount: Account, // ◄ PLATFORM_COMMISSION_ESCROW.MARKETPLACE-1.EUR
+            merchantGrossPool: Account       // ◄ MARKETPLACE_COMMISSION_REVENUE_BALANCE_ACCOUNT.MARKETPLACE-1.EUR
+        ): List<JournalEntry> {
+            require(commissionEscrowAccount.type == AccountType.PLATFORM_COMMISSION_ESCROW) {
+                "Target must be a tenant escrow account: ${commissionEscrowAccount.accountCode}"
+            }
+
+
+            return listOf(
+                JournalEntry(
+                    id             = "MOR_DC_COMMISSION:$journalIdentifier",
+                    journalType    = JournalType.COMMISSION_FEE,
+                    name           = "Mor-DC Platform Escrow Fee Charge — Tenant Isolated",
+                    paymentId      = paymentId,
+                    txId           = txId,
+                    postings       = listOf(
+                        Posting.Debit.create(merchantGrossPool, commissionFee),       // Reduces the merchant's folder 🔴
+                        Posting.Credit.create(commissionEscrowAccount, commissionFee)   // Increases the merchant's specific escrow lock 🟢
+                    )
                 )
             )
-        )
+        }
+
+// =====================================================================
+// 8. REVENUE RECOGNITION (Clearing Tenant Escrow to Corporate Profit)
+// =====================================================================
+        /**
+         * recognizePlatformRevenue
+         *
+         * Sweeps a specific tenant's matured escrow account after the refund safety window clears,
+         * moving those funds into Mor-DC's global corporate operational revenue.
+         *
+         * @param commissionEscrowAccount Must be AccountType.PLATFORM_COMMISSION_ESCROW for the target tenant
+         * @param platformOperationalRevenue Must be AccountType.PLATFORM_OPERATIONAL_REVENUE for GLOBAL
+         */
+        fun recognizePlatformRevenue(
+            txId: TxId,
+            recognitionIdentifier: String,
+            maturedFeeAmount: Amount,
+            commissionEscrowAccount: Account,   // ◄ PLATFORM_COMMISSION_ESCROW.MARKETPLACE-1.EUR
+            platformOperationalRevenue: Account // ◄ PLATFORM_OPERATIONAL_REVENUE.GLOBAL.EUR
+        ): List<JournalEntry> {
+            require(commissionEscrowAccount.type == AccountType.PLATFORM_COMMISSION_ESCROW) {
+                "Source must be a tenant escrow account: ${commissionEscrowAccount.accountCode}"
+            }
+            require(platformOperationalRevenue.type == AccountType.PLATFORM_OPERATIONAL_REVENUE) {
+                "Destination must be global operational revenue: ${platformOperationalRevenue.accountCode}"
+            }
+
+            return listOf(
+                JournalEntry(
+                    id             = "REV_REC:$recognitionIdentifier",
+                    journalType    = JournalType.INTERNAL_TRANSFER,
+                    name           = "Platform Fee Release — Tenant: ${commissionEscrowAccount.accountCode}",
+                    paymentId      = PaymentId(0L), // System batch level
+                    txId           = txId,
+                    postings       = listOf(
+                        Posting.Debit.create(commissionEscrowAccount, maturedFeeAmount),   // Frees the specific tenant hold 🔴
+                        Posting.Credit.create(platformOperationalRevenue, maturedFeeAmount) // Adds to Mor-DC's aggregate profit 🟢
+                    )
+                )
+            )
+        }
+
 
         // =====================================================================
         // PAYOUT
         // =====================================================================
 
-        /**
-         * payout
-         *
-         * Records a cash disbursement from the platform to a merchant/seller.
-         *
-         * Postings:
-         *   DR MERCHANT_GROSS_POOL  (reduces the merchant's payable balance)
-         *   CR PLATFORM_CASH        (reduces platform's cash holding)
-         */
+        // =====================================================================
+        // 7. PAYOUT (Clearing Liabilities & Pushing Cash to External Bank Accounts)
+        // =====================================================================
         fun payout(
             paymentId: PaymentId,
             txId: TxId,
             journalIdentifier: String,
             payoutAmount: Amount,
-            merchantAccount: Account,
-            platformCashAccount: Account
+            sourceBalanceAccount: Account,
+            platformCash: Account
         ): List<JournalEntry> = listOf(
             JournalEntry(
-                id       = "PAYOUT:$journalIdentifier",
-                journalType   = JournalType.PAYOUT,
-                name     = "Merchant Payout Disbursement",
-                paymentId = paymentId,
-                txId     = txId,
-                postings = listOf(
-                    Posting.Debit.create(merchantAccount, payoutAmount),
-                    Posting.Credit.create(platformCashAccount, payoutAmount)
+                id             = "PAYOUT:$journalIdentifier",
+                journalType    = JournalType.PAYOUT,
+                name           = "Outbound Wire Transfer to Merchant/Seller External Bank",
+                paymentId      = paymentId,
+                txId           = txId,
+                postings       = listOf(
+                    Posting.Debit.create(sourceBalanceAccount, payoutAmount),
+                    Posting.Credit.create(platformCash, payoutAmount)
                 )
             )
         )

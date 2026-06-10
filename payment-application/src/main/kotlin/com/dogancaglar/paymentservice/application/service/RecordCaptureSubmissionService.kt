@@ -40,7 +40,7 @@ open class RecordCaptureSubmissionService(
         val authTxIdValue = authTx?.txId ?: TxId(0L)
 
         // 3. Setup transaction tracking metadata record
-        val newTxId = TxId(idGeneratorPort.nextTxId())
+        val newTxId = TxId(idGeneratorPort.generateId())
         val amount = Amount.of(event.amountValue, Currency(event.currency))
 
         val captureTx = Tx.createCaptureTx(
@@ -59,6 +59,6 @@ open class RecordCaptureSubmissionService(
          */
         // 5. Commit atomic units through outbound database gateways
         logger.info("Atomically persisting pending state modifications and transaction outbox event for track ref=${event.pspReference}")
-        centralDbTransactionalFacadePort.saveAtomically(updatedPayment, captureTx, emptyList(), emptyList())
+        centralDbTransactionalFacadePort.recordPaymentOperationInLedger(updatedPayment, captureTx, emptyList(), emptyList())
     }
 }

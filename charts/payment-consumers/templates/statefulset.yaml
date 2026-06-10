@@ -68,13 +68,13 @@ spec:
             failureThreshold: 60
           livenessProbe:
             httpGet: { path: /actuator/health/liveness, port: http }
-            initialDelaySeconds: 90
+            initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 12
           readinessProbe:
             httpGet: { path: /actuator/health/readiness, port: http }
-            initialDelaySeconds: 90
+            initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 12

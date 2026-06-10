@@ -22,7 +22,7 @@ CREATE TABLE payment_intents (
     payment_intent_id BIGINT PRIMARY KEY,
     buyer_id VARCHAR(255) NOT NULL,
     order_id VARCHAR(255) NOT NULL,
-    merchant_account_id VARCHAR(255) NOT NULL,
+    merchant_account VARCHAR(255) NOT NULL,
     processing_model VARCHAR(255) NOT NULL,
     psp_reference VARCHAR(255),
     total_amount_value BIGINT NOT NULL,

@@ -71,5 +71,53 @@ object PaymentTxEntityMapper {
             settledAmountValue = domain.settledAmount.quantity,
             createdAt          = domain.createdAt
         )
+
+        is Tx.InternalTransferTx -> PaymentTxEntity(
+            txId              = domain.txId.value,
+            txType            = domain.txType,
+            paymentId         = domain.paymentId.value,
+            paymentIntentId   = domain.paymentIntentId.value,
+            parentTxId        = domain.parentCaptureTxId.value,
+            acquirerReference = "",
+            amountValue       = domain.amount.quantity,
+            amountCurrency    = domain.amount.currency.currencyCode,
+            status            = domain.status.name,
+            settleStatus      = null,
+            acquirerBatchRef  = null,
+            settledAmountValue = null,
+            createdAt         = domain.createdAt
+        )
+
+        is Tx.PayoutTx -> PaymentTxEntity(
+            txId              = domain.txId.value,
+            txType            = domain.txType,
+            paymentId         = domain.paymentId.value,
+            paymentIntentId   = domain.paymentIntentId.value,
+            parentTxId        = null,
+            acquirerReference = domain.payoutBatchReference,
+            amountValue       = domain.amount.quantity,
+            amountCurrency    = domain.amount.currency.currencyCode,
+            status            = domain.status.name,
+            settleStatus      = null,
+            acquirerBatchRef  = null,
+            settledAmountValue = null,
+            createdAt         = domain.createdAt
+        )
+
+        is Tx.PspFeeTx -> PaymentTxEntity(
+            txId              = domain.txId.value,
+            txType            = domain.txType,
+            paymentId         = domain.paymentId.value,
+            paymentIntentId   = domain.paymentIntentId.value,
+            parentTxId        = domain.parentTxId.value,
+            acquirerReference = "",
+            amountValue       = domain.amount.quantity,
+            amountCurrency    = domain.amount.currency.currencyCode,
+            status            = domain.status.name,
+            settleStatus      = null,
+            acquirerBatchRef  = null,
+            settledAmountValue = null,
+            createdAt         = domain.createdAt
+        )
     }
 }

@@ -12,26 +12,26 @@ import com.dogancaglar.paymentservice.domain.model.ledger.AccountType
  * generate INTERNAL_TRANSFER ledger postings.
  *
  * Invariants enforced at construction time:
- *  - targetEntityId must be non-blank (identifies the seller, sub-merchant,
+ *  - account must be non-blank (identifies the seller, sub-merchant,
  *    or platform entity that is the beneficiary of this split).
  *  - amount must be positive.
- *  - targetAccountType must be one of the canonical AccountType values.
+ *  - accountType must be one of the canonical AccountType values.
  *
  * No cart items, product lines, or order-level concepts exist here.
  * This is a pure fintech routing primitive.
  *
- * @param targetAccountType  The internal ledger bucket that receives funds.
- * @param targetEntityId     Identifier of the owning entity (seller ID, merchant ID, etc.).
+ * @param accountType  The internal ledger bucket that receives funds.
+ * @param account     Identifier of the owning entity (seller ID, merchant ID, etc.).
  * @param amount             The monetary amount to route to this account.
  */
 data class PaymentSplit(
-    val targetAccountType: AccountType,
-    val targetEntityId: String,
+    val accountType: AccountType,
+    val account: String,
     val amount: Amount
 ) {
     init {
-        require(targetEntityId.isNotBlank()) {
-            "PaymentSplit.targetEntityId must not be blank"
+        require(account.isNotBlank()) {
+            "PaymentSplit.account must not be blank"
         }
         require(amount.isPositive()) {
             "PaymentSplit.amount must be positive, but was ${amount.quantity}"
@@ -44,12 +44,12 @@ data class PaymentSplit(
          * and a validation gate for incoming split instructions.
          */
         fun of(
-            targetAccountType: AccountType,
-            targetEntityId: String,
+            accountType: AccountType,
+            account: String,
             amount: Amount
         ): PaymentSplit = PaymentSplit(
-            targetAccountType = targetAccountType,
-            targetEntityId = targetEntityId,
+            accountType = accountType,
+            account = account,
             amount = amount
         )
     }

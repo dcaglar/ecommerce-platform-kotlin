@@ -32,7 +32,7 @@ class SnowflakeIdGeneratorAdapterTest {
             coreField.set(this, core)
         }
 
-        val id = adapter.nextPaymentId()
+        val id = adapter.generateId()
         val extractedNodeId = id shr 10
         assertEquals(5L, extractedNodeId)
     }
@@ -51,7 +51,7 @@ class SnowflakeIdGeneratorAdapterTest {
             coreField.set(this, core)
         }
 
-        val id = adapter.nextPaymentId()
+        val id = adapter.generateId()
         val extractedNodeId = id shr 10
         val expectedNodeId = (podName.hashCode() and Int.MAX_VALUE) % 32
         assertEquals(expectedNodeId.toLong(), extractedNodeId)
@@ -70,7 +70,7 @@ class SnowflakeIdGeneratorAdapterTest {
             coreField.set(this, core)
         }
 
-        val id = adapter.nextPaymentId()
+        val id = adapter.generateId()
         val extractedNodeId = id shr 10
         assertEquals(1L, extractedNodeId)
     }

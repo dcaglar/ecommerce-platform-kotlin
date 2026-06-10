@@ -44,7 +44,7 @@ class CapturePaymentService(
         val payload = serializationPort.toJson(envelope)
 
         val outboxEvent = OutboxEvent.createNew(
-            oeid = idGeneratorPort.nextPaymentId(),
+            oeid = idGeneratorPort.generateId(),
             eventType = envelope.eventType,
             aggregateId = envelope.aggregateId,
             payload = payload

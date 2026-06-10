@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.TransferMapper">
+
+    <resultMap id="TransferResultMap" type="com.dogancaglar.common.db.entity.TransferEntity">
+        <id property="transferId" column="transfer_id"/>
+        <result property="sourceTransactionId" column="source_transaction_id"/>
+        <result property="amountValue" column="amount_value"/>
+        <result property="currency" column="currency"/>
+        <result property="reversedAmountValue" column="reversed_amount_value"/>
+        <result property="targetAccount" column="target_account"/>
+        <result property="sourceAccount" column="source_account"/>
+        <result property="transferType" column="transfer_type"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.dogancaglar.common.db.entity.TransferEntity">
+        INSERT INTO transfers (
+            transfer_id, source_transaction_id, amount_value, currency, reversed_amount_value,
+            target_account, source_account, transfer_type,
+            status, created_at, updated_at
+        ) VALUES (
+            #{transferId}, #{sourceTransactionId}, #{amountValue}, #{currency}, #{reversedAmountValue},
+            #{targetAccount}, #{sourceAccount}, #{transferType},
+            #{status}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <insert id="upsert" parameterType="com.dogancaglar.common.db.entity.TransferEntity">
+        INSERT INTO transfers (
+            transfer_id, source_transaction_id, amount_value, currency, reversed_amount_value,
+            target_account, source_account, transfer_type,
+            status, created_at, updated_at
+        ) VALUES (
+            #{transferId}, #{sourceTransactionId}, #{amountValue}, #{currency}, #{reversedAmountValue},
+            #{targetAccount}, #{sourceAccount}, #{transferType},
+            #{status}, #{createdAt}, #{updatedAt}
+        )
+        ON CONFLICT (transfer_id) DO UPDATE SET
+            reversed_amount_value = EXCLUDED.reversed_amount_value,
+            status = EXCLUDED.status,
+            updated_at = EXCLUDED.updated_at
+    </insert>
+
+    <select id="findById" resultMap="TransferResultMap">
+        SELECT * FROM transfers WHERE transfer_id = #{id}
+    </select>
+
+    <update id="update" parameterType="com.dogancaglar.common.db.entity.TransferEntity">
+        UPDATE transfers
+        SET reversed_amount_value = #{reversedAmountValue},
+            status = #{status},
+            updated_at = #{updatedAt}
+        WHERE transfer_id = #{transferId}
+    </update>
+
+</mapper>

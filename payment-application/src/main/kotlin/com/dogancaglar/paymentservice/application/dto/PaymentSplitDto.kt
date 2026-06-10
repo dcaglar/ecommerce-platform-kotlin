@@ -19,45 +19,68 @@ import com.fasterxml.jackson.annotation.JsonProperty
  * Jackson @JsonCreator + @JsonProperty annotations guarantee that
  * deserialization is explicit, deterministic, and immune to field-reordering.
  *
- * @param targetAccountType  Canonical enum value identifying the ledger bucket.
- * @param targetEntityId     Identifies the beneficiary entity (seller, platform, etc.).
- * @param amountValue        Amount in the smallest currency unit (e.g., cents).
- * @param currency           ISO 4217 three-letter currency code (e.g., "EUR").
+ * @param accountType  Canonical enum value identifying the ledger bucket.
+ * @param account     Identifies the beneficiary entity (seller, platform, etc.).
+ * @param amountValue        The quantity of funds.
+ * @param currency           The currency code (e.g., EUR, USD).
  */
-data class PaymentSplitDto @JsonCreator private constructor(
-    @JsonProperty("targetAccountType") val targetAccountType: AccountTypeDto,
-    @JsonProperty("targetEntityId")    val targetEntityId: String,
+data class PaymentSplitDto @JsonCreator constructor(
+    @JsonProperty("accountType") val accountType: String,
+    @JsonProperty("account")    val account: String,
     @JsonProperty("amountValue")       val amountValue: Long,
     @JsonProperty("currency")          val currency: String
 ) {
     companion object {
         fun of(
-            targetAccountType: AccountTypeDto,
-            targetEntityId: String,
+            accountType: String,
+            account: String,
             amountValue: Long,
             currency: String
         ): PaymentSplitDto {
-            require(targetEntityId.isNotBlank()) { "targetEntityId must not be blank" }
-            require(amountValue > 0) { "amountValue must be positive, but was $amountValue" }
-            require(currency.matches(Regex("^[A-Z]{3}$"))) {
-                "currency must be a valid ISO 4217 code, but was '$currency'"
+            require(account.isNotBlank()) { "account must not be blank" }
+            require(amountValue > 0) { "Amount value must be positive" }
+            require(currency.isNotBlank() && currency.length == 3) {
+                "Currency must be a valid 3-letter ISO code"
             }
-            return PaymentSplitDto(targetAccountType, targetEntityId, amountValue, currency)
+            return PaymentSplitDto(accountType, account, amountValue, currency)
         }
 
-        /** Convert a domain PaymentSplit to its DTO representation for event serialization. */
-        fun fromDomain(split: PaymentSplit): PaymentSplitDto = PaymentSplitDto(
-            targetAccountType = AccountTypeDto.valueOf(split.targetAccountType.name),
-            targetEntityId    = split.targetEntityId,
-            amountValue       = split.amount.quantity,
-            currency          = split.amount.currency.currencyCode
-        )
+        fun fromDomain(split: PaymentSplit): PaymentSplitDto {
+            val typeStr = when(split.accountType.name) {
+                "MARKETPLACE_SELLER_BALANCE_ACCOUNT" -> "BalanceAccount"
+                "MARKETPLACE_COMMISSION_REVENUE_BALANCE_ACCOUNT" -> "Commission"
+                "MERCHANT_GROSS_CAPTURE_SUSPENSE" -> "Operator"
+                else -> split.accountType.name
+            }
+            return PaymentSplitDto(
+                accountType = typeStr,
+                account    = split.account,
+                amountValue       = split.amount.quantity,
+                currency          = split.amount.currency.currencyCode
+            )
+        }
     }
 
-    /** Rehydrate this DTO back into the domain object, e.g. inside PspResultConsumer. */
-    fun toDomain(): PaymentSplit = PaymentSplit.of(
-        targetAccountType = targetAccountType.toDomain(),
-        targetEntityId    = targetEntityId,
-        amount            = Amount.of(amountValue, Currency(currency))
-    )
+    fun toDomain(): PaymentSplit {
+        // We must map it back to AccountType
+        // using reflection or direct matching so we don't need AccountType enum here
+        val mappedAccountType = try {
+            com.dogancaglar.paymentservice.domain.model.ledger.AccountType.valueOf(
+                when(accountType) {
+                    "BalanceAccount", "BALANCE_ACCOUNT" -> "MARKETPLACE_SELLER_BALANCE_ACCOUNT"
+                    "Commission", "MARKETPLACE_COMMISSION_REVENUE_BALANCE_ACCOUNT" -> "MARKETPLACE_COMMISSION_REVENUE_BALANCE_ACCOUNT"
+                    "Operator", "MARKETPLACE_OPERATOR" -> "MERCHANT_GROSS_CAPTURE_SUSPENSE"
+                    else -> accountType
+                }
+            )
+        } catch (e: Exception) {
+            com.dogancaglar.paymentservice.domain.model.ledger.AccountType.MARKETPLACE_SELLER_BALANCE_ACCOUNT
+        }
+
+        return PaymentSplit.of(
+            accountType = mappedAccountType,
+            account    = account,
+            amount            = Amount.of(amountValue, Currency(currency))
+        )
+    }
 }

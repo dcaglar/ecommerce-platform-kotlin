@@ -2,7 +2,6 @@ package com.dogancaglar.paymentservice.infra.adapter.inbound.kafka.consumers
 
 import com.dogancaglar.common.event.EventEnvelope
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
-import com.dogancaglar.paymentservice.application.service.ProcessPspResultProcessingService
 import com.dogancaglar.common.kafka.metadata.CONSUMER_GROUPS
 import com.dogancaglar.common.kafka.metadata.Topics
 import com.dogancaglar.paymentservice.ports.outbound.EventDeduplicationPort
@@ -13,6 +12,7 @@ import org.springframework.stereotype.Component
 import com.dogancaglar.common.event.Event
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.events.CaptureConfirmed
+import com.dogancaglar.paymentservice.application.events.InternalTransferCommand
 import com.dogancaglar.paymentservice.ports.inbound.usecases.ProcessPspResultUseCase
 import org.apache.kafka.clients.consumer.Consumer
 
@@ -60,6 +60,11 @@ class PspResultConsumer(
                     is CaptureConfirmed -> {
                         logger.info("🎬 Processing CaptureConfirmed event for paymentIntentId: ${event.publicPaymentIntentId}")
                         processPspResultUseCase.processCaptureConfirmed(event)
+                    }
+
+                    is InternalTransferCommand -> {
+                        logger.info("🎬 Processing InternalTransferCommand event for target: ${event.targetAccount}")
+                        processPspResultUseCase.processInternalTransferCommand(event)
                     }
 
                     else -> {

@@ -9,7 +9,7 @@
     central DB and owned by PspResultConsumer / payment-consumers.
 
     Column mapping reflects the Epic 1 schema:
-      - merchant_account_id  replaces order_id
+      - merchant_account  replaces order_id
       - processing_model     new column (DIRECT_MERCHANT | MARKETPLACE)
       - splits_json          replaces payment_lines (stores PaymentSplit routing matrix)
 -->
@@ -20,7 +20,7 @@
         <id  property="paymentId"           column="payment_id"/>
         <result property="paymentIntentId"   column="payment_intent_id"/>
         <result property="buyerId"           column="buyer_id"/>
-        <result property="merchantAccountId" column="merchant_account_id"/>
+        <result property="merchantAccount" column="merchant_account"/>
         <result property="processingModel"   column="processing_model"/>
         <result property="totalAmountValue"  column="total_amount_value"/>
         <result property="currency"          column="currency"/>
@@ -46,7 +46,7 @@
         SELECT payment_id,
                payment_intent_id,
                buyer_id,
-               merchant_account_id,
+               merchant_account,
                processing_model,
                total_amount_value,
                currency,
@@ -64,7 +64,7 @@
         SELECT payment_id,
                payment_intent_id,
                buyer_id,
-               merchant_account_id,
+               merchant_account,
                processing_model,
                total_amount_value,
                currency,
@@ -88,7 +88,7 @@
             payment_id,
             payment_intent_id,
             buyer_id,
-            merchant_account_id,
+            merchant_account,
             processing_model,
             total_amount_value,
             captured_amount_value,
@@ -102,7 +102,7 @@
             #{paymentId},
             #{paymentIntentId},
             #{buyerId},
-            #{merchantAccountId},
+            #{merchantAccount},
             #{processingModel},
             #{totalAmountValue},
             #{capturedAmountValue},
@@ -121,7 +121,7 @@
             payment_id,
             payment_intent_id,
             buyer_id,
-            merchant_account_id,
+            merchant_account,
             processing_model,
             total_amount_value,
             captured_amount_value,
@@ -135,7 +135,7 @@
             #{paymentId},
             #{paymentIntentId},
             #{buyerId},
-            #{merchantAccountId},
+            #{merchantAccount},
             #{processingModel},
             #{totalAmountValue},
             #{capturedAmountValue},
@@ -155,7 +155,7 @@
 
     <!--
         UPDATE: only mutable state fields are included.
-        payment_id, payment_intent_id, buyer_id, merchant_account_id,
+        payment_id, payment_intent_id, buyer_id, merchant_account,
         processing_model, total_amount_value, currency, splits_json are
         immutable after creation and must NOT appear in UPDATE statements.
     -->

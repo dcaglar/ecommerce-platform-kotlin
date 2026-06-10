@@ -15,9 +15,15 @@
                 <constraints nullable="false"/>
             </column>
             <column name="parent_tx_id" type="BIGINT"/>
+            <column name="payment_intent_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+
             <column name="payment_id" type="BIGINT">
                 <constraints nullable="false"/>
             </column>
+
+
             <column name="status" type="VARCHAR(16)" defaultValue="PENDING">
                 <constraints nullable="false"/>
             </column>
@@ -139,8 +145,6 @@
             <column name="account_code"/>
         </createIndex>
     </changeSet>
-
-
 
 
 </databaseChangeLog>
