@@ -19,7 +19,7 @@ object PaymentEventMetadataCatalog {
         override val eventType = EventType.PAYMENT_AUTHORIZED
         override val clazz = PaymentAuthorized::class.java
         override val typeRef = object : TypeReference<EventEnvelope<PaymentAuthorized>>() {}
-        override val partitionKey = { evt: PaymentAuthorized -> evt.paymentIntentId }
+        override val partitionKey = { evt: PaymentAuthorized -> evt.publicPaymentIntentId }
     }
 
     // 2. Routes to CAPTURE_COMMANDS for the PaymentCaptureExecutor
@@ -28,7 +28,7 @@ object PaymentEventMetadataCatalog {
         override val eventType = EventType.CAPTURE_REQUESTED
         override val clazz = CaptureRequested::class.java
         override val typeRef = object : TypeReference<EventEnvelope<CaptureRequested>>() {}
-        override val partitionKey = { evt: CaptureRequested -> evt.paymentIntentId }
+        override val partitionKey = { evt: CaptureRequested -> evt.publicPaymentIntentId }
     }
 
     // 3. Routes to CAPTURE_SUBMITTED_ACKS (The HTTP 202)
@@ -37,7 +37,7 @@ object PaymentEventMetadataCatalog {
         override val eventType = EventType.CAPTURE_SUBMITTED
         override val clazz = CaptureSubmitted::class.java
         override val typeRef = object : TypeReference<EventEnvelope<CaptureSubmitted>>() {}
-        override val partitionKey = { evt: CaptureSubmitted -> evt.paymentIntentId }
+        override val partitionKey = { evt: CaptureSubmitted -> evt.publicPaymentIntentId }
     }
 
     // 4. Routes to shared PSP_RESULTS topic (The Adyen Webhook)
@@ -55,7 +55,7 @@ object PaymentEventMetadataCatalog {
         override val eventType = EventType.JOURNAL_ENTRIES_RECORDED
         override val clazz = JournalEntriesRecorded::class.java
         override val typeRef = object : TypeReference<EventEnvelope<JournalEntriesRecorded>>() {}
-        override val partitionKey = { evt: JournalEntriesRecorded -> evt.sellerId!! }
+        override val partitionKey = { evt: JournalEntriesRecorded -> evt.customPartitionKey!! }
     }
 
     // 5. Routes to PSP RESULT

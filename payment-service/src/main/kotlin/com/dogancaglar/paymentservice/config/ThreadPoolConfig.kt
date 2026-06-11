@@ -52,8 +52,8 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
     @Bean("createPaymentIntentExecutor")
     fun createPaymentIntentExecutor(decorator: TaskDecorator): ThreadPoolTaskExecutor =
         ThreadPoolTaskExecutor().apply {
-            corePoolSize = 80          // Align with Tomcat max-threads
-            maxPoolSize = 200
+            corePoolSize = 250          // Align with Tomcat max-threads
+            maxPoolSize = 250
             queueCapacity = 50       // Minimal queue to ensure low latency
             setThreadNamePrefix("po-psp-")
             setTaskDecorator(decorator)

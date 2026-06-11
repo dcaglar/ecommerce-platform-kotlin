@@ -7,7 +7,7 @@ import java.time.Instant
 data class JournalEntriesRecorded(
     override val paymentIntentId: String,
     override val publicPaymentIntentId: String,
-    val sellerId: String?,
+    val customPartitionKey: String?,
     override val amountValue: Long,
     override val currency: String,
     val ledgerBatchId: String,
@@ -29,11 +29,12 @@ data class JournalEntriesRecorded(
             cmd: PaymentBaseEvent,
             batchId: String,
             entries: List<JournalEntryEventData>,
+            customPartitionKey:  String,
             now: Instant
         ) = JournalEntriesRecorded(
             paymentIntentId = cmd.paymentIntentId,
             publicPaymentIntentId = cmd.publicPaymentIntentId,
-            sellerId = if (cmd is CaptureConfirmed) cmd.merchantAccount else null,
+            customPartitionKey =  customPartitionKey,
             amountValue = cmd.amountValue,
             currency = cmd.currency,
             ledgerBatchId = batchId,

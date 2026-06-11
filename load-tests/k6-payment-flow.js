@@ -22,9 +22,9 @@ const SCENARIOS = {
         executor: 'constant-arrival-rate',
         rate: 5,
         timeUnit: '1s',
-        duration: '10m',
-        preAllocatedVUs: 2,
-        maxVUs: 10,
+        duration: '2m',
+        preAllocatedVUs: 4,
+        maxVUs: 20,
         tags: { test_type: 'smoke' },
     },
     // B. Average Load Test: Simulates expected day-to-day typical user traffic (RPS)
@@ -32,12 +32,12 @@ const SCENARIOS = {
         executor: 'ramping-arrival-rate',
         startRate: 0,
         timeUnit: '1s',
-        preAllocatedVUs: 150,
+        preAllocatedVUs: 50,
         maxVUs: 1000,
         stages: [
-            { duration: '2m', target: 150 },  // Warm-up to 50 RPS
-            { duration: '5m', target: 150 },  // Maintain 50 RPS
-            { duration: '1m', target: 0 },   // Cool-down
+            { duration: '2m', target: 150 },  // Warm-up to 150 RPS
+            { duration: '15m', target: 150 },  // Maintain 150 RPS
+            { duration: '2m', target: 0 },   // Cool-down
         ],
         tags: { test_type: 'average_load' },
     },

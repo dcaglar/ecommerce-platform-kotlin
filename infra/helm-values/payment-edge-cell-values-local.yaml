@@ -6,9 +6,10 @@ autoscaling:
   minReplicas: 1
   maxReplicas: 2
   metrics:
-    - type: Resource
-      resource:
+    - type: ContainerResource
+      containerResource:
         name: cpu
+        container: payment-service
         target:
           type: Utilization
           # Increased to 85% to avoid 'panic' scaling on noise
@@ -35,10 +36,10 @@ paymentService:
     -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication -XX:MaxRAMPercentage=45 -XX:InitialRAMPercentage=45 -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
   resources:
     requests:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 1000m
+      memory: 768Mi
     limits:
-      cpu: 500m
+      cpu: 1000m
       memory: 768Mi
 edgeWorker:
   resources:
@@ -49,7 +50,7 @@ edgeWorker:
 edgeDb:
   resources:
     requests: {cpu: "150m", memory: "256Mi"}
-    limits: {cpu: "500m", memory: "512Mi"}
+    limits: {cpu: "1000m", memory: "512Mi"}
 ingress:
   enabled: true
   className: nginx
@@ -62,8 +63,8 @@ ingress:
     # 2. Increase Timeouts
     # 10s is too short when the DB is under heavy pressure.
     # Give the backend 30s to respond before Nginx kills the request.
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "5"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "10"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
     # 3. Connection Management
     # Increase keepalive to prevent the overhead of recreating TCP connections constantly.
     nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "120"

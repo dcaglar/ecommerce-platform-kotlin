@@ -86,7 +86,7 @@ mybatis:
 
 outbox-relay:
   batch-size: 500
-  poll-interval: 500
+  poll-interval: 1000
 
 app:
   datasource:

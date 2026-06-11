@@ -126,6 +126,7 @@ open class ProcessPspResultProcessingService(
             cmd = event,
             batchId = transaction.txId.value.toString(),
             entries = journalEntries.map { LedgerDomainEventEntityMapper.toLedgerEntryEventData(it) },
+            customPartitionKey = event.merchantAccount,
             now = now
         )
 
@@ -198,6 +199,7 @@ open class ProcessPspResultProcessingService(
             cmd = event,
             batchId = captureTx.txId.value.toString(),
             entries = journalEntries.map { LedgerDomainEventEntityMapper.toLedgerEntryEventData(it) },
+            customPartitionKey = event.merchantAccount,
             now = now
         )
 
@@ -285,11 +287,35 @@ open class ProcessPspResultProcessingService(
                 "Inbound routing error: JournalType [${event.journalType}] cannot be processed by processInternalTransferCommand. TxId: ${event.internalTransferTxId}"
             )
         }
+        val now = Utc.nowInstant()
+        val ledgerEvent = JournalEntriesRecorded.from(
+            cmd = event,
+            batchId = updatedTransferTx.txId.value.toString(),
+            entries = journalEntries.map { LedgerDomainEventEntityMapper.toLedgerEntryEventData(it) },
+            customPartitionKey = event.targetAccount,
+            now = now
+        )
+
+        val envelope = EventEnvelopeFactory.envelopeFor(
+            traceId = EventLogContext.getTraceId(),
+            data = ledgerEvent,
+            aggregateId = event.publicPaymentIntentId,
+            parentEventId = EventLogContext.getEventId()
+        )
+
+        val outboxEvent = OutboxEvent.createNew(
+            oeid = idGeneratorPort.generateId(),
+            eventType = envelope.eventType,
+            aggregateId = envelope.aggregateId,
+            payload = serializationPort.toJson(envelope)
+        )
+
         // 4. Persist
         centralDbTransactionalFacadePort.recordInternalTransferOperationInLedger(
             internalTransfer = updatedTransfer,
             tx = updatedTransferTx,
-            journalEntries = journalEntries
+            journalEntries = journalEntries,
+            outboxEvents = listOf(outboxEvent)
         )
     }
 

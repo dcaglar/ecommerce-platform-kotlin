@@ -60,6 +60,10 @@ class KafkaProducerConfig(
             put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 60_000)
             put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 30_000)
 
+            put(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, 5_242_880) // 5MB (Default is 1MB)
+            put(ProducerConfig.BUFFER_MEMORY_CONFIG, 67_108_864) // 64MB (Default is 32MB)
+            put(ProducerConfig.LINGER_MS_CONFIG, 5)
+
             // compression
             put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "zstd")
         }
