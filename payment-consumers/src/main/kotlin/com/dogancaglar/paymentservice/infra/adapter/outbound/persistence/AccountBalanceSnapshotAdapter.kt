@@ -2,7 +2,8 @@ package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence
 
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.common.db.entity.AccountBalanceEntity
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.AccountBalanceMapper
+import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.snapshotmapper.AccountBalanceWriteMapper
+import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.AccountBalanceReadMapper
 import com.dogancaglar.paymentservice.domain.model.balance.AccountBalanceSnapshot
 import com.dogancaglar.paymentservice.ports.outbound.AccountBalanceSnapshotPort
 import org.springframework.stereotype.Repository
@@ -10,11 +11,12 @@ import org.springframework.stereotype.Repository
 
 @Repository
 class AccountBalanceSnapshotAdapter(
-    private val accountBalanceMapper: AccountBalanceMapper
+    private val readMapper: AccountBalanceReadMapper,
+    private val writeMapper: AccountBalanceWriteMapper
 ) : AccountBalanceSnapshotPort {
     
     override fun getSnapshot(accountCode: String): AccountBalanceSnapshot? {
-        val entity = accountBalanceMapper.findByAccountCode(accountCode) ?: return null
+        val entity = readMapper.findByAccountCode(accountCode) ?: return null
         return toSnapshot(entity)
     }
     
@@ -26,16 +28,16 @@ class AccountBalanceSnapshotAdapter(
             lastSnapshotAt = Utc.toInstant(snapshot.lastSnapshotAt),
             updatedAt = Utc.toInstant(snapshot.updatedAt)
         )
-        accountBalanceMapper.insertOrUpdateSnapshot(entity)
+        writeMapper.insertOrUpdateSnapshot(entity)
     }
     
     override fun findAllSnapshots(): List<AccountBalanceSnapshot> {
-        return accountBalanceMapper.findAll()
+        return readMapper.findAll()
             .map { toSnapshot(it) }
     }
 
     override fun findByAccountCodes(accountCodes: Set<String>): List<AccountBalanceSnapshot> {
-        return accountBalanceMapper.findByAccountCodes(accountCodes)
+        return readMapper.findByAccountCodes(accountCodes)
             .map { toSnapshot(it) }
             .toList()
     }

@@ -38,6 +38,12 @@ class LocalOutboxStoreAndForwardJob(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
+    init {
+        io.micrometer.core.instrument.Gauge.builder("local_outbox_backlog_size", this) {
+            localOutboxStoreAndForwardPort.countNew().toDouble()
+        }.register(meterRegistry)
+    }
+
     @Scheduled(initialDelay = 30000, fixedDelay = 5000)
     fun dispatchBatches() {
         repeat(threadCount) { workerIdx ->
@@ -108,6 +114,7 @@ class LocalOutboxStoreAndForwardJob(
 
         val events = claimBatch(batchSize, workerId)
         if (events.isEmpty()) {
+            centralOutboxRepository.updateWatermark(appInstanceId, Utc.nowInstant())
             sample.stop(meterRegistry.timer("outbox_dispatcher_duration"))
             return
         }

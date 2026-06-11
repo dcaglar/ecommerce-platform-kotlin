@@ -10,7 +10,7 @@ import com.dogancaglar.common.db.entity.EdgeWatermarkEntity
 interface CentralOutboxRelayMapper {
     fun findEligible(tSafe: Instant, batchSize: Int): List<OutboxEventEntity>
     fun countEligible(tSafe: Instant): Long
-    fun markDispatched(oeid: Long)
+    fun markDispatched(@org.apache.ibatis.annotations.Param("oeid") oeid: Long, @org.apache.ibatis.annotations.Param("createdAt") createdAt: Instant)
     
     // Edge Watermark operations (consolidated into outbox mapper)
     fun computeTSafe(): Instant?

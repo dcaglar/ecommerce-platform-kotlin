@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 8081
 
 spring:
   application:
@@ -25,7 +25,7 @@ mybatis:
 
 management:
   server:
-    port: 9000
+    port: 9001
   health:
     probes:
       enabled: true
@@ -56,6 +56,7 @@ management:
       outbox_dispatch_failed_total: true
       outbox_event_backlog: true
       outbox_dispatcher_duration: true
+      local_outbox_backlog_size: true
     distribution:
       percentiles-histogram:
         outbox_dispatcher_duration: true
@@ -66,9 +67,9 @@ management:
         enabled: true
 
 outbox-dispatcher:
-  thread-count: 2
-  batch-size: 300
-  pool-size: 2
+  thread-count: 4
+  batch-size: 500
+  pool-size: 4
 
 db:
   outbox:
@@ -84,10 +85,10 @@ app:
       username: ${SPRING_DATASOURCE_EDGE_USERNAME}
       password: ${SPRING_DATASOURCE_EDGE_PASSWORD}
       pool-name: edge-outbox-pool
-      maximum-pool-size: 6
+      maximum-pool-size: 20
       minimum-idle: 3
-      connection-timeout: 1000
-      validation-timeout: 1000
+      connection-timeout: 15000
+      validation-timeout: 15000
       idle-timeout: 600000
       max-lifetime: 1800000
     maintenance:
@@ -98,8 +99,8 @@ app:
       pool-name: edge-maint-pool
       maximum-pool-size: 1
       minimum-idle: 0
-      connection-timeout: 1500
-      validation-timeout: 1500
+      connection-timeout: 15000
+      validation-timeout: 15000
       idle-timeout: 60000
       max-lifetime: 1800000
     central:
@@ -108,9 +109,9 @@ app:
       username: ${SPRING_DATASOURCE_CENTRAL_USERNAME}
       password: ${SPRING_DATASOURCE_CENTRAL_PASSWORD}
       pool-name: central-writer-pool
-      maximum-pool-size: 6
+      maximum-pool-size: 20
       minimum-idle: 3
-      connection-timeout: 1000
-      validation-timeout: 1000
+      connection-timeout: 15000
+      validation-timeout: 15000
       idle-timeout: 600000
       max-lifetime: 1800000

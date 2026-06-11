@@ -5,7 +5,9 @@ paymentService:
     pullPolicy: Always
 
 serviceMonitor:
-  enabled: false
+  enabled: true
+  labels:
+    release: prometheus-stack
 
 
 runPrivilegeGrantJob: true

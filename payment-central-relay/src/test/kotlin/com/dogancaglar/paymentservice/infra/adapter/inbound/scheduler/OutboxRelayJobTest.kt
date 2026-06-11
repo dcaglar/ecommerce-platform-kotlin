@@ -63,15 +63,17 @@ class OutboxRelayJobTest {
     }
 
     @Test
-    fun `should skip poll if tSafe is null`() {
+    fun `should default tSafe to now if null and continue polling`() {
         // Given
         every { centralOutboxRepository.computeTSafe() } returns null
+        every { centralOutboxRepository.findEligible(any(), any()) } returns emptyList()
 
         // When
         outboxRelayJob.poll()
 
         // Then
-        verify(exactly = 0) { centralOutboxRepository.findEligible(any(), any()) }
+        verify(exactly = 1) { centralOutboxRepository.findEligible(any(), any()) }
+        verify(exactly = 0) { executor.execute(any()) }
         verify(exactly = 0) { executor.execute(any()) }
     }
 
@@ -162,9 +164,9 @@ class OutboxRelayJobTest {
         verify(exactly = 1) { kafkaPublisher.publishAsync(envelope3) }
 
         // Verify that centralOutboxRepository.markDispatched was called for all events upon successful publish
-        verify(exactly = 1) { centralOutboxRepository.markDispatched(1L) }
-        verify(exactly = 1) { centralOutboxRepository.markDispatched(2L) }
-        verify(exactly = 1) { centralOutboxRepository.markDispatched(3L) }
+        verify(exactly = 1) { centralOutboxRepository.markDispatched(1L, any()) }
+        verify(exactly = 1) { centralOutboxRepository.markDispatched(2L, any()) }
+        verify(exactly = 1) { centralOutboxRepository.markDispatched(3L, any()) }
     }
 
     @Test
@@ -202,7 +204,7 @@ class OutboxRelayJobTest {
 
         // Then
         verify(exactly = 1) { kafkaPublisher.publishAsync(envelope) }
-        verify(exactly = 0) { centralOutboxRepository.markDispatched(4L) }
+        verify(exactly = 0) { centralOutboxRepository.markDispatched(4L, any()) }
     }
 
     @Test
@@ -251,7 +253,7 @@ class OutboxRelayJobTest {
         // Should publish event2 successfully
         verify(exactly = 1) { kafkaPublisher.publishAsync(envelope2) }
         // markDispatched is only called for event2
-        verify(exactly = 0) { centralOutboxRepository.markDispatched(5L) }
-        verify(exactly = 1) { centralOutboxRepository.markDispatched(6L) }
+        verify(exactly = 0) { centralOutboxRepository.markDispatched(5L, any()) }
+        verify(exactly = 1) { centralOutboxRepository.markDispatched(6L, any()) }
     }
 }

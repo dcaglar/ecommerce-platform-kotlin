@@ -129,6 +129,29 @@ spec:
                   key: EDGE_DB_PAYMENT_SERVICE_PASSWORD
 
       containers:
+        # 5. POSTGRES EXPORTER SIDECAR
+        - name: postgres-exporter
+          image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+          ports:
+            - name: metrics-db
+              containerPort: 9187
+              protocol: TCP
+          env:
+            - name: EDGE_DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_NAME
+            - name: DATA_SOURCE_URI
+              value: "localhost:5432/$(EDGE_DB_NAME)?sslmode=disable"
+            - name: DATA_SOURCE_USER
+              value: "postgres"
+            - name: DATA_SOURCE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_POSTGRES_PASSWORD
+
         # 1. THE WEB API (Accepts Traffic)
         - name: payment-service
           image: "{{ .Values.paymentService.image.repository }}:{{ .Values.paymentService.image.tag }}"
@@ -200,6 +223,13 @@ spec:
         - name: payment-edge-workers
           image: "{{ .Values.edgeWorker.image.repository }}:{{ .Values.edgeWorker.image.tag }}"
           imagePullPolicy: {{ .Values.edgeWorker.image.pullPolicy }}
+          ports:
+            - name: http-worker
+              containerPort: 8081
+              protocol: TCP
+            - name: mgmt-worker
+              containerPort: 9001
+              protocol: TCP
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "local"

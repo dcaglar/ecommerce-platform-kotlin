@@ -18,11 +18,16 @@
     </resultMap>
 
     <select id="findEligible" resultMap="CentralOutboxResultMap">
-        SELECT * FROM outbox_event
-        WHERE status = 'NEW'
-          AND created_at &lt;= #{tSafe, typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
-        ORDER BY created_at
-        LIMIT #{batchSize}
+        UPDATE outbox_event
+        SET status = 'PROCESSING', updated_at = now() AT TIME ZONE 'UTC'
+        WHERE (oeid, created_at) IN (
+            SELECT oeid, created_at FROM outbox_event
+            WHERE status = 'NEW'
+              AND created_at &lt;= #{tSafe, typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
+            ORDER BY created_at
+            LIMIT #{batchSize}
+        )
+        RETURNING *;
     </select>
 
     <select id="countEligible" resultType="long">
@@ -34,7 +39,7 @@
     <update id="markDispatched">
         UPDATE outbox_event
         SET status = 'SENT', updated_at = now() AT TIME ZONE 'UTC'
-        WHERE oeid = #{oeid}
+        WHERE oeid = #{oeid} AND created_at = #{createdAt, typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
     </update>
 
     <!-- Edge Watermark Operations -->

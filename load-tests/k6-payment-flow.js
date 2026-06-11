@@ -8,60 +8,87 @@ const endpoints = JSON.parse(open('../infra/endpoints.json'));
 
 // --- 2. Multi-Profile Workload Scenarios ---
 const SCENARIOS = {
+     single: {
+        executor: 'constant-arrival-rate',
+        rate: 1,
+        timeUnit: '1s',
+        duration: '10s',
+        preAllocatedVUs: 2,
+        maxVUs: 10,
+        tags: { test_type: 'single' },
+    },
     // A. Smoke Test: Minimal load for validating that scripts and APIs work correctly
     smoke: {
-        executor: 'constant-vus',
-        vus: 1,
+        executor: 'constant-arrival-rate',
+        rate: 5,
+        timeUnit: '1s',
         duration: '10m',
+        preAllocatedVUs: 2,
+        maxVUs: 10,
         tags: { test_type: 'smoke' },
     },
-    // B. Average Load Test: Simulates expected day-to-day typical user traffic
+    // B. Average Load Test: Simulates expected day-to-day typical user traffic (RPS)
     average: {
-        executor: 'ramping-vus',
-        startVUs: 0,
+        executor: 'ramping-arrival-rate',
+        startRate: 0,
+        timeUnit: '1s',
+        preAllocatedVUs: 150,
+        maxVUs: 1000,
         stages: [
-            { duration: '2m', target: 50 },  // Warm-up to 20 users
-            { duration: '5m', target: 50 },  // Maintain typical active traffic
+            { duration: '2m', target: 150 },  // Warm-up to 50 RPS
+            { duration: '5m', target: 150 },  // Maintain 50 RPS
             { duration: '1m', target: 0 },   // Cool-down
         ],
         tags: { test_type: 'average_load' },
     },
-    // C. Stress Test: Push system past average limits to see how resources handle pressure
+    // C. Stress Test: Push system past average limits to see how resources handle pressure (RPS)
     stress: {
-        executor: 'ramping-vus',
-        startVUs: 0,
+        executor: 'ramping-arrival-rate',
+        startRate: 0,
+        timeUnit: '1s',
+        preAllocatedVUs: 100,
+        maxVUs: 3000,
         stages: [
-            { duration: '3m', target: 100 }, // Ramps up to a high load
-            { duration: '10m', target: 100 },// Maintains sustained high load
+            { duration: '3m', target: 100 }, // Ramps up to 100 RPS
+            { duration: '10m', target: 100 },// Maintains sustained 100 RPS
             { duration: '2m', target: 0 },   // Cool-down
         ],
         tags: { test_type: 'stress' },
     },
-    // D. Soak Test: Continuous moderate load over a long time to check memory leaks & slow degradation
+    // D. Soak Test: Continuous moderate load over a long time to check memory leaks & slow degradation (RPS)
     soak: {
-        executor: 'constant-vus',
-        vus: 30,
-        duration: '1h',                     // Long running execution
+        executor: 'constant-arrival-rate',
+        rate: 30,
+        timeUnit: '1s',
+        duration: '1h',
+        preAllocatedVUs: 50,
+        maxVUs: 1000,
         tags: { test_type: 'soak' },
     },
-    // E. Spike Test: Sudden extreme burst of massive traffic to test caching, buffering, and fast autoscaling
+    // E. Spike Test: Sudden extreme burst of massive traffic to test caching, buffering, and fast autoscaling (RPS)
     spike: {
-        executor: 'ramping-vus',
-        startVUs: 0,
+        executor: 'ramping-arrival-rate',
+        startRate: 0,
+        timeUnit: '1s',
+        preAllocatedVUs: 50,
+        maxVUs: 5000,
         stages: [
-            { duration: '10s', target: 5 },   // Normal baseline
-            { duration: '10s', target: 400 }, // Sudden immediate spike to 400 VUs!
-            { duration: '3m', target: 400 },  // Hold peak
+            { duration: '10s', target: 5 },   // Normal baseline 5 RPS
+            { duration: '10s', target: 400 }, // Sudden immediate spike to 400 RPS!
+            { duration: '3m', target: 400 },  // Hold peak 400 RPS
             { duration: '1m', target: 0 },    // Ramp down
         ],
         tags: { test_type: 'spike' },
     },
-    // F. Breakpoint Test: Step-wise steady ramp to identify the absolute limits of server failure
+    // F. Breakpoint Test: Step-wise steady ramp to identify the absolute limits of server failure (RPS)
     breakpoint: {
-        executor: 'ramping-vus',
-        startVUs: 0,
+        executor: 'ramping-arrival-rate',
+        startRate: 0,
+        timeUnit: '1s',
+        preAllocatedVUs: 50,
+        maxVUs: 10000,
         stages: [
-            { duration: '15m', target: 1000 }, // Slowly ramp up to 1000 users until failure
+            { duration: '15m', target: 1000 }, // Slowly ramp up to 1000 RPS until failure
         ],
         tags: { test_type: 'breakpoint' },
     }
@@ -195,7 +222,7 @@ export default function () {
         const paymentIntentId = createRes.json().paymentIntentId;
 
         // Realistic human pacing delay
-        sleep(1.5);
+        sleep(0.2);
 
         const authUrl = `${baseUrl}/api/v1/payments/${paymentIntentId}/authorize`;
         const authPayload = JSON.stringify({

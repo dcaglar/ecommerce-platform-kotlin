@@ -15,8 +15,8 @@ spring:
     hikari:
       maximum-pool-size: 5
       minimum-idle: 1
-      connection-timeout: 1500
-      validation-timeout: 1000
+      connection-timeout: 15000
+      validation-timeout: 15000
       idle-timeout: 600000
       max-lifetime: 1740000
       keepalive-time: 300000
@@ -66,6 +66,8 @@ management:
       kafka.producer.io.wait.time.total: true
       kafka.producer.bufferpool.wait.ratio: true
       kafka.producer.bufferpool.wait.time.total: true
+      central_outbox_backlog_size: true
+      redis_retry_batch_size: true
   data:
     redis:
       url: ${SPRING_DATA_REDIS_URL:redis://localhost:6379}
@@ -84,7 +86,7 @@ mybatis:
 
 outbox-relay:
   batch-size: 500
-  poll-interval: 5000
+  poll-interval: 500
 
 app:
   datasource:
@@ -96,7 +98,7 @@ app:
       pool-name: central-maint-pool
       maximum-pool-size: 1
       minimum-idle: 0
-      connection-timeout: 1500
-      validation-timeout: 1500
+      connection-timeout: 15000
+      validation-timeout: 15000
       idle-timeout: 60000
       max-lifetime: 1800000
