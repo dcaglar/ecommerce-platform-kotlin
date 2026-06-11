@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.snapshotmapper.AccountBalanceWriteMapper">
+
+    <!-- Upsert that only advances if watermark increases -->
+    <insert id="insertOrUpdateSnapshot">
+        INSERT INTO account_balances
+        (account_code, balance, last_applied_entry_id, last_snapshot_at, updated_at)
+        VALUES
+        (#{accountCode}, #{balance}, #{lastAppliedEntryId}, #{lastSnapshotAt}, #{updatedAt})
+        ON CONFLICT (account_code) DO UPDATE
+        SET
+        balance = EXCLUDED.balance,
+        last_applied_entry_id = EXCLUDED.last_applied_entry_id,
+        last_snapshot_at = EXCLUDED.last_snapshot_at,
+        updated_at = EXCLUDED.updated_at
+        WHERE account_balances.last_applied_entry_id  &lt;  EXCLUDED.last_applied_entry_id
+    </insert>
+
+</mapper>
+

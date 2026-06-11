@@ -255,7 +255,113 @@ This document contains C4 model diagrams for the payment service system at diffe
 The System Context diagram shows the payment service system in its environment, illustrating users and external systems it interacts with.
 
 ```mermaid
-zz
+graph TD
+    %% Styles
+    classDef edgeCell fill:#fff0f0,stroke:#ffbaba,stroke-width:2px,color:#333
+    classDef internalHost fill:#f0f8ff,stroke:#baddff,stroke-width:2px,color:#333
+    classDef db fill:#e2f0d9,stroke:#70ad47,stroke-width:2px,color:#333
+    classDef service fill:#fff2cc,stroke:#ffc000,stroke-width:2px,color:#333
+    classDef job fill:#e1dfdd,stroke:#a6a6a6,stroke-width:2px,color:#333
+    classDef topic fill:#e8d1ff,stroke:#b160ff,stroke-width:2px,color:#333
+    classDef consumer fill:#ffe6cc,stroke:#f4b183,stroke-width:2px,color:#333
+
+    subgraph ExternalLayer["EXTERNAL HOSTS (Edge Layer)"]
+        direction LR
+        
+        subgraph Edge1["Edge Cell 1"]
+            direction TB
+            API1["Payment Acceptance Service"]
+            IdemDB1[("Idempotency DB<br/>IdempotencyRecord")]
+            EdgeDB1[("Edge Local DB<br/>PaymentIntent<br/>OutboxEvents")]
+            Fwd1[["LocalOutboxStoreAndForwardJob"]]
+            PSP_Edge1["External PSP API<br/>(Synchronous Auth)"]
+            
+            %% Flow Splits inside Edge
+            API1 -.->|1. Idempotency Check| IdemDB1
+            API1 ===>|2a. Synchronous Auth Pass<br/>Shopper Present| PSP_Edge1
+            PSP_Edge1 ===>|2b. Persist Auth Response to local Outbox  as  EventEnvelope &lt;PaymentAuthorized&gt; | EdgeDB1
+            API1 -->|3.  Capture / Refund received from merchant <br/>Persisted to Outbox as  EventEnvelope &lt;CaptureRequested&gt; in edge db  without any psp interaction| EdgeDB1
+            EdgeDB1 --> Fwd1
+        end
+
+        subgraph Edge2["Edge Cell 2"]
+            direction TB
+            API2["Payment Acceptance Service"]
+            IdemDB2[("Idempotency DB<br/>IdempotencyRecord")]
+            EdgeDB2[("Edge Local DB<br/>PaymentIntent<br/>OutboxEvents")]
+            Fwd2[["LocalOutboxStoreAndForwardJob"]]
+            PSP_Edge2["External PSP API<br/>(Synchronous Auth)"]
+            
+            %% Flow Splits inside Edge
+            API2 -.->|1. Idempotency Check| IdemDB2
+            API2 ===>|2a. Synchronous Auth Pass<br/>Shopper Present| PSP_Edge2
+            PSP_Edge2 ===>|2b. Persist Auth Response to local Outbox  as  EventEnvelope &lt;PaymentAuthorized&gt; | EdgeDB2
+            API2 -->|3.  Capture / Refund received from merchant <br/>Persisted to  local Outbox as  EventEnvelope &lt;CaptureRequested&gt; in edge db  without any psp interaction| EdgeDB2
+            EdgeDB2 --> Fwd2
+        end
+    end
+
+    subgraph InternalLayer["INTERNAL HOST (Central Cluster)"]
+        direction TB
+        
+        CentralDB[("Central DB<br/>OutboxEvent, Payment, PaymentTx,<br/>LedgerEntry, JournalEntry, Postings")]
+        
+        Relay[["OutboxRelayJob<br/>(payment-central-relay)"]]
+        
+        subgraph Topics["Kafka Topics"]
+            direction LR
+            CAPTURE_COMMANDS_TOPIC>"gateway.capture.commands<br/>(Accepted: EventEnvelope &lt;CaptureRequested&gt;)"]
+            JOURNAL_ENTRIES_RECORDED_TOPIC>"journal.entries.recorded<br/>(Accepted: EventEnvelope &lt;JournalEntriesRecorded&gt;)"]
+            CAPTURE_SUBMITTED_ACKS_TOPIC>"gateway.capture.submitted<br/>(Accepted: EventEnvelope &lt;CaptureSubmitted&gt;)"]
+            PSP_RESULTS_TOPIC>"payment.psp.results<br/>(Accepted: EventEnvelope &lt;PaymentAuthorized&gt;, &lt;CaptureConfirmed&gt;, &lt;InternalTransferCommand&gt;)"]
+        end
+        
+        CentralDB -->|Polls OutboxEvents| Relay
+        
+        Relay -->|EventEnvelope &lt;CaptureRequested&gt;| CAPTURE_COMMANDS_TOPIC
+        Relay -->|EventEnvelope &lt;CaptureSubmitted&gt;| CAPTURE_SUBMITTED_ACKS_TOPIC
+        Relay -->|EventEnvelope &lt;PaymentAuthorized&gt;| PSP_RESULTS_TOPIC
+        Relay -->|EventEnvelope &lt;CaptureConfirmed&gt;| PSP_RESULTS_TOPIC
+        Relay -->|EventEnvelope &lt;JournalEntriesRecorded&gt;| JOURNAL_ENTRIES_RECORDED_TOPIC
+        Relay -->|EventEnvelope &lt;InternalTransferCommand&gt;| PSP_RESULTS_TOPIC
+
+        
+        subgraph Consumers["Payment Consumers (payment-consumers)"]
+            direction TB
+            CaptureCommandExecutor("CaptureCommandExecutor<br/> Consumes EventEnvelope &lt;CaptureRequested&gt;<br/>Calls psp.capture() async endpoint<br/>Stores OutboxEvent EventEnvelope&lt;CaptureSubmitted&gt;")
+            GrossCaptureAllocationConsumer("GrossCaptureAllocationConsumer<br/> Consumes EventEnvelope &lt;JournalEntriesRecorded&gt;<br/>Checks for CAPTURE entries, and creates an OutboxEvent EventEnvelope &lt;InternalTransferCommand&gt; for splits")
+            AccountBalanceConsumer("AccountBalanceConsumer<br/> Consumes EventEnvelope &lt;JournalEntriesRecorded&gt;<br/>Updates account balances in Redis caching layer")
+            CapturePspPerformedConsumer("CapturePspPerformedConsumer<br/> Consumes EventEnvelope &lt;CaptureSubmitted&gt;")
+     
+            PspResultConsumer("PspResultConsumer<br/> Consumes &lt;PaymentAuthorized&gt;, &lt;CaptureConfirmed&gt; and &lt;InternalTransferCommand&gt;<br/><b>if &lt;PaymentAuthorized&gt;</b> -> creates Payment, AuthTx, JournalEntry (AuthHold), appends &lt;JournalEntriesRecorded&gt;<br/><b>if &lt;CaptureConfirmed&gt;</b> -> updates to CAPTURED, updates CaptureTx, JournalEntry (Capture), appends &lt;JournalEntriesRecorded&gt;<br/><b>if &lt;InternalTransferCommand&gt;</b> -> updates InternalTransferTx, JournalEntry (InternalTransfer)")
+        end
+        
+        CAPTURE_COMMANDS_TOPIC --> CaptureCommandExecutor
+        CAPTURE_SUBMITTED_ACKS_TOPIC --> CapturePspPerformedConsumer
+        JOURNAL_ENTRIES_RECORDED_TOPIC --> GrossCaptureAllocationConsumer 
+        JOURNAL_ENTRIES_RECORDED_TOPIC --> AccountBalanceConsumer 
+        PSP_RESULTS_TOPIC --> PspResultConsumer
+        
+        CaptureCommandExecutor -->|Calls external async psp capture, Writes Outbox EventEnvelope &lt;CaptureSubmitted&gt; | CentralDB
+        GrossCaptureAllocationConsumer -->|Writes Outbox EventEnvelope &lt;InternalTransferCommand&gt;| CentralDB
+        AccountBalanceConsumer -.->|Updates Cache| CentralDB
+        PspResultConsumer -->|Upserts Txs & JournalEntries, appends Outbox EventEnvelope &lt;JournalEntriesRecorded&gt; | CentralDB
+        CapturePspPerformedConsumer -->|Writes Result State| CentralDB
+
+    end
+
+    %% Network Links
+    Fwd1 ===>|Forwards OutboxEvents Asynchronously| CentralDB
+    Fwd2 ===>|Forwards OutboxEvents Asynchronously| CentralDB
+
+    %% Assign Classes
+    class Edge1,Edge2 edgeCell
+    class InternalLayer internalHost
+    class IdemDB1,EdgeDB1,IdemDB2,EdgeDB2,CentralDB db
+    class API1,API2 service
+    class Fwd1,Fwd2,Relay job
+    class CapTopic,TransTopic,ResTopic topic
+    class CapCons,TransCons,ResCons consumer
 ```
 **Capture and Refund Request(Modifications )**  are  asychronous(opposite to the syncronous authorization operation) operations,so we simply receive the capture/refund request from merchant and simply just persist an Outbox<EventEnvelope<CaptureRequest>> in the local edge-db
 
@@ -726,12 +832,12 @@ The following catalog defines every event and command passing through Kafka, inc
 
 | No. | Logical Event / Command | Event Type String (`eventType`) | Envelope Payload Class | Kafka Topic | Publisher Module & Class | Consumer Module & Class | Consumer Group ID | Container Factory Bean |
 |---|---|---|---|---|---|---|---|---|
-| **1** | **Payment Authorized Event** | `"payment_authorized"` | `EventEnvelope<PaymentAuthorized>` | `psp-result-queue` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`PspResultConsumer` | `psp-result-consumer-group` | `psp-result-factory` |
-| **2** | **Capture Received Event** | `"capture_received"` | `EventEnvelope<CaptureReceived>` | `capture-execution-queue` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`CaptureCommandExecutor` | `capture-command-executor-group` | (Default String Factory) |
-| **3** | **External Async Capture to PSP Performed** | `"external_async_capture_to_psp_performed"` | `EventEnvelope<ExternalAsyncCaptureToPspPerformed>` | `psp-result-queue` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`CapturePspPerformedConsumer` | `capture-psp-performed-group` | (Default String Factory) |
-| **4** | **Capture Successful Event** | `"capture_successful"` | `EventEnvelope<CaptureSuccessful>` | `psp-result-queue` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`PspResultConsumer` | `psp-result-consumer-group` | `psp-result-factory` |
-| **5** | **Internal Transfer Request** | `"internal_transfer_request"` | `EventEnvelope<InternalTransferRequest>` | `internal-transfer-queue` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`InternalTransferConsumer` | `internal-transfer-consumer-group` | (Default String Factory) |
-| **6** | **Ledger Entries Recorded Event** | `"ledger_entries_recorded"` | `EventEnvelope<LedgerEntriesRecorded>` | `ledger_entries_recorded_topic` | `payment-consumers`<br/>`PspResultProcessingService` | `payment-consumers`<br/>`AccountBalanceConsumer` | `account-balance-consumer-group` | `ledger_entries_recorded_topic-factory` |
+| **1** | **Payment Authorized Event** | `"payment_authorized"` | `EventEnvelope<PaymentAuthorized>` | `payment.psp.results` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`PspResultConsumer` | `payment-core.psp-result-consumer` | `payment-core.psp-result-consumer-factory` |
+| **2** | **Capture Requested Event** | `"capture_requested"` | `EventEnvelope<CaptureRequested>` | `gateway.capture.commands` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`CaptureCommandExecutor` | `gateway-workers.capture-command-executor` | `gateway-workers.capture-command-executor-factory` |
+| **3** | **Capture Submitted Event** | `"capture_submitted"` | `EventEnvelope<CaptureSubmitted>` | `gateway.capture.submitted` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`CapturePspPerformedConsumer` | `payment-core.capture-submitted` | `payment-core.capture-submitted-factory` |
+| **4** | **Capture Confirmed Event** | `"capture_confirmed"` | `EventEnvelope<CaptureConfirmed>` | `payment.psp.results` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`PspResultConsumer` | `payment-core.psp-result-consumer` | `payment-core.psp-result-consumer-factory` |
+| **5** | **Internal Transfer Command** | `"internal_transfer_command"` | `EventEnvelope<InternalTransferCommand>` | `payment.psp.results` | `payment-central-relay`<br/>`OutboxRelayJob` | `payment-consumers`<br/>`PspResultConsumer` | `payment-core.psp-result-consumer` | `payment-core.psp-result-consumer-factory` |
+| **6** | **Journal Entries Recorded** | `"journal_entries_recorded"` | `EventEnvelope<JournalEntriesRecorded>` | `journal.entries.recorded` | `payment-consumers`<br/>`ProcessPspResultUseCase` | `payment-consumers`<br/>`GrossCaptureAllocationConsumer` &<br/>`AccountBalanceConsumer` | `payment.gross-capture-allocation-consumer-group`<br/>`ledger-engine.account-balance-consumer` | `...-factory` |
 
 ---
 

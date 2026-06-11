@@ -29,5 +29,5 @@ echo "⏳ Waiting for Exporter Pod..."
 kubectl -n "$NAMESPACE" rollout status deploy/"$RELEASE_NAME"-prometheus-postgres-exporter --timeout=3m
 
 echo "✅ Postgres Exporter is up and running."
-echo "   Target DB: payment-db-postgresql.payment.svc"
+echo "   Target DB: central-db-postgresql.payment.svc"
 echo "   Metrics URL: http://localhost:9187/metrics (via port-forward)"

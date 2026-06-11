@@ -9,6 +9,9 @@ import org.springframework.stereotype.Component
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
+import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.MeterRegistry
+
 /**
  * Redis adapter for account balance delta cache.
  * Uses HINCRBY for atomic delta updates with TTL for automatic cleanup.
@@ -17,12 +20,21 @@ import java.util.concurrent.TimeUnit
 class AccountBalanceRedisCacheAdapter(
     private val redisTemplate: StringRedisTemplate,
     @Value("\${account-balance.delta-ttl-seconds:300}") // 5 minutes
-    private val deltaTtlSeconds: Long
+    private val deltaTtlSeconds: Long,
+    meterRegistry: MeterRegistry
 ) : AccountBalanceCachePort {
 
     private val logger = LoggerFactory.getLogger(javaClass)
     private val accPrefix = "balance:acc:"
     private val dirtySet = "balances:dirty"
+
+    init {
+        Gauge.builder("redis_dirty_accounts_size") {
+            redisTemplate.opsForSet().size(dirtySet)?.toDouble() ?: 0.0
+        }
+            .description("Number of accounts pending database snapshot flush")
+            .register(meterRegistry)
+    }
 
     private val addDeltaScript = """
         local key = KEYS[1]

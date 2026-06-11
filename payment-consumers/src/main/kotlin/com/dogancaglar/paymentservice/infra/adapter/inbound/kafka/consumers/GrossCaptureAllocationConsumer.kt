@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component
 /**
  * GrossCaptureAllocationConsumer
  *
- * Listens for finalized CAPTURE events and handles the critical task of draining
+ * Listens for finalized JournalEntriesRecorded events and handles the critical task of draining
  * the transient MERCHANT_GROSS_CAPTURE_SUSPENSE pool down to exactly €0.
  * Routes funds to direct merchant revenue or splits them across sub-sellers and commissions.
  */

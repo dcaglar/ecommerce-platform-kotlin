@@ -105,7 +105,7 @@ primary:
       cpu: 200m
       memory: 512Mi
     limits:
-      cpu: 800m
+      cpu: 500m
       memory: 768Mi
 
   extendedConfiguration: |

@@ -29,19 +29,38 @@ spring:
   jackson:
     time-zone: UTC
   datasource:
-    url: ${SPRING_DATASOURCE_CENTRAL_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
-    hikari:
-      pool-name: central-pool
-      maximum-pool-size: 5
-      minimum-idle: 1
-      connection-timeout: 1500
-      validation-timeout: 1000
-      idle-timeout: 600000
-      max-lifetime: 1740000
-      keepalive-time: 300000
-      leak-detection-threshold: 60000
+    payment-consumers:
+      url: ${SPRING_DATASOURCE_URL}
+      username: ${SPRING_DATASOURCE_USERNAME}
+      password: ${SPRING_DATASOURCE_PASSWORD}
+      driver-class-name: org.postgresql.Driver
+      type: com.zaxxer.hikari.HikariDataSource
+      hikari:
+        pool-name: PaymentConsumerHikariPool
+        maximum-pool-size: 20
+        minimum-idle: 1
+        connection-timeout: 15000
+        validation-timeout: 15000
+        idle-timeout: 600000
+        max-lifetime: 1740000
+        keepalive-time: 300000
+        leak-detection-threshold: 60000
+    account-snapshot-job:
+      url: ${SPRING_DATASOURCE_URL}
+      username: ${SPRING_DATASOURCE_USERNAME}
+      password: ${SPRING_DATASOURCE_PASSWORD}
+      driver-class-name: org.postgresql.Driver
+      type: com.zaxxer.hikari.HikariDataSource
+      hikari:
+        pool-name: AccountSnapshotHikariPool
+        maximum-pool-size: 5
+        minimum-idle: 1
+        connection-timeout: 15000
+        validation-timeout: 15000
+        idle-timeout: 600000
+        max-lifetime: 1740000
+        keepalive-time: 300000
+        leak-detection-threshold: 60000
   kafka:
     consumer:
       isolation-level: read_committed
@@ -105,6 +124,7 @@ management:
       kafka.consumer.fetch.manager.fetch.latency: true
       kafka.consumer.io.time: true
       kafka.consumer.records.lag.max: true
+      redis_dirty_accounts_size: true
       kafka.consumer.fetch.latency.avg: true
       kafka.consumer.fetch.latency.max: true
       kafka.producer.batch.size.avg: true

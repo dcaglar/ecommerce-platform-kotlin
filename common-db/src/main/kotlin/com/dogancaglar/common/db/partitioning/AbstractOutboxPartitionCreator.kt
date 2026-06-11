@@ -70,7 +70,7 @@ abstract class AbstractOutboxPartitionCreator(
 
                 -- Only prune partitions strictly before current window
                 IF part_end_time <= curr_window_start THEN
-                    EXECUTE format('SELECT count(*) FROM %I WHERE status = %L', part.partition_name, 'NEW') INTO new_count;
+                    EXECUTE format('SELECT count(*) FROM %I WHERE status IN (%L, %L)', part.partition_name, 'NEW', 'PROCESSING') INTO new_count;
                     IF new_count = 0 THEN
                         RAISE NOTICE 'Dropping partition: %', part.partition_name;
                         EXECUTE format('ALTER TABLE outbox_event DETACH PARTITION %I', part.partition_name);

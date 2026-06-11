@@ -50,11 +50,7 @@ class OutboxRelayJob(
     @Scheduled(fixedDelayString = "\${outbox-relay.poll-interval:5000}")
     fun poll() {
         val sample = Timer.start(meterRegistry)
-        val tSafe = centralOutboxRepository.computeTSafe()
-        if (tSafe == null) {
-            logger.debug("No edge watermarks available, skipping poll")
-            return
-        }
+        val tSafe = centralOutboxRepository.computeTSafe() ?: com.dogancaglar.common.time.Utc.nowInstant()
 
         val batch = centralOutboxRepository.findEligible(tSafe, batchSize)
         if (batch.isEmpty()) {
@@ -104,7 +100,7 @@ class OutboxRelayJob(
 
         return future.handle { _, exception ->
             if (exception == null) {
-                centralOutboxRepository.markDispatched(entry.oeid)
+                centralOutboxRepository.markDispatched(entry.oeid, com.dogancaglar.common.time.Utc.toInstant(entry.createdAt))
                 meterRegistry.counter("relay_published_total").increment()
                 null
             } else {

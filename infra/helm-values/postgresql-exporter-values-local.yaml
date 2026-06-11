@@ -1,14 +1,13 @@
 config:
   datasource:
-    host: "payment-db-postgresql.payment.svc.cluster.local"
+    host: "central-db-postgresql.payment.svc.cluster.local"
     port: "5432"
     user: "postgres"
-    database: "payment_db"
+    database: "central-db"
     sslmode: "disable"
-    # This tells the chart to get the password from your existing secret
     passwordSecret:
-      name: "payment-db-credentials"
-      key: "ADMIN_POSTGRES_PASSWORD"
+      name: "central-db-credentials"
+      key: "CENTRAL_DB_POSTGRES_PASSWORD"
 
 serviceMonitor:
   enabled: true

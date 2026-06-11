@@ -27,8 +27,8 @@ class CentralOutboxRelayAdapter(
         }
     }
 
-    override fun markDispatched(oeid: Long) {
-        mapper.markDispatched(oeid)
+    override fun markDispatched(oeid: Long, createdAt: Instant) {
+        mapper.markDispatched(oeid, createdAt)
     }
 
     override fun countEligible(tSafe: Instant): Long {

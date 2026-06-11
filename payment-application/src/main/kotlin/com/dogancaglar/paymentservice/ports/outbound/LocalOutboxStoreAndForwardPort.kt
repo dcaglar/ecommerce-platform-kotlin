@@ -7,4 +7,5 @@ interface LocalOutboxStoreAndForwardPort {
     fun markDispatched(events: List<OutboxEvent>)
     fun reclaimStuck(olderThanSeconds: Int): Int
     fun unclaimFailed(workerId: String, oeids: List<Long>): Int
+    fun countNew(): Long
 }

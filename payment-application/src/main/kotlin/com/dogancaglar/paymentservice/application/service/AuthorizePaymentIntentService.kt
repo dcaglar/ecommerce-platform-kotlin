@@ -30,10 +30,12 @@ class AuthorizePaymentIntentService(
     private val logger = LoggerFactory.getLogger(javaClass)
     override fun authorize(cmd: AuthorizePaymentIntentCommand): PaymentIntent {
         logger.info("AuthorizePaymentIntentService.authorize  started for long numeric paymentintentid ,${cmd.paymentIntentId.value}")
+        val start = System.currentTimeMillis()
         val paymentIntent = paymentIntentRepository.findById(cmd.paymentIntentId)
             ?: error("PaymentIntent ${cmd.paymentIntentId.value} not found")
+        val finish = System.currentTimeMillis()
         // 1) Idempotent behavior first (NO domain transition before this)
-        logger.info("AuthorizePaymentIntentService.findbyId(${cmd.paymentIntentId.value} returned a $paymentIntent)")
+        logger.info("AuthorizePaymentIntentService.findbyId(${cmd.paymentIntentId.value} TOOK ${finish-start} MSreturned a $paymentIntent)")
         when (paymentIntent.status) {
             PaymentIntentStatus.CREATED_PENDING -> {
                 // Payment not ready for authorization yet
@@ -52,12 +54,20 @@ class AuthorizePaymentIntentService(
         }
         // 2) Concurrency gate: only ONE request may flip CREATED -> PENDING_AUTH
         val now = Utc.nowInstant()
+        val start2 = System.currentTimeMillis()
         val won = paymentIntentRepository.tryMarkPendingAuth(cmd.paymentIntentId, now)
-        logger.info("What is win returns $won")
+        val end2 = System.currentTimeMillis()
+        logger.info("What is win returns $won and paymentIntentRepository.tryMarkPendingAuth( TOOK ${end2 - start2} MS")
         if (!won) {
             // someone else started authorization; return latest state
+            val start1 = System.currentTimeMillis()
             return paymentIntentRepository.findById(cmd.paymentIntentId)
                 ?: error("PaymentIntent not found ${cmd.paymentIntentId.value}")
+            val end1 = System.currentTimeMillis()
+            logger.info("paymentIntentRepositoryRepository.findByI TOOK ${end1 - start1}  MS")
+
+
+
         }
 
         // 3) We "own" the authorization attempt; update in-memory state before psp call
@@ -135,7 +145,7 @@ class AuthorizePaymentIntentService(
                 val startUpdate = System.currentTimeMillis()
                 paymentIntentRepository.updatePaymentIntent(cancelled)
                 val finishUpdate = System.currentTimeMillis()
-                logger.info("db.updatePaymentIntent (immediate failure) took {} ms", finishUpdate - startUpdate)
+                logger.info("db.updatePaymentIntent (immediate failure) TOOK {} MS", finishUpdate - startUpdate)
                 cancelled
             }
             else -> {
@@ -152,7 +162,10 @@ class AuthorizePaymentIntentService(
         if(confirmedPaymentIntent.status == PaymentIntentStatus.AUTHORIZED){
             //generate outbox<paymentauthorized> +  from paymentintent objefct which is just authorized
             val outboxEventPaymentAuthorizedEvent = toOutboxPaymentAuthorizedEvent(confirmedPaymentIntent)
+            val startUpdate = System.currentTimeMillis()
             paymentTransactionalFacadePort.handleAuthorized(confirmedPaymentIntent,outboxEventPaymentAuthorizedEvent)
+            val finishUpdate = System.currentTimeMillis()
+            logger.info("paymentTransactionalFacadePort.handleAuthorize TOOK{} MS", finishUpdate - startUpdate)
         }
     }
 

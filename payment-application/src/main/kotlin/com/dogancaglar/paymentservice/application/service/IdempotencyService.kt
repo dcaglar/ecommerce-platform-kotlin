@@ -27,7 +27,7 @@ class IdempotencyService(
         val isFirst = store.tryInsertPending(key, hash)
 
         if (isFirst) {
-            logger.info("🆕 [Idempotency] Scenario 1: First request for key=$key. Executing block...")
+            logger.debug("🆕 [Idempotency] Scenario 1: First request for key=$key. Executing block...")
             try {
                 // Execute the actual business logic (CreatePaymentIntent, etc.)
                 val response = block()

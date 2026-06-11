@@ -22,7 +22,7 @@ class IdempotencyStoreAdapter(
         val start = System.currentTimeMillis()
         val insertedKey = mapper.insertPending(record)
         val finish = System.currentTimeMillis()
-        logger.info("IdempotencyStoreAdapter.insertPending took {} ms", finish - start)
+        logger.info("IdempotencyStoreAdapter.insertPending TOOK {} MS", finish - start)
 
         logger.debug(
             "🟡 [Idempotency] insertPending returned key $insertedKey , key: $key")
@@ -42,7 +42,7 @@ class IdempotencyStoreAdapter(
         val start = System.currentTimeMillis()
         val result = mapper.findByKey(key)
         val finish = System.currentTimeMillis()
-        logger.info("IdempotencyStoreAdapter.findByKey took {} ms", finish - start)
+        logger.info("IdempotencyStoreAdapter.findByKey TOOK {} MS", finish - start)
         return result
     }
 
@@ -50,20 +50,20 @@ class IdempotencyStoreAdapter(
         val start = System.currentTimeMillis()
         mapper.updatePaymentIntentId(key, paymentIntentId)
         val finish = System.currentTimeMillis()
-        logger.info("IdempotencyStoreAdapter.updatePaymentIntentId took {} ms", finish - start)
+        logger.info("IdempotencyStoreAdapter.updatePaymentIntentId TOOK  {} MS", finish - start)
     }
 
     override fun updateResponsePayload(key: String, payload: String, paymentIntentId: Long) {
         val start = System.currentTimeMillis()
         mapper.updateResponsePayload(key, payload, paymentIntentId)
         val finish = System.currentTimeMillis()
-        logger.info("IdempotencyStoreAdapter.updateResponsePayload took {} ms", finish - start)
+        logger.info("IdempotencyStoreAdapter.updateResponsePayload TOOK {} MS", finish - start)
     }
 
     override fun deletePending(key: String) {
         val start = System.currentTimeMillis()
         mapper.deletePending(key)
         val finish = System.currentTimeMillis()
-        logger.info("IdempotencyStoreAdapter.deletePending took {} ms", finish - start)
+        logger.info("IdempotencyStoreAdapter.deletePending TOOK {} MS", finish - start)
     }
 }

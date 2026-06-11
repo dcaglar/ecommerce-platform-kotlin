@@ -6,6 +6,6 @@ object EventType {
     const val CAPTURE_SUBMITTED = "capture_submitted"
     const val CAPTURE_CONFIRMED = "capture_confirmed"
     const val INTERNAL_TRANSFER_COMMAND = "internal_transfer_command"
-    const val JOURNAL_ENTRIES_RECORDED = "ledger_entries_recorded"
+    const val JOURNAL_ENTRIES_RECORDED = "journal_entries_recorded"
 }
 

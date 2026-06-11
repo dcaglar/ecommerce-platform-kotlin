@@ -1,7 +1,64 @@
 server:
   port: 8080
   shutdown: graceful
+  tomcat:
+    threads:
+      max: 120          # The maximum number of concurrent requests actively processing
+      min-spare: 20     # The minimum threads kept alive for instant response
+    max-connections: 1000 # Keep-alive sockets (default)
+    accept-count: 200   # The waiting room queue size
+    connection-timeout: 20000
+#  Here is the step-by-step, didactic masterclass on calculating your pool sizes using Little's Law (N=λ×W).
+#
+#  The secret to mastering this is realizing that 200 Concurrent Users (Virtual Users) is NOT the same thing as 200 Requests Per Second. We must calculate how fast those 200 users are actually clicking!
+#
+#  For this calculation, we will assume both of your endpoints wait on the external PSP Simulator for 0.8 seconds (800ms).
+#
+#Step 1: Calculate Your True Traffic (Requests Per Second)
+#First, we calculate how long it takes one user to complete their entire flow (The Cycle Time):
+#
+#Endpoint 1 Response Time: 0.8s
+#User Wait/Sleep Time: 0.2s
+#Endpoint 2 Response Time: 0.8s
+#Total Cycle Time: 0.8 + 0.2 + 0.8 = 1.8 seconds
+#Next, we calculate how many cycles your 200 Virtual Users (VUs) can complete per second:
+#
+#Flows Per Second: 200 VUs / 1.8s = 111 Flows/sec
+#Since there are 2 HTTP endpoints per flow:
+#
+#  Total HTTP Requests Per Second (λ
+#  HTTP
+#  ​
+#): 111 * 2 = 222 HTTP req/sec
+#Step 2: Calculate Tomcat Threads (The Web Layer)
+#  A Tomcat thread is blocked for the entire duration of the HTTP request, which means it is held hostage during the 0.8s PSP Simulator wait.
+#
+#Target Load (λ): 222 HTTP req/sec
+#Time Held (W): 0.8 seconds
+#Calculation: 222 * 0.8 = 177.6 Threads
+#The Verdict: You mathematically need 178 Tomcat threads to process this traffic without queuing. Setting server.tomcat.threads.max: 250 gives you a perfect ~40% buffer (shock absorber) for latency spikes.
+#
+#Step 3: Calculate HikariCP Connections (The Database Layer)
+#  Because you properly release the database connection during the PSP wait, the database connection is only held for the raw query execution time (5ms).
+#
+#HTTP Target Load: 222 HTTP req/sec
+#Queries Per Request: 5 queries
+#Database Target Load (λ): 222 * 5 = 1,110 DB queries/sec
+#Time Held (W): 0.005 seconds (5ms)
+#Calculation: 1,110 * 0.005 = 5.55 Connections
+#The Verdict: You mathematically need just 6 database connections to execute over a thousand queries per second. Setting maximum-pool-size: 15 gives you a massive 150% buffer.
+#
+#  Summary Checklist for 200 Concurrent Users
+#To smoothly run this specific k6 load test, your application.yml should look like this:
 
+#server:
+#  tomcat:
+#    threads:
+#      max: 250         # 178 needed + 72 buffer
+#app:
+#  datasource:
+#    web:
+#      maximum-pool-size: 15   # 6 needed + 9 buffer
 spring:
   application:
     name: payment-service
@@ -57,6 +114,8 @@ management:
       tomcat.threads.busy: true
       tomcat.threads.config.max: true
       http.server.requests: true
+      redis_dirty_accounts_size: true
+      redis_retry_zset_size: true
       tomcat.threads: true
       hikaricp.connections: true
       hikaricp.connections.acquire: true
@@ -94,7 +153,7 @@ app:
       pool-name: web-pool
       maximum-pool-size: 12
       minimum-idle: 6
-      connection-timeout: 1000
+      connection-timeout: 5000
       validation-timeout: 1000
       idle-timeout: 600000
       max-lifetime: 1800000

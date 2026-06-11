@@ -32,4 +32,6 @@ class LocalOutboxStoreAndForwardAdapter(
         )
         return mapper.unclaimSpecific(params)
     }
+
+    override fun countNew(): Long = mapper.countByStatus("NEW")
 }
