@@ -18,7 +18,7 @@ capture pipelines, idempotent state transitions, retries, and double-entry ledge
 The goal is not feature completeness — it is **correctness, architectural integrity, and
 fault-tolerant coordination across bounded contexts**.
 
-![Architecture](docs/architecture/arch-1.svg)
+![Architecture](docs/architecture/arch-1.svg) 
 
 At the domain layer, the system follows **DDD principles** with clear aggregate boundaries
 (`PaymentIntent`, `Payment`, `PaymentOrder`, `Ledger`). Each event — authorization, capture
