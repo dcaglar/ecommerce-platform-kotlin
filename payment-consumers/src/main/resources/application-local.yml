@@ -2,15 +2,70 @@ app:
   instance-id: ${POD_NAME:${HOSTNAME:${random.value}}}
   payment-service:
     api-key: secretpaymentapikey12345
+  kafka:
+    specs:
+      psp-result-queue:                           { partitions: 12, replicas: 1, createDlq: true }
+      ledger_entries_recorded_topic:              { partitions: 24, replicas: 1, createDlq: true }
+      capture-execution-queue:                    { partitions: 12, replicas: 1, createDlq: true }
+      capture_psp_performed_queue:                { partitions: 12, replicas: 1, createDlq: true }
+      internal-transfer-queue:                    { partitions: 12, replicas: 1, createDlq: true }
 
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_CENTRAL_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    payment-consumers:
+      url: ${SPRING_DATASOURCE_CENTRAL_URL}
+      username: ${SPRING_DATASOURCE_USERNAME}
+      password: ${SPRING_DATASOURCE_PASSWORD}
+      hikari:
+        maximum-pool-size: 20
+        minimum-idle: 1
+        connection-timeout: 15000
+        validation-timeout: 15000
+        idle-timeout: 600000
+        max-lifetime: 1740000
+        keepalive-time: 300000
+        leak-detection-threshold: 60000
+    account-snapshot-job:
+      url: ${SPRING_DATASOURCE_CENTRAL_URL}
+      username: ${SPRING_DATASOURCE_USERNAME}
+      password: ${SPRING_DATASOURCE_PASSWORD}
+      hikari:
+        maximum-pool-size: 5
+        minimum-idle: 1
+        connection-timeout: 15000
+        validation-timeout: 15000
+        idle-timeout: 600000
+        max-lifetime: 1740000
+        keepalive-time: 300000
+        leak-detection-threshold: 60000
   data:
     redis:
       url: ${SPRING_DATA_REDIS_URL:redis://localhost:6379}
+      timeout: 10s
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+          max-wait: 5000ms
+  kafka:
+    consumer:
+      isolation-level: read_committed
+      enable-auto-commit: false
+      max-poll-records: 120
+      max-poll-interval: 240000
+      fetch-min-bytes: 131072
+      fetch-max-wait: 25ms
+      max-partition-fetch-bytes: 1048576
+      fetch-max-bytes: 33554432
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: com.dogancaglar.common.kafka.serde.EventEnvelopeKafkaDeserializer
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+    properties:
+      security.protocol: PLAINTEXT
+      session.timeout.ms: 45000
 
 psp:
   refund:
@@ -19,5 +74,3 @@ psp:
   capture:
     simulation:
       currentScenario: NORMAL
-
-

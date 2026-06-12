@@ -31,42 +31,7 @@ spec:
         - name: local-edge-db
           image: "{{ .Values.edgeDb.image.repository }}:{{ .Values.edgeDb.image.tag }}"
           args:
-            - "-c"
-            - "shared_preload_libraries=pg_stat_statements"
-            - "-c"
-            - "pg_stat_statements.track=all"
-            - "-c"
-            - "shared_buffers=256MB"
-            - "-c"
-            - "effective_cache_size=512MB"
-            - "-c"
-            - "work_mem=3MB"
-            - "-c"
-            - "maintenance_work_mem=64MB"
-            - "-c"
-            - "max_parallel_workers_per_gather=0"
-            - "-c"
-            - "max_parallel_workers=4"
-            - "-c"
-            - "max_worker_processes=4"
-            - "-c"
-            - "temp_file_limit=2GB"
-            - "-c"
-            - "max_connections=85"
-            - "-c"
-            - "checkpoint_timeout=10min"
-            - "-c"
-            - "max_wal_size=1GB"
-            - "-c"
-            - "min_wal_size=256MB"
-            - "-c"
-            - "checkpoint_completion_target=0.9"
-            - "-c"
-            - "wal_compression=on"
-            - "-c"
-            - "bgwriter_lru_maxpages=400"
-            - "-c"
-            - "bgwriter_lru_multiplier=2"
+            {{- toYaml .Values.edgeDb.args | nindent 12}}
           restartPolicy: Always
           env:
             - name: POSTGRES_DB
@@ -129,12 +94,7 @@ spec:
               mountPath: /docker-entrypoint-initdb.d/init-edge-db.sh
               subPath: init-edge-db.sh
           resources:
-            requests:
-              cpu: 750m
-              memory: 768Mi
-            limits:
-              cpu: 750m
-              memory: 768Mi
+            {{- toYaml .Values.edgeDb.resources | nindent 12}}
 
         # 4. LIQUIBASE JOB (Runs after DB is ready)
         - name: payment-service-liquibase
@@ -165,6 +125,10 @@ spec:
                   name: edge-db-credentials
                   key: EDGE_DB_PAYMENT_SERVICE_PASSWORD
 
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         # 5. POSTGRES EXPORTER SIDECAR
         - name: postgres-exporter
@@ -189,12 +153,7 @@ spec:
                   name: edge-db-credentials
                   key: EDGE_DB_POSTGRES_PASSWORD
           resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 100m
-              memory: 128Mi
+            {{- toYaml .Values.postgresExporter.resources | nindent 12}}
 
         # 1. THE WEB API (Accepts Traffic)
         - name: payment-service
@@ -215,9 +174,9 @@ spec:
             - name: JAVA_TOOL_OPTIONS
               value: "{{ .Values.paymentService.jvmOpts }}"
             - name: SPRING_PROFILES_ACTIVE
-              value: "local"
+              value: "{{ .Values.spring.profile }}"
             - name: SPRING_DATA_REDIS_URL
-              value: redis://redis-master:6379
+              value: "{{ .Values.redis.url }}"
             - name: EDGE_DB_NAME
               valueFrom:
                 configMapKeyRef:
@@ -238,10 +197,15 @@ spec:
                 secretKeyRef:
                   name: edge-db-credentials
                   key: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+            - name: YUGABYTE_DB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: YUGABYTE_DB_URL
             - name: SPRING_LIQUIBASE_ENABLED
               value: "false"
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-              value: kafka.payment.svc.cluster.local:9092
+              value: "{{ .Values.kafka.bootstrapServers }}"
             - name: SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
               valueFrom:
                 configMapKeyRef:
@@ -276,9 +240,9 @@ spec:
               protocol: TCP
           env:
             - name: SPRING_PROFILES_ACTIVE
-              value: "local"
+              value: "{{ .Values.spring.profile }}"
             - name: SPRING_DATA_REDIS_URL
-              value: redis://redis-master:6379
+              value: "{{ .Values.redis.url }}"
             - name: EDGE_DB_NAME
               valueFrom:
                 configMapKeyRef:
@@ -341,4 +305,4 @@ spec:
         accessModes: [ "ReadWriteOnce" ]
         resources:
           requests:
-            storage: 20Gi
+            storage: {{ .Values.edgeDb.storage.size }}

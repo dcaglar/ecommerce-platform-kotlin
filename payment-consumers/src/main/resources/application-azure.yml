@@ -1,0 +1,70 @@
+app:
+  kafka:
+    specs:
+      psp-result-queue:                           { partitions: 24, replicas: 3, createDlq: true }
+      ledger_entries_recorded_topic:              { partitions: 48, replicas: 3, createDlq: true }
+      capture-execution-queue:                    { partitions: 24, replicas: 3, createDlq: true }
+      capture_psp_performed_queue:                { partitions: 24, replicas: 3, createDlq: true }
+      internal-transfer-queue:                    { partitions: 24, replicas: 3, createDlq: true }
+
+spring:
+  datasource:
+    payment-consumers:
+      url: ${SPRING_DATASOURCE_CENTRAL_URL}
+      username: ${SPRING_DATASOURCE_USERNAME}
+      password: ${SPRING_DATASOURCE_PASSWORD}
+      hikari:
+        maximum-pool-size: 40
+        minimum-idle: 5
+        connection-timeout: 15000
+        validation-timeout: 15000
+        idle-timeout: 600000
+        max-lifetime: 1740000
+        keepalive-time: 300000
+        leak-detection-threshold: 60000
+    account-snapshot-job:
+      url: ${SPRING_DATASOURCE_CENTRAL_URL}
+      username: ${SPRING_DATASOURCE_USERNAME}
+      password: ${SPRING_DATASOURCE_PASSWORD}
+      hikari:
+        maximum-pool-size: 20
+        minimum-idle: 2
+        connection-timeout: 15000
+        validation-timeout: 15000
+        idle-timeout: 600000
+        max-lifetime: 1740000
+        keepalive-time: 300000
+        leak-detection-threshold: 60000
+  data:
+    redis:
+      url: ${SPRING_DATA_REDIS_URL}
+      timeout: 10s
+      lettuce:
+        pool:
+          max-active: 64
+          max-idle: 32
+          min-idle: 16
+          max-wait: 5000ms
+  kafka:
+    consumer:
+      isolation-level: read_committed
+      enable-auto-commit: false
+      max-poll-records: 500
+      max-poll-interval: 300000
+      fetch-min-bytes: 1048576
+      fetch-max-wait: 100ms
+      max-partition-fetch-bytes: 5242880
+      fetch-max-bytes: 104857600
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: com.dogancaglar.common.kafka.serde.EventEnvelopeKafkaDeserializer
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+    properties:
+      security.protocol: PLAINTEXT
+      session.timeout.ms: 45000
+
+logging:
+  level:
+    root: ERROR
+    org.springframework: ERROR

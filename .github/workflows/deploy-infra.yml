@@ -1,0 +1,99 @@
+name: "Phase 1 & 2: Deploy Infrastructure and Application"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  terraform-plan:
+    name: "Terraform Plan"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: infra/terraform
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: infra/terraform
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        run: terraform plan -out=tfplan
+        
+  # This job represents the "Approval Gate" you asked for!
+  # It requires the "azure-loadtest" GitHub Environment to be approved by you.
+  deploy-infrastructure:
+    name: "Terraform Apply & Helm Deploy"
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    environment: azure-loadtest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        
+      # ---------- PHASE 1: INFRASTRUCTURE (TERRAFORM) ----------
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: infra/terraform
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: infra/terraform
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        run: terraform apply -auto-approve
+
+      # ---------- PHASE 2: BUILD & PUSH ----------
+
+      - name: Docker Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push Images
+        env:
+          DOCKER_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          ./infra/scripts/build-and-push-payment-service-docker-repo.sh ${{ secrets.DOCKERHUB_USERNAME }} latest
+          ./infra/scripts/build-and-push-payment-edge-workers-docker-repo.sh ${{ secrets.DOCKERHUB_USERNAME }} latest
+          ./infra/scripts/build-and-push-payment-consumers-docker-repo.sh ${{ secrets.DOCKERHUB_USERNAME }} latest
+          ./infra/scripts/build-and-push-payment-central-relay-docker-repo.sh ${{ secrets.DOCKERHUB_USERNAME }} latest
+
+      # ---------- PHASE 3: HELM DEPLOYMENT ----------
+      - name: Get AKS Credentials
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        run: |
+          az login --service-principal -u $ARM_CLIENT_ID -p $ARM_CLIENT_SECRET --tenant $ARM_TENANT_ID
+          az aks get-credentials --resource-group rg-payment-platform-loadtest --name aks-payment-loadtest --overwrite-existing
+
+      - name: Setup Helm & Plugins
+        run: |
+          curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+          chmod 700 get_helm.sh
+          ./get_helm.sh
+          helm plugin install https://github.com/jkroepke/helm-secrets
+
+      - name: Deploy Azure Environment
+        run: |
+          # We execute your exact bash scripts, just pointing to the Azure versions!
+          ./infra/scripts/deploy-all-azure.sh

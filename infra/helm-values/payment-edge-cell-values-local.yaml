@@ -48,9 +48,48 @@ edgeWorker:
   jvmOpts: >-
     -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication -XX:MaxRAMPercentage=45 -XX:InitialRAMPercentage=45 -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
 edgeDb:
+  storage:
+    size: 20Gi
   resources:
     requests: {cpu: "150m", memory: "256Mi"}
     limits: {cpu: "1000m", memory: "512Mi"}
+  args:
+    - "-c"
+    - "shared_preload_libraries=pg_stat_statements"
+    - "-c"
+    - "pg_stat_statements.track=all"
+    - "-c"
+    - "shared_buffers=256MB"
+    - "-c"
+    - "effective_cache_size=512MB"
+    - "-c"
+    - "work_mem=3MB"
+    - "-c"
+    - "maintenance_work_mem=64MB"
+    - "-c"
+    - "max_parallel_workers_per_gather=0"
+    - "-c"
+    - "max_parallel_workers=2"
+    - "-c"
+    - "max_worker_processes=2"
+    - "-c"
+    - "temp_file_limit=2GB"
+    - "-c"
+    - "max_connections=85"
+    - "-c"
+    - "checkpoint_timeout=10min"
+    - "-c"
+    - "max_wal_size=1GB"
+    - "-c"
+    - "min_wal_size=256MB"
+    - "-c"
+    - "checkpoint_completion_target=0.9"
+    - "-c"
+    - "wal_compression=on"
+    - "-c"
+    - "bgwriter_lru_maxpages=400"
+    - "-c"
+    - "bgwriter_lru_multiplier=2"
 ingress:
   enabled: true
   className: nginx
@@ -86,3 +125,17 @@ service:
   type: ClusterIP
   port: 8080
   portName: http
+
+redis:
+  url: redis://redis-master:6379
+kafka:
+  bootstrapServers: kafka.payment.svc.cluster.local:9092
+
+postgresExporter:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi

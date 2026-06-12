@@ -1,21 +1,52 @@
 app:
   instance-id: ${POD_NAME:${HOSTNAME:${random.value}}}
-
   datasource:
     outbox:
       jdbc-url: ${SPRING_DATASOURCE_EDGE_URL}
       username: ${SPRING_DATASOURCE_EDGE_USERNAME}
       password: ${SPRING_DATASOURCE_EDGE_PASSWORD}
+      connection-timeout: 15000
+      validation-timeout: 15000
+      idle-timeout: 600000
+      max-lifetime: 1800000
     maintenance:
       jdbc-url: ${SPRING_DATASOURCE_EDGE_URL}
       username: ${SPRING_DATASOURCE_MAINTENANCE_USERNAME}
       password: ${SPRING_DATASOURCE_MAINTENANCE_PASSWORD}
+      maximum-pool-size: 1
+      minimum-idle: 0
+      connection-timeout: 15000
+      validation-timeout: 15000
+      idle-timeout: 60000
+      max-lifetime: 1800000
     central:
       jdbc-url: ${SPRING_DATASOURCE_CENTRAL_URL}
       username: ${SPRING_DATASOURCE_CENTRAL_USERNAME}
       password: ${SPRING_DATASOURCE_CENTRAL_PASSWORD}
+      connection-timeout: 15000
+      validation-timeout: 15000
+      idle-timeout: 600000
+      max-lifetime: 1800000
 
 spring:
   data:
     redis:
-      url: ${SPRING_DATA_REDIS_URL}
+      url: ${SPRING_DATA_REDIS_URL:redis://localhost:6379}
+      timeout: 10s
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+          max-wait: 5000ms
+
+outbox-dispatcher:
+  thread-count: 4
+  batch-size: 500
+  pool-size: 4
+
+db:
+  outbox:
+    statement-timeout-ms: 2000
+    lock-timeout-ms: 200
+    idle-in-tx-timeout-ms: 0

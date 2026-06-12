@@ -1,0 +1,80 @@
+server:
+  tomcat:
+    threads:
+      max: 250
+      min-spare: 50
+    max-connections: 4000
+    accept-count: 500
+    connection-timeout: 20000
+
+#app:
+spring:
+  datasource:
+    edge:
+      jdbc-url: ${EDGE_DB_URL}
+      username: ${EDGE_DB_USERNAME}
+      password: ${EDGE_DB_PASSWORD}
+      maximum-pool-size: 60
+      minimum-idle: 10
+      connection-timeout: 5000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+      connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
+    yugabyte:
+      jdbc-url: ${YUGABYTE_DB_URL:jdbc:postgresql://yb-tserver.payment.svc.cluster.local:5433/yugabyte}
+      username: ${YUGABYTE_DB_USERNAME:yugabyte}
+      password: ${YUGABYTE_DB_PASSWORD:yugabyte}
+      maximum-pool-size: 60
+      minimum-idle: 10
+      connection-timeout: 5000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+      connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
+
+spring:
+  data:
+    redis:
+      url: ${SPRING_DATA_REDIS_URL}
+      timeout: 10s
+      lettuce:
+        pool:
+          max-active: 64
+          max-idle: 32
+          min-idle: 16
+          max-wait: 5000ms
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}
+
+outbox-dispatcher:
+  thread-count: 8
+  batch-size: 1000
+  pool-size: 8
+
+db:
+  web:
+    statement-timeout-ms: 500
+    lock-timeout-ms: 250
+    idle-in-tx-timeout-ms: 0
+
+stripe:
+  api:
+    api-key: ${STRIPE_API_KEY}
+    connect-timeout: 5000
+    read-timeout: 30000
+
+psp:
+  gateway:
+    type: STRIPE
+
+logging:
+  level:
+    root: ERROR
+    org.springframework: ERROR
+    com.dogancaglar.paymentservice: ERROR

@@ -29,6 +29,10 @@ spec:
                       values:
                         - payment-consumers
                 topologyKey: "kubernetes.io/hostname"
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: payment-central-relay
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -44,9 +48,9 @@ spec:
             - name: SPRING_PROFILES_ACTIVE
               value: "{{ .Values.spring.profile }}"
             - name: SPRING_DATA_REDIS_URL
-              value: redis://redis-master:6379
+              value: "{{ .Values.redis.url }}"
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-              value: kafka.payment.svc.cluster.local:9092
+              value: "{{ .Values.kafka.bootstrapServers }}"
             - name: SPRING_DATASOURCE_URL
               valueFrom: { configMapKeyRef: { name: payment-platform-config, key: CENTRAL_DB_URL } }
             - name: SPRING_DATASOURCE_USERNAME
