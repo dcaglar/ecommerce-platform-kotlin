@@ -125,12 +125,10 @@ service:
   type: ClusterIP
   port: 8080
   portName: http
-
 redis:
   url: redis://redis-master:6379
 kafka:
   bootstrapServers: kafka.payment.svc.cluster.local:9092
-
 postgresExporter:
   resources:
     requests:

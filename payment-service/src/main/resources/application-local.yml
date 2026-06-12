@@ -12,6 +12,22 @@ server:
   payment-service:
     api-key: secretpaymentapikey12345
 spring:
+  data:
+    redis:
+      url: ${SPRING_DATA_REDIS_URL:redis://localhost:6379}
+      timeout: 10s
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+          max-wait: 5000ms
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI:http://localhost:8180/realms/payment}
+
   datasource:
     edge:
       jdbc-url: ${EDGE_DB_URL:jdbc:postgresql://localhost:5432/edge-db}
@@ -33,23 +49,6 @@ spring:
       max-lifetime: 1800000
       leak-detection-threshold: 60000
       connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
-
-spring:
-  data:
-    redis:
-      url: ${SPRING_DATA_REDIS_URL:redis://localhost:6379}
-      timeout: 10s
-      lettuce:
-        pool:
-          max-active: 16
-          max-idle: 8
-          min-idle: 4
-          max-wait: 5000ms
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI:http://localhost:8180/realms/payment}
 
 outbox-dispatcher:
   thread-count: 2

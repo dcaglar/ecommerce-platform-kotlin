@@ -48,7 +48,6 @@ serviceMonitor:
   labels:
     release: prometheus-stack
 replicaCount: 1
-
 redis:
   url: redis://redis-master:6379
 kafka:

@@ -7,8 +7,8 @@ REPO_ROOT="$SCRIPT_DIR/../.."
 cd "$REPO_ROOT"
 
 
-echo "🚀 Deploying secrets..."
-"$SCRIPT_DIR/deploy-secrets.sh"
+echo "🚀 Deploying platform config and secrets..."
+"$SCRIPT_DIR/deploy-payment-platform-config-azure.sh"
 
 echo "🚀 Deploying  central databases..."
 "$SCRIPT_DIR/deploy-central-db-azure.sh"
