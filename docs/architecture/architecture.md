@@ -9,7 +9,8 @@ The platform manages the **full payment lifecycle**: synchronous authorization, 
 
 # 🟦   High Level Plaform Arhictecture 
 
-![Architecture](docs/architecture/high-level-context-full-architecture.png)
+![Architecture](https://github.com/dcaglar/ecommerce-platform-kotlin/blob/25b863edd5fc15647c14b70f55703e3494bf6e91/docs/architecture/high-level-context-full-architecture.png)
+
 
 # 🟩 Key Clarifications (MoR Model)
 
@@ -49,7 +50,7 @@ PaymentIntent is just a domain entity living in edge layer and edge db so its no
 
 
 Authorization Flow
-![Architecture](docs/architecture/idempotency-sequence-diagram.png)
+![Architecture](https://github.com/dcaglar/ecommerce-platform-kotlin/blob/25b863edd5fc15647c14b70f55703e3494bf6e91/docs/architecture/idempotency-sequence-diagram.png)
 
 ## **For Sellers**
 
@@ -268,7 +269,7 @@ TYou can see here sequence diagram  of shopper a, and payment journey end to end
 
 ### Simplified Consumer Architecture
 
-![Architecture](docs/architecture/async-payment-prrocessing.png)
+![Architecture](https://github.com/dcaglar/ecommerce-platform-kotlin/blob/25b863edd5fc15647c14b70f55703e3494bf6e91/docs/architecture/async-payment-prrocessing.png)
 A new simplified Kafka consumer architecture has been introduced to streamline PSP operations and double-entry bookkeeping.
 
 **Why we moved away from the "Consume-Process-Publish" pattern:**
