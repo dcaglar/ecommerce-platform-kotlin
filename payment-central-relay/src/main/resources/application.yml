@@ -9,20 +9,6 @@ spring:
   jackson:
     time-zone: UTC
   datasource:
-    url: ${SPRING_DATASOURCE_CENTRAL_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
-    hikari:
-      maximum-pool-size: 5
-      minimum-idle: 1
-      connection-timeout: 15000
-      validation-timeout: 15000
-      idle-timeout: 600000
-      max-lifetime: 1740000
-      keepalive-time: 300000
-      leak-detection-threshold: 60000
-
-
 
 management:
   server:
@@ -70,7 +56,6 @@ management:
       redis_retry_batch_size: true
   data:
     redis:
-      url: ${SPRING_DATA_REDIS_URL:redis://localhost:6379}
       timeout: 10s
       lettuce:
         pool:
@@ -85,20 +70,9 @@ mybatis:
   type-handlers-package: com.dogancaglar.common.db.typehandler
 
 outbox-relay:
-  batch-size: 500
-  poll-interval: 1000
 
 app:
   datasource:
     maintenance:
       driver-class-name: org.postgresql.Driver
-      jdbc-url: ${SPRING_DATASOURCE_URL}
-      username: ${SPRING_DATASOURCE_MAINTENANCE_USERNAME}
-      password: ${SPRING_DATASOURCE_MAINTENANCE_PASSWORD}
       pool-name: central-maint-pool
-      maximum-pool-size: 1
-      minimum-idle: 0
-      connection-timeout: 15000
-      validation-timeout: 15000
-      idle-timeout: 60000
-      max-lifetime: 1800000

@@ -1,8 +1,8 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence
 
-import com.dogancaglar.common.db.converter.PaymentIntentEntityMapper
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentIntentMapper
 import com.dogancaglar.paymentservice.domain.model.payment.PaymentIntent
+import com.dogancaglar.common.db.converter.PaymentIntentEntityMapper
+import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.edge.PaymentIntentMapper
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.paymentservice.ports.outbound.PaymentIntentRepository
 import org.springframework.stereotype.Repository
@@ -35,8 +35,7 @@ class PaymentIntentOutboundAdapter(
         return paymentIntent
     }
 
-    override fun findById(paymentIntentId: PaymentIntentId): PaymentIntent {
-        val entity = paymentIntentMapper.findById(paymentIntentId.value)!!
+a        val entity = paymentIntentMapper.findById(paymentIntentId.value)!!
         val splits: List<PaymentSplit> = if (entity.splitsJson.isNotBlank()) {
             objectMapper.readValue(entity.splitsJson, splitsTypeRef)
         } else {

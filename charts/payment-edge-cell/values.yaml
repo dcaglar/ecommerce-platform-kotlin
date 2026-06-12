@@ -23,8 +23,6 @@ edgeDb:
     repository: postgres
     tag: "15-alpine"
     pullPolicy: IfNotPresent
-  storage:
-    size: 20Gi
 
 topologySpreadConstraints:
   - maxSkew: 1

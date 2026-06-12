@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper
+package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.edge
 
 import com.dogancaglar.common.db.entity.PaymentIntentEntity
 import org.apache.ibatis.annotations.Mapper

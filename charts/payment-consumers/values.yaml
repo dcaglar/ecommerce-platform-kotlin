@@ -6,9 +6,7 @@ image:
   tag: latest
   pullPolicy: Always
 
-resources:
-  requests: { cpu: "400m", memory: "512Mi" }
-  limits:   { cpu: "1",    memory: "896Mi" }
+resources: {}
 
 jvmOpts: >-
   -XX:+UseG1GC
@@ -26,40 +24,3 @@ service:
   type: ClusterIP
   portName: http
   port: 8080
-
-autoscaling:
-  enabled: true
-  minReplicas: 3
-  maxReplicas: 5
-  metrics:
-    - type: External
-      external:
-        metric:
-          name: kafka_consumer_group_lag_worst2
-        target:
-          type: Value
-          value: "2400"   # keep as string quantity
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 120
-      selectPolicy: Max
-      policies:
-        - type: Pods
-          value: 1
-          periodSeconds: 60
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-        - type: Percent
-          value: 50
-          periodSeconds: 60
-
-serviceMonitor:
-  enabled: true
-  labels:
-    release: prometheus-stack  # must match Prometheus' serviceMonitorSelector
-  path: /actuator/prometheus
-  interval: 30s
-  scrapeTimeout: 10s
-
-replicaCount: 3

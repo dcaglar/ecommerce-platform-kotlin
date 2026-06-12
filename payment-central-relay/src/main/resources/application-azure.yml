@@ -1,0 +1,41 @@
+app:
+  instance-id: ${POD_NAME:${HOSTNAME:${random.value}}}
+  datasource:
+    maintenance:
+      jdbc-url: ${SPRING_DATASOURCE_URL}
+      username: ${SPRING_DATASOURCE_MAINTENANCE_USERNAME}
+      password: ${SPRING_DATASOURCE_MAINTENANCE_PASSWORD}
+      pool-name: central-maint-pool
+      maximum-pool-size: 1
+      minimum-idle: 0
+      connection-timeout: 15000
+      validation-timeout: 15000
+      idle-timeout: 60000
+      max-lifetime: 1800000
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_CENTRAL_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      connection-timeout: 15000
+      validation-timeout: 15000
+      idle-timeout: 600000
+      max-lifetime: 1740000
+      keepalive-time: 300000
+      leak-detection-threshold: 60000
+  data:
+    redis:
+      url: ${SPRING_DATA_REDIS_URL}
+
+outbox-relay:
+  batch-size: 2000
+  poll-interval: 200
+
+logging:
+  level:
+    root: ERROR
+    org.springframework: ERROR

@@ -1,0 +1,17 @@
+# helm-values/elasticsearch-values-local.yaml
+
+replicas: 1              # ← THE ONLY setting you really need
+minimumMasterNodes: 1    # required when replicas < 3
+
+resources:
+  requests:
+    cpu: 1
+    memory: 2Gi
+  limits:
+    cpu: 2
+    memory: 3Gi
+volumeClaimTemplate:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 5Gi

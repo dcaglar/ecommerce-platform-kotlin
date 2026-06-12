@@ -9,4 +9,5 @@ data:
   CENTRAL_DB_URL: {{.Values.CENTRAL_DB_URL | quote}}
   EDGE_DB_NAME: {{.Values.EDGE_DB_NAME | quote}}
   CENTRAL_DB_NAME: {{.Values.CENTRAL_DB_NAME | quote}}
+  YUGABYTE_DB_URL: {{.Values.YUGABYTE_DB_URL | quote}}
   # ...more keys as needed

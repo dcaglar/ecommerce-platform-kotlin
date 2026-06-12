@@ -1,6 +1,6 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence
 
-import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.IdempotencyKeyMapper
+import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.yugabyte.IdempotencyKeyMapper
 import com.dogancaglar.paymentservice.ports.outbound.IdempotencyRecord
 import com.dogancaglar.paymentservice.ports.outbound.IdempotencyStorePort
 import org.slf4j.LoggerFactory

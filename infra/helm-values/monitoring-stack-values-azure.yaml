@@ -1,0 +1,82 @@
+prometheusOperator:
+  resources:
+    requests: { cpu: 30m,  memory: 96Mi }
+    limits:   { cpu: 150m, memory: 192Mi }
+  admissionWebhooks:
+    enabled: false
+    patch:
+      enabled: false
+  tls:
+    enabled: false
+
+prometheus:
+  prometheusSpec:
+    enableAdminAPI: true
+    enableRemoteWriteReceiver: true
+    containers:
+      - name: config-reloader
+        resources:
+          requests: { cpu: 5m,  memory: 24Mi }
+          limits:   { cpu: 30m, memory: 48Mi }
+    resources:
+      requests: { cpu: 150m, memory: 256Mi }
+      limits:   { cpu: 500m, memory: 512Mi }
+    retention: 6h
+    walCompression: true
+    scrapeInterval: 60s
+    evaluationInterval: 60s
+    serviceMonitorSelector:
+      matchLabels:
+        release: prometheus-stack
+    serviceMonitorNamespaceSelector: {}   # 👈 allow ServiceMonitors from ALL namespaces
+
+alertmanager:
+  alertmanagerSpec:
+    containers:
+      - name: config-reloader
+        resources:
+          requests: { cpu: 5m,  memory: 24Mi }
+          limits:   { cpu: 30m, memory: 48Mi }
+    resources:
+      requests: { cpu: 30m, memory: 48Mi }
+      limits:   { cpu: 150m, memory: 128Mi }
+
+grafana:
+  plugins: []
+  readinessProbe:
+    timeoutSeconds: 10
+    periodSeconds: 30
+    failureThreshold: 20
+  livenessProbe:
+    timeoutSeconds: 10
+    periodSeconds: 30
+    failureThreshold: 20
+  grafana.ini:
+    database:
+      query_retries: 5
+      transaction_retries: 5
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 1000m, memory: 768Mi }
+  sidecar:
+    datasources:
+      resources:
+        requests: { cpu: 5m,  memory: 24Mi }
+        limits:   { cpu: 30m, memory: 48Mi }
+    dashboards:
+      resources:
+        requests: { cpu: 5m,  memory: 24Mi }
+        limits:   { cpu: 30m, memory: 48Mi }
+
+kube-state-metrics:
+  resources:
+    requests: { cpu: 30m,  memory: 48Mi }
+    limits:   { cpu: 150m, memory: 128Mi }
+
+prometheus-node-exporter:
+  resources:
+    requests: { cpu: 15m,  memory: 24Mi }
+    limits:   { cpu: 80m,  memory: 96Mi }
+
+prometheusAdapter:
+  enabled: false

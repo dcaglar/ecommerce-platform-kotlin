@@ -6,7 +6,6 @@
                         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
     <include file="payment-intent-changelog.xml" relativeToChangelogFile="true"/>
     <include file="payment-outbox-changelog.xml" relativeToChangelogFile="true"/>
-    <include file="20251202-idempotency-keys.xml" relativeToChangelogFile="true"/>
-    <include file="20260208-optimize-idempotency.xml" relativeToChangelogFile="true"/>
+    <!-- Idempotency tables have been extracted to changelog.yugabyte.xml -->
     <!-- Epic 1: Payment aggregate moved to Central DB — remove from edge -->
 </databaseChangeLog>

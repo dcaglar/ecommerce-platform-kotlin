@@ -1,0 +1,61 @@
+replicaCount: 1
+postgresql:
+  enabled: true
+  auth:
+    username: bn_keycloak
+    password: bitnami
+    database: bitnami_keycloak
+    # leave ports at defaults (5432). Do NOT override.
+  primary:
+    nodeSelector:
+      pool: central
+    persistence:
+      enabled: true
+      size: 50Gi
+service:
+  type: NodePort
+  ports:
+    http: 8080
+  nodePorts:
+    http: 32080
+# single-node cache; also blank out KC_CACHE_STACK so no jdbc-ping surprise
+extraEnvVars:
+  - name: KC_CACHE
+    value: "local"
+  - name: KC_CACHE_STACK
+    value: "kubernetes"
+  - name: KC_PROXY
+    value: "edge"
+  # Configure hostname to use cluster-internal DNS so JWT issuer matches payment service config
+  # This ensures tokens have issuer: http://keycloak:8080/realms/ecommerce-platform
+  - name: KC_HOSTNAME
+    value: "keycloak"
+  - name: KC_HOSTNAME_PORT
+    value: "8080"
+  - name: KC_HOSTNAME_STRICT
+    value: "false"
+  - name: KEYCLOAK_ADMIN
+    value: "admin"
+  - name: KEYCLOAK_ADMIN_PASSWORD
+    value: "adminpassword"
+resources:
+  requests:
+    memory: 1Gi
+    cpu: 1000m
+  limits:
+    memory: 4Gi
+    cpu: 2000m
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 300
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+nodeSelector:
+  pool: central

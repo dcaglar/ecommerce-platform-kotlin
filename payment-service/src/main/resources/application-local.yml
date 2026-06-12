@@ -1,27 +1,76 @@
-app:
+server:
+  tomcat:
+    threads:
+      max: 120
+      min-spare: 20
+    max-connections: 1000
+    accept-count: 200
+    connection-timeout: 20000
+
+#app:
   instance-id: ${POD_NAME:${HOSTNAME:${random.value}}}
   payment-service:
     api-key: secretpaymentapikey12345
-  datasource:
-    web:
-      jdbc-url: ${SPRING_DATASOURCE_URL}
-      username: ${SPRING_DATASOURCE_USERNAME}
-      password: ${SPRING_DATASOURCE_PASSWORD}
-
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    edge:
+      jdbc-url: ${EDGE_DB_URL:jdbc:postgresql://localhost:5432/edge-db}
+      username: ${EDGE_DB_USERNAME:edge_db_user}
+      password: ${EDGE_DB_PASSWORD:edge_db_password}
+      connection-timeout: 5000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+      connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
+    yugabyte:
+      jdbc-url: ${YUGABYTE_DB_URL:jdbc:postgresql://localhost:5433/yugabyte}
+      username: ${YUGABYTE_DB_USERNAME:yugabyte}
+      password: ${YUGABYTE_DB_PASSWORD:yugabyte}
+      connection-timeout: 5000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+      connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
+
+spring:
   data:
     redis:
       url: ${SPRING_DATA_REDIS_URL:redis://localhost:6379}
+      timeout: 10s
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+          max-wait: 5000ms
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI:http://localhost:8180/realms/payment}
+
+outbox-dispatcher:
+  thread-count: 2
+  batch-size: 300
+  pool-size: 2
+
+db:
+  web:
+    statement-timeout-ms: 500
+    lock-timeout-ms: 250
+    idle-in-tx-timeout-ms: 0
 
 stripe:
   api:
     api-key: ${STRIPE_API_KEY:sk_test_51ShA8HEAJKUKtoJwTALvrfMadP0eoKwyggnasHkqgY6y6jLoSjg9YqewkxiYrRw54TnZ7tVFX5Xreg3qaHm5wWAX00tupdpr6y}
+    connect-timeout: 5000
+    read-timeout: 30000
 
 psp:
+  gateway:
+    type: SIMULATED
   authorization:
     simulation:
       currentScenario: NORMAL

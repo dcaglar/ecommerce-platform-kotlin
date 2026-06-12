@@ -1,0 +1,58 @@
+app:
+  datasource:
+    outbox:
+      jdbc-url: ${SPRING_DATASOURCE_EDGE_URL}
+      username: ${SPRING_DATASOURCE_EDGE_USERNAME}
+      password: ${SPRING_DATASOURCE_EDGE_PASSWORD}
+      maximum-pool-size: 40
+      connection-timeout: 15000
+      validation-timeout: 15000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+    maintenance:
+      jdbc-url: ${SPRING_DATASOURCE_EDGE_URL}
+      username: ${SPRING_DATASOURCE_MAINTENANCE_USERNAME}
+      password: ${SPRING_DATASOURCE_MAINTENANCE_PASSWORD}
+      maximum-pool-size: 1
+      minimum-idle: 0
+      connection-timeout: 15000
+      validation-timeout: 15000
+      idle-timeout: 60000
+      max-lifetime: 1800000
+    central:
+      jdbc-url: ${SPRING_DATASOURCE_CENTRAL_URL}
+      username: ${SPRING_DATASOURCE_CENTRAL_USERNAME}
+      password: ${SPRING_DATASOURCE_CENTRAL_PASSWORD}
+      maximum-pool-size: 40
+      connection-timeout: 15000
+      validation-timeout: 15000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+spring:
+  data:
+    redis:
+      url: ${SPRING_DATA_REDIS_URL}
+      timeout: 10s
+      lettuce:
+        pool:
+          max-active: 64
+          max-idle: 32
+          min-idle: 16
+          max-wait: 5000ms
+
+outbox-dispatcher:
+  thread-count: 16
+  batch-size: 2000
+  pool-size: 16
+
+db:
+  outbox:
+    statement-timeout-ms: 5000
+    lock-timeout-ms: 500
+    idle-in-tx-timeout-ms: 0
+
+logging:
+  level:
+    root: ERROR
+    org.springframework: ERROR

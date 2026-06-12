@@ -1,4 +1,4 @@
-package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper
+package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.yugabyte
 
 import com.dogancaglar.paymentservice.ports.outbound.IdempotencyRecord
 import org.apache.ibatis.annotations.Mapper

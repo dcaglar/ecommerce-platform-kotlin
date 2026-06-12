@@ -1,0 +1,141 @@
+# ---- Image (Bitnami Legacy) ----
+image:
+  registry: docker.io
+  repository: bitnamilegacy/postgresql
+  tag: 16.4.0-debian-12-r0 # override at deploy if you prefer another existing legacy tag
+  pullPolicy: IfNotPresent
+postgresqlSharedPreloadLibraries: "pgaudit,pg_stat_statements"
+auth:
+  existingSecret: central-db-credentials
+  secretKeys:
+    adminPasswordKey: CENTRAL_DB_POSTGRES_PASSWORD
+primary:
+  extraEnvVarsSecret: central-db-credentials
+  extraEnvVars:
+    - name: CENTRAL_DB_NAME
+      valueFrom:
+        configMapKeyRef:
+          name: payment-platform-config
+          key: CENTRAL_DB_NAME
+    - name: POSTGRES_DB
+      valueFrom:
+        configMapKeyRef:
+          name: payment-platform-config
+          key: CENTRAL_DB_NAME
+    - name: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: central-db-credentials
+          key: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME
+    - name: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: central-db-credentials
+          key: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD
+    - name: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: central-db-credentials
+          key: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME
+    - name: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: central-db-credentials
+          key: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_PASSWORD
+    - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: central-db-credentials
+          key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
+    - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: central-db-credentials
+          key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+    - name: CENTRAL_DB_DUTY_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: central-db-credentials
+          key: CENTRAL_DB_DUTY_USERNAME
+    - name: CENTRAL_DB_DUTY_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: central-db-credentials
+          key: CENTRAL_DB_DUTY_PASSWORD
+    - name: POSTGRES_USER
+      value: postgres
+    - name: PGPASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: central-db-credentials
+          key: CENTRAL_DB_POSTGRES_PASSWORD
+  initdb:
+    scriptsConfigMap: central-db-init-scripts
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 10
+    failureThreshold: 12
+    successThreshold: 1
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 10
+    failureThreshold: 6
+    successThreshold: 1
+  startupProbe:
+    enabled: true
+    periodSeconds: 10
+    timeoutSeconds: 10
+    failureThreshold: 30
+  resources:
+    requests:
+      cpu: 2000m
+      memory: 4Gi
+    limits:
+      cpu: 6000m
+      memory: 12Gi
+  persistence:
+    enabled: true
+    size: 250Gi
+  extendedConfiguration: |
+    # memory / caches
+    shared_buffers = '4GB'
+    effective_cache_size = '8GB'
+    work_mem = '32MB'
+    maintenance_work_mem = '512MB'
+
+    max_parallel_workers_per_gather = 4
+    max_parallel_workers = 8
+    max_worker_processes = 8
+
+    temp_file_limit = '20GB'
+
+    # connections
+    max_connections = 1000
+
+    # WAL / checkpoints
+    checkpoint_timeout = '15min'
+    max_wal_size = '10GB'
+    min_wal_size = '2GB'
+    checkpoint_completion_target = 0.9
+    wal_compression = on
+
+    # pg_stat_statements
+    pg_stat_statements.max = 1000
+    pg_stat_statements.track = top
+    pg_stat_statements.track_utility = off
+    pg_stat_statements.save = on
+
+    # misc
+    jit = off
+    log_min_duration_statement = 1000
+    log_statement = 'none'
+    bgwriter_lru_maxpages = 400
+    bgwriter_lru_multiplier = 2
+  nodeSelector:
+    pool: central
+metrics:
+  enabled: false

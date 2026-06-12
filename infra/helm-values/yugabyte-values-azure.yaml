@@ -1,0 +1,39 @@
+replicas:
+  master: 3
+  tserver: 3
+
+# Standard 3-node Raft quorum
+conf:
+  tserver:
+    flags:
+      replication_factor: 3
+
+resource:
+  master:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  tserver:
+    requests:
+      cpu: 2000m
+      memory: 4Gi
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+
+storage:
+  master:
+    size: 10Gi
+  tserver:
+    size: 100Gi
+
+# Pin the YugabyteDB cluster to the dedicated edgedb pool,
+# keeping it architecturally part of the edge while maintaining compute isolation.
+nodeSelector:
+  pool: edgedb
+
+metrics:
+  enabled: false

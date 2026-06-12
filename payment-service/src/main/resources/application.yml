@@ -1,13 +1,6 @@
 server:
   port: 8080
   shutdown: graceful
-  tomcat:
-    threads:
-      max: 120          # The maximum number of concurrent requests actively processing
-      min-spare: 20     # The minimum threads kept alive for instant response
-    max-connections: 1000 # Keep-alive sockets (default)
-    accept-count: 200   # The waiting room queue size
-    connection-timeout: 20000
 #  Here is the step-by-step, didactic masterclass on calculating your pool sizes using Little's Law (N=λ×W).
 #
 #  The secret to mastering this is realizing that 200 Concurrent Users (Virtual Users) is NOT the same thing as 200 Requests Per Second. We must calculate how fast those 200 users are actually clicking!
@@ -68,24 +61,11 @@ spring:
     time-zone: UTC
   data:
     redis:
-      timeout: 10s
-      lettuce:
-        pool:
-          max-active: 16
-          max-idle: 8
-          min-idle: 4
-          max-wait: 5000ms
   liquibase:
-    enabled: true
-    change-log: classpath:db/changelog/changelog.edge.xml
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI:http://localhost:8180/realms/payment}
+    enabled: false
+
 
 mybatis:
-  mapper-locations: classpath*:mapper/**/*.xml
   type-aliases-package: com.dogancaglar.common.db.entity
   type-handlers-package: com.dogancaglar.common.db.typehandler
 
@@ -143,22 +123,14 @@ management:
 
 # Pool defaults for the web datasource — overrideable per environment
 # These are production-safe defaults; tune in application-{profile}.yml if needed
-app:
+spring:
   datasource:
-    web:
+    edge:
       driver-class-name: org.postgresql.Driver
-      jdbc-url: ${SPRING_DATASOURCE_URL}
-      username: ${SPRING_DATASOURCE_USERNAME}
-      password: ${SPRING_DATASOURCE_PASSWORD}
-      pool-name: web-pool
-      maximum-pool-size: 12
-      minimum-idle: 6
-      connection-timeout: 5000
-      validation-timeout: 1000
-      idle-timeout: 600000
-      max-lifetime: 1800000
-      leak-detection-threshold: 60000
-      connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
+      pool-name: edge-pool
+    yugabyte:
+      driver-class-name: org.postgresql.Driver
+      pool-name: yugabyte-pool
   cache:
     ttl-seconds: 3600
   account-balance:
@@ -166,28 +138,14 @@ app:
     idempotency-ttl-seconds: 86400
     snapshot-interval: PT1M
 
-outbox-dispatcher:
-  thread-count: 2
-  batch-size: 300
-  pool-size: 2
 
-db:
-  web:
-    statement-timeout-ms: 500
-    lock-timeout-ms: 250
-    idle-in-tx-timeout-ms: 0
 
 stripe:
   api:
-    api-key: ${STRIPE_API_KEY:sk_test_123}
-    connect-timeout: 5000
-    read-timeout: 30000
+    api-key: ${STRIPE_API_KEY}
 
 payments:
   id:
     epoch-millis: 1735689600000   # 2025-01-01T00:00:00Z
     region-id: 1                  # EU1
 
-psp:
-  gateway:
-    type: SIMULATED               # Options: STRIPE, SIMULATED — override per environment
