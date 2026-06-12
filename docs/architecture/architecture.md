@@ -9,7 +9,7 @@ The platform manages the **full payment lifecycle**: synchronous authorization, 
 
 # 🟦   High Level Plaform Arhictecture 
 
-![Architecture](docs/architecture/arch-1.svg)
+![Architecture](docs/architecture/high-level-context-full-architecture.png)
 
 # 🟩 Key Clarifications (MoR Model)
 
@@ -46,6 +46,10 @@ PaymentIntent is just a domain entity living in edge layer and edge db so its no
 - Shoppers should be able to view whether their payment is authorized or declined, its a syncronous psp call, and shoppers can see payment status via the paymentintent
 
 ---
+
+
+Authorization Flow
+![Architecture](docs/architecture/idempotency-sequence-diagram.png)
 
 ## **For Sellers**
 
@@ -253,19 +257,18 @@ Used for reporting, analytics, payouts, and consistency validation.
 
 
 
-# 🟩 C4 Architecture Diagrams
+
+## Sequnce Diagrams
 
 
-This document contains C4 model diagrams for the payment service system at different levels of abstraction.
 
-## Level 1: System Context Diagram
-
-The System Context diagram shows the payment service system in its environment, illustrating users and external systems it interacts with.
+TYou can see here sequence diagram  of shopper a, and payment journey end to end, also global idempotency hanlding 
 
 
 
 ### Simplified Consumer Architecture
 
+![Architecture](docs/architecture/async-payment-prrocessing.png)
 A new simplified Kafka consumer architecture has been introduced to streamline PSP operations and double-entry bookkeeping.
 
 **Why we moved away from the "Consume-Process-Publish" pattern:**

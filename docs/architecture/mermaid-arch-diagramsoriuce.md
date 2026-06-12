@@ -1,4 +1,4 @@
-
+payment platform context diafram
 ```mermaid
 graph TD
     %% Styles
@@ -107,81 +107,12 @@ graph TD
     class Fwd1,Fwd2,Relay job
     class CapTopic,TransTopic,ResTopic topic
     class CapCons,TransCons,ResCons consumer
-```
-### End to End payment flow
 
-```mermaid
-graph TD
-    classDef intentPending fill:#fff4e1,stroke:#ffb74d,stroke-width:2px,color:#333
-    classDef intentSuccess fill:#e8f5e9,stroke:#81c784,stroke-width:2px,color:#333
-    classDef intentFailed fill:#ffebee,stroke:#e57373,stroke-width:2px,color:#333
-    classDef payment fill:#f3e5f5,stroke:#ba68c8,stroke-width:2px,color:#333
-    classDef order fill:#e3f2fd,stroke:#64b5f6,stroke-width:2px,color:#333
-    classDef consumer fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#333
-    classDef psp fill:#fce4ec,stroke:#f06292,stroke-width:2px,color:#333
-    classDef idem fill:#e0f7fa,stroke:#00bcd4,stroke-width:2px,color:#333
-
-    Start([Checkout Service<br/>Initiates Payment]) --> IdemCheck{Idempotency<br/>Key Exists?}
-    
-    IdemCheck -->|Yes| ReturnStored[Return Stored<br/>PaymentIntent]
-    
-    IdemCheck -->|No| PI0[PaymentIntent<br/>Status: CREATED_PENDING<br/>Total: 2900 EUR]
-    
-    subgraph IntentPhase ["Payment Intent Phase (Synchronous)"]
-        direction TB
-        PI0 -->|POST /api/v1/payments| PSP_Create{PSP Create<br/>Intent}
-        PSP_Create -->|SUCCESS| PI1[PaymentIntent<br/>Status: CREATED]
-        PSP_Create -.->|TIMEOUT| PI0
-    end
-    
-    subgraph AuthPhase ["Authorization Phase (Synchronous)"]
-        direction TB
-        PI1 -->|POST /authorize| PI2[PaymentIntent<br/>Status: PENDING_AUTH]
-        PI2 -->|PSP Confirm| PSP_Auth{PSP Response}
-        PSP_Auth -->|AUTHORIZED| PI3[PaymentIntent<br/>Status: AUTHORIZED]
-        PSP_Auth -->|DECLINED| PI4[PaymentIntent<br/>Status: DECLINED<br/>END]
-        PSP_Auth -.->|TIMEOUT| PI2
-    end
-
-    subgraph PaymentPhase ["Edge Ingestion Phase (Asynchronous)"]
-        direction TB
-        PI3 -->|POST /captures| CAP1[Edge DB Outbox<br/>CaptureReceived]
-        CAP1 -->|Forwarded by<br/>LocalOutboxStoreAndForwardJob| CENT1[Central DB Outbox<br/>CaptureReceived]
-    end
-
-    subgraph ExecutionPhase ["Execution & Relay"]
-        direction TB
-        CENT1 -->|Relayed by OutboxRelayJob| CAP2["CaptureCommandExecutor"]
-        
-        CAP2 -->|PSP Capture Call| PSP1{PSP Result}
-        
-        PSP1 -->|Append to Central Outbox| PSP2[OutboxEvent: ExternalAsyncCaptureToPspPerformed]
-        PSP2 -->|Relayed to psp-result-queue| PSP3["CapturePspPerformedConsumer"]
-        
-        PSP3 -->|Wait for Webhook| WEB1[Edge DB Outbox<br/>CaptureSuccessful]
-        WEB1 -->|Forwarded by<br/>LocalOutboxStoreAndForwardJob| CENT2[Central DB Outbox<br/>CaptureSuccessful]
-        CENT2 -->|Relayed to psp-result-queue<br/>by OutboxRelayJob| WEB2["PspResultConsumer"]
-    end
-
-    WEB2 -->|Updates Ledger| P3[Payment<br/>Status: CAPTURED<br/>MERCHANT_GROSS_CAPTURE_SUSPENSE updated]
-    WEB2 -->|Creates| P1[Payment<br/>Status: AUTHORIZED<br/>If first webhook]
-    
-    P3 -.->|If MARKETPLACE| SPLIT1[OutboxEvent: InternalTransferRequest]
-    SPLIT1 -->|Relayed to internal-transfer-queue| SPLIT2["InternalTransferRequestExecutor"]
-    SPLIT2 -->|Sub-Seller Distribution| SPLIT3[JournalType.INTERNAL_TRANSFER]
-
-    class IdemCheck,ReturnStored idem
-    class PI0,PI1,PI2 intentPending
-    class PI3 intentSuccess
-    class PI4 intentFailed
-    class P1,P3 payment
-    class CAP1,WEB1,SPLIT1 order
-    class CAP2,PSP3,WEB2,SPLIT2 consumer
-    class PSP_Create,PSP_Auth,PSP1 psp
-```
+ ### End to End payment flow
 
 
 
+IDEMPOTENCY HANDLING
 
 ```mermaid
 sequenceDiagram
@@ -296,7 +227,7 @@ sequenceDiagram
     Browser->>Shopper: Display "Payment Successful" message
 ```
 
-#### Ledger Finalization & Split Execution Flow
+#### Ledger Finalization & Split Execution Flow (NOT UPTODATE KAFKA FLOW)
 
 ```mermaid
 sequenceDiagram
