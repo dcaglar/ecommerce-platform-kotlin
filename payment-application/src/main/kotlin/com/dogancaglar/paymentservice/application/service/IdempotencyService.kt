@@ -15,7 +15,7 @@ class IdempotencyService(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     fun <REQ : Any, RES : Any> run(
-        key: String,
+        key: java.util.UUID,
         requestBody: REQ,
         responseClass: Class<RES>,
         idExtractor: (RES) -> Long, // Final Addition: Extract internal ID from response

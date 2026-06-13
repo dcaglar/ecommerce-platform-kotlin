@@ -33,7 +33,7 @@
     </select>
 
     <select id="findByKey"
-            parameterType="string"
+            parameterType="java.util.UUID"
             resultMap="IdempotencyResultMap">
         SELECT id,
         idempotency_key,
@@ -60,7 +60,7 @@
         WHERE idempotency_key = #{key}
     </update>
 
-    <delete id="deletePending" parameterType="string">
+    <delete id="deletePending" parameterType="java.util.UUID">
         DELETE FROM idempotency_keys
         WHERE idempotency_key = #{key}
         AND status = 'PENDING'
