@@ -21,7 +21,6 @@ Minikube uses `minikube tunnel` to simulate a LoadBalancer IP.
 - [ ] Update your DNS provider to point your domain to the Public IP.
 
 ## 4. Configuration & Endpoints
-The local scripts rely on `infra/endpoints.json` pointing to `127.0.0.1`.
-- [ ] Update `infra/endpoints.json` to reflect your actual Azure domain names (e.g., `api.yourdomain.com`).
+The local scripts now use native Kubernetes DNS (`payment.k8s.orb.local`), so you will need to update the base URLs in your load test scripts or frontend to match your Azure domain names (e.g., `api.yourdomain.com`).
 - [ ] Update the Keycloak provisioning scripts (`keycloak/provision-keycloak.sh`) to target the production Keycloak URL.
 - [ ] Review the Resource Requests and Limits. The current `Guaranteed QoS` configuration reserves exactly 2.5 CPU cores per Edge Cell. Ensure your Azure VM sizes are large enough to pack these efficiently (e.g., a 16-core VM can fit 6 Edge Cells perfectly).

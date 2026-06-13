@@ -1,0 +1,17 @@
+spring:
+  main:
+    web-application-type: none
+  kafka:
+    listener:
+      auto-startup: false
+  datasource:
+    payment-consumers:
+      jdbc-url: ${CENTRAL_DB_URL}
+      username: ${CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME}
+      password: ${CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD}
+      driver-class-name: org.postgresql.Driver
+    account-snapshot-job:
+      jdbc-url: ${CENTRAL_DB_URL}
+      username: ${CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME}
+      password: ${CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD}
+      driver-class-name: org.postgresql.Driver

@@ -7,4 +7,4 @@ REPO_ROOT="$SCRIPT_DIR/../.."
 cd "$REPO_ROOT"
 helm upgrade --install payment-central-relay "$REPO_ROOT/charts/payment-central-relay" \
   -n payment --create-namespace \
-  -f "$REPO_ROOT/infra/helm-values/payment-central-relay-local.yaml"
+  -f "$REPO_ROOT/infra/helm-values/payment-central-relay-values-local.yaml"

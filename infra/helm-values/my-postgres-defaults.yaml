@@ -175,7 +175,7 @@ replication:
   ## @param replication.numSynchronousReplicas Number of replicas that will have synchronous replication. Note: Cannot be greater than `readReplicas.replicaCount`.
   ## ref: https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-SYNCHRONOUS-COMMIT
   ##
-  synchronousCommit: "off"
+  synchronousCommit: "on"
   numSynchronousReplicas: 0
   ## @param replication.applicationName Cluster application name. Useful for advanced replication settings
   ##

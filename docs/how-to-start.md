@@ -2,11 +2,11 @@
 
 Follow these steps to provision auth, get a token, test the API, and run load tests locally.
 
-This is a short, practical “start order” for spinning up the stack on minikube, with one‑line notes on what each script does.
+This is a short, practical “start order” for spinning up the stack on OrbStack native Kubernetes, with one‑line notes on what each script does.
 
 Prereqs (once):
 - Docker Desktop (or Docker Engine) running
-- minikube, kubectl, helm installed
+- OrbStack native Kubernetes, kubectl, helm installed
 - Troubleshooting connectivity? See docs/troubleshooting/connectivity.md
 
 ## ⚠️ The Golden Rules (Immutable Constraints)
@@ -36,22 +36,18 @@ chmod +x infra/scripts/*.sh
 Recommended order
 
 0) Nuke existing cluster (Optional but recommended)
-- What: Completely destroys the existing minikube cluster to ensure a completely fresh state.
-- Run:
+- What: Completely destroys the existing OrbStack native Kubernetes cluster to ensure a completely fresh state.
+- Script:
 ```bash
-infra/scripts/minikube-nuke-dev.sh
+infra/scripts/orbstack-nuke-dev.sh
 ```
 
-1) Bootstrap a local Kubernetes cluster
-- What: Creates/uses a minikube profile sized from your Docker resources and enables metrics-server.
-- Run:
-```bash
-infra/scripts/bootstrap-minikube-cluster.sh
-```
-
-2) Deploy core infrastructure
+1) Deploy core infrastructure
 - What: Config, Keycloak, Postgres, Redis, and Kafka in the payment namespace.
-- Run:
+- if you want to set the credentials in plain text first, then update the untracked decrypted_secrets.yaml, then run sops -e  ecrypted_secrets.yaml, 
+- and you would see  a file with encrypted passswords created at payment-platform-config-secrets-local.yaml ,then simply deploy-payment-platform-config.sh
+- create secret configmaps in kube run time, youy van check existing secrets with kubectl get secret -n payment edge-db-credentials/central-db-credentials -o json
+- this woul print  secret alianms names and encrypted values
 ```bash
 infra/scripts/deploy-all-local.sh
 ```
@@ -97,10 +93,16 @@ infra/scripts/deploy-payment-edge-cell-local.sh
 - Run:
 ```bash
 infra/scripts/deploy-payment-consumers-local.sh
-
 ```
 
-7) Expose consumer lag as an external metric (for HPA)
+7) Payment Central Relay
+- What: Deploys the OutboxRelayJob which acts as the sole publisher to Kafka (enforcing the Separation of Powers architectural rule).
+- Run:
+```bash
+infra/scripts/deploy-payment-central-relay-local.sh
+```
+
+8) Expose consumer lag as an external metric (for HPA)
 - What: Installs/promotes prometheus-adapter with a rule that surfaces worst consumer-lag per group.
 - Run:
 ```bash
@@ -123,7 +125,7 @@ infra/scripts/port-forwarding.sh
 - Tip: If you aren’t using port-forwarding, set KEYCLOAK_URL to your reachable Keycloak base.
 - Run:
 ```bash
-KEYCLOAK_URL=http://127.0.0.1:8080 ./keycloak/provision-keycloak.sh
+KEYCLOAK_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/provision-keycloak.sh
 ```
 2) Generate access tokens for different operations
 - What: Get JWT tokens for different use cases; saves tokens under `keycloak/output/jwt`.
@@ -138,17 +140,17 @@ get-token.sh
 # Claims saved to: keycloak/output/jwt/payment-service.claims.json
 
 # Request a 6-hour token via CLI override:
-get-token.sh http://127.0.0.1:8080 6
+get-token.sh http://keycloak.payment.svc.cluster.local:8080 6
 ```
 
 **For Balance Queries - Finance/Admin (Backoffice user with FINANCE role):**
 ```bash
-KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-finance.sh
+KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-finance.sh
 # Token saved to: keycloak/output/jwt/finance-<username>.token
 # Claims saved to: keycloak/output/jwt/finance-<username>.claims.json
 
 # Request a 4-hour token for finance-ops:
-./keycloak/get-token-finance.sh finance-ops finance123 http://127.0.0.1:8080 4
+./keycloak/get-token-finance.sh finance-ops finance123 http://keycloak.payment.svc.cluster.local:8080 4
 ```
 > Example: running without arguments issues a token for the `finance-ops / finance123` user.
 > Optional CLI override (with TTL): `./keycloak/get-token-finance.sh finance-ops finance123 http://my-keycloak:8080 6`
@@ -156,15 +158,15 @@ KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-finance.sh
 **For Balance Queries - Seller User (User Account with SELLER role, Case 1):**
 ```bash
 # Default: seller-111 (SELLER-111)
-KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-seller.sh
+KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-seller.sh
 
 # Or specify a different seller
-KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-seller.sh seller-222 seller123
+KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-seller.sh seller-222 seller123
 # Token saved to: keycloak/output/jwt/seller-<username>.token
 # Claims saved to: keycloak/output/jwt/seller-<username>.claims.json
 
 # Request an 8-hour token for seller-222:
-./keycloak/get-token-seller.sh seller-222 seller123 http://127.0.0.1:8080 8
+./keycloak/get-token-seller.sh seller-222 seller123 http://keycloak.payment.svc.cluster.local:8080 8
 ```
 > Example: running without arguments produces `keycloak/output/jwt/seller-seller-111.token`.
 > Optional CLI override: third argument can pass Keycloak URL; append a fourth argument for TTL (hours).
@@ -172,15 +174,15 @@ KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-seller.sh seller-222 seller123
 **For Balance Queries - Merchant API (M2M with SELLER_API role, Case 3):**
 ```bash
 # Default: SELLER-111
-KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-merchant-api.sh
+KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-merchant-api.sh
 
 # Or specify a different merchant
-KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-merchant-api.sh SELLER-222
+KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-merchant-api.sh SELLER-222
 # Token saved to: keycloak/output/jwt/merchant-api-<SELLER_ID>.token
 # Claims saved to: keycloak/output/jwt/merchant-api-<SELLER_ID>.claims.json
 
 # Request a 12-hour token for SELLER-222:
-./keycloak/get-token-merchant-api.sh SELLER-222 http://127.0.0.1:8080 12
+./keycloak/get-token-merchant-api.sh SELLER-222 http://keycloak.payment.svc.cluster.local:8080 12
 ```
 > Example: `SELLER_ID=SELLER-111` writes to `keycloak/output/jwt/merchant-api-SELLER-111.token`.
 > Optional CLI override: second argument can pass Keycloak URL; append a third argument for TTL (hours).
@@ -198,18 +200,12 @@ Tokens are intentionally scoped to those roles so you can exercise each endpoint
 
 **Step 1: Create Payment Intent**
 
-- Dynamic (reads host and base URL from infra/endpoints.json):
 ```bash
-BASE_URL=$(jq -r .base_url infra/endpoints.json)
-HOST=$(jq -r .host_header infra/endpoints.json)
-IDEMPOTENCY_KEY="idem-$(date +%s)-$RANDOM"
-
-echo "Using BASE_URL=$BASE_URL"
-echo "Using Host header=$HOST"
+# Generate a pseudo-UUIDv7 idempotency key
+IDEMPOTENCY_KEY=$(printf '%08x-%04x-7%03x-8%03x-%04x%08x' $((RANDOM*RANDOM)) $((RANDOM)) $((RANDOM%4096)) $((RANDOM%4096)) $((RANDOM)) $((RANDOM*RANDOM)))
 echo "Using Idempotency-Key=$IDEMPOTENCY_KEY"
 
-curl -i -X POST "$BASE_URL/api/v1/payments" \
-  -H "Host: $HOST" \
+curl -i -X POST "http://payment.k8s.orb.local/api/v1/payments" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
   -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
@@ -221,7 +217,7 @@ curl -i -X POST "$BASE_URL/api/v1/payments" \
     "totalAmount": { "quantity": 3000, "currency": "EUR" },
     "splits": [
       { "type": "BalanceAccount", "account": "SELLER-1-1", "amount": { "quantity": 1400, "currency": "EUR" }},
-       { "type": "Commission", "amount": { "quantity": 100, "currency": "EUR" }},
+      { "type": "Commission", "amount": { "quantity": 100, "currency": "EUR" }},
       { "type": "BalanceAccount", "account": "SELLER-1-2", "amount": { "quantity": 1400, "currency": "EUR" }},
       { "type": "Commission", "amount": { "quantity": 100, "currency": "EUR" }}
     ]
@@ -254,8 +250,7 @@ If Stripe API call is still processing, you'll receive:
 
 ```bash
 # Step 2: Authorize the payment intent
-curl -i -X POST "$BASE_URL/api/v1/payments/pi_AqPKfE1CAAA/authorize" \
-  -H "Host: $HOST" \
+curl -i -X POST "http://payment.k8s.orb.local/api/v1/payments/pi_AcqzYyHCcAA/authorize" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
   -d '{}'
@@ -400,23 +395,16 @@ Balance endpoints support three authentication scenarios (matching real-world ma
 1. Get a token for a seller user:
 ```bash
 # Default: seller-111 (SELLER-111)
-KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-seller.sh
+KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-seller.sh
 
 # Or specify a different seller
-KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-seller.sh seller-222 seller123
+KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-seller.sh seller-222 seller123
 # Token saved to: keycloak/output/jwt/seller-<username>.token
 ```
 
 2. Query your own balance (dynamic):
 ```bash
-BASE_URL=$(jq -r .base_url infra/endpoints.json)
-HOST=$(jq -r .host_header infra/endpoints.json)
-
-echo "Using BASE_URL=$BASE_URL"
-echo "Using Host header=$HOST"
-
-curl -i -X GET "$BASE_URL/api/v1/sellers/me/balance" \
-  -H "Host: $HOST" \
+curl -i -X GET "http://payment.k8s.orb.local/api/v1/sellers/me/balance" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/seller-SELLER-111.token)" 
 ```
@@ -431,19 +419,13 @@ curl -i -X GET "$BASE_URL/api/v1/sellers/me/balance" \
 **Steps:**
 1. Get a token with FINANCE role (backoffice user for testing):
 ```bash
-KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-finance.sh
+KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-finance.sh
 # Token saved to: keycloak/output/jwt/finance-<username>.token
 ```
 
 2. Query balance for any seller (dynamic):
 ```bash
-BASE_URL=$(jq -r .base_url infra/endpoints.json)
-HOST=$(jq -r .host_header infra/endpoints.json)
-
-echo "Using BASE_URL=$BASE_URL"
-echo "Using Host header=$HOST"
-curl -i -X GET "$BASE_URL/api/v1/sellers/SELLER-111/balance" \
-  -H "Host: $HOST" \
+curl -i -X GET "http://payment.k8s.orb.local/api/v1/sellers/SELLER-111/balance" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/finance-finance-ops.token)"
 ```
 
@@ -459,20 +441,16 @@ curl -i -X GET "$BASE_URL/api/v1/sellers/SELLER-111/balance" \
 1. Get a token for merchant API (M2M):
 ```bash
 # Default: SELLER-111
-KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-merchant-api.sh
+KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-merchant-api.sh
 
 # Or specify a different merchant
-KC_URL=http://127.0.0.1:8080 ./keycloak/get-token-merchant-api.sh SELLER-222
+KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-merchant-api.sh SELLER-222
 # Token saved to: keycloak/output/jwt/merchant-api-<SELLER_ID>.token
 ```
 
 2. Query balance via merchant API (dynamic):
 ```bash
-BASE_URL=$(jq -r .base_url infra/endpoints.json)
-HOST=$(jq -r .host_header infra/endpoints.json)
-
-curl -i -X GET "$BASE_URL/api/v1/sellers/me/balance" \
-  -H "Host: $HOST" \
+curl -i -X GET "http://payment.k8s.orb.local/api/v1/sellers/me/balance" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/merchant-api-SELLER-111.token)"  
 ```
 

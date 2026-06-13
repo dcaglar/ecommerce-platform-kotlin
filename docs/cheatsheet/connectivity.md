@@ -13,15 +13,10 @@ kubectl get svc -A
 kubectl -n payment get endpoints kafka
 kubectl -n payment get endpoints payment-db-postgresql
 ```
-- If using LoadBalancer, ensure tunnel is running; otherwise port-forward:
-```bash
-sudo -E minikube -p newprofile tunnel
-# or
-infra/scripts/port-forwarding.sh
-```
+- With OrbStack, LoadBalancer IPs and native routing (`*.k8s.orb.local`) are available by default. No tunnels or port-forwarding needed!
 - Confirm payment-service base URL and host:
 ```bash
-cat infra/endpoints.json
+
 ```
 
 Kafka connectivity
@@ -82,11 +77,11 @@ kubectl -n payment get svc payment-db-postgresql -o wide
 kubectl -n payment get endpoints payment-db-postgresql
 ```
 
-2) Connect from host via port‑forward
+2) Connect from host via OrbStack NodePort
 ```bash
-infra/scripts/port-forwarding.sh
-psql -h 127.0.0.1 -p 5432 -U payment -d payment_db
+psql -h 127.0.0.1 -p 32032 -U payment -d payment_db
 ```
+*(Verify port 32032 via `kubectl get svc`)*
 
 3) Connect from inside the cluster
 ```bash
@@ -102,30 +97,27 @@ kubectl -n payment rollout status statefulset/payment-db-postgresql
 - Connection refused: ensure port-forwarding or service/Endpoints are correct; check pod logs for readiness probe failures.
 
 Ingress and service access
-- Ensure endpoints.json exists: it’s written by deploy-payment-service-local.sh
-- If EXTERNAL-IP is pending, run:
+- Ensure ingress controller is running
+- On OrbStack, the ingress LoadBalancer automatically gets an IP and `.k8s.orb.local` DNS routing works out of the box.
 ```bash
-sudo -E minikube -p newprofile tunnel
-```
-- Without tunnel, use NodePort (the script falls back automatically) or set PF_INGRESS=true and run port-forwarding:
-```bash
-PF_INGRESS=true infra/scripts/port-forwarding.sh
+# Verify base URL natively responds:
+curl -I http://payment.k8s.orb.local
 ```
 
 Keycloak and tokens
-- Port-forward or set KEYCLOAK_URL/KC_URL to http://127.0.0.1:8080
+- Set KEYCLOAK_URL/KC_URL to Keycloak's native NodePort `32080`:
 ```bash
-export KEYCLOAK_URL=http://127.0.0.1:8080
-export KC_URL=http://127.0.0.1:8080
+export KEYCLOAK_URL=http://127.0.0.1:32080
+export KC_URL=http://127.0.0.1:32080
 ```
 - Provision realm/clients:
 ```bash
-KEYCLOAK_URL=http://127.0.0.1:8080 ./keycloak/provision-keycloak.sh
+KEYCLOAK_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/provision-keycloak.sh
 ```
 - Get token (saved at `keycloak/output/jwt/payment-service.token`):
 ```bash
 ./keycloak/get-token.sh
-# Optional: ./keycloak/get-token.sh http://127.0.0.1:8080 6   # request 6-hour token
+# Optional: ./keycloak/get-token.sh http://keycloak.payment.svc.cluster.local:8080 6   # request 6-hour token
 ```
 
 Helpful references (avoid duplication)

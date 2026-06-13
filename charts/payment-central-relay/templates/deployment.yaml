@@ -11,6 +11,7 @@ spec:
       app: {{ include "payment-central-relay.fullname" . }}
   template:
     metadata:
+      rollout/reboot: "{{ now | unixEpoch }}"
       labels:
         app: {{ include "payment-central-relay.fullname" . }}
         {{- include "payment-central-relay.labels" . | nindent 8 }}

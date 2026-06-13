@@ -19,7 +19,7 @@ if [[ -n "$CLI_KC_URL" ]]; then
   KC_URL="$CLI_KC_URL"
 fi
 
-KC_URL="${KC_URL:-http://127.0.0.1:8080}"  # Defaults to localhost (port-forwarding). Override if running inside cluster.
+KC_URL="${KC_URL:-http://keycloak.payment.svc.cluster.local:8080}"
 
 # Ensure output directories exist
 mkdir -p "$JWT_DIR"

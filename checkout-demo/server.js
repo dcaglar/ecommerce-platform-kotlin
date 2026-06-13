@@ -57,7 +57,7 @@ function readEnvFile() {
 const envFile = readEnvFile();
 
 // Read configuration from environment variables, .env file, or defaults
-const KEYCLOAK_URL = process.env.KEYCLOAK_URL || envFile.KEYCLOAK_URL || 'http://127.0.0.1:8080';
+const KEYCLOAK_URL = process.env.KEYCLOAK_URL || envFile.KEYCLOAK_URL || 'http://127.0.0.1:32080';
 const REALM = process.env.KEYCLOAK_REALM || envFile.KEYCLOAK_REALM || 'ecommerce-platform';
 const CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID || envFile.KEYCLOAK_CLIENT_ID || 'payment-service';
 
@@ -92,31 +92,11 @@ function getClientSecret() {
 
 const CLIENT_SECRET = getClientSecret();
 
-// Helper to read endpoints.json (like generate-env.cjs does)
-function readEndpoints() {
-  try {
-    const endpointsPath = path.join(__dirname, '..', 'infra', 'endpoints.json');
-    if (fs.existsSync(endpointsPath)) {
-      const content = fs.readFileSync(endpointsPath, 'utf8');
-      return JSON.parse(content);
-    }
-  } catch (error) {
-    console.warn('Could not read infra/endpoints.json:', error.message);
-  }
-  return null;
-}
-
-// Payment API configuration (read from env, .env file, endpoints.json, or defaults)
-// Priority: env var > .env file > endpoints.json > defaults
-const endpoints = readEndpoints();
+// Payment API configuration (read from env, .env file, or defaults)
+// Priority: env var > .env file > defaults
 const PAYMENT_API_BASE_URL = process.env.PAYMENT_API_BASE_URL || 
                               envFile.API_BASE_URL || 
-                              (endpoints && endpoints.base_url) || 
-                              'http://127.0.0.1';
-const PAYMENT_API_HOST_HEADER = process.env.PAYMENT_API_HOST_HEADER || 
-                                 envFile.API_HOST_HEADER || 
-                                 (endpoints && endpoints.host_header) || 
-                                 'payment.192.168.49.2.nip.io';
+                              'http://payment.k8s.orb.local';
 
 // Helper function to get access token from Keycloak
 async function getAccessToken() {
@@ -183,7 +163,7 @@ function httpRequestWithHost(url, options = {}) {
       headers: {
         ...headers,
         // Override Host header if provided (for ingress routing)
-        ...(hostHeader && { Host: hostHeader }),
+
       },
       timeout: timeout,
     };
@@ -335,7 +315,6 @@ app.post('/api/checkout/process-payment', async (req, res) => {
     console.log(`   [${requestId}] 💳 Step 3: Calling payment-service...`);
     const paymentUrl = `${PAYMENT_API_BASE_URL}/api/v1/payments`;
     console.log(`   [${requestId}]    URL: ${paymentUrl}`);
-    console.log(`   [${requestId}]    Host header: ${PAYMENT_API_HOST_HEADER}`);
     console.log(`   [${requestId}]    Idempotency-Key: ${idempotencyKey}`);
     console.log(`   [${requestId}]    Request payload:`, JSON.stringify(paymentData, null, 2));
     
@@ -346,7 +325,6 @@ app.post('/api/checkout/process-payment', async (req, res) => {
       console.log(`   [${requestId}]    Full request details:`);
       console.log(`   [${requestId}]      Method: POST`);
       console.log(`   [${requestId}]      URL: ${paymentUrl}`);
-      console.log(`   [${requestId}]      Host header: ${PAYMENT_API_HOST_HEADER}`);
       console.log(`   [${requestId}]      Idempotency-Key: ${idempotencyKey}`);
       console.log(`   [${requestId}]      Token length: ${token.length} chars`);
       
@@ -359,7 +337,6 @@ app.post('/api/checkout/process-payment', async (req, res) => {
           'Authorization': `Bearer ${token}`,
           'Idempotency-Key': idempotencyKey,
         },
-        hostHeader: PAYMENT_API_HOST_HEADER, // Custom Host header for ingress routing
         body: JSON.stringify(paymentData),
         timeout: 30000,
       });
@@ -490,7 +467,6 @@ app.get('/api/checkout/payment-status/:paymentId', async (req, res) => {
     console.log(`   [${requestId}] 💳 Checking payment status...`);
     const statusUrl = `${PAYMENT_API_BASE_URL}/api/v1/payments/${paymentId}`;
     console.log(`   [${requestId}]    URL: ${statusUrl}`);
-    console.log(`   [${requestId}]    Host header: ${PAYMENT_API_HOST_HEADER}`);
     
     let statusResponse;
     try {
@@ -499,7 +475,6 @@ app.get('/api/checkout/payment-status/:paymentId', async (req, res) => {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
-        hostHeader: PAYMENT_API_HOST_HEADER,
         timeout: 10000,
       });
       
@@ -588,7 +563,6 @@ app.post('/api/checkout/authorize-payment/:paymentId', async (req, res) => {
     console.log(`   [${requestId}] 🔐 Authorizing payment...`);
     const authorizeUrl = `${PAYMENT_API_BASE_URL}/api/v1/payments/${paymentId}/authorize`;
     console.log(`   [${requestId}]    URL: ${authorizeUrl}`);
-    console.log(`   [${requestId}]    Host header: ${PAYMENT_API_HOST_HEADER}`);
     console.log(`   [${requestId}]    Note: No payment details sent - backend uses stored PaymentIntent ID`);
     
     // Build authorization request
@@ -605,7 +579,6 @@ app.post('/api/checkout/authorize-payment/:paymentId', async (req, res) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        hostHeader: PAYMENT_API_HOST_HEADER,
         body: JSON.stringify(authorizeRequest),
         timeout: 30000,
       });
@@ -686,7 +659,6 @@ app.listen(PORT, () => {
   console.log(`   Client ID: ${CLIENT_ID}`);
   console.log(`   Client Secret: ${CLIENT_SECRET ? '✅ Configured' : '❌ Not found'}`);
   console.log(`   Payment API URL: ${PAYMENT_API_BASE_URL}`);
-  console.log(`   Payment API Host Header: ${PAYMENT_API_HOST_HEADER}`);
   console.log(`   Payment Service Endpoint: ${PAYMENT_API_BASE_URL}/api/v1/payments`);
   console.log(`\n📋 Available endpoints:`);
   console.log(`   GET  /health`);

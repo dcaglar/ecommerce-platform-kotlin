@@ -41,7 +41,7 @@ if [[ -n "$KC_URL_OVERRIDE" ]]; then
   KC_URL="$KC_URL_OVERRIDE"
 fi
 
-KC_URL="${KC_URL:-http://127.0.0.1:8080}"
+KC_URL="${KC_URL:-http://keycloak.payment.svc.cluster.local:8080}"
 
 # Ensure Keycloak is ready before requesting a token
 wait_for_keycloak

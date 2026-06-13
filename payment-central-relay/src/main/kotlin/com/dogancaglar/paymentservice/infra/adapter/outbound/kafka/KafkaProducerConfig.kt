@@ -56,13 +56,14 @@ class KafkaProducerConfig(
             put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5)
 
             // timeouts
-            put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 20_000)
-            put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 60_000)
-            put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 30_000)
+            put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 30_000)
+            put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 120_000)
+            put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 60_000)
 
             put(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, 5_242_880) // 5MB (Default is 1MB)
             put(ProducerConfig.BUFFER_MEMORY_CONFIG, 67_108_864) // 64MB (Default is 32MB)
-            put(ProducerConfig.LINGER_MS_CONFIG, 5)
+            put(ProducerConfig.BATCH_SIZE_CONFIG, 262_144) // 256KB for heavy batching (Default is 16KB)
+            put(ProducerConfig.LINGER_MS_CONFIG, 20)
 
             // compression
             put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "zstd")

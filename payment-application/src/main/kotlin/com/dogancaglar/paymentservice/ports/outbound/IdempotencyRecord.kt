@@ -3,10 +3,11 @@ package com.dogancaglar.paymentservice.ports.outbound
 
 import com.dogancaglar.common.time.Utc
 import java.time.Instant
+import java.util.UUID
 
 data class IdempotencyRecord(
     val id: Long? = null,
-    val idempotencyKey: String,
+    val idempotencyKey: UUID,
     val requestHash: String,
     val paymentIntentId: Long? = null,
     val responsePayload: String? = null,

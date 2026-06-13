@@ -1,5 +1,6 @@
 spring:
   profile: "local"
+topologySpreadConstraints: []
 runPrivilegeGrantJob: true
 autoscaling:
   enabled: true
@@ -32,6 +33,8 @@ autoscaling:
           value: 100
           periodSeconds: 15
 paymentService:
+  image:
+    pullPolicy: Always
   jvmOpts: >-
     -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication -XX:MaxRAMPercentage=45 -XX:InitialRAMPercentage=45 -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
   resources:
@@ -42,6 +45,8 @@ paymentService:
       cpu: 1000m
       memory: 768Mi
 edgeWorker:
+  image:
+    pullPolicy: Always
   resources:
     requests: {cpu: "250m", memory: "512Mi"}
     limits: {cpu: "500m", memory: "768Mi"}
@@ -77,19 +82,9 @@ edgeDb:
     - "-c"
     - "max_connections=85"
     - "-c"
-    - "checkpoint_timeout=10min"
+    - "fsync=on"
     - "-c"
-    - "max_wal_size=1GB"
-    - "-c"
-    - "min_wal_size=256MB"
-    - "-c"
-    - "checkpoint_completion_target=0.9"
-    - "-c"
-    - "wal_compression=on"
-    - "-c"
-    - "bgwriter_lru_maxpages=400"
-    - "-c"
-    - "bgwriter_lru_multiplier=2"
+    - "synchronous_commit=on"
 ingress:
   enabled: true
   className: nginx
@@ -125,12 +120,10 @@ service:
   type: ClusterIP
   port: 8080
   portName: http
-
 redis:
   url: redis://redis-master:6379
 kafka:
   bootstrapServers: kafka.payment.svc.cluster.local:9092
-
 postgresExporter:
   resources:
     requests:

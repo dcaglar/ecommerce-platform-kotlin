@@ -12,29 +12,6 @@ server:
   payment-service:
     api-key: secretpaymentapikey12345
 spring:
-  datasource:
-    edge:
-      jdbc-url: ${EDGE_DB_URL:jdbc:postgresql://localhost:5432/edge-db}
-      username: ${EDGE_DB_USERNAME:edge_db_user}
-      password: ${EDGE_DB_PASSWORD:edge_db_password}
-      connection-timeout: 5000
-      validation-timeout: 1000
-      idle-timeout: 600000
-      max-lifetime: 1800000
-      leak-detection-threshold: 60000
-      connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
-    yugabyte:
-      jdbc-url: ${YUGABYTE_DB_URL:jdbc:postgresql://localhost:5433/yugabyte}
-      username: ${YUGABYTE_DB_USERNAME:yugabyte}
-      password: ${YUGABYTE_DB_PASSWORD:yugabyte}
-      connection-timeout: 5000
-      validation-timeout: 1000
-      idle-timeout: 600000
-      max-lifetime: 1800000
-      leak-detection-threshold: 60000
-      connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
-
-spring:
   data:
     redis:
       url: ${SPRING_DATA_REDIS_URL:redis://localhost:6379}
@@ -50,6 +27,28 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI:http://localhost:8180/realms/payment}
+
+  datasource:
+    edge:
+      url: ${EDGE_DB_URL}
+      username: ${EDGE_DB_PAYMENT_SERVICE_USERNAME}
+      password: ${EDGE_DB_PAYMENT_SERVICE_PASSWORD}
+      connection-timeout: 5000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+      connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
+    yugabyte:
+      url: ${YUGABYTE_DB_URL}
+      username: ${YUGABYTE_DB_PAYMENT_SERVICE_USERNAME}
+      password: ${YUGABYTE_DB_PAYMENT_SERVICE_PASSWORD}
+      connection-timeout: 5000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+      connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
 
 outbox-dispatcher:
   thread-count: 2

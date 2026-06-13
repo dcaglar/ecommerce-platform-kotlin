@@ -116,10 +116,10 @@ kubectl config get-contexts
 # Show the current context (the cluster kubectl is using)
 kubectl config current-context
 
-# Switch to a different context (e.g., minikube, docker-desktop, GKE, etc.)
+# Switch to a different context (e.g., orbstack, docker-desktop, GKE, etc.)
 kubectl config use-context <context-name>
 
-# Why: Contexts let you easily switch between local (minikube, Docker Desktop) and cloud (GKE, EKS, etc.) clusters. Always check your context before applying manifests to avoid deploying to the wrong cluster.
+# Why: Contexts let you easily switch between local (orbstack, Docker Desktop) and cloud (GKE, EKS, etc.) clusters. Always check your context before applying manifests to avoid deploying to the wrong cluster.
 ```
 
 ## Cluster Info & Health

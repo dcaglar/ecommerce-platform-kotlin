@@ -35,7 +35,8 @@ class PaymentIntentOutboundAdapter(
         return paymentIntent
     }
 
-a        val entity = paymentIntentMapper.findById(paymentIntentId.value)!!
+    override fun findById(paymentIntentId: PaymentIntentId): PaymentIntent {
+        val entity = paymentIntentMapper.findById(paymentIntentId.value)!!
         val splits: List<PaymentSplit> = if (entity.splitsJson.isNotBlank()) {
             objectMapper.readValue(entity.splitsJson, splitsTypeRef)
         } else {

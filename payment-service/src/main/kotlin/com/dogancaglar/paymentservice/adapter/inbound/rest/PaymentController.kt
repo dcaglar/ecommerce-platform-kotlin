@@ -21,8 +21,12 @@ import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CaptureRequestDTO
 import com.dogancaglar.common.id.PublicIdFactory
 import com.dogancaglar.paymentservice.adapter.inbound.rest.dto.CaptureResponseDTO
 
+import org.springframework.validation.annotation.Validated
+import com.dogancaglar.paymentservice.adapter.inbound.rest.validation.ValidUuidV7
+
 @RestController
 @RequestMapping("/api/v1")
+@Validated
 class PaymentController(
     private val paymentApiOrchestrator: PaymentApiOrchestrator,
     private val modificationOrchestrator: ModificationOrchestrator,
@@ -41,16 +45,13 @@ class PaymentController(
     @PostMapping("/payments")
     @PreAuthorize("hasAuthority('payment:write')")
     fun createPayment(
-        @RequestHeader("Idempotency-Key") idempotencyKey: String?,
+        @RequestHeader("Idempotency-Key") @ValidUuidV7 idempotencyKey: String,
         @Valid @RequestBody request: CreatePaymentIntentRequestDTO
     ): ResponseEntity<CreatePaymentIntentResponseDTO> {
         logger.info("📥 Starting payment create intent reqeust")
-        require(!idempotencyKey.isNullOrBlank()) {
-            "Idempotency-Key header is required"
-        }
 
         val result = idempotencyService.run(
-            key = idempotencyKey,
+            key = java.util.UUID.fromString(idempotencyKey),
             requestBody = request,
             responseClass = CreatePaymentIntentResponseDTO::class.java, // Arg 3: The type
             idExtractor = { response ->
