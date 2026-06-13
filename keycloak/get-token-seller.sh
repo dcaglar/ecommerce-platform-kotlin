@@ -17,7 +17,7 @@ if [[ -n "$KC_URL_OVERRIDE" ]]; then
   KC_URL="$KC_URL_OVERRIDE"
 fi
 
-KC_URL="${KC_URL:-http://127.0.0.1:8080}"  # Defaults to localhost (port-forwarding). Override if running inside cluster.
+KC_URL="${KC_URL:-http://keycloak.payment.svc.cluster.local:8080}"
 
 SANITIZED_USERNAME=$(printf '%s' "$USERNAME" | tr -c 'A-Za-z0-9._:-' '_')
 BASE_NAME="seller-${SANITIZED_USERNAME}"

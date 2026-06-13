@@ -116,7 +116,7 @@ const PAYMENT_API_BASE_URL = process.env.PAYMENT_API_BASE_URL ||
 const PAYMENT_API_HOST_HEADER = process.env.PAYMENT_API_HOST_HEADER || 
                                  envFile.API_HOST_HEADER || 
                                  (endpoints && endpoints.host_header) || 
-                                 'payment.192.168.49.2.nip.io';
+                                 'payment.mor-dc.local';
 
 // Helper function to get access token from Keycloak
 async function getAccessToken() {
@@ -183,7 +183,7 @@ function httpRequestWithHost(url, options = {}) {
       headers: {
         ...headers,
         // Override Host header if provided (for ingress routing)
-        ...(hostHeader && { Host: hostHeader }),
+
       },
       timeout: timeout,
     };

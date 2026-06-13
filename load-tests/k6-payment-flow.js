@@ -179,7 +179,7 @@ export default function () {
     const baseUrl = endpoints.base_url;
 
     const headers = {
-        'Host': endpoints.host_header,
+
         'Authorization': `Bearer ${ACCESS_TOKEN}`,
         'Content-Type': 'application/json',
     };

@@ -15,7 +15,6 @@ kubectl -n payment get endpoints payment-db-postgresql
 ```
 - If using LoadBalancer, ensure tunnel is running; otherwise port-forward:
 ```bash
-sudo -E minikube -p newprofile tunnel
 # or
 infra/scripts/port-forwarding.sh
 ```
@@ -105,7 +104,6 @@ Ingress and service access
 - Ensure endpoints.json exists: it’s written by deploy-payment-service-local.sh
 - If EXTERNAL-IP is pending, run:
 ```bash
-sudo -E minikube -p newprofile tunnel
 ```
 - Without tunnel, use NodePort (the script falls back automatically) or set PF_INGRESS=true and run port-forwarding:
 ```bash
@@ -113,19 +111,19 @@ PF_INGRESS=true infra/scripts/port-forwarding.sh
 ```
 
 Keycloak and tokens
-- Port-forward or set KEYCLOAK_URL/KC_URL to http://127.0.0.1:8080
+- Port-forward or set KEYCLOAK_URL/KC_URL to http://keycloak.payment.svc.cluster.local:8080
 ```bash
-export KEYCLOAK_URL=http://127.0.0.1:8080
-export KC_URL=http://127.0.0.1:8080
+export KEYCLOAK_URL=http://keycloak.payment.svc.cluster.local:8080
+export KC_URL=http://keycloak.payment.svc.cluster.local:8080
 ```
 - Provision realm/clients:
 ```bash
-KEYCLOAK_URL=http://127.0.0.1:8080 ./keycloak/provision-keycloak.sh
+KEYCLOAK_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/provision-keycloak.sh
 ```
 - Get token (saved at `keycloak/output/jwt/payment-service.token`):
 ```bash
 ./keycloak/get-token.sh
-# Optional: ./keycloak/get-token.sh http://127.0.0.1:8080 6   # request 6-hour token
+# Optional: ./keycloak/get-token.sh http://keycloak.payment.svc.cluster.local:8080 6   # request 6-hour token
 ```
 
 Helpful references (avoid duplication)

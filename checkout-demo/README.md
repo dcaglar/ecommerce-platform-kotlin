@@ -55,7 +55,7 @@ A developer-facing internal demo page for testing payment creation requests with
    The other values have sensible defaults:
    - `VITE_KEYCLOAK_URL`: Defaults to `http://127.0.0.1:8080` (assumes port-forwarding)
    - `VITE_API_BASE_URL`: Defaults to `http://127.0.0.1`
-   - `VITE_API_HOST_HEADER`: Defaults to `payment.192.168.49.2.nip.io`
+   - `VITE_API_HOST_HEADER`: Defaults to `payment.mor-dc.local`
 
 3. **Start the development servers:**
    ```bash
@@ -120,7 +120,7 @@ Payment Orders:
 **API Connection Error:**
 - Check that payment service is running and accessible
 - The proxy reads from `infra/endpoints.json` automatically (or uses defaults)
-- Payment service URL: `http://127.0.0.1/api/v1/payments` with Host header `payment.192.168.49.2.nip.io`
+- Payment service URL: `http://127.0.0.1/api/v1/payments` with Host header `payment.mor-dc.local`
 - For Kubernetes: Ensure ingress is set up (see `docs/how-to-start.md` step 5)
 - For local access: Port-forwarding may be needed: `kubectl port-forward -n payment svc/payment-service 80:80`
 - Check proxy console logs for the exact URL and Host header being used

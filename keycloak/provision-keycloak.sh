@@ -85,20 +85,9 @@ log() { echo "[$(date +'%H:%M:%S')] $*" >&2; }
 # Keycloak's KC_HOSTNAME configuration (set in keycloak-values-local.yaml)
 # Default to localhost assuming port-forwarding is running
 if [[ -z "${KEYCLOAK_URL:-}" ]]; then
-  log "🔍 Auto-detecting Keycloak URL..."
-  # Try localhost first (port-forwarding from host machine)
-  if curl -sf --max-time 2 "http://127.0.0.1:8080/realms/master" >/dev/null 2>&1; then
-    KEYCLOAK_URL="http://127.0.0.1:8080"
-    log "   ✅ Found Keycloak at http://127.0.0.1:8080 (port-forwarding)"
-  # Fallback to cluster-internal URL (running inside cluster)
-  elif curl -sf --max-time 2 "http://keycloak:8080/realms/master" >/dev/null 2>&1; then
-    KEYCLOAK_URL="http://keycloak:8080"
-    log "   ✅ Found Keycloak at http://keycloak:8080 (cluster-internal)"
-  else
-    # Default to localhost (most common scenario)
-    KEYCLOAK_URL="http://127.0.0.1:8080"
-    log "   ⚠️  Could not detect Keycloak, defaulting to http://127.0.0.1:8080"
-  fi
+  log "🔍 Using cluster-internal Keycloak URL..."
+  KEYCLOAK_URL="http://keycloak.payment.svc.cluster.local:8080"
+
 else
   log "   Using explicit KEYCLOAK_URL: $KEYCLOAK_URL"
 fi

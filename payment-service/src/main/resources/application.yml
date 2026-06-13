@@ -8,7 +8,7 @@ spring:
   application:
     name: payment-service
   # Pool defaults for the web datasource — overrideable per environment
-  # These are production-safe defaults; tune in application-{profile}.yml if needed
+  # These are production-safe dwefaults; tune in application-{profile}.yml if needed
   datasource:
     edge:
       driver-class-name: org.postgresql.Driver

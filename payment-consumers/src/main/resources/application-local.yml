@@ -13,9 +13,9 @@ app:
 spring:
   datasource:
     payment-consumers:
-      url: ${SPRING_DATASOURCE_CENTRAL_URL}
-      username: ${SPRING_DATASOURCE_USERNAME}
-      password: ${SPRING_DATASOURCE_PASSWORD}
+      url: ${CENTRAL_DB_URL}
+      username: ${CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME}
+      password: ${CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD}
       hikari:
         maximum-pool-size: 20
         minimum-idle: 1
@@ -26,9 +26,9 @@ spring:
         keepalive-time: 300000
         leak-detection-threshold: 60000
     account-snapshot-job:
-      url: ${SPRING_DATASOURCE_CENTRAL_URL}
-      username: ${SPRING_DATASOURCE_USERNAME}
-      password: ${SPRING_DATASOURCE_PASSWORD}
+      url: ${CENTRAL_DB_URL}
+      username: ${CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME}
+      password: ${CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD}
       hikari:
         maximum-pool-size: 5
         minimum-idle: 1

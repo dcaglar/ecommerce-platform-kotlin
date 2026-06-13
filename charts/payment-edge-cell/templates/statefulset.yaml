@@ -17,6 +17,8 @@ spec:
     metadata:
       labels:
         app: {{ include "payment-edge-cell.fullname" . }}
+      annotations:
+        rollout/reboot: "{{ now | unixEpoch }}"
     spec:
       {{- if .Values.serviceAccount }}
       serviceAccountName: {{ .Values.serviceAccount.name | default "default" }}
@@ -99,6 +101,7 @@ spec:
         # 4. LIQUIBASE JOB (Runs after DB is ready)
         - name: payment-service-liquibase
           image: "{{ .Values.paymentService.image.repository }}:{{ .Values.paymentService.image.tag }}"
+          imagePullPolicy: {{ .Values.paymentService.image.pullPolicy }}
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "liquibase-job"
@@ -109,21 +112,36 @@ spec:
                 configMapKeyRef:
                   name: payment-platform-config
                   key: EDGE_DB_NAME
-            - name: SPRING_DATASOURCE_URL
+            - name: EDGE_DB_URL
               valueFrom:
                 configMapKeyRef:
                   name: payment-platform-config
                   key: EDGE_DB_URL
-            - name: SPRING_DATASOURCE_USERNAME
+            - name: EDGE_DB_PAYMENT_SERVICE_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: edge-db-credentials
                   key: EDGE_DB_PAYMENT_SERVICE_USERNAME
-            - name: SPRING_DATASOURCE_PASSWORD
+            - name: EDGE_DB_PAYMENT_SERVICE_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: edge-db-credentials
                   key: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+            - name: YUGABYTE_DB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: YUGABYTE_DB_URL
+            - name: YUGABYTE_DB_PAYMENT_SERVICE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: yugabyte-db-credentials
+                  key: YUGABYTE_DB_PAYMENT_SERVICE_USERNAME
+            - name: YUGABYTE_DB_PAYMENT_SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: yugabyte-db-credentials
+                  key: YUGABYTE_DB_PAYMENT_SERVICE_PASSWORD
 
       {{- with .Values.nodeSelector }}
       nodeSelector:
@@ -182,17 +200,17 @@ spec:
                 configMapKeyRef:
                   name: payment-platform-config
                   key: EDGE_DB_NAME
-            - name: SPRING_DATASOURCE_URL
+            - name: SPRING_DATASOURCE_EDGE_URL
               valueFrom:
                 configMapKeyRef:
                   name: payment-platform-config
                   key: EDGE_DB_URL
-            - name: SPRING_DATASOURCE_USERNAME
+            - name: EDGE_DB_PAYMENT_SERVICE_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: edge-db-credentials
                   key: EDGE_DB_PAYMENT_SERVICE_USERNAME
-            - name: SPRING_DATASOURCE_PASSWORD
+            - name: EDGE_DB_PAYMENT_SERVICE_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: edge-db-credentials
@@ -202,6 +220,17 @@ spec:
                 configMapKeyRef:
                   name: payment-platform-config
                   key: YUGABYTE_DB_URL
+            - name: YUGABYTE_DB_PAYMENT_SERVICE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: yugabyte-db-credentials
+                  key: YUGABYTE_DB_PAYMENT_SERVICE_USERNAME
+            - name: YUGABYTE_DB_PAYMENT_SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: yugabyte-db-credentials
+                  key: YUGABYTE_DB_PAYMENT_SERVICE_PASSWORD
+
             - name: SPRING_LIQUIBASE_ENABLED
               value: "false"
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
@@ -248,42 +277,42 @@ spec:
                 configMapKeyRef:
                   name: payment-platform-config
                   key: EDGE_DB_NAME
-            - name: SPRING_DATASOURCE_EDGE_URL
+            - name: EDGE_DB_URL
               valueFrom:
                 configMapKeyRef:
                   name: payment-platform-config
                   key: EDGE_DB_URL
-            - name: SPRING_DATASOURCE_EDGE_USERNAME
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: edge-db-credentials
                   key: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
-            - name: SPRING_DATASOURCE_EDGE_PASSWORD
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: edge-db-credentials
                   key: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
-            - name: SPRING_DATASOURCE_MAINTENANCE_USERNAME
+            - name: EDGE_DB_DUTY_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: edge-db-credentials
                   key: EDGE_DB_DUTY_USERNAME
-            - name: SPRING_DATASOURCE_MAINTENANCE_PASSWORD
+            - name: EDGE_DB_DUTY_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: edge-db-credentials
                   key: EDGE_DB_DUTY_PASSWORD
-            - name: SPRING_DATASOURCE_CENTRAL_URL
+            - name: CENTRAL_DB_URL
               valueFrom:
                 configMapKeyRef:
                   name: payment-platform-config
                   key: CENTRAL_DB_URL
-            - name: SPRING_DATASOURCE_CENTRAL_USERNAME
+            - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: central-db-credentials
                   key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
-            - name: SPRING_DATASOURCE_CENTRAL_PASSWORD
+            - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: central-db-credentials

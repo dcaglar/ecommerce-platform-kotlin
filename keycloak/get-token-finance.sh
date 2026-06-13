@@ -17,7 +17,7 @@ if [[ -n "$KC_URL_OVERRIDE" ]]; then
   KC_URL="$KC_URL_OVERRIDE"
 fi
 
-KC_URL="${KC_URL:-http://127.0.0.1:8080}"
+KC_URL="${KC_URL:-http://keycloak.payment.svc.cluster.local:8080}"
 SANITIZED_USERNAME=$(printf '%s' "$USERNAME" | tr -c 'A-Za-z0-9._:-' '_')
 ACCESS_TOKEN_FILE="${JWT_DIR}/finance-${SANITIZED_USERNAME}.token"
 CLAIMS_FILE="${JWT_DIR}/finance-${SANITIZED_USERNAME}.claims.json"

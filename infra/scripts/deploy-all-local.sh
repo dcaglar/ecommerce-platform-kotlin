@@ -6,6 +6,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR/../.."
 cd "$REPO_ROOT"
 
+echo "🛡️  Checking Kubernetes context..."
+CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "none")
+if [[ "$CURRENT_CONTEXT" != "orbstack" ]]; then
+  echo "⚠️  Current context is '$CURRENT_CONTEXT', but this script requires 'orbstack'."
+  if kubectl config get-contexts orbstack >/dev/null 2>&1; then
+    echo "🔄 Switching context to 'orbstack'..."
+    kubectl config use-context orbstack
+  else
+    echo "❌ OrbStack context not found! Is OrbStack running with Kubernetes enabled?"
+    exit 1
+  fi
+fi
+
+
 
 echo "🚀 Deploying platform config and secrets..."
 "$SCRIPT_DIR/deploy-payment-platform-config.sh"

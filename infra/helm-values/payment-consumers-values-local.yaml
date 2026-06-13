@@ -3,7 +3,7 @@ spring:
 image:
   repository: dcaglar1987/payment-consumers
   tag: latest
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
 resources:
   requests: {cpu: "150m", memory: "256Mi"}
   limits: {cpu: "500m", memory: "768Mi"}

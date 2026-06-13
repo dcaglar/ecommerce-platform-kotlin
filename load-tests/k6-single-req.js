@@ -72,7 +72,7 @@ function createPaymentIntent() {
 
     const params = {
         headers: {
-            'Host': `${endpoints.host_header}`,
+
             'Authorization': `Bearer ${ACCESS_TOKEN}`,
             'Idempotency-Key': randomId('IDEM'),
             'Content-Type': 'application/json'
@@ -95,7 +95,7 @@ function authorizePayment(paymentId) {
 
     const params = {
         headers: {
-            'Host': `${endpoints.host_header}`,
+
             'Authorization': `Bearer ${ACCESS_TOKEN}`,
             'Content-Type': 'application/json'
         },

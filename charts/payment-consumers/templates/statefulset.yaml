@@ -52,14 +52,14 @@ spec:
               value: "{{ .Values.redis.url }}"
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: "{{ .Values.kafka.bootstrapServers }}"
-            - name: SPRING_DATASOURCE_URL
+            - name: CENTRAL_DB_URL
               valueFrom: { configMapKeyRef: { name: payment-platform-config, key: CENTRAL_DB_URL } }
-            - name: SPRING_DATASOURCE_USERNAME
+            - name: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: central-db-credentials
                   key: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME
-            - name: SPRING_DATASOURCE_PASSWORD
+            - name: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: central-db-credentials

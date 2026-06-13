@@ -7,6 +7,5 @@
 
     <!-- Global Idempotency Store deployed on YugabyteDB -->
     <include file="20251202-idempotency-keys.xml" relativeToChangelogFile="true"/>
-    <include file="20260208-optimize-idempotency.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

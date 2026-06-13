@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    edge:
+      url: ${EDGE_DB_URL}
+      username: ${EDGE_DB_PAYMENT_SERVICE_USERNAME}
+      password: ${EDGE_DB_PAYMENT_SERVICE_PASSWORD}
+      driver-class-name: org.postgresql.Driver
+    yugabyte:
+      url:  ${YUGABYTE_DB_URL}
+      username: ${YUGABYTE_DB_PAYMENT_SERVICE_USERNAME}
+      password: ${YUGABYTE_DB_PAYMENT_SERVICE_PASSWORD}
+      driver-class-name: org.postgresql.Driver

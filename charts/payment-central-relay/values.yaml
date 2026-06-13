@@ -4,7 +4,6 @@ spring:
 image:
   repository: dcaglar1987/payment-central-relay
   tag: latest
-  pullPolicy: Always
 
 resources: {}
 
