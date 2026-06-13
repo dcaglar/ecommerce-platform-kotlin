@@ -26,7 +26,7 @@ public class YugabyteMybatisConfig {
         sessionFactory.setDataSource(dataSource)
         sessionFactory.setTypeAliasesPackage("com.dogancaglar.common.db.entity")
         sessionFactory.setTypeHandlersPackage("com.dogancaglar.common.db.typehandler")
-        sessionFactory.setMapperLocations(*PathMatchingResourcePatternResolver().getResources("classpath*:mapper/edge/**/*.xml"))
+        sessionFactory.setMapperLocations(*PathMatchingResourcePatternResolver().getResources("classpath*:mapper/yugabyte/**/*.xml"))
         return sessionFactory.`object`!!
     }
 }

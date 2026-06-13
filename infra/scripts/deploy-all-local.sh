@@ -24,6 +24,11 @@ fi
 echo "🚀 Deploying platform config and secrets..."
 "$SCRIPT_DIR/deploy-payment-platform-config.sh"
 
+
+echo "🚀 Deploying keycloak"
+"$SCRIPT_DIR/deploy-keycloak-local.sh"
+
+
 echo "🚀 Deploying  central databases..."
 "$SCRIPT_DIR/deploy-central-db-local.sh"
 

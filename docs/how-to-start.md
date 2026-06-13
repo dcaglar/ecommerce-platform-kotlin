@@ -200,17 +200,10 @@ Tokens are intentionally scoped to those roles so you can exercise each endpoint
 
 **Step 1: Create Payment Intent**
 
-- Dynamic (reads host and base URL from infra/endpoints.json):
 ```bash
-BASE_URL=$(jq -r .base_url infra/endpoints.json)
-HOST=$(jq -r .host_header infra/endpoints.json)
-IDEMPOTENCY_KEY="idem-$(date +%s)-$RANDOM"
-
-echo "Using BASE_URL=$BASE_URL"
-echo "Using Host header=$HOST"
+ IDEMPOTENCY_KEY=$(printf '%08x-%04x-7%03x-8%03x-%04x%08x' $((RANDOM*RANDOM)) $((RANDOM)) $((RANDOM%4096)) $((RANDOM%4096)) $((RANDOM)) $((RANDOM*RANDOM)))
 echo "Using Idempotency-Key=$IDEMPOTENCY_KEY"
-
-curl -i -X POST "$BASE_URL/api/v1/payments" \
+curl -i -X POST "http://payment.k8s.orb.local/api/v1/payments" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
   -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
@@ -222,11 +215,11 @@ curl -i -X POST "$BASE_URL/api/v1/payments" \
     "totalAmount": { "quantity": 3000, "currency": "EUR" },
     "splits": [
       { "type": "BalanceAccount", "account": "SELLER-1-1", "amount": { "quantity": 1400, "currency": "EUR" }},
-       { "type": "Commission", "amount": { "quantity": 100, "currency": "EUR" }},
+      { "type": "Commission", "amount": { "quantity": 100, "currency": "EUR" }},
       { "type": "BalanceAccount", "account": "SELLER-1-2", "amount": { "quantity": 1400, "currency": "EUR" }},
       { "type": "Commission", "amount": { "quantity": 100, "currency": "EUR" }}
-    ]
-  }'
+            ]
+      }'  
 ```
 
 **Expected Response (200 OK):**

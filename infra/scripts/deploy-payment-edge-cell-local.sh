@@ -15,7 +15,7 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
 kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller --timeout=180s
 
 # 2) Compute host + base URL for OrbStack Native
-INGRESS_HOST="payment.mor-dc.local"
+INGRESS_HOST="payment.k8s.orb.local"
 BASE_URL="http://$INGRESS_HOST"
 
 echo "✅ Using Base URL: $BASE_URL (Host: $INGRESS_HOST)"
