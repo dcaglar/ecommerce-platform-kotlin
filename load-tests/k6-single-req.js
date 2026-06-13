@@ -3,7 +3,6 @@ import { check, sleep } from 'k6';
 
 // 1. INIT STAGE
 const ACCESS_TOKEN = open('../keycloak/output/jwt/payment-service.token').replace(/[\r\n]+$/, '');
-const endpoints = JSON.parse(open('../infra/endpoints.json'));
 
 export const options = {
     vus: 1,
@@ -54,10 +53,20 @@ function generateRandomOrder() {
 
 const randomId = (prefix) => `${prefix}-${Math.floor(Math.random() * 1e12)}`;
 
+function generateUuidV7() {
+    const hex = () => Math.floor(Math.random() * 16).toString(16);
+    const hexN = (n) => {
+        let str = '';
+        for (let i = 0; i < n; i++) str += hex();
+        return str;
+    };
+    return `${hexN(8)}-${hexN(4)}-7${hexN(3)}-8${hexN(3)}-${hexN(12)}`;
+}
+
 // --- API Methods ---
 
 function createPaymentIntent() {
-    const url = `${endpoints.base_url}/api/v1/payments`;
+    const url = `http://payment.k8s.orb.local/api/v1/payments`;
 
     const orderData = generateRandomOrder();
 
@@ -74,7 +83,7 @@ function createPaymentIntent() {
         headers: {
 
             'Authorization': `Bearer ${ACCESS_TOKEN}`,
-            'Idempotency-Key': randomId('IDEM'),
+            'Idempotency-Key': generateUuidV7(),
             'Content-Type': 'application/json'
         },
     };
@@ -83,7 +92,7 @@ function createPaymentIntent() {
 }
 
 function authorizePayment(paymentId) {
-    const url = `${endpoints.base_url}/api/v1/payments/${paymentId}/authorize`;
+    const url = `http://payment.k8s.orb.local/api/v1/payments/${paymentId}/authorize`;
 
     const payload = JSON.stringify({
         paymentMethod: {

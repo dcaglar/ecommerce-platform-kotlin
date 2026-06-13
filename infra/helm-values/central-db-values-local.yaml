@@ -126,12 +126,9 @@ primary:
     # connections (lower = less RAM)
     max_connections = 85
 
-    # WAL / checkpoints (lighter on disk/CPU)
-    checkpoint_timeout = '10min'
-    max_wal_size = '1GB'
-    min_wal_size = '256MB'
-    checkpoint_completion_target = 0.9
-    wal_compression = on
+    # WAL / checkpoints
+    fsync = on
+    synchronous_commit = on
 
     # pg_stat_statements
     pg_stat_statements.max = 1000

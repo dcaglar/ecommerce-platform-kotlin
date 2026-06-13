@@ -201,8 +201,10 @@ Tokens are intentionally scoped to those roles so you can exercise each endpoint
 **Step 1: Create Payment Intent**
 
 ```bash
- IDEMPOTENCY_KEY=$(printf '%08x-%04x-7%03x-8%03x-%04x%08x' $((RANDOM*RANDOM)) $((RANDOM)) $((RANDOM%4096)) $((RANDOM%4096)) $((RANDOM)) $((RANDOM*RANDOM)))
+# Generate a pseudo-UUIDv7 idempotency key
+IDEMPOTENCY_KEY=$(printf '%08x-%04x-7%03x-8%03x-%04x%08x' $((RANDOM*RANDOM)) $((RANDOM)) $((RANDOM%4096)) $((RANDOM%4096)) $((RANDOM)) $((RANDOM*RANDOM)))
 echo "Using Idempotency-Key=$IDEMPOTENCY_KEY"
+
 curl -i -X POST "http://payment.k8s.orb.local/api/v1/payments" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
@@ -218,8 +220,8 @@ curl -i -X POST "http://payment.k8s.orb.local/api/v1/payments" \
       { "type": "Commission", "amount": { "quantity": 100, "currency": "EUR" }},
       { "type": "BalanceAccount", "account": "SELLER-1-2", "amount": { "quantity": 1400, "currency": "EUR" }},
       { "type": "Commission", "amount": { "quantity": 100, "currency": "EUR" }}
-            ]
-      }'  
+    ]
+  }'
 ```
 
 **Expected Response (200 OK):**
@@ -248,7 +250,7 @@ If Stripe API call is still processing, you'll receive:
 
 ```bash
 # Step 2: Authorize the payment intent
-curl -i -X POST "$BASE_URL/api/v1/payments/pi_AqPKfE1CAAA/authorize" \
+curl -i -X POST "http://payment.k8s.orb.local/api/v1/payments/pi_AcqzYyHCcAA/authorize" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
   -d '{}'
@@ -402,13 +404,7 @@ KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-selle
 
 2. Query your own balance (dynamic):
 ```bash
-BASE_URL=$(jq -r .base_url infra/endpoints.json)
-HOST=$(jq -r .host_header infra/endpoints.json)
-
-echo "Using BASE_URL=$BASE_URL"
-echo "Using Host header=$HOST"
-
-curl -i -X GET "$BASE_URL/api/v1/sellers/me/balance" \
+curl -i -X GET "http://payment.k8s.orb.local/api/v1/sellers/me/balance" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/seller-SELLER-111.token)" 
 ```
@@ -429,12 +425,7 @@ KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-finan
 
 2. Query balance for any seller (dynamic):
 ```bash
-BASE_URL=$(jq -r .base_url infra/endpoints.json)
-HOST=$(jq -r .host_header infra/endpoints.json)
-
-echo "Using BASE_URL=$BASE_URL"
-echo "Using Host header=$HOST"
-curl -i -X GET "$BASE_URL/api/v1/sellers/SELLER-111/balance" \
+curl -i -X GET "http://payment.k8s.orb.local/api/v1/sellers/SELLER-111/balance" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/finance-finance-ops.token)"
 ```
 
@@ -459,10 +450,7 @@ KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-merch
 
 2. Query balance via merchant API (dynamic):
 ```bash
-BASE_URL=$(jq -r .base_url infra/endpoints.json)
-HOST=$(jq -r .host_header infra/endpoints.json)
-
-curl -i -X GET "$BASE_URL/api/v1/sellers/me/balance" \
+curl -i -X GET "http://payment.k8s.orb.local/api/v1/sellers/me/balance" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/merchant-api-SELLER-111.token)"  
 ```
 

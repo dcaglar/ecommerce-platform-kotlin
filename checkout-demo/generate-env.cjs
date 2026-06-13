@@ -15,12 +15,11 @@ const ENV_EXAMPLE = path.join(__dirname, '.env.example');
 
 // Default values
 const defaults = {
-  VITE_KEYCLOAK_URL: 'http://127.0.0.1:8080',
+  VITE_KEYCLOAK_URL: 'http://127.0.0.1:32080',
   VITE_KEYCLOAK_REALM: 'ecommerce-platform',
   VITE_KEYCLOAK_CLIENT_ID: 'payment-service',
   VITE_KEYCLOAK_CLIENT_SECRET: '',
-  VITE_API_BASE_URL: 'http://127.0.0.1',
-  VITE_API_HOST_HEADER: 'payment.192.168.49.2.nip.io'
+  VITE_API_BASE_URL: 'http://payment.k8s.orb.local',
 };
 
 function readSecrets() {
@@ -48,20 +47,7 @@ function readSecrets() {
   return secrets;
 }
 
-function readEndpoints() {
-  const endpointsFile = path.join(PROJECT_ROOT, 'infra', 'endpoints.json');
-  if (!fs.existsSync(endpointsFile)) {
-    return null;
-  }
 
-  try {
-    const content = fs.readFileSync(endpointsFile, 'utf8');
-    return JSON.parse(content);
-  } catch (error) {
-    console.warn(`⚠️  Could not read endpoints.json: ${error.message}`);
-    return null;
-  }
-}
 
 function readExistingEnv() {
   const env = {};
@@ -94,8 +80,6 @@ function generateEnv() {
     process.exit(1);
   }
 
-  // Read endpoints if available
-  const endpoints = readEndpoints();
 
   // Read existing .env to preserve custom values
   const existing = readExistingEnv();
@@ -109,15 +93,7 @@ function generateEnv() {
     VITE_KEYCLOAK_CLIENT_ID: defaults.VITE_KEYCLOAK_CLIENT_ID,
   };
 
-  // Override with endpoints.json if available
-  if (endpoints) {
-    if (endpoints.base_url) {
-      env.VITE_API_BASE_URL = endpoints.base_url;
-    }
-    if (endpoints.host_header) {
-      env.VITE_API_HOST_HEADER = endpoints.host_header;
-    }
-  }
+
 
   // Generate .env content
   const lines = [
@@ -128,9 +104,7 @@ function generateEnv() {
     `VITE_KEYCLOAK_CLIENT_SECRET=${env.VITE_KEYCLOAK_CLIENT_SECRET}`,
     '',
     '# Payment API Configuration',
-    '# These can be read from infra/endpoints.json, but can be overridden here',
     `VITE_API_BASE_URL=${env.VITE_API_BASE_URL}`,
-    `VITE_API_HOST_HEADER=${env.VITE_API_HOST_HEADER}`,
     ''
   ];
 
@@ -144,8 +118,7 @@ function generateEnv() {
   console.log(`   Realm: ${env.VITE_KEYCLOAK_REALM}`);
   console.log(`   Client ID: ${env.VITE_KEYCLOAK_CLIENT_ID}`);
   console.log(`   Client Secret: ${clientSecret.substring(0, 8)}... (hidden)`);
-  console.log(`   API Base URL: ${env.VITE_API_BASE_URL}`);
-  console.log(`   API Host Header: ${env.VITE_API_HOST_HEADER}\n`);
+  console.log(`   API Base URL: ${env.VITE_API_BASE_URL}\n`);
   console.log('💡 You can now run: npm run dev');
 }
 

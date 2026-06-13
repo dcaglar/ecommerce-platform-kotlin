@@ -5,7 +5,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR/../.."
 VALUES_TPL="$REPO_ROOT/infra/helm-values/payment-edge-cell-values-azure.yaml"
 INGRESS_VALUES="$REPO_ROOT/infra/helm-values/ingress-values.yaml"
-ENDPOINTS_JSON="$REPO_ROOT/infra/endpoints.json"
 # 1) Ensure we don't have two ingress controllers
 if minikube addons list  | grep -qE '^- +ingress +enabled'; then
   echo "⚠️  Disabling minikube ingress addon to avoid duplicate controllers..."
@@ -73,22 +72,9 @@ echo "✅ payment-edge-cell deployment applied."
 echo "Use 'kubectl get pods -n payment' to check status."
 kubectl -n payment rollout status statefulset payment-edge-cell  --timeout=180s || true
 
-# Ensure Ingress object exists before writing endpoints.json
-for _ in {1..30}; do
-  kubectl -n payment get ingress payment-edge-cell >/dev/null 2>&1 && break
-  sleep 2
-done
-
-# 5) Write endpoints.json for k6 etc.
-mkdir -p "$(dirname "$ENDPOINTS_JSON")"
-cat > "$ENDPOINTS_JSON" <<EOF
-{ "base_url": "$BASE_URL", "host_header": "$INGRESS_HOST" }
-EOF
-
 echo "✅ Deployed."
 echo "   Host header: $INGRESS_HOST"
 echo "   Base URL:    $BASE_URL"
-echo "   endpoints.json → $ENDPOINTS_JSON"
 
 # 6) Optional health probe (uncomment to fail fast)
 # echo "🔎 Probing: $BASE_URL/actuator/health with Host: $INGRESS_HOST"

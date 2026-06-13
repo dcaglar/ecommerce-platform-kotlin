@@ -39,7 +39,7 @@ A developer-facing internal demo page for testing payment creation requests with
    
    This script will:
    - Read the client secret from `keycloak/output/secrets.txt`
-   - Read API endpoints from `infra/endpoints.json` (if available)
+   - Uses default http://payment.k8s.orb.local for API calls
    - Generate a `.env` file with all required configuration
    
    **Option B - Manual:**
@@ -53,9 +53,8 @@ A developer-facing internal demo page for testing payment creation requests with
    - `VITE_KEYCLOAK_CLIENT_SECRET`: Get this from `keycloak/output/secrets.txt` after running `./keycloak/provision-keycloak.sh`
    
    The other values have sensible defaults:
-   - `VITE_KEYCLOAK_URL`: Defaults to `http://127.0.0.1:8080` (assumes port-forwarding)
-   - `VITE_API_BASE_URL`: Defaults to `http://127.0.0.1`
-   - `VITE_API_HOST_HEADER`: Defaults to `payment.mor-dc.local`
+   - `VITE_KEYCLOAK_URL`: Defaults to `http://127.0.0.1:32080` (native NodePort)
+   - `VITE_API_BASE_URL`: Defaults to `http://payment.k8s.orb.local`
 
 3. **Start the development servers:**
    ```bash
@@ -112,18 +111,16 @@ Payment Orders:
 
 **Payment Request Errors:**
 - Ensure both servers are running (frontend on 3000, proxy on 3001 - check console)
-- Ensure Keycloak is running: `kubectl port-forward -n payment svc/keycloak 8080:8080`
+- Ensure Keycloak is running and reachable: `http://127.0.0.1:32080`
 - Check that `./keycloak/provision-keycloak.sh` was run
 - Verify proxy console shows "Client Secret: ✅ Configured"
 - Check proxy console for detailed error messages (it logs token and payment-service call errors)
 
 **API Connection Error:**
 - Check that payment service is running and accessible
-- The proxy reads from `infra/endpoints.json` automatically (or uses defaults)
-- Payment service URL: `http://127.0.0.1/api/v1/payments` with Host header `payment.mor-dc.local`
-- For Kubernetes: Ensure ingress is set up (see `docs/how-to-start.md` step 5)
-- For local access: Port-forwarding may be needed: `kubectl port-forward -n payment svc/payment-service 80:80`
-- Check proxy console logs for the exact URL and Host header being used
+- The proxy uses `http://payment.k8s.orb.local` natively
+- For Kubernetes: Ensure the payment-edge-cell ingress is successfully deployed
+- Check proxy console logs for the exact URL being used
 
 **Validation Errors:**
 - Total amount must equal the sum of all payment orders

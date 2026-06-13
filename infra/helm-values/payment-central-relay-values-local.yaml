@@ -41,4 +41,4 @@ autoscaling:
           periodSeconds: 60
 resources:
   requests: {cpu: "150m", memory: "256Mi"}
-  limits: {cpu: "500m", memory: "768Mi"}
+  limits: {memory: "1024Mi"}

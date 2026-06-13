@@ -82,19 +82,9 @@ edgeDb:
     - "-c"
     - "max_connections=85"
     - "-c"
-    - "checkpoint_timeout=10min"
+    - "fsync=on"
     - "-c"
-    - "max_wal_size=1GB"
-    - "-c"
-    - "min_wal_size=256MB"
-    - "-c"
-    - "checkpoint_completion_target=0.9"
-    - "-c"
-    - "wal_compression=on"
-    - "-c"
-    - "bgwriter_lru_maxpages=400"
-    - "-c"
-    - "bgwriter_lru_multiplier=2"
+    - "synchronous_commit=on"
 ingress:
   enabled: true
   className: nginx

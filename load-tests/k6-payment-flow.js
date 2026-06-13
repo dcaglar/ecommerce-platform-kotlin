@@ -4,7 +4,6 @@ import { Trend } from 'k6/metrics';
 
 // --- 1. Load Configurations & Credentials ---
 const ACCESS_TOKEN = open('../keycloak/output/jwt/payment-service.token').replace(/[\r\n]+$/, '');
-const endpoints = JSON.parse(open('../infra/endpoints.json'));
 
 // --- 2. Multi-Profile Workload Scenarios ---
 const SCENARIOS = {
@@ -131,6 +130,16 @@ function randomId(prefix) {
     return `${prefix}-${Math.floor(Math.random() * 1e8)}`;
 }
 
+function generateUuidV7() {
+    const hex = () => Math.floor(Math.random() * 16).toString(16);
+    const hexN = (n) => {
+        let str = '';
+        for (let i = 0; i < n; i++) str += hex();
+        return str;
+    };
+    return `${hexN(8)}-${hexN(4)}-7${hexN(3)}-8${hexN(3)}-${hexN(12)}`;
+}
+
 const MARKETPLACE = "MARKETPLACE-1";
 const SELLERS = Array.from({length: 10}, (_, i) => `SELLER-1-${i+1}`);
 
@@ -176,7 +185,7 @@ function generateRandomOrder() {
 
 // --- 4. Main User Journey ---
 export default function () {
-    const baseUrl = endpoints.base_url;
+    const baseUrl = "http://payment.k8s.orb.local";
 
     const headers = {
 
@@ -198,7 +207,7 @@ export default function () {
     });
 
     const createParams = {
-        headers: Object.assign({ 'Idempotency-Key': randomId('IDEM-C') }, headers),
+        headers: Object.assign({ 'Idempotency-Key': generateUuidV7() }, headers),
         tags: { name: 'CreateIntent' }
     };
 
@@ -230,7 +239,7 @@ export default function () {
         });
 
         const authParams = {
-            headers: Object.assign({ 'Idempotency-Key': randomId('IDEM-A') }, headers),
+            headers: Object.assign({ 'Idempotency-Key': generateUuidV7() }, headers),
             tags: { name: 'Authorize' }
         };
 
