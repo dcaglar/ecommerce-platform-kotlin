@@ -49,7 +49,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "edge" {
   vm_size               = "Standard_D8s_v5"
   
   # Enable Cluster Autoscaler!
-  enable_auto_scaling   = true
+  auto_scaling_enabled  = true
   min_count             = 1
   max_count             = 3
   
