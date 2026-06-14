@@ -13,32 +13,8 @@ serviceMonitor:
   interval: 30s
   scrapeTimeout: 10s
 replicaCount: 1
-autoscaling:
+keda:
   enabled: false
-  minReplicas: 1
-  maxReplicas: 2
-  metrics:
-    - type: External
-      external:
-        metric:
-          name: central_outbox_backlog_external
-        target:
-          type: Value
-          value: "5000"
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 120
-      selectPolicy: Max
-      policies:
-        - type: Pods
-          value: 1
-          periodSeconds: 60
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-        - type: Percent
-          value: 50
-          periodSeconds: 60
 resources:
   requests: {cpu: "150m", memory: "256Mi"}
   limits: {memory: "1024Mi"}

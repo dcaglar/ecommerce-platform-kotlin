@@ -1,7 +1,20 @@
+# infra/helm-values/monitoring-stack-values-azure.yaml
+#
+# Industry standard: kube-prometheus-stack manages ALL observability components
+# in a single Helm release. Everything is declarative, version-controlled YAML.
+# No separate scripts for metric registration.
+#
+# Node placement: ALL components → centralpool (pool: central)
+# Exception: prometheus-node-exporter is a DaemonSet — runs on every node
+# automatically to give per-node CPU/mem/disk/net metrics from all pools.
+
+# ── Prometheus Operator ────────────────────────────────────────────────────────
 prometheusOperator:
+  nodeSelector:
+    pool: central
   resources:
-    requests: { cpu: 30m,  memory: 96Mi }
-    limits:   { cpu: 150m, memory: 192Mi }
+    requests: {cpu: "100m",  memory: "128Mi"}
+    limits:   {cpu: "300m",  memory: "384Mi"}
   admissionWebhooks:
     enabled: false
     patch:
@@ -9,40 +22,117 @@ prometheusOperator:
   tls:
     enabled: false
 
+# ── Prometheus Server ──────────────────────────────────────────────────────────
 prometheus:
   prometheusSpec:
+    nodeSelector:
+      pool: central
+
+    # Load-test retention: 24h keeps data available for post-test analysis.
+    retention: 24h
+    walCompression: true
+
+    # 15s interval: fine-grained enough to catch latency spikes and HPA events.
+    # 60s (local default) is too coarse for a load test.
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+
     enableAdminAPI: true
     enableRemoteWriteReceiver: true
-    containers:
-      - name: config-reloader
-        resources:
-          requests: { cpu: 5m,  memory: 24Mi }
-          limits:   { cpu: 30m, memory: 48Mi }
-    resources:
-      requests: { cpu: 150m, memory: 256Mi }
-      limits:   { cpu: 500m, memory: 512Mi }
-    retention: 6h
-    walCompression: true
-    scrapeInterval: 60s
-    evaluationInterval: 60s
+
+    # Persistent storage on Azure Premium SSD.
+    # Survives Prometheus pod restarts mid-test without losing metric history.
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: managed-csi-premium
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 50Gi
+
+    # Discover ServiceMonitors from ALL namespaces (payment, monitoring, ingress-nginx)
     serviceMonitorSelector:
       matchLabels:
         release: prometheus-stack
-    serviceMonitorNamespaceSelector: {}   # 👈 allow ServiceMonitors from ALL namespaces
+    serviceMonitorNamespaceSelector: {}
 
-alertmanager:
-  alertmanagerSpec:
+    # Sized for 15s scrape across ~50 targets:
+    # 3 edge cells + 3 YB tservers + Kafka + Central DB + Redis
+    # + Keycloak + consumers + relay + node-exporters + ingress-nginx
+    resources:
+      requests: {cpu: "500m",  memory: "2Gi"}
+      limits:   {cpu: "1500m", memory: "4Gi"}
     containers:
       - name: config-reloader
         resources:
-          requests: { cpu: 5m,  memory: 24Mi }
-          limits:   { cpu: 30m, memory: 48Mi }
-    resources:
-      requests: { cpu: 30m, memory: 48Mi }
-      limits:   { cpu: 150m, memory: 128Mi }
+          requests: {cpu: "10m",  memory: "32Mi"}
+          limits:   {cpu: "50m",  memory: "64Mi"}
 
+# ── AlertManager ───────────────────────────────────────────────────────────────
+alertmanager:
+  alertmanagerSpec:
+    nodeSelector:
+      pool: central
+    resources:
+      requests: {cpu: "30m",  memory: "64Mi"}
+      limits:   {cpu: "100m", memory: "128Mi"}
+    containers:
+      - name: config-reloader
+        resources:
+          requests: {cpu: "5m",  memory: "24Mi"}
+          limits:   {cpu: "30m", memory: "48Mi"}
+
+# ── Grafana ────────────────────────────────────────────────────────────────────
 grafana:
+  nodeSelector:
+    pool: central
+
   plugins: []
+
+  # Community dashboards auto-provisioned at startup via the sidecar.
+  # All from grafana.com — no custom JSON needed.
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: default
+          orgId: 1
+          folder: "Payment Platform"
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+
+  dashboards:
+    default:
+      jvm-micrometer:
+        gnetId: 4701     # JVM (Micrometer) — HikariCP pools, GC, heap, threads
+        revision: 14
+        datasource: Prometheus
+      node-exporter:
+        gnetId: 1860     # Node Exporter Full — per-node CPU/mem/disk/net
+        revision: 37
+        datasource: Prometheus
+      kubernetes-pods:
+        gnetId: 6417     # Kubernetes pod resource usage
+        revision: 1
+        datasource: Prometheus
+      kafka-overview:
+        gnetId: 7589     # Kafka — consumer lag, throughput, partition metrics
+        revision: 5
+        datasource: Prometheus
+      nginx-ingress:
+        gnetId: 9614     # ingress-nginx — RPS, P95/P99, upstream latency
+        revision: 1
+        datasource: Prometheus
+
+  grafana.ini:
+    database:
+      query_retries: 5
+      transaction_retries: 5
+
   readinessProbe:
     timeoutSeconds: 10
     periodSeconds: 30
@@ -51,32 +141,94 @@ grafana:
     timeoutSeconds: 10
     periodSeconds: 30
     failureThreshold: 20
-  grafana.ini:
-    database:
-      query_retries: 5
-      transaction_retries: 5
+
   resources:
-    requests: { cpu: 100m, memory: 256Mi }
-    limits:   { cpu: 1000m, memory: 768Mi }
+    requests: {cpu: "200m",  memory: "512Mi"}
+    limits:   {cpu: "1000m", memory: "1Gi"}
+
   sidecar:
     datasources:
       resources:
-        requests: { cpu: 5m,  memory: 24Mi }
-        limits:   { cpu: 30m, memory: 48Mi }
+        requests: {cpu: "5m",  memory: "24Mi"}
+        limits:   {cpu: "30m", memory: "48Mi"}
     dashboards:
       resources:
-        requests: { cpu: 5m,  memory: 24Mi }
-        limits:   { cpu: 30m, memory: 48Mi }
+        requests: {cpu: "5m",  memory: "24Mi"}
+        limits:   {cpu: "30m", memory: "48Mi"}
 
+# ── kube-state-metrics ────────────────────────────────────────────────────────
+# Captures HPA scale events, pod restarts, StatefulSet replica counts.
+# Essential for correlating autoscale timing with latency spikes in Grafana.
 kube-state-metrics:
+  nodeSelector:
+    pool: central
   resources:
-    requests: { cpu: 30m,  memory: 48Mi }
-    limits:   { cpu: 150m, memory: 128Mi }
+    requests: {cpu: "50m",  memory: "64Mi"}
+    limits:   {cpu: "150m", memory: "256Mi"}
 
+# ── Node Exporter ──────────────────────────────────────────────────────────────
+# DaemonSet: runs on ALL nodes automatically.
+# No nodeSelector: we want per-node metrics from edgepool, edgedbpool, centralpool.
 prometheus-node-exporter:
   resources:
-    requests: { cpu: 15m,  memory: 24Mi }
-    limits:   { cpu: 80m,  memory: 96Mi }
+    requests: {cpu: "15m",  memory: "32Mi"}
+    limits:   {cpu: "80m",  memory: "96Mi"}
 
+# ── Prometheus Adapter ────────────────────────────────────────────────────────
+# Managed as a subchart — industry standard.
+# Exposes custom Prometheus metrics to the Kubernetes HPA controller via the
+# external.metrics.k8s.io API. Required for payment-consumers HPA to function.
+#
+# Without this: payment-consumers stays at minReplicas=1 regardless of Kafka lag.
 prometheusAdapter:
-  enabled: false
+  enabled: true
+  nodeSelector:
+    pool: central
+  resources:
+    requests: {cpu: "50m",  memory: "128Mi"}
+    limits:   {cpu: "200m", memory: "256Mi"}
+  prometheus:
+    url: http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local
+    port: 9090
+
+  rules:
+    default: false
+
+    external:
+      # ── payment-consumers HPA: Kafka consumer lag ───────────────────────────
+      # Tracks worst-case lag across the 3 PSP consumer groups.
+      # topk(1,...) returns the single highest-lag group so one slow group
+      # triggers scale-out before the others queue up behind it.
+      # HPA fires when this value exceeds 2400 (payment-consumers-values-azure.yaml).
+      - seriesQuery: 'kafka_consumergroup_lag{namespace!="",consumergroup!=""}'
+        resources:
+          overrides:
+            namespace: {resource: namespace}
+        name:
+          as: kafka_consumer_group_lag_worst2
+        metricsQuery: >
+          topk(1,
+            sum by (namespace, consumergroup) (
+              clamp_min(
+                avg_over_time(
+                  kafka_consumergroup_lag{
+                    <<.LabelMatchers>>,
+                    consumergroup=~"psp-capture-executor-consumer-group|psp-refund-executor-consumer-group|psp-result-consumer-group"
+                  }[1m]
+                ),
+                0
+              )
+            )
+          )
+
+      # ── payment-central-relay HPA: central outbox backlog ───────────────────
+      # Emitted by the relay as a Micrometer gauge.
+      # Relay is currently a singleton (autoscaling: false) but the metric is
+      # registered here ready for when horizontal scaling is enabled.
+      - seriesQuery: 'central_outbox_backlog_size{namespace!=""}'
+        resources:
+          overrides:
+            namespace: {resource: namespace}
+        name:
+          as: central_outbox_backlog_external
+        metricsQuery: 'max(central_outbox_backlog_size{<<.LabelMatchers>>})'

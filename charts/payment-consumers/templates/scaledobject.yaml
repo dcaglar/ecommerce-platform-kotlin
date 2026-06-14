@@ -1,0 +1,18 @@
+{{- if .Values.keda.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "payment-consumers.fullname" . }}-scaler
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "payment-consumers.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    name: {{ include "payment-consumers.fullname" . }}
+  minReplicaCount: {{ .Values.keda.minReplicaCount | default 1 }}
+  maxReplicaCount: {{ .Values.keda.maxReplicaCount | default 6 }}
+  pollingInterval: {{ .Values.keda.pollingInterval | default 15 }}
+  cooldownPeriod: {{ .Values.keda.cooldownPeriod | default 300 }}
+  triggers:
+    {{- toYaml .Values.keda.triggers | nindent 4 }}
+{{- end }}

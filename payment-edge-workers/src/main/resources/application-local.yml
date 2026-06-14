@@ -9,6 +9,7 @@ app:
       validation-timeout: 15000
       idle-timeout: 600000
       max-lifetime: 1800000
+      maximum-pool-size: 20
     maintenance:
       jdbc-url: ${EDGE_DB_URL}
       username: ${EDGE_DB_DUTY_USERNAME}
@@ -27,6 +28,7 @@ app:
       validation-timeout: 15000
       idle-timeout: 600000
       max-lifetime: 1800000
+      maximum-pool-size: 10
 
 spring:
   data:

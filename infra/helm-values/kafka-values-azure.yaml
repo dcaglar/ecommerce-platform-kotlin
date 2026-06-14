@@ -13,7 +13,7 @@ listeners:
   controller: {protocol: PLAINTEXT, containerPort: 9093, name: CONTROLLER}
   interbroker: {protocol: PLAINTEXT, containerPort: 9094, name: INTERNAL}
 controller:
-  heapOpts: "-Xms6g -Xmx6g"
+  heapOpts: "-Xms8g -Xmx8g"  # 8Gi heap + ~6Gi OS page cache within 14Gi limit
   persistence:
     enabled: true
     size: 250Gi
@@ -45,7 +45,7 @@ controller:
   # ✅ Resources for the Kafka container (fix OOMKills)
   resources:
     requests: {cpu: "2000m", memory: "8Gi"}
-    limits: {cpu: "6000m", memory: "16Gi"}
+    limits:   {cpu: "4000m", memory: "14Gi"}  # 4000m: shares centralpool with 5 other workloads
   extraEnv:
   overrideConfiguration:
     # Roles & listeners

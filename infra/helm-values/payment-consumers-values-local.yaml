@@ -13,32 +13,31 @@ service:
   type: ClusterIP
   portName: http
   port: 8080
-autoscaling:
+keda:
   enabled: true
-  minReplicas: 1
-  maxReplicas: 6
-  metrics:
-    - type: External
-      external:
-        metric:
-          name: kafka_consumer_group_lag_worst2
-        target:
-          type: Value
-          value: "2400" # keep as string quantity
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 120
-      selectPolicy: Max
-      policies:
-        - type: Pods
-          value: 1
-          periodSeconds: 60
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-        - type: Percent
-          value: 50
-          periodSeconds: 60
+  minReplicaCount: 1
+  maxReplicaCount: 6
+  pollingInterval: 15
+  cooldownPeriod: 300
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: kafka.payment.svc.cluster.local:9092
+        consumerGroup: psp-capture-executor-consumer-group
+        topic: gateway.capture.commands
+        lagThreshold: "2400"
+    - type: kafka
+      metadata:
+        bootstrapServers: kafka.payment.svc.cluster.local:9092
+        consumerGroup: psp-refund-executor-consumer-group
+        topic: gateway.refund.commands
+        lagThreshold: "2400"
+    - type: kafka
+      metadata:
+        bootstrapServers: kafka.payment.svc.cluster.local:9092
+        consumerGroup: psp-result-consumer-group
+        topic: payment.psp.results
+        lagThreshold: "2400"
 serviceMonitor:
   enabled: true
   path: /actuator/prometheus

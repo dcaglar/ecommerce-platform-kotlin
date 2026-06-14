@@ -1,10 +1,26 @@
 spring:
   profile: "azure"
 runPrivilegeGrantJob: true
+
+# ── Topology: 1 pod per edgepool node ───────────────────────────────────────
+# Hard enforcement: Kubernetes will NOT schedule a 2nd edge cell on a node that
+# already has one. This preserves the Guaranteed QoS contract (1 pod : 1 node)
+# and prevents noisy-neighbour interference between edge cells under autoscale.
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app: payment-edge-cell
+
+# ── Autoscaler ────────────────────────────────────────────────────────────────
+# HPA target: 70% CPU on payment-service. Lower than local (85%) for faster
+# scale-up trigger during load test — we want pods ready before latency spikes.
 autoscaling:
   enabled: true
   minReplicas: 1
-  maxReplicas: 3
+  maxReplicas: 3  # matches edgepool max_count in Terraform
   metrics:
     - type: ContainerResource
       containerResource:
@@ -12,56 +28,80 @@ autoscaling:
         container: payment-service
         target:
           type: Utilization
-          # Increased to 85% to avoid 'panic' scaling on noise
-          averageUtilization: 85
+          averageUtilization: 70
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 15
       selectPolicy: Max
       policies:
         - type: Pods
-          value: 1 # Add 1 pod at a time
-          periodSeconds: 45 # Wait 45s between steps to allow JIT/warmup
+          value: 1          # add 1 pod at a time
+          periodSeconds: 45 # 45s between steps — allow JIT warmup before next
     scaleDown:
-      # "The Patience Window": Keep pods for 5 mins after load drops.
-      # Prevents killing pods during small traffic dips.
-      stabilizationWindowSeconds: 300
+      stabilizationWindowSeconds: 300  # "Patience window" — no scale-down during brief dips
       selectPolicy: Max
       policies:
         - type: Percent
           value: 100
           periodSeconds: 15
+
+# ── payment-service ──────────────────────────────────────────────────────────
+# Manages TWO HikariCP pools simultaneously:
+#   Pool 1: EDGE_DB_URL    → localhost:5432  (transactional outbox, local sidecar)
+#   Pool 2: YUGABYTE_DB_URL → yb-tservers:5433 (cross-cell idempotency checks)
+# +1Gi RAM vs local to absorb dual JDBC buffer + thread-stack overhead.
+# MaxRAMPercentage bumped to 60% (was 45%) — we have 4Gi limit, JVM can use ~2.4Gi.
 paymentService:
+  image:
+    pullPolicy: Always
   jvmOpts: >-
-    -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication -XX:MaxRAMPercentage=45 -XX:InitialRAMPercentage=45 -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
+    -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication
+    -XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=60
+    -XX:MaxMetaspaceSize=256m -XX:MaxDirectMemorySize=256m
+    -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
   resources:
     requests:
-      cpu: 1000m
-      memory: 768Mi
+      cpu: "2000m"
+      memory: "3Gi"
     limits:
-      cpu: 3000m
-      memory: 768Mi
+      cpu: "3000m"
+      memory: "4Gi"   # +1Gi vs local (768Mi) — dual HikariCP pool overhead
+
+# ── payment-edge-workers ─────────────────────────────────────────────────────
+# Outbox forwarder: reads edge-db, batch-inserts to central-db.
+# Single datasource (EDGE_DB_URL only) — no Yugabyte connection.
 edgeWorker:
-  resources:
-    requests: {cpu: "500m", memory: "512Mi"}
-    limits: {cpu: "1500m", memory: "768Mi"}
+  image:
+    pullPolicy: Always
   jvmOpts: >-
-    -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication -XX:MaxRAMPercentage=45 -XX:InitialRAMPercentage=45 -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
+    -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication
+    -XX:MaxRAMPercentage=45 -XX:InitialRAMPercentage=45
+    -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m
+    -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
+  resources:
+    requests: {cpu: "1000m", memory: "1Gi"}
+    limits:   {cpu: "2000m", memory: "2Gi"}
+
+# ── edge-db (local PostgreSQL sidecar) ───────────────────────────────────────
+# Sized for D8s_v5 (8 vCPU / 32GB node).
+# shared_buffers=1GB (25% of 4Gi RAM limit).
+# max_connections=250: payment-service HikariCP (20) + edge-workers HikariCP (10)
+#   × 3 edge cells max = 90 total. 250 is safe headroom.
 edgeDb:
   storage:
     size: 100Gi
   resources:
-    requests: {cpu: "1000m", memory: "256Mi"}
-    limits: {cpu: "3000m", memory: "512Mi"}
+    requests: {cpu: "2000m", memory: "2Gi"}
+    limits:   {cpu: "3000m", memory: "4Gi"}
   args:
     - "-c"
     - "shared_preload_libraries=pg_stat_statements"
     - "-c"
     - "pg_stat_statements.track=all"
     - "-c"
-    - "shared_buffers=1024MB"
+    - "shared_buffers=1024MB"         # 25% of 4Gi RAM limit
     - "-c"
-    - "effective_cache_size=2048MB"
+    - "effective_cache_size=3072MB"   # 75% of RAM limit
     - "-c"
     - "work_mem=16MB"
     - "-c"
@@ -90,6 +130,8 @@ edgeDb:
     - "bgwriter_lru_maxpages=1000"
     - "-c"
     - "bgwriter_lru_multiplier=3"
+
+# ── Ingress ───────────────────────────────────────────────────────────────────
 ingress:
   enabled: true
   className: nginx
@@ -97,22 +139,17 @@ ingress:
   path: /
   pathType: Prefix
   annotations:
-    # 1. Load Balancing Algorithm
     nginx.ingress.kubernetes.io/load-balance: "ewma"
-    # 2. Increase Timeouts
-    # 10s is too short when the DB is under heavy pressure.
-    # Give the backend 30s to respond before Nginx kills the request.
     nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
-    # 3. Connection Management
-    # Increase keepalive to prevent the overhead of recreating TCP connections constantly.
     nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "120"
     nginx.ingress.kubernetes.io/upstream-keepalive-connections: "200"
-    # 4. Concurrency Protection (The Bouncer)
-    # Limit simultaneous connections to slightly above your total capacity (Threads + Queue).
-    # 250 threads + 100 accept-count = 350. Set limit to 400.
     nginx.ingress.kubernetes.io/limit-connections: "350"
-  tls: [] # HTTP for minikube
+  tls: []
+
+# ── Observability ─────────────────────────────────────────────────────────────
+# ServiceMonitor disabled: no Prometheus stack deployed in load-test env by default.
+# Enable when monitoring-stack is deployed.
 serviceMonitor:
   enabled: false
   path: /actuator/prometheus
@@ -121,23 +158,25 @@ serviceMonitor:
   scheme: http
   labels:
     release: prometheus-stack
+
+# ── Service & Routing ─────────────────────────────────────────────────────────
 service:
   type: ClusterIP
   port: 8080
   portName: http
+
+# ── Node placement ────────────────────────────────────────────────────────────
 nodeSelector:
   pool: edge
 
+# ── Downstream services ───────────────────────────────────────────────────────
 redis:
   url: redis://redis-master:6379
 kafka:
   bootstrapServers: kafka.payment.svc.cluster.local:9092
 
+# ── Postgres exporter sidecar ─────────────────────────────────────────────────
 postgresExporter:
   resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 200m
-      memory: 256Mi
+    requests: {cpu: "100m", memory: "128Mi"}
+    limits:   {cpu: "200m", memory: "256Mi"}
