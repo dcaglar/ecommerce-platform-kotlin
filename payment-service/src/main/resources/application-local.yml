@@ -1,7 +1,7 @@
 server:
   tomcat:
     threads:
-      max: 200
+      max: 120
       min-spare: 40
     max-connections: 1000
     accept-count: 200
@@ -39,7 +39,7 @@ spring:
       max-lifetime: 1800000
       leak-detection-threshold: 60000
       connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
-      maximum-pool-size: 60
+      maximum-pool-size: 15
     yugabyte:
       url: ${YUGABYTE_DB_URL}
       username: ${YUGABYTE_DB_PAYMENT_SERVICE_USERNAME}
@@ -50,7 +50,7 @@ spring:
       max-lifetime: 1800000
       leak-detection-threshold: 60000
       connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
-      maximum-pool-size: 20
+      maximum-pool-size: 15
 
 outbox-dispatcher:
   thread-count: 2
