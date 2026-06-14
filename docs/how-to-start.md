@@ -44,22 +44,20 @@ infra/scripts/orbstack-nuke-dev.sh
 
 1) Deploy core infrastructure
 - What: Config, Keycloak, Postgres, Redis, and Kafka in the payment namespace.
-- if you want to set the credentials in plain text first, then update the untracked decrypted_secrets.yaml, then run sops -e  ecrypted_secrets.yaml, 
-- and you would see  a file with encrypted passswords created at payment-platform-config-secrets-local.yaml ,then simply deploy-payment-platform-config.sh
-- create secret configmaps in kube run time, youy van check existing secrets with kubectl get secret -n payment edge-db-credentials/central-db-credentials -o json
-- this woul print  secret alianms names and encrypted values
+- Note on Secrets: Local secrets are deployed automatically. If you need to rotate them, update the untracked `decrypted_secrets.yaml`, re-encrypt it using `sops -e decrypted_secrets.yaml > payment-platform-config-secrets-local.yaml`, and re-run `infra/scripts/deploy-payment-platform-config.sh`.
+- Tip: You can verify existing secrets at runtime by running `kubectl get secret -n payment edge-db-credentials -o json` to print the secret aliases and encrypted values.
 ```bash
 infra/scripts/deploy-all-local.sh
 ```
 
-3) Monitoring stack (Prometheus + Grafana) (Optional)
+2) Monitoring stack (Prometheus + Grafana) (Optional)
 - What: Installs kube-prometheus-stack into monitoring.
 - Run:
 ```bash
 infra/scripts/deploy-monitoring-stack.sh
 ```
 
-4) Kafka  and Postgresql Exporter (Prometheus metrics for Kafka) (Optional)
+3) Exporters (Kafka & Postgresql) (Optional)
 - What: Exposes Kafka consumer lag, offsets, etc. for Prometheus.
 - Run:
 ```bash
@@ -67,8 +65,8 @@ infra/scripts/deploy-kafka-exporter-local.sh
 infra/scripts/deploy-postgresql-exporter-local.sh
 ```
 
-4.5) Build Docker Images
-- What: Builds the latest source code and updates the local Minikube docker registry so the pods pull the latest code.
+4) Build Docker Images
+- What: Builds the latest source code into Docker images. Because OrbStack shares the Docker environment, these images are instantly available to your local Kubernetes pods without pushing to a registry.
 - Run:
 ```bash
 infra/scripts/build-and-push-payment-service-docker-repo.sh
@@ -78,11 +76,7 @@ infra/scripts/build-and-push-payment-consumers-docker-repo.sh
 
 5) Payment Edge Cell
 - What: Deploys the complete Atomic Edge Cell (REST API, Local DB, and Local Forwarder) and sets up ingress. Writes infra/endpoints.json.
-- Tip: For a LoadBalancer IP, run in a separate terminal:
-```bash
-tunnel.sh
-```
-- Then run:
+- Run:
 ```bash
 infra/scripts/deploy-payment-edge-cell-local.sh
 ```
@@ -102,19 +96,9 @@ infra/scripts/deploy-payment-consumers-local.sh
 infra/scripts/deploy-payment-central-relay-local.sh
 ```
 
-8) Expose consumer lag as an external metric (for HPA)
-- What: Installs/promotes prometheus-adapter with a rule that surfaces worst consumer-lag per group.
-- Run:
-```bash
-infra/scripts/add-consumer-lag-metric.sh
-```
 
-8) Local access via port-forwarding (optional, recommended before Keycloak provisioning)
-- What: Opens local ports to Keycloak, Postgres, Prometheus, Grafana, etc. Press Ctrl+C to stop.
-- Run:
-```bash
-infra/scripts/port-forwarding.sh
-```
+
+
 
 
 ## 1️⃣ Create Realms,Authentication, and Roles for test user
@@ -122,14 +106,12 @@ infra/scripts/port-forwarding.sh
 
 1)  Provision Keycloak realm and clients
 - What: Creates realm, role, and OIDC confidential clients; writes secrets to keycloak/output/secrets.txt.
-- Tip: If you aren’t using port-forwarding, set KEYCLOAK_URL to your reachable Keycloak base.
 - Run:
 ```bash
 KEYCLOAK_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/provision-keycloak.sh
 ```
 2) Generate access tokens for different operations
 - What: Get JWT tokens for different use cases; saves tokens under `keycloak/output/jwt`.
-- Tip: KC_URL defaults to http://keycloak:8080; override if needed (e.g., when port-forwarding).
 - Default validity is ~1 hour. Append a TTL (hours) as the final argument to keep a test token alive longer (e.g., `... 6` for 6 h).
 - Reuse the saved token across requests until it expires; no need to regenerate for every call.
 
@@ -360,7 +342,7 @@ The checkout demo uses a production-like flow with Stripe Payment Element:
 
 
 
-12) Elasticsearch/Logstash/Kibana stack (OPTIONAL)
+9) Observability stack (Elasticsearch/Logstash/Kibana) (Optional)
 - What: Installs ELK stack for log aggregation and searching.
 - Run:
 ```bash
@@ -371,7 +353,7 @@ infra/scripts/deploy-observability-stack.sh
 **Troubleshooting:**
 
 - **"Client secret not found"**: Run `npm run setup-env` after provisioning Keycloak
-- **"Cannot reach Keycloak"**: Ensure Keycloak port-forwarding is active: `kubectl port-forward -n payment svc/keycloak 8080:8080`
+- **"Cannot reach Keycloak"**: Verify OrbStack is running and the DNS `keycloak.payment.svc.cluster.local` is resolving.
 - **"Stripe publishable key not configured"**: Add `VITE_STRIPE_PUBLISHABLE_KEY` to `.env` file
 - **Payment request errors**: Check proxy console for detailed error messages (it logs token and payment-service call errors)
 - **Network errors**: Verify payment service is running and `infra/endpoints.json` is correct
@@ -380,7 +362,7 @@ infra/scripts/deploy-observability-stack.sh
 
 For more details, see `checkout-demo/README.md`.
 
-## 5️⃣ Query Balance Endpoints
+## 3️⃣ Query Balance Endpoints
 
 Balance endpoints support three authentication scenarios (matching real-world marketplace patterns):
 

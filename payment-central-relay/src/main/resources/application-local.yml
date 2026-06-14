@@ -6,7 +6,7 @@ app:
       username: ${SPRING_DATASOURCE_MAINTENANCE_USERNAME}
       password: ${SPRING_DATASOURCE_MAINTENANCE_PASSWORD}
       pool-name: central-maint-pool
-      maximum-pool-size: 1
+      maximum-pool-size: 5
       minimum-idle: 0
       connection-timeout: 15000
       validation-timeout: 15000

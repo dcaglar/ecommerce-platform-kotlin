@@ -39,10 +39,10 @@ paymentService:
     -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication -XX:MaxRAMPercentage=45 -XX:InitialRAMPercentage=45 -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
   resources:
     requests:
-      cpu: 1000m
+      cpu: 150m
       memory: 768Mi
     limits:
-      cpu: 1000m
+      cpu: 1500m
       memory: 768Mi
 edgeWorker:
   image:

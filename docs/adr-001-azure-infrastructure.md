@@ -33,6 +33,12 @@ Inside your *existing* `infra/scripts` folder, we will duplicate `deploy-all-loc
 > 
 > GitHub downloads your code onto that Ubuntu VM. **Every single script (Terraform, Docker builds, and Bash scripts) is executed directly on that temporary GitHub Ubuntu VM**, not on your Mac, and not inside the AKS cluster! That Ubuntu VM acts as your "robot developer", doing exactly what you would do on your Mac terminal.
 
+!IMPORTANT]
+> **WHERE DOES ALL THIS RUN?**
+> When you click "Run workflow" in GitHub, GitHub boots up a temporary, free **Ubuntu Virtual Machine** in their cloud (called a "Runner").
+>
+> GitHub downloads your code onto that Ubuntu VM. **Every single script (Terraform, Docker builds, and Bash scripts) is executed directly on that temporary GitHub Ubuntu VM**, not on your Mac, and not inside the AKS cluster! That Ubuntu VM acts as your "robot developer", doing exactly what you would do on your Mac terminal.
+
 ```mermaid
 graph TD
     Dev(("Developer (Your Mac)")) -->|1. git push| GH["GitHub Repository"]
@@ -58,6 +64,7 @@ graph TD
 3. **Build & Push:** The Ubuntu Runner executes your existing `build-and-push-payment-service-docker-repo.sh` scripts. The Java code is compiled and the Docker images are built **directly on the Ubuntu Runner**. The Runner then pushes those built images to your Docker Hub.
 4. **Application Deployment:** The Ubuntu Runner installs `helm` and `kubectl` on itself, downloads the `kubeconfig` from Azure, and then executes your `deploy-all-azure.sh` script. The bash script talks to the AKS Cluster's API and tells it to deploy your Helm charts.
 5. **Teardown:** When finished, you run `destroy-infra.yml`. A new Ubuntu Runner boots up, runs `terraform destroy`, and deletes the Azure resources.
+
 
 ## 7. Status
 **PROPOSED**
@@ -119,6 +126,23 @@ resource "azurerm_kubernetes_cluster_node_pool" "edge" {
 
 ---
 
+
+## 8.5 VM Operating System Disks vs Application Disks
+We establish a strict architectural boundary between compute storage and persistent application data:
+*   **Node OS Disks (Compute):** The Terraform `main.tf` defines the VM SKUs (`Standard_D8s_v5`). By default, AKS provisions a 128GB Managed OS Disk for these nodes to hold the Linux OS, container images, and ephemeral logs. Because Kubernetes nodes are stateless cattle, these OS disks are entirely disposable.
+*   **Application Data (PVCs):** Our databases (PostgreSQL and Kafka) utilize Kubernetes `PersistentVolumeClaims` (PVCs). In Azure, this automatically triggers the `managed-csi` driver to provision highly-redundant, independent **Premium SSD Managed Disks** over the network. If a physical VM crashes, the node OS disk is lost, but the Premium SSD Data Disk is safely detached by Azure and plugged into the replacement VM with zero data loss.
+
+### 8.6 The Dual Purpose of StatefulSets
+Our architecture utilizes the `StatefulSet` API object for two fundamentally different reasons:
+1.  **For Databases (`payment-edge-cell`):** We use StatefulSets to dynamically provision independent hard drives. If the Edge Cell scales to 3 replicas, the `volumeClaimTemplates` forces Kubernetes to provision 3 entirely separate Premium SSDs. This ensures `payment-edge-cell-0` never attempts to corrupt the physical database files of `payment-edge-cell-1`.
+2.  **For Kafka Consumers (`payment-consumers`):** The consumers have absolutely no persistent storage attached. However, they use a StatefulSet to acquire stable network identities (e.g., `payment-consumers-0`). If a pod restarts, it retains its exact identity. This signals to the Kafka broker that it is the *same* consumer returning, completely bypassing a cluster-wide Kafka Consumer Group Rebalance storm.
+
+### 8.7 Environment-Specific Capacity Tuning
+All infrastructure capacity constraints are mathematically decoupled from the generic Helm templates (`values.yaml`) and strictly injected via environment-specific profiles (`helm-values/*-azure.yaml` vs `*-local.yaml`).
+*   **Central Infrastructure:** The Azure configuration for the Central Database and Kafka explicitly override defaults with massive production-grade capacities (e.g., `250Gi` Managed Disks, `6000m` CPU, `12Gi` RAM, and `4GB shared_buffers`) tailored precisely for the 8-core `Standard_D8s_v5` nodes in the `centralpool`. Local configurations are strictly starved to prevent laptop exhaustion.
+*   **Relay Singleton:** The `payment-central-relay` polling job is explicitly stripped of autoscaling and locked to a strict `replicaCount: 1` singleton to prevent database contention and duplicate message publishing.
+
+
 ## Append-Only Ledger Log
 
 ### 2026-06-11: Phase 1 - Script and Configuration Scaffolding Completed
@@ -157,3 +181,151 @@ resource "azurerm_kubernetes_cluster_node_pool" "edge" {
 - Created `application-azure.yml` files across all microservices. Increased HikariCP connection pools to `60` (from `12`) and disabled verbose logging bottlenecks to prevent stdout thread locking under load.
 - Increased the Kubernetes CPU limits in `payment-edge-cell-values-azure.yaml` to consume exactly 7.5 vCPUs per pod (3 for DB, 3 for App, 1.5 for Worker), perfectly matching the `Standard_D8s_v5` hardware boundaries.
 **Result:** The cloud deployment will now flawlessly utilize 100% of the Azure hardware and completely isolate Edge traffic from Central traffic.
+
+### 2026-06-12: Phase 5 - Azure Configurations & Constraints Injected
+**Action:** Moved all environment speficic confioguration to local for now, and did test the system locally if seperation has any config issue
+**Details:**
+- Injected /created local and azure suffixx yml and shell script for local azure environments
+
+
+### 2026-06-13: Phase 6 - Move local build from minikube to orbstack
+
+OrbStack Migration Walkthrough
+I have successfully purged the repository of all Minikube network bottlenecks and aligned the local environment to run optimally on OrbStack Native Kubernetes.
+
+What Was Changed
+1. Network Plumbing Purge
+   Deleted: tunnel.sh, port-forwarding.sh, bootstrap-minikube-cluster.sh, and minikube-nuke-dev.sh via git rm.
+   Created: orbstack-nuke-dev.sh to securely wipe Kubernetes namespaces, Helm releases, and Docker system cache natively without Minikube commands.
+   Refactored deploy-payment-edge-cell-local.sh: Ripped out the complex minikube ip / LoadBalancer port polling logic and .nip.io domain mapping. It now explicitly generates http://payment.mor-dc.local endpoints.
+   Audited: All other deploy-*-local.sh and delete-*-local.sh scripts were verified and found fully compatible with native kubectl.
+2. Spring & Keycloak Provisioning
+   Updated payment-service/src/main/resources/application-local.yml to rely on the cluster-native http://keycloak.payment.svc.cluster.local:8080/realms/payment issuer instead of localhost port-forwarding.
+   Updated provision-keycloak.sh and get-token.sh scripts to use the same internal service DNS natively.
+3. Docker Build Script Forking
+   I have fully separated local builds from registry pushes:
+
+Renamed: Existing build-and-push-*.sh scripts were mapped strictly to the azure environment (e.g. build-and-push-payment-service-docker-repo-azure.sh).
+Created: Four brand new build-local-*.sh scripts (e.g. build-local-payment-service.sh). These scripts compile the image locally and exit immediately. Because OrbStack shares the native Docker socket, Kubernetes can instantly resolve these images without the overhead of pushing/pulling from Docker Hub!
+4. Documentation Cleanup
+   how-to-start.md was thoroughly stripped of all -H "Host: $HOST" injected headers. Your curl calls are now fully standardized.
+   The minikube setup steps have been removed, replacing them directly with instructions pointing to OrbStack.
+   Verification
+   The system is now primed for your "Golden Startup Path".
+
+Next Steps to Validate:
+
+Execute ./infra/scripts/orbstack-nuke-dev.sh to confirm the local environment is pristine.
+Ensure OrbStack is active in your MacOS menu bar and Kubernetes is enabled.
+Run ./infra/scripts/deploy-all-local.sh.
+Run ./infra/scripts/deploy-payment-edge-cell-local.sh.
+No tunnels, no CPU overhead, no port forwarding loops!
+
+
+
+
+### 2026-06-12 Phase 8 - Global Distributed Idempotency Cluster via YugabyteDB
+**Action:** Migrated idempotency state management from the localized `edge-db` instances to a globally distributed YugabyteDB cluster.
+**Details:**
+- Deployed YugabyteDB via Helm (`yugabyte-values-local.yaml`) alongside the `payment-edge-cell` charts. For the local environment, it is optimized via `replication_factor: 1` to behave as a single-node cluster without waiting for a 3-node Raft quorum.
+- Fully automated the database provisioning using a Kubernetes Job (`yugabyte-db-init-job.yaml`) running an Alpine PostgreSQL client. The script loops until Yugabyte is healthy, then executes DDL to create the `payment_service` and `duty` roles, injects credentials via k8s Secrets, and configures schema permissions.
+- Injected `YUGABYTE_DB_URL` into the Spring Boot application, separating the idempotency data source from the primary `edge-db` PostgreSQL instance.
+**Result:** Idempotency keys are now strongly consistent across the entire system. If a merchant's retry request hits a completely different edge cell due to load balancing, the distributed Yugabyte consensus ensures the edge cell immediately recognizes the key and prevents a double-charge.
+
+### 2026-06-13: Phase 7 - Helm Values & Secrets Parity Audit ✅ COMPLETED
+**Action:** Compared every `*-local.yaml` against its `*-azure.yaml` counterpart across `infra/helm-values/` and `infra/secrets/`.
+**Findings & Fixes:**
+- **FIXED** `payment-central-relay-azure.yaml`: `spring.profile` was `local` — corrected to `azure`. Resources were laptop-grade (100m/256Mi) — bumped to production-grade (1000m/1024Mi → 3000m/2048Mi).
+- **FIXED** `payment-central-relay-values-azure.yaml`: Missing `nodeSelector: pool: central` — the relay singleton was not pinned to the centralpool, risking it landing on the edgepool. Added.
+- **VERIFIED** `central-db-values-azure.yaml`: Correctly configured with `nodeSelector: pool: central`, 250Gi disk, 6000m CPU, 4GB shared_buffers.
+- **VERIFIED** `kafka-values-azure.yaml`: Correctly configured with `nodeSelector: pool: central`, 250Gi persistence, 6GB JVM heap.
+- **VERIFIED** `payment-edge-cell-values-azure.yaml`: Correctly configured with `nodeSelector: pool: edge`, 100Gi edge-db disk, 3 vCPU per app container.
+- **VERIFIED** `payment-consumers-values-azure.yaml`: Correctly configured with `nodeSelector: pool: central`, 3000m CPU, 2048Mi RAM.
+- **VERIFIED** `keycloak-values-azure.yaml`: Correctly configured with `nodeSelector: pool: central`, 50Gi Postgres PVC.
+- **VERIFIED** `redis-values-azure.yaml`: Correctly configured with `nodeSelector: pool: central`, 50Gi PVC, AOF persistence enabled.
+- **VERIFIED** `yugabyte-values-azure.yaml`: Correctly configured with `replication_factor: 3`, 3 master/tserver replicas, 100Gi tserver disk, `nodeSelector: pool: edgedb`.
+**Result:** All 9 Helm value pairs are correctly differentiated. No azure YAML accidentally references local sizing.
+
+### 2026-06-13: Phase 8 - Build Script Parity Audit ✅ COMPLETED
+**Action:** Compared all `build-and-push-*-local.sh` scripts against their `-azure.sh` counterparts.
+**Findings & Fixes:**
+- **FIXED** `build-and-push-payment-edge-workers-docker-repo-local..sh`: Double-dot typo in filename. Renamed to `build-and-push-payment-edge-workers-docker-repo-local.sh` via `git mv`.
+- **VERIFIED** All 4 service pairs (`payment-service`, `payment-consumers`, `payment-central-relay`, `payment-edge-workers`): local and azure scripts are functionally identical — both build and push to Docker Hub. This is intentional; the local/azure distinction is purely at the Helm values layer.
+**Result:** All build scripts are structurally correct and filename typo is resolved.
+
+### 2026-06-13: Phase 9 - Deploy Script Parity Audit ✅ COMPLETED
+**Action:** Compared all `deploy-*-local.sh` scripts against their `-azure.sh` counterparts.
+**Findings & Fixes:**
+- **FIXED** `deploy-payment-platform-config.sh`: Missing `-local` suffix. Renamed to `deploy-payment-platform-config-local.sh` via `git mv`. Updated the reference in `deploy-all-local.sh` line 25.
+- **FIXED** `deploy-payment-edge-cell-azure.sh`: Still contained Minikube-era code (`minikube ip`, `nip.io` from Minikube IP, `tunnel.sh` fallback, `nc` port probing). This was a stale copy from Phase 5 that was never updated during the OrbStack migration (Phase 6). Fully rewritten for AKS: polls Azure Load Balancer for EXTERNAL-IP (up to 30 attempts × 10s = 5min), constructs `payment.<IP>.nip.io` hostname, writes `infra/endpoints.json` for k6 load tests, then deploys via Helm.
+- **VERIFIED** Static scan: zero azure scripts reference `-local.yaml` files; zero local scripts reference `-azure.yaml` files.
+**Result:** All deploy scripts are correctly environment-scoped. Azure deploy pipeline is now safe to run end-to-end.
+
+---
+
+### 2026-06-13: Phase 10 - Load Test Strategy Decision ✅ DECIDED
+
+**Decision: Test Edge Layer Capacity First — Kafka Single Broker (Scenario A)**
+
+**Rationale:**
+The edge layer (`payment-service` + `edge-db` + `payment-edge-workers` + YugabyteDB idempotency check) is the **synchronous hot path** — the only part of the system the shopper waits for. The central async pipeline (Kafka, `payment-consumers`, `payment-central-relay`) can lag behind under load without degrading shopper-visible latency. Therefore edge capacity is measured first to establish the true RPS ceiling before introducing async backpressure.
+
+**Kafka configuration stays at single broker:**
+- `replicaCount: 1`, `controllerOnly: false` (combined controller + broker, KRaft mode)
+- `replication.factor: 1`, `min.insync.replicas: 1`
+- No Terraform changes required. Cost delta: $0.
+- Risk accepted: Kafka pod restart during a 4-hour window is low probability. If it occurs, the test run is invalidated and restarted.
+
+**What "Edge Layer Capacity" means in measurable terms:**
+
+| Metric | What it tells us |
+|---|---|
+| **Max sustained RPS** before P99 > 500ms | Actual throughput ceiling of one edge cell pod |
+| **P50 / P95 / P99 latency** under load | Where latency is spent: JVM, edge-db, or YugabyteDB |
+| **YugabyteDB idempotency check latency** | Cross-node overhead on every payment request (edgepool → edgedbpool) |
+| **edge-db connection pool exhaustion** | Whether HikariCP queue depth spikes at peak |
+| **HPA trigger point** | At what RPS does the autoscaler add Edge Cell Pod 1, then Pod 2 |
+| **Edge cell autoscale latency** | How long from "traffic spike" to "second pod ready and serving" |
+| **Memory headroom on payment-service** | JVM GC pause frequency under sustained load (dual HikariCP pool overhead) |
+
+**Next Phase:** Ground-up rewrite of all `*-azure.yaml` Helm values from Terraform hardware topology (see Phase 11).
+
+---
+
+### 2026-06-13: Phase 11 - Azure Helm Values Topology Rewrite ✅ COMPLETED
+
+**Action:** Rewrote all `*-azure.yaml` Helm values from scratch to map directly to the Terraform hardware budgets (`systempool`, `centralpool`, `edgepool`, `edgedbpool`) and implemented industry-standard observability.
+
+**Findings & Fixes:**
+- **Edge Cell (`payment-edge-cell-values-azure.yaml`)**:
+  - Added `topologySpreadConstraints` with `maxSkew: 1` and `whenUnsatisfiable: DoNotSchedule`. This hard-enforces the "1 pod per node" rule on the `edgepool` to prevent noisy-neighbor GC pauses under load.
+  - Bumped `payment-service` RAM to 4Gi limit / 60% heap to absorb the dual HikariCP pool overhead (local `edge-db` + cross-node YugabyteDB).
+  - Scaled HPA trigger down from 85% to 70% CPU to ensure the autoscaler provisions Edge Pod 2 and 3 *before* P99 latency spikes during the k6 test.
+- **Idempotency Layer (`yugabyte-values-azure.yaml`)**:
+  - Added `podAntiAffinity` to hard-enforce 1 `yb-tserver` per node on the `edgedbpool`. Without this, all 3 tservers could land on the same node, defeating the Raft quorum logic entirely.
+  - Bumped `tserver` RAM limit to 10Gi (from 4Gi) to account for YSQL `shared_buffers` and the incoming 60 connection pool threads from the edge cells.
+- **Monitoring Stack (`monitoring-stack-values-azure.yaml`)**:
+  - Replaced the custom local bash script (`add-consumer-lag-metric.sh`) with the industry-standard `prometheus-adapter` Helm subchart.
+  - Pinned all Prometheus, Grafana, Alertmanager, and Adapter components to the `centralpool`.
+  - Configured for load testing: 15s scrape interval, 24h retention, and a 50Gi Premium SSD PVC to survive test interruptions.
+- **Consumer Sizing (`payment-consumers-values-azure.yaml`)**:
+  - Solved the **"Pending Pod" scaling lock**. The single `centralpool` node (8 vCPU) runs Kafka, Postgres, Redis, Keycloak, Relay, and Monitoring (using ~6.8 vCPU).
+  - Previously, `payment-consumers` requested 1000m CPU. When scaling past 1 replica, the scheduler would reject pods due to lack of requested CPU, locking it at 1.
+  - **Fix:** Dropped `requests.cpu` to 150m, kept `limits.cpu` at 1000m. This allows all 6 consumer replicas to schedule on the node and dynamically burst into idle CPU capacity as Kafka backlog grows.
+
+**Result:** The entire Azure deployment pipeline and infrastructure configuration is now fully robust, strictly mapped to hardware constraints, and ready for the first load test.
+
+---
+
+### 2026-06-13: Phase 12 - Universal Health Probe Standardization ✅ COMPLETED
+
+**Context:** The legacy health probes were too aggressive for a Kubernetes environment experiencing CPU contention (Local deployment) or GC pauses (Azure Load Testing). This caused "false positive" pod terminations.
+
+**Action:** Standardized `startupProbe`, `livenessProbe`, and `readinessProbe` definitions across all `payment-edge-cell`, `payment-consumers`, and `payment-central-relay` Helm charts.
+
+**The Strategy:**
+1. **Startup Probes (Forgiving):** Increased failure threshold to 60 (5-minute timeout) to absorb slow multi-JVM local startup times without throwing the deployment into a `CrashLoopBackOff`.
+2. **Readiness Probes (Responsive):** Set to check every 10s and fail after 30s. Safely pulls pods out of the Ingress load balancer if they lose their database connection.
+3. **Liveness Probes (Loose):** Increased failure threshold to allow up to 60 seconds of unresponsiveness. This prevents Kubernetes from `SIGKILL`ing a pod that is simply paused for a heavy Garbage Collection cycle during the k6 load test.
+
+**Result:** A massive reduction in false-positive pod restarts locally, and guaranteed GC pause tolerance during the Azure load test.

@@ -29,7 +29,7 @@ class MultiDataSourceConfig {
 
     @Bean("centralDataSource")
     @ConfigurationProperties("app.datasource.central")
-    fun centralDataSource(): HikariDataSource = HikariDataSource().apply { poolName = "central-edge-worker-pool" }
+    fun centralDataSource(): HikariDataSource = HikariDataSource().apply { poolName = "central-edge-worker-pool"}
 
     // -------- TxManagers --------
 

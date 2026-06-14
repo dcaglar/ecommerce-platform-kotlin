@@ -22,7 +22,7 @@ fi
 
 
 echo "🚀 Deploying platform config and secrets..."
-"$SCRIPT_DIR/deploy-payment-platform-config.sh"
+"$SCRIPT_DIR/deploy-payment-platform-config-local.sh"
 
 
 echo "🚀 Deploying keycloak"
@@ -40,5 +40,8 @@ echo "🚀 Deploying yugabytedb..."
 
 echo "🚀 Deploying kafka..."
 "$SCRIPT_DIR/deploy-kafka-local.sh"
+
+echo "🚀 Deploying KEDA (Autoscaler)..."
+"$SCRIPT_DIR/deploy-keda-local.sh"
 
 echo "✅ All components deployed!"

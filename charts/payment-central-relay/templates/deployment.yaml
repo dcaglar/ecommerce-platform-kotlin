@@ -75,22 +75,19 @@ spec:
                   name: central-db-credentials
                   key: CENTRAL_DB_DUTY_PASSWORD
           startupProbe:
-            httpGet: { path: /actuator/health/liveness, port: management }
-            initialDelaySeconds: 20
-            periodSeconds: 10
-            timeoutSeconds: 5
+            httpGet: {path: /actuator/health/liveness, port: management}
+            initialDelaySeconds: 10
+            periodSeconds: 5
             failureThreshold: 60
-          livenessProbe:
-            httpGet: { path: /actuator/health/liveness, port: management }
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 12
           readinessProbe:
-            httpGet: { path: /actuator/health/readiness, port: management }
-            initialDelaySeconds: 5
+            httpGet: {path: /actuator/health/readiness, port: management}
             periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: management}
+            periodSeconds: 15
+            failureThreshold: 4
             timeoutSeconds: 5
-            failureThreshold: 12
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

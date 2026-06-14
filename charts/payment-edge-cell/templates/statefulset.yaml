@@ -242,17 +242,19 @@ spec:
                   key: KEYCLOAK_ISSUER_URL
           startupProbe:
             httpGet: {path: /actuator/health/liveness, port: 9000}
-            initialDelaySeconds: 15
+            initialDelaySeconds: 10
             periodSeconds: 5
             failureThreshold: 60
           readinessProbe:
             httpGet: {path: /actuator/health/readiness, port: 9000}
             periodSeconds: 10
             failureThreshold: 3
+            timeoutSeconds: 3
           livenessProbe:
             httpGet: {path: /actuator/health/liveness, port: 9000}
             periodSeconds: 15
-            failureThreshold: 6
+            failureThreshold: 4
+            timeoutSeconds: 5
           resources:
             {{- toYaml .Values.paymentService.resources | nindent 12}}
 
@@ -317,6 +319,21 @@ spec:
                 secretKeyRef:
                   name: central-db-credentials
                   key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+          startupProbe:
+            httpGet: {path: /actuator/health/liveness, port: 9001}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: 9001}
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: 9001}
+            periodSeconds: 15
+            failureThreshold: 4
+            timeoutSeconds: 5
           resources:
             {{- toYaml .Values.edgeWorker.resources | nindent 12}}
 

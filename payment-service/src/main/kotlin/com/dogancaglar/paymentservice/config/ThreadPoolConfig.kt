@@ -91,8 +91,8 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
     @Bean("resilientExecutor")
     fun resilientExecutor(decorator: TaskDecorator): ThreadPoolTaskExecutor =
         ThreadPoolTaskExecutor().apply {
-            corePoolSize = 32
-            maxPoolSize = 32
+            corePoolSize = 200
+            maxPoolSize = 200
             queueCapacity = 500
             setThreadNamePrefix("resilient-callback-")
             setTaskDecorator(decorator)

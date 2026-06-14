@@ -12,17 +12,17 @@ conf:
 resource:
   master:
     requests:
-      cpu: 200m
+      cpu: 50m
       memory: 256Mi
     limits:
       cpu: 500m
       memory: 512Mi
   tserver:
     requests:
-      cpu: 500m
+      cpu: 150m
       memory: 512Mi
     limits:
-      cpu: 1000m
+      cpu: 1500m
       memory: 1Gi
 
 storage:

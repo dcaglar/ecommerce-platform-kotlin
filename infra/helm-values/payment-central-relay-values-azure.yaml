@@ -13,8 +13,10 @@ serviceMonitor:
   interval: 30s
   scrapeTimeout: 10s
 replicaCount: 1
-autoscaling:
+keda:
   enabled: false
+nodeSelector:
+  pool: central
 resources:
-  requests: {cpu: "1000m", memory: "1024Mi"}
-  limits: {cpu: "3000m", memory: "2048Mi"}
+  requests: {cpu: "250m", memory: "512Mi"}
+  limits: {cpu: "1000m", memory: "1024Mi"}

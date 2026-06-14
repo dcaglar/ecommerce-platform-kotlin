@@ -35,7 +35,7 @@ spring:
       leak-detection-threshold: 60000
       connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
 
-spring:
+
   data:
     redis:
       url: ${SPRING_DATA_REDIS_URL}
