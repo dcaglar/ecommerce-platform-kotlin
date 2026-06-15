@@ -5,6 +5,7 @@
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
     <include file="central-payment-outbox-changelog.xml" relativeToChangelogFile="true"/>
+    <include file="central-edge-watermak-table.xml" relativeToChangelogFile="true"/>
     <include file="central-payments-table.xml" relativeToChangelogFile="true"/>
     <include file="central-accounting-tables.xml" relativeToChangelogFile="true"/>
     <include file="central-account-profile.xml" relativeToChangelogFile="true"/>

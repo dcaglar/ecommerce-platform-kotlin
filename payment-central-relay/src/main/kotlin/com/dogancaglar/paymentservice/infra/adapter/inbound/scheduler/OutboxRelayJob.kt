@@ -9,6 +9,7 @@ import com.dogancaglar.paymentservice.application.events.InternalTransferCommand
 import com.dogancaglar.paymentservice.application.events.JournalEntriesRecorded
 import com.dogancaglar.paymentservice.application.events.OutboxEventTypes
 import com.dogancaglar.paymentservice.application.events.PaymentBaseEvent
+import com.dogancaglar.paymentservice.application.events.SettlementReceived
 
 import com.dogancaglar.paymentservice.ports.outbound.EventPublisherPort
 import com.dogancaglar.paymentservice.ports.outbound.CentralOutboxRelayPort
@@ -47,7 +48,10 @@ class OutboxRelayJob(
         }.register(meterRegistry)
     }
 
-    @Scheduled(fixedDelayString = "\${outbox-relay.poll-interval:5000}")
+    @Scheduled(
+        initialDelayString = "\${outbox-relay.initial-delay:15000}",
+        fixedDelayString = "\${outbox-relay.poll-interval:5000}"
+    )
     fun poll() {
         val sample = Timer.start(meterRegistry)
         val tSafe = centralOutboxRepository.computeTSafe() ?: com.dogancaglar.common.time.Utc.nowInstant()
@@ -62,12 +66,24 @@ class OutboxRelayJob(
         // Group events by aggregateId (e.g. sellerId) to preserve ordering per account
         val groups = batch.groupBy { it.aggregateId }
 
-        // Process each group concurrently, but keep events inside each group strictly sequential
+        // Process each aggregate group concurrently, dispatching events to Kafka asynchronously
         for ((_, events) in groups) {
             executor.execute {
-                var chain = CompletableFuture.completedFuture<Void>(null)
                 for (entry in events) {
-                    chain = chain.thenCompose { processEntryAsync(entry) }
+                    try {
+                        processEntryAsync(entry).thenAccept {
+                            logger.info("✅ Marked dispatched outboxevent with ${entry.eventType} and oeid ${entry.oeid}  and sstatus${entry.status}")
+                            centralOutboxRepository.markDispatched(entry.oeid, com.dogancaglar.common.time.Utc.toInstant(entry.createdAt))
+                            meterRegistry.counter("relay_published_total").increment()
+                        }.exceptionally { exception ->
+                            meterRegistry.counter("relay_publish_failed_total").increment()
+                            logger.error("Failed to publish event oeid=${entry.oeid} for aggregate ${entry.aggregateId}", exception)
+                            null
+                        }
+                    } catch (e: Exception) {
+                        logger.error("🛑 Breaking group processing for aggregate ${entry.aggregateId} due to synchronous failure", e)
+                        break
+                    }
                 }
             }
         }
@@ -77,36 +93,20 @@ class OutboxRelayJob(
 
      */
 
-    private fun processEntryAsync(entry: OutboxEvent): CompletableFuture<Void> {
-        val future = try {
-            when (OutboxEventTypes.from(entry.eventType)) {
-                OutboxEventTypes.PAYMENT_AUTHORIZED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, PaymentAuthorized::class.java))
-                OutboxEventTypes.CAPTURE_REQUESTED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, CaptureRequested::class.java))
-                OutboxEventTypes.CAPTURE_SUBMITTED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, CaptureSubmitted::class.java))
-                OutboxEventTypes.CAPTURE_CONFIRMED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, CaptureConfirmed::class.java))
-                OutboxEventTypes.JOURNAL_ENTRIES_RECORDED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, JournalEntriesRecorded::class.java))
-                OutboxEventTypes.INTERNAL_TRANSFER_COMMAND -> kafkaPublisher.publishAsync(convertToEnvelope(entry, InternalTransferCommand::class.java))
-                else -> {
-                    logger.warn("❓ Unknown outbox event type=${entry.eventType}, skipping oeid=${entry.oeid}")
-                    CompletableFuture.completedFuture(null)
-                }
-            }
-        } catch (e: Exception) {
-            logger.error("Error starting processing for event oeid=${entry.oeid}", e)
-            val failedFuture = CompletableFuture<Void>()
-            failedFuture.completeExceptionally(e)
-            failedFuture
-        }
-
-        return future.handle { _, exception ->
-            if (exception == null) {
-                centralOutboxRepository.markDispatched(entry.oeid, com.dogancaglar.common.time.Utc.toInstant(entry.createdAt))
-                meterRegistry.counter("relay_published_total").increment()
-                null
-            } else {
-                meterRegistry.counter("relay_publish_failed_total").increment()
-                logger.error("Failed to publish event oeid=${entry.oeid} for aggregate ${entry.aggregateId}", exception)
-                throw exception
+    private fun processEntryAsync(entry: OutboxEvent): CompletableFuture<*> {
+        logger.info("🚀 OutboxRelayJob: Processing outbox event oeid={} of type={}", entry.oeid, entry.eventType)
+        
+        return when (OutboxEventTypes.from(entry.eventType)) {
+            OutboxEventTypes.PAYMENT_AUTHORIZED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, PaymentAuthorized::class.java))
+            OutboxEventTypes.CAPTURE_REQUESTED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, CaptureRequested::class.java))
+            OutboxEventTypes.CAPTURE_SUBMITTED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, CaptureSubmitted::class.java))
+            OutboxEventTypes.CAPTURE_CONFIRMED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, CaptureConfirmed::class.java))
+            OutboxEventTypes.JOURNAL_ENTRIES_RECORDED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, JournalEntriesRecorded::class.java))
+            OutboxEventTypes.INTERNAL_TRANSFER_COMMAND -> kafkaPublisher.publishAsync(convertToEnvelope(entry, InternalTransferCommand::class.java))
+            OutboxEventTypes.SETTLEMENT_RECEIVED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, SettlementReceived::class.java))
+            else -> {
+                logger.warn("❓ Unknown outbox event type=${entry.eventType}, skipping oeid=${entry.oeid}")
+                CompletableFuture.completedFuture<Any>(null)
             }
         }
     }
@@ -115,6 +115,7 @@ class OutboxRelayJob(
     // Replace all 6 custom envelope conversion methods with this single robust implementation:
     private fun <T : PaymentBaseEvent> convertToEnvelope(evt: OutboxEvent, clazz: Class<T>): EventEnvelope<T> {
         val envelopeType = objectMapper.typeFactory.constructParametricType(EventEnvelope::class.java, clazz)
+        logger.info("Outboxevent. type is ${evt.eventType} , but EventEnvelopetype Generic Event class is ${clazz.name}" )
         return objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<T>
     }
 }

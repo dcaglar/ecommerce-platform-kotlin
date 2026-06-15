@@ -20,6 +20,14 @@
         ON CONFLICT (oeid, created_at) DO NOTHING
     </insert>
 
+    <select id="isSchemaReady" resultType="boolean">
+        SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
+        AND table_name = 'edge_watermarks'
+        )
+    </select>
+
     <!-- Edge Watermark Operations -->
     <insert id="upsert" parameterType="com.dogancaglar.common.db.entity.EdgeWatermarkEntity">
         INSERT INTO edge_watermarks (edge_node_id, forwarded_up_to)

@@ -57,4 +57,6 @@ class MultiDataSourceConfig {
 
     @Bean("maintenanceJdbcTemplate")
     fun maintenanceJdbc(@Qualifier("maintenanceDataSource") ds: DataSource) = JdbcTemplate(ds)
+
+
 }

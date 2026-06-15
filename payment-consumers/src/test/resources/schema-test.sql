@@ -66,7 +66,7 @@ CREATE TABLE payment_tx (
     amount_currency CHAR(3) NOT NULL,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() AT TIME ZONE 'UTC'),
     CONSTRAINT fk_payment_tx_parent FOREIGN KEY (parent_tx_id) REFERENCES payment_tx(tx_id),
-    CONSTRAINT chk_tx_type CHECK (tx_type IN ('AUTHORIZATION', 'CAPTURE', 'REFUND', 'SETTLE', 'INTERNAL_TRANSFER')),
+    CONSTRAINT chk_tx_type CHECK (tx_type IN ('AUTHORIZATION', 'CAPTURE', 'REFUND', 'SETTLE', 'INTERNAL_TRANSFER', 'COMMISSION_FEE')),
     CONSTRAINT chk_tx_amount_positive CHECK (amount_value > 0),
     CONSTRAINT chk_tx_currency CHECK (amount_currency ~ '^[A-Z]{3}$'),
     CONSTRAINT chk_tx_status CHECK (status IN ('PENDING', 'SUCCESS', 'FAILED')),

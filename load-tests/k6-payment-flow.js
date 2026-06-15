@@ -140,8 +140,8 @@ function generateUuidV7() {
     return `${hexN(8)}-${hexN(4)}-7${hexN(3)}-8${hexN(3)}-${hexN(12)}`;
 }
 
-const MARKETPLACE = "MARKETPLACE-1";
-const SELLERS = Array.from({length: 10}, (_, i) => `SELLER-1-${i+1}`);
+const MARKETPLACE = "MARKETPLACE-5";
+const SELLERS = Array.from({length: 10}, (_, i) => `SELLER-5-${i+1}`);
 
 function getUniqueSellers(count) {
     const shuffled = SELLERS.slice().sort(() => 0.5 - Math.random());

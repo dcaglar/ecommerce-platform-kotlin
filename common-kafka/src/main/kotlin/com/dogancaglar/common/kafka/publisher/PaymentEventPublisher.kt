@@ -63,6 +63,8 @@ class PaymentEventPublisher(
         return envelope
     }
 
+
+
     // ======================================================================
     // ASYNC PUBLISH
     // ======================================================================
@@ -72,27 +74,21 @@ class PaymentEventPublisher(
         val eventMetaData = eventMetaDataRegistry.metadataForEvent(envelope.data)
         val record = buildRecord(eventMetaData, envelope)
 
-        val future = CompletableFuture<EventEnvelope<T>>()
-
-        kafkaTemplate.send(record).whenComplete { result, ex ->
-            if (ex == null) {
-                logger.debug(
-                    "📨 publishAsync OK topic={} key={} eventId={}",
-                    eventMetaData.topic, envelope.aggregateId, envelope.eventId
-                )
-                future.complete(envelope)
-            } else {
-                logger.warn(
-                    "❌ publishAsync ERROR topic={} key={} eventId={} error={}",
-                    eventMetaData.topic, envelope.aggregateId, envelope.eventId, ex.message
-                )
-                future.completeExceptionally(ex)
+        logger.info("🚀 PaymentEventPublisher: IS GOING TO SEND an RECORD with event type ${record.value().eventType} to Topic  ${record.topic()}")
+        
+        return kafkaTemplate.send(record)
+            .thenApply { _ ->
+                logger.info("🚀 PaymentEventPublisher: JUSST SENT an RECORD with event type ${record.value().eventType} to Topic  ${record.topic()}")
+                envelope
             }
-        }
-
-        return future
+            .exceptionally { ex ->
+                logger.error(
+                    "❌  PaymentEventPublisher: JUSST FAILED to SEND an RECORD with event type ${record.value().eventType} to Topic  ${record.topic()}",
+                    ex
+                )
+                throw ex
+            }
     }
-
     // ======================================================================
     // BUILD RECORD
     // ======================================================================

@@ -10,6 +10,7 @@ import com.dogancaglar.paymentservice.application.events.EventType
 import com.dogancaglar.paymentservice.application.events.CaptureSubmitted
 import com.dogancaglar.paymentservice.application.events.InternalTransferCommand
 import com.dogancaglar.paymentservice.application.events.JournalEntriesRecorded
+import com.dogancaglar.paymentservice.application.events.SettlementReceived
 
 object PaymentEventMetadataCatalog {
 
@@ -24,7 +25,7 @@ object PaymentEventMetadataCatalog {
 
     // 2. Routes to CAPTURE_COMMANDS for the PaymentCaptureExecutor
     object CaptureRequestedMetadata : EventMetadata<CaptureRequested> {
-        override val topic = Topics.CAPTURE_COMMANDS
+        override val topic = Topics.CAPTURE_REQUESTED
         override val eventType = EventType.CAPTURE_REQUESTED
         override val clazz = CaptureRequested::class.java
         override val typeRef = object : TypeReference<EventEnvelope<CaptureRequested>>() {}
@@ -47,7 +48,7 @@ object PaymentEventMetadataCatalog {
         override val clazz = CaptureConfirmed::class.java
         override val typeRef = object : TypeReference<EventEnvelope<CaptureConfirmed>>() {}
         // Use publicPaymentIntentId here to ensure it lands in the exact same partition as PaymentAuthorized
-        override val partitionKey = { evt: CaptureConfirmed -> evt.publicPaymentIntentId }
+        override val partitionKey = { evt: CaptureConfirmed -> evt.merchantAccount }
     }
         //publish LEdgerEntriesRecorded
     object JournalEntriesRecordedMetadata : EventMetadata<JournalEntriesRecorded> {
@@ -67,13 +68,23 @@ object PaymentEventMetadataCatalog {
         override val partitionKey = { evt: InternalTransferCommand -> evt.targetAccount }
     }
 
+    // 6. Routes simulated SDR results to PSP_RESULTS
+    object SettlementLineReconciledMetadata : EventMetadata<SettlementReceived> {
+        override val topic = Topics.PSP_RESULTS
+        override val eventType = EventType.SETTLEMENT_RECEIVED
+        override val clazz = SettlementReceived::class.java
+        override val typeRef = object : TypeReference<EventEnvelope<SettlementReceived>>() {}
+        override val partitionKey = { evt: SettlementReceived -> evt.merchantAccount }
+    }
+
     val all: List<EventMetadata<*>> = listOf(
         PaymentAuthorizedMetadata,
         CaptureRequestedMetadata,
         CaptureSubmittedMetadata,
         CaptureConfirmedMetadata,
         InternalTransferCommandMetadata,
-        JournalEntriesRecordedMetadata
+        JournalEntriesRecordedMetadata,
+        SettlementLineReconciledMetadata
     )
 
 }

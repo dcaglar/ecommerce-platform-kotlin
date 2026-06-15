@@ -2,9 +2,12 @@ package com.dogancaglar.paymentservice.domain.model.payment
 
 import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.domain.model.common.Amount
+import com.dogancaglar.paymentservice.domain.model.ledger.SettleStatus
+import com.dogancaglar.paymentservice.domain.model.ledger.Tx
 import com.dogancaglar.paymentservice.domain.model.vo.BuyerId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
+import com.dogancaglar.paymentservice.domain.model.vo.TxId
 import java.time.LocalDateTime
 
 /**
@@ -187,6 +190,72 @@ class Payment private constructor(
 
         return copy(capturedAmount = newCaptured, status = newStatus, updatedAt = now)
     }
+
+    /**
+     * applySettlement
+     *
+     * Applies the SDR settlement loopback confirmation to the aggregate.
+     * Only allowed from [PaymentStatus.CAPTURED].
+     *
+     * @param now  UTC timestamp of the transition.
+     * @return     A new Payment instance with status=SETTLED.
+     */
+    fun applySettlement(now: LocalDateTime = Utc.nowLocalDateTime()): Payment {
+        //this should not be the only this check,mnore than that  beleiuve
+        require(status == PaymentStatus.CAPTURED) {
+            "Can only apply settlement to a CAPTURED payment (current=\$status)"
+        }
+        return copy(status = PaymentStatus.SETTLED, updatedAt = now)
+    }
+
+    fun reconcileCaptureSettlement(
+        targetTxId: TxId,
+        actualGrossAmount: Amount,
+        allCaptures: List<Tx.CaptureTx>
+    ): ReconciliationResult {
+        // Invariant Check 1: Ensure macro lifecycle state allows settlement clearing
+        require(status == PaymentStatus.CAPTURED || status == PaymentStatus.PARTIALLY_CAPTURED) {
+            "Cannot reconcile settlement against a payment in $status status. Target must be CAPTURED or PARTIALLY_CAPTURED."
+        }
+
+        // Locate the specific target transaction within our provided aggregate collection context
+        val targetTx = allCaptures.find { it.txId == targetTxId }
+            ?: throw IllegalArgumentException("Transaction TxId=${targetTxId.value} is not a valid child of PaymentId=${this.paymentId.value}")
+
+        // Invariant Check 2: Evaluate gross volume consistency (Expected vs Actual Cleared)
+        val derivedSettleStatus = if (actualGrossAmount == targetTx.amount) {
+            SettleStatus.MATCHED
+        } else {
+            SettleStatus.DISCREPANCY
+        }
+
+        // Advance micro transaction state safely using our encapsulated domain method
+        val updatedCaptureTx = targetTx.progressReconciliation(derivedSettleStatus)
+
+        // Evaluate macro state machine transition conditions:
+        // We check if this newly matched line item completes the puzzle for ALL captures.
+        val areAllCapturesMatched = allCaptures.map { if (it.txId == targetTxId) updatedCaptureTx else it }
+            .all { it.settleStatus == SettleStatus.MATCHED }
+
+        val newStatus = if (areAllCapturesMatched && status == PaymentStatus.CAPTURED) {
+            PaymentStatus.SETTLED
+        } else {
+            status // Remains at CAPTURED or PARTIALLY_CAPTURED to trap any exception/discrepancy lines
+        }
+
+        val updatedPayment = this.copy(
+            status = newStatus,
+            updatedAt = com.dogancaglar.common.time.Utc.nowLocalDateTime()
+        )
+
+        return ReconciliationResult(updatedPayment, updatedCaptureTx)
+    }
+
+    // Immutable domain DTO returned by the aggregate root
+    data class ReconciliationResult(
+        val payment: Payment,
+        val captureTx: Tx.CaptureTx
+    )
 
     /**
      * voidAuthorization

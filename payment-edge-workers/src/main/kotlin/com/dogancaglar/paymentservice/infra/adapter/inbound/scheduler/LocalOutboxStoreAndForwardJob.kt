@@ -46,11 +46,20 @@ class LocalOutboxStoreAndForwardJob(
 
     @Scheduled(initialDelay = 30000, fixedDelay = 5000)
     fun dispatchBatches() {
-        repeat(threadCount) { workerIdx ->
-            val delayMs = 500L * workerIdx
-            taskScheduler.schedule({ dispatchBatchWorker() },
-                Utc.nowInstant().plusMillis(delayMs))
+        if(centralOutboxRepository.isSchemaReady()) {
+            repeat(threadCount) { workerIdx ->
+                val delayMs = 500L * workerIdx
+                taskScheduler.schedule(
+                    {
+                        dispatchBatchWorker()
+                    },
+                    Utc.nowInstant().plusMillis(delayMs)
+                )
+            }
+        } else {
+            logger.warn("FATAL ERROR, EDGE TABLE MOT PRESENT,SHUUTTING DOWN")
         }
+
     }
 
     @Scheduled(initialDelay = 30000, fixedDelay = 120000)

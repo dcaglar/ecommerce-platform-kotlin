@@ -55,15 +55,6 @@
         </changeSet>
 
 
-    <changeSet id="create-edge-watermarks-table" author="antigravity">
-        <createTable tableName="edge_watermarks">
-            <column name="edge_node_id" type="VARCHAR(64)">
-                <constraints primaryKey="true"/>
-            </column>
-            <column name="forwarded_up_to" type="TIMESTAMP WITHOUT TIME ZONE">
-                <constraints nullable="false"/>
-            </column>
-        </createTable>
-    </changeSet>
+
 
     </databaseChangeLog>

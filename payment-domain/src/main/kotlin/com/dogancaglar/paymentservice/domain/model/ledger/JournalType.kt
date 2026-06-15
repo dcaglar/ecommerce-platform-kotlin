@@ -8,7 +8,7 @@ enum class JournalType {
     CAPTURE,            // DR AUTH_LIABILITY / CR AUTH_RECEIVABLE & DR PSP_RECEIVABLES / CR MERCHANT_GROSS_POOL
     INTERNAL_TRANSFER,  // DR MERCHANT_GROSS_POOL / CR Sub-Seller or Escrow Balance
     REFUND,             // Reversal of capture balances due to customer return
-    SETTLEMENT,         // Multi-payment batch processing from PSP file (clears receivables into platform bank)
+    SETTLEMENT,         // represent a settlement of  single transaction which was sent with other trasnactions in same fileMulti-payment batch processing from PSP file (clears receivables into platform bank)
     PSP_FEE,
     COMMISSION_FEE,     // DR MERCHANT_GROSS_POOL / CR PLATFORM_COMMISSION_ESCROW
     REVENUE_RECOGNITION,

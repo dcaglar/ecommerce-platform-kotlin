@@ -19,9 +19,6 @@
             <column name="currency" type="CHAR(3)">
                 <constraints nullable="false"/>
             </column>
-            <column name="reversed_amount_value" type="BIGINT">
-                <constraints nullable="false"/>
-            </column>
             <column name="target_account" type="VARCHAR(255)">
                 <constraints nullable="false"/>
             </column>

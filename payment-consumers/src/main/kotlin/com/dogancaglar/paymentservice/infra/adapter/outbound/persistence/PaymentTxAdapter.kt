@@ -1,18 +1,10 @@
 package com.dogancaglar.paymentservice.infra.adapter.outbound.persistence
 
-import com.dogancaglar.paymentservice.domain.model.common.Amount
-import com.dogancaglar.paymentservice.domain.model.common.Currency
 import com.dogancaglar.paymentservice.domain.model.ledger.Tx
-import com.dogancaglar.paymentservice.domain.model.ledger.SettleStatus
-import com.dogancaglar.paymentservice.domain.model.ledger.TxStatus
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
-import com.dogancaglar.paymentservice.domain.model.vo.TxId
 import com.dogancaglar.common.db.entity.PaymentTxEntity
 import com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.PaymentTxMapper
 import com.dogancaglar.paymentservice.ports.outbound.PaymentTxPort
 import org.springframework.stereotype.Repository
-import java.time.Instant
-import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.common.db.converter.PaymentTxEntityMapper
 
 /**
@@ -49,89 +41,5 @@ class PaymentTxAdapter(
     }
 
     override fun findByPaymentId(paymentId: Long): List<Tx> =
-        mapper.findByPaymentId(paymentId).map { toDomain(it) }
-
-    // =========================================================================
-    // Domain → Entity (downgrade to raw primitives for DB storage)
-    // =========================================================================
-
-
-    // =========================================================================
-    // Entity → Domain (lift raw primitives back to typed domain VOs)
-    // =========================================================================
-
-    private fun toDomain(entity: PaymentTxEntity): Tx {
-        val amount    = Amount.of(entity.amountValue, Currency(entity.amountCurrency))
-        val createdAt = entity.createdAt ?: Instant.now()
-        val status    = TxStatus.valueOf(entity.status)
-        val paymentIntentId = PaymentIntentId(entity.paymentIntentId)
-
-        return when (entity.txType) {
-
-            "AUTHORIZATION" -> Tx.AuthorizationTx(
-                txId              = TxId(entity.txId),
-                paymentId         = PaymentId(entity.paymentId),
-                paymentIntentId   = paymentIntentId,
-                acquirerReference = entity.acquirerReference,
-                amount            = amount,
-                status            = status,
-                createdAt         = createdAt
-            )
-
-            "CAPTURE" -> Tx.CaptureTx(
-                txId              = TxId(entity.txId),
-                paymentId         = PaymentId(entity.paymentId),
-                paymentIntentId   = paymentIntentId,
-                authorizationTxId = TxId(requireNotNull(entity.parentTxId) {
-                    "CAPTURE row txId=${entity.txId} is missing parentTxId (authorizationTxId)"
-                }),
-                acquirerReference = entity.acquirerReference,
-                amount            = amount,
-                status            = status,
-                settleStatus      = entity.settleStatus
-                    ?.let { SettleStatus.valueOf(it) }
-                    ?: SettleStatus.UNMATCHED,
-                createdAt         = createdAt
-            )
-
-            "REFUND" -> Tx.RefundTx(
-                txId              = TxId(entity.txId),
-                paymentId         = PaymentId(entity.paymentId),
-                paymentIntentId   = paymentIntentId,
-                captureTxId       = TxId(requireNotNull(entity.parentTxId) {
-                    "REFUND row txId=${entity.txId} is missing parentTxId (captureTxId)"
-                }),
-                acquirerReference = entity.acquirerReference,
-                amount            = amount,
-                status            = status,
-                createdAt         = createdAt
-            )
-
-            "SETTLE" -> Tx.SettleTx(
-                txId                   = TxId(entity.txId),
-                paymentId              = PaymentId(entity.paymentId),
-                paymentIntentId        = paymentIntentId,
-                captureTxId            = TxId(requireNotNull(entity.parentTxId) {
-                    "SETTLE row txId=${entity.txId} is missing parentTxId (captureTxId)"
-                }),
-                acquirerBatchReference = requireNotNull(entity.acquirerBatchRef) {
-                    "SETTLE row txId=${entity.txId} is missing acquirerBatchRef"
-                },
-                settledAmount          = Amount.of(
-                    requireNotNull(entity.settledAmountValue) {
-                        "SETTLE row txId=${entity.txId} is missing settledAmountValue"
-                    },
-                    Currency(entity.amountCurrency)
-                ),
-                amount                 = amount,
-                status                 = status,
-                createdAt              = createdAt
-            )
-
-            else -> throw IllegalStateException(
-                "Unknown Tx type '${entity.txType}' for txId=${entity.txId}. " +
-                "Expected one of: AUTHORIZATION, CAPTURE, REFUND, SETTLE"
-            )
-        }
-    }
+        mapper.findByPaymentId(paymentId).map { PaymentTxEntityMapper.toDomain(it) }
 }

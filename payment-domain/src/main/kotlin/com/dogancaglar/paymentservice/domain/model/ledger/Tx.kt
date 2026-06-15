@@ -58,6 +58,19 @@ sealed class Tx {
         override val createdAt: Instant = Instant.now()
     ) : Tx() {
         override val txType = "CAPTURE"
+
+        /**
+         * Progresses the settlement state of an outstanding capture record.
+         */
+        fun progressReconciliation(newSettleStatus: SettleStatus): CaptureTx {
+            // Invariant Check: Prevent double-clearing or regression mutations
+            require(this.settleStatus == SettleStatus.UNMATCHED) {
+                "Ledger Security Invariant Violation: CaptureTx [${this.txId.value}] cannot be transitioned " +
+                        "to $newSettleStatus because it has already cleared out of UNMATCHED (Current status: ${this.settleStatus})"
+            }
+
+            return this.copy(settleStatus = newSettleStatus)
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -140,15 +153,15 @@ sealed class Tx {
         override val paymentIntentId: PaymentIntentId,
         val captureTxId: TxId,
         val acquirerBatchReference: String,
-        val settledAmount: Amount,
-        override val amount: Amount, // Original capture gross amount for safety audits
+        val grossAmount: Amount,
+        val feeAmount: Amount,
+        val netCashAmount: Amount,
+        override val amount: Amount, // Original expected capture volume
+        val settleStatus: SettleStatus, // 🟢 Explicit, immutable domain property
         override val status: TxStatus = TxStatus.SUCCESS,
         override val createdAt: Instant = Instant.now()
     ) : Tx() {
         override val txType = "SETTLE"
-
-        val hasDiscrepancy: Boolean
-            get() = settledAmount != amount
     }
 
     // -------------------------------------------------------------------------
@@ -268,17 +281,27 @@ sealed class Tx {
             paymentIntentId: PaymentIntentId,
             captureTxId: TxId,
             acquirerBatchReference: String,
-            settledAmount: Amount,
+            grossAmount: Amount,
+            feeAmount: Amount,
+            netCashAmount: Amount,
             originalCaptureAmount: Amount
-        ): SettleTx = SettleTx(
-            txId = txId,
-            paymentId = paymentId,
-            paymentIntentId = paymentIntentId,
-            captureTxId = captureTxId,
-            acquirerBatchReference = acquirerBatchReference,
-            settledAmount = settledAmount,
-            amount = originalCaptureAmount
-        )
+        ): SettleTx {
+            // 🟢 The domain logic stays encapsulated inside the domain module factory boundary
+            val derivedStatus = if (grossAmount == originalCaptureAmount) SettleStatus.MATCHED else SettleStatus.DISCREPANCY
+
+            return SettleTx(
+                txId = txId,
+                paymentId = paymentId,
+                paymentIntentId = paymentIntentId,
+                captureTxId = captureTxId,
+                acquirerBatchReference = acquirerBatchReference,
+                grossAmount = grossAmount,
+                feeAmount = feeAmount,
+                netCashAmount = netCashAmount,
+                amount = originalCaptureAmount,
+                settleStatus = derivedStatus // Passed directly to the private record constructor
+            )
+        }
 
         fun createPayoutTx(
             txId: TxId,

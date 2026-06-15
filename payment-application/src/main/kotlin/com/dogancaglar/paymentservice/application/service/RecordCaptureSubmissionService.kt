@@ -4,7 +4,7 @@ import com.dogancaglar.common.event.EventEnvelopeFactory
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.events.CaptureConfirmed
 import com.dogancaglar.paymentservice.application.events.CaptureSubmitted
-import com.dogancaglar.paymentservice.application.util.TestAccounts
+import com.dogancaglar.paymentservice.ports.outbound.PspSimulationRulesPort
 import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.common.Currency
 import com.dogancaglar.paymentservice.domain.model.ledger.Tx
@@ -25,7 +25,8 @@ open class RecordCaptureSubmissionService(
     private val paymentRepository: PaymentRepository,
     private val paymentTxPort: PaymentTxPort,
     private val idGeneratorPort: IdGeneratorPort,
-    private val serializationPort: SerializationPort
+    private val serializationPort: SerializationPort,
+    private val pspSimulationRulesPort: PspSimulationRulesPort
 ) : RecordCaptureSubmissionUseCase {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -59,7 +60,8 @@ open class RecordCaptureSubmissionService(
 
         //TODO simulation ,here also just create one Outbox<CaptureConfirmed> for simulator purposes.
         val outboxEvents = mutableListOf<OutboxEvent>()
-        if (TestAccounts.contains(event.merchantAccount)) {
+        if (pspSimulationRulesPort.isSimulationTarget(event.merchantAccount)) {
+            logger.info("Simulation target profile verified for merchant=${event.merchantAccount}. Generating automatic Stage 2 loopback confirmation.")
             val captureConfirmed = CaptureConfirmed(
                 paymentIntentId = event.paymentIntentId,
                 publicPaymentIntentId = event.publicPaymentIntentId,

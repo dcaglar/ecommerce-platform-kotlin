@@ -13,6 +13,7 @@ import com.dogancaglar.common.event.Event
 import com.dogancaglar.common.logging.EventLogContext
 import com.dogancaglar.paymentservice.application.events.CaptureConfirmed
 import com.dogancaglar.paymentservice.application.events.InternalTransferCommand
+import com.dogancaglar.paymentservice.application.events.SettlementReceived
 import com.dogancaglar.paymentservice.ports.inbound.usecases.ProcessPspResultUseCase
 import org.apache.kafka.clients.consumer.Consumer
 
@@ -40,9 +41,10 @@ class PspResultConsumer(
     ) {
         val envelope = record.value()
         EventLogContext.with(envelope) {
-            val exists = dedupe.exists(record.value().eventId)
-            if (exists) {
-                logger.warn("⚠️ Event is processed already, skipping eventId=${record.value().eventId}")
+
+           val eventId = envelope.data.deterministicEventId()
+            if (dedupe.exists(eventId)) {
+                logger.warn("⚠️ Event is processed already, skipping eventId=$eventId")
                 return@with
             }
 
@@ -67,12 +69,17 @@ class PspResultConsumer(
                         processPspResultUseCase.processInternalTransferCommand(event)
                     }
 
+                    is SettlementReceived -> {
+                        logger.info("🎬 Processing SettlementReceived event from simulated SDR line for paymentIntentId: ${event.publicPaymentIntentId}")
+                        processPspResultUseCase.processSettlementLineReconciled(event)
+                    }
+
                     else -> {
                         logger.warn("⚠️ Unhandled event type in PspResultConsumer: ${event.javaClass.name}")
                     }
                 }
 
-                dedupe.markProcessed(record.value().eventId, 3600)
+                dedupe.markProcessed(eventId, 3600)
             } catch (e: Exception) {
                 logger.error(
                     "❌ Failed to process event ${event.javaClass.simpleName} with eventId: ${record.value().eventId}",

@@ -31,13 +31,35 @@ if command -v helm >/dev/null 2>&1; then
   helm ls -a -n ingress-nginx -q | xargs -r helm uninstall -n ingress-nginx || true
 fi
 
-echo "🧱  Deleting ALL Kubernetes namespaces (including PVCs/PVs)..."
+echo "⏳  Waiting for pods to terminate gracefully..."
 if command -v kubectl >/dev/null 2>&1; then
-  kubectl delete pvc --all --all-namespaces || true
-  kubectl delete pv --all || true
-  kubectl delete ns payment || true
-    kubectl delete ns monitoring || true
-  kubectl delete ns ingress-nginx || true
+  kubectl wait --for=delete pod --all -n payment --timeout=60s 2>/dev/null || true
+  kubectl wait --for=delete pod --all -n monitoring --timeout=60s 2>/dev/null || true
+  kubectl wait --for=delete pod --all -n ingress-nginx --timeout=60s 2>/dev/null || true
+
+  echo "🧹  Deleting PVCs gracefully to allow local-path-provisioner to clean physical data..."
+  kubectl delete pvc --all -n payment --timeout=30s 2>/dev/null || true
+  kubectl delete pvc --all -n monitoring --timeout=30s 2>/dev/null || true
+  kubectl delete pvc --all -n ingress-nginx --timeout=30s 2>/dev/null || true
+
+  echo "🧹  Patching out finalizers from any remaining PVCs to prevent hanging..."
+  kubectl get pvc --all-namespaces -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name --no-headers 2>/dev/null | while read -r ns name; do
+    kubectl patch pvc "$name" -n "$ns" -p '{"metadata":{"finalizers":null}}' --type=merge 2>/dev/null || true
+  done
+
+  echo "🧹  Patching out finalizers from any remaining PVs..."
+  kubectl get pv -o name 2>/dev/null | while read -r pv; do
+    kubectl patch "$pv" -p '{"metadata":{"finalizers":null}}' --type=merge 2>/dev/null || true
+  done
+
+  echo "🧨  Force deleting any stuck PVCs and PVs..."
+  kubectl delete pvc --all --all-namespaces --force --grace-period=0 2>/dev/null || true
+  kubectl delete pv --all --force --grace-period=0 2>/dev/null || true
+
+  echo "💣  Force deleting namespaces..."
+  kubectl delete ns payment --force --grace-period=0 2>/dev/null || true
+  kubectl delete ns monitoring --force --grace-period=0 2>/dev/null || true
+  kubectl delete ns ingress-nginx --force --grace-period=0 2>/dev/null || true
 fi
 
 echo "🐳  Stopping all Docker containers..."

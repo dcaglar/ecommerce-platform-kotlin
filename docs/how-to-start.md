@@ -194,13 +194,13 @@ curl -i -X POST "http://payment.k8s.orb.local/api/v1/payments" \
   -d '{
     "orderId": "ORDER-1450",
     "buyerId": "BUYER-1450",
-    "merchantAccount": "MARKETPLACE-1",
+    "merchantAccount": "MARKETPLACE-5",
     "processingModel": "MARKETPLACE",
     "totalAmount": { "quantity": 3000, "currency": "EUR" },
     "splits": [
-      { "type": "BalanceAccount", "account": "SELLER-1-1", "amount": { "quantity": 1400, "currency": "EUR" }},
+      { "type": "BalanceAccount", "account": "SELLER-5-1", "amount": { "quantity": 1400, "currency": "EUR" }},
       { "type": "Commission", "amount": { "quantity": 100, "currency": "EUR" }},
-      { "type": "BalanceAccount", "account": "SELLER-1-2", "amount": { "quantity": 1400, "currency": "EUR" }},
+      { "type": "BalanceAccount", "account": "SELLER-5-2", "amount": { "quantity": 1400, "currency": "EUR" }},
       { "type": "Commission", "amount": { "quantity": 100, "currency": "EUR" }}
     ]
   }'
@@ -232,7 +232,7 @@ If Stripe API call is still processing, you'll receive:
 
 ```bash
 # Step 2: Authorize the payment intent
-curl -i -X POST "http://payment.k8s.orb.local/api/v1/payments/pi_AcqzYyHCcAA/authorize" \
+curl -i -X POST "http://payment.k8s.orb.local/api/v1/payments/pi_AqnVrI0CAAA/authorize" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
   -d '{}'
