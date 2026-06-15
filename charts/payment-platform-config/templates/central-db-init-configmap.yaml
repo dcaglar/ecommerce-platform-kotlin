@@ -1,3 +1,9 @@
+# also intermas of naming what sohuld be careful is this namea keyweord? or ?
+#but what happens here is actually given we also passsed postgresq admin apssword as env variable fro omour secreethelm wilth run sql and sh files here as below?
+#improtatant thing here the  env variables used to acccess values, are the very variable who was generated at  A12 .So that mean the script below are executed,
+#effectively this is whjre crendetials are grants are executed
+
+
 apiVersion: v1
 kind: ConfigMap
 metadata:

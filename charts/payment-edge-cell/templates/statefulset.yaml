@@ -1,3 +1,7 @@
+# we need a proper explanation here, so what do we do here,
+
+
+
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -22,26 +26,37 @@ spec:
       serviceAccountName: {{ .Values.serviceAccount.name | default "default" }}
       {{- end }}
       terminationGracePeriodSeconds: 120
+      #what does this below do ?
       {{- if .Values.topologySpreadConstraints }}
       topologySpreadConstraints:
         {{- toYaml .Values.topologySpreadConstraints | nindent 8 }}
       {{- end }}
+      ## and what is thgis inittcontainer, you had told that we cant ue initcontainere, as main container if we defineted it here, kube treat it as one time things.
       initContainers:
+        - //so we do install endge-db container as initcntiner'?
         # 3. THE LOCAL DATABASE (Edge NVMe Storage) - Native Sidecar
         - name: local-edge-db
           image: "{{ .Values.edgeDb.image.repository }}:{{ .Values.edgeDb.image.tag }}"
+
+
+        #we also create usnerma passord crendetial pairs for edge-db
           restartPolicy: Always
-          env:
+          env: #//we aree configuring heree actualy when container environment POSTGRE+__DB env variable called, we decide wat to return as value
+            - #when env.get(POTSTGRE_DB called,this is actually tellin helm template what db to conent as default
             - name: POSTGRES_DB
+              ##return the conigmapp entriry with EDGE_DB_NAME name from the  payment-platform-config configmap
               valueFrom:
                 configMapKeyRef:
                   name: payment-platform-config
                   key: EDGE_DB_NAME
+             ## here we specifiy what will be the postgres admin password to use for helm
             - name: POSTGRES_USER
               value: postgres
+              ## when env.POSTGRES_PASSWORD is cal we instirct helm to return the  secretmap value with  entry  name POSTGRES_PASSWORD , passwword is stored as  encrypted, but injkection decrypt it
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
+                  ##here we  define the what should be the paymentservive app's username for ed-gedb, and password
                   name: edge-db-credentials
                   key: EDGE_DB_POSTGRES_PASSWORD
             - name: EDGE_DB_PAYMENT_SERVICE_USERNAME
@@ -58,12 +73,14 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: edge-db-credentials
+                  ## decide the userna,e/password for edge-worker apps to use for conencting edge-db
                   key: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
             - name: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: edge-db-credentials
                   key: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+                  ##EDGE_DB_DUTY_USERNAME its for operational staff, with admin roles
             - name: EDGE_DB_DUTY_USERNAME
               valueFrom:
                 secretKeyRef:
@@ -74,6 +91,7 @@ spec:
                 secretKeyRef:
                   name: edge-db-credentials
                   key: EDGE_DB_DUTY_PASSWORD
+                  ## what does this do startup rpobe
           startupProbe:
             exec:
               command:
@@ -85,12 +103,13 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 2
             failureThreshold: 30
+          #OH HERE IS CRITICAL I HAVEN O IDEA WHAT HAPPENS HERE DETAIL NEEDED
           volumeMounts:
             - name: edge-db-data
               mountPath: /var/lib/postgresql/data
             - name: init-scripts
               mountPath: /docker-entrypoint-initdb.d/init-edge-db.sh
-              subPath: init-edge-db.sh
+              subPath: init-edge-db.sh # then what is this ?
           resources:
             requests:
               cpu: 500m
@@ -98,8 +117,10 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
-
+        ## AT THIS POINT WE DO NOT HAVE TABLES YEONLY USERNAME AND ROLES ETC.
         # 4. LIQUIBASE JOB (Runs after DB is ready)
+
+
         - name: payment-service-liquibase
           image: "{{ .Values.paymentService.image.repository }}:{{ .Values.paymentService.image.tag }}"
           env:
@@ -127,9 +148,14 @@ spec:
                 secretKeyRef:
                   name: edge-db-credentials
                   key: EDGE_DB_PAYMENT_SERVICE_PASSWORD
-
+      #here again nocluue wahts happening here
+      #take the init-scripts volume, and mount the init-edge-db.sh file exactly into /docker-entrypoint-initdb.d/init-edge-db.sh."
+      VolumeMounts:
+        # Liquibase XML dosyalarını ConfigMap'ten içeri mount ediyoruz,where is the confimap
+        - name: liquibase-changelog
+          mountPath: /liquibase/changelog
       containers:
-        # 1. THE WEB API (Accepts Traffic)
+        # 1. THE WEB API (Accepts Traffic),actually payment-service starts
         - name: payment-service
           image: "{{ .Values.paymentService.image.repository }}:{{ .Values.paymentService.image.tag }}"
           imagePullPolicy: {{ .Values.paymentService.image.pullPolicy }}
@@ -196,7 +222,8 @@ spec:
           resources:
             {{- toYaml .Values.paymentService.resources | nindent 12}}
 
-        # 2. THE LOCAL WORKER (Forwards to Central)
+        # 2. THE LOCAL WORKER (Forwards to Central), we also start payment-edge-work , background hero worker, keep moving the outboxes to centrla,
+        #outbox and same time, update its watermark value on central -db, if edgewatermark is not avaialble simply returne early.
         - name: payment-edge-workers
           image: "{{ .Values.edgeWorker.image.repository }}:{{ .Values.edgeWorker.image.tag }}"
           imagePullPolicy: {{ .Values.edgeWorker.image.pullPolicy }}
@@ -254,12 +281,14 @@ spec:
             {{- toYaml .Values.resources | nindent 12}}
 
 
-
-      volumes:
-        - name: init-scripts
-          configMap:
-            name: {{ include "payment-edge-cell.fullname" . }}-init-db
-            defaultMode: 0755
+#again whataa aaintiscrtipt here where is it coming from, here we do instrict hgel that creaate a helm
+## you tell Kubernetes: "Take that ConfigMap(we created under bolume section in central-db-values.yaml and )
+  #and turn it into a volume named init- olan payment-service-lscripts confogmap isntance in run time.
+  volumes:
+      - name: init-scripts
+        configMap:
+          name: {{ include "payment-edge-cell.fullname" . }}-init-db
+          defaultMode: 0755
   volumeClaimTemplates:
     - metadata:
         name: edge-db-data
@@ -268,3 +297,10 @@ spec:
         resources:
           requests:
             storage: 20Gi
+İşte Pod ayağa kalkarken yaşanacak o pürüzsüz sıralama:
+
+Önce Veritabanı (Edge DB) Başlar: Kubernetes ilk olarak local-edge-db container'ını ayağa kaldırır. startupProbe gidip pg_isready komutuyla veritabanının ping atılabilir hale gelmesini bekler.
+
+Sonra Liquibase Devreye Girer: Veritabanı hazır sinyalini verdiği an, hemen altındaki ikinci init containeriquibase başlar. Bu container, Spring Boot'u web sunucusu olmadan (SPRING_MAIN_WEB_APPLICATION_TYPE=none) sadece liquibase-job profiliyle açar. Gidip Edge DB'nin içine tablolarını mis gibi kurar ve başarıyla kapanır (exit 0).
+
+Son Olarak Ana Uygulamalar Başlar: Liquibase işini bitirip kapandıktan sonra, senin asıl işi yapan payment-service ve payment-edge-workers ana container'ların başlar.

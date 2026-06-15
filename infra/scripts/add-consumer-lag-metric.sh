@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+kub#!/usr/bin/env bash
 set -euo pipefail
 
 # --- Config (override via env) -----------------------------------------------

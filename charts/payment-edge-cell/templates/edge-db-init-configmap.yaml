@@ -1,13 +1,15 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "payment-edge-cell.fullname" . }}-init-db
-  namespace: {{.Release.Namespace}}
+  name: edge-db-init-scripts
+  namespace: payment
 data:
-  init-edge-db.sh: |
+  #: the reason we use init-central-db.sh here ,because go checck statafu
+  init-central-db.sh: |
+
     #!/bin/bash
     set -e
-
+    
     echo "🔌 Enabling pg_stat_statements extension..."
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
@@ -70,3 +72,38 @@ data:
     EOSQL
 
     echo "✅ Edge DB initialized with all required users and extensions."
+
+    
+#  kubectl apply -f infra/edge-db-init-configmap.yaml
+
+#
+#
+#volumes:
+#  - name: init-scripts
+#    configMap:
+#      name: edge-db-init-scripts
+#      defaultMode: 0755
+#  containers:
+#    # ... your local-edge-db container ...
+#    volumeMounts:
+#      - name: edge-db-data
+#        mountPath: /var/lib/postgresql/data
+#      - name: init-scripts
+#        mountPath: /docker-entrypoint-initdb.d/init-edge-db.sh
+#        subPath: init-edge-db.sh
+
+
+#
+#        Step 3: Run the Liquibase Update
+#        You do not need to build a new image if you don't want to. Just execute this temporary job once to create the tables manually if you are already deployed. If you are not deployed, let the initContainer in the StatefulSet run the job as we discussed.
+#
+#        If you need to force the table creation now:
+#
+#
+#          kubectl run liquibase-migrator --rm -it \
+#          --image=liquibase/liquibase:4.25 \
+#          --restart=Never \
+#          --env="LIQUIBASE_COMMAND_URL=jdbc:postgresql://central-db-postgresql:5432/edge-db" \
+#          --env="LIQUIBASE_COMMAND_USERNAME=$YOUR_DUTY_USER" \
+#          --env="LIQUIBASE_COMMAND_PASSWORD=$YOUR_DUTY_PASS" \
+#          -- /liquibase/liquibase update --changeLogFile=changelog.edge.xml

@@ -7,6 +7,9 @@ image:
 
 postgresqlSharedPreloadLibraries: "pgaudit,pg_stat_statements"
 
+
+
+# A11  we do set the admin password in roder to run some sql and system tasl as initcontainer
 auth:
   existingSecret: central-db-credentials
   secretKeys:
@@ -14,7 +17,8 @@ auth:
 
 
 
-
+#A12 We do create anv variable for container run time, most important part is actually we do crate username password pairs, for central DB
+# those are later on gonna be the deciated crednetials for the CETNRAL DB, so  actually
 
 primary:
   extraEnvVarsSecret: central-db-credentials
@@ -75,7 +79,9 @@ primary:
       valueFrom:
         secretKeyRef:
           name: central-db-credentials
+#            we look for a central-db-credentials which is a secretmap
           key: CENTRAL_DB_POSTGRES_PASSWORD
+#A13 look what we do here,we do instruct central db to run the configmap exactly here, and whats the name of it central-db-initscripts.,let see what is there
   initdb:
     scriptsConfigMap: central-db-init-scripts
   livenessProbe:

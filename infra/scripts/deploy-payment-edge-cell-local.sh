@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR/../.."
+
+//payment-edge-cell-values-lcoal.yaml is our local lhem env variables, which makes our statefulset file dynamic
 VALUES_TPL="$REPO_ROOT/infra/helm-values/payment-edge-cell-values-local.yaml"
 INGRESS_VALUES="$REPO_ROOT/infra/helm-values/ingress-values.yaml"
 ENDPOINTS_JSON="$REPO_ROOT/infra/endpoints.json"

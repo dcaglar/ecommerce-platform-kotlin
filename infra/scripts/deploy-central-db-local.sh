@@ -28,3 +28,7 @@ helm upgrade --install central-db bitnami/postgresql \
   --set image.tag="${PG_TAG}"
 
 echo "✅ central-db deployed (image=bitnamilegacy/postgresql:${PG_TAG})"
+
+
+
+#A.10  use central-db-values-local.yaml" when running the psoitgre helm tempalte

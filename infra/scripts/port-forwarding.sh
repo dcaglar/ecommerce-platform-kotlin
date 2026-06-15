@@ -147,7 +147,7 @@ FORWARDS+=("$LOGGING_NS svc/kibana-kibana 5601 5601")
 
 
 # Pre-free all local ports and start PF loops
-for spec in "${FORWARDS[@]}"; do
+for spec in "${ac[@]}"; do
   # shellcheck disable=SC2086
   set -- $spec
   ns="$1"; ref="$2"; lport="$3"; rport="$4"
