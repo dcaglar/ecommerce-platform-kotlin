@@ -1,0 +1,9 @@
+apiVersion: external-secrets.io/v1beta1
+kind: SecretStore
+metadata:
+  name: edge-cell-global-store # <-- Same name as the Azure one!
+spec:
+  provider:
+    kubernetes:
+      secret:
+        name: edge-cell-local-backend

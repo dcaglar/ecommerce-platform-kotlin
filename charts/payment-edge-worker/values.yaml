@@ -1,0 +1,31 @@
+paymentService:
+  image:
+    repository: dcaglar1987/payment-service
+    tag: "latest"
+
+serviceMonitor:
+  enabled: false
+  labels:
+    release: prometheus-stack
+
+
+runPrivilegeGrantJob: true
+
+edgeWorker:
+  image:
+    repository: dcaglar1987/payment-edge-workers
+    tag: "latest"
+
+edgeDb:
+  image:
+    repository: postgres
+    tag: "15-alpine"
+    pullPolicy: IfNotPresent
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: "topology.kubernetes.io/zone"
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app: payment-edge-cell

@@ -1,8 +1,11 @@
 app:
   instance-id: ${POD_NAME:${HOSTNAME:${random.value}}}
+  pod-name: ${POD_NAME}
+  edge-cell-base-url: ${EDGE_CELL_BASE_URL}
+  edge-cell-headless-service: ${EDGE_CELL_HEADLESS_SERVICE}
+
   datasource:
     outbox:
-      jdbc-url: ${EDGE_DB_URL}
       username: ${EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME}
       password: ${EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD}
       connection-timeout: 15000
@@ -11,7 +14,6 @@ app:
       max-lifetime: 1800000
       maximum-pool-size: 20
     maintenance:
-      jdbc-url: ${EDGE_DB_URL}
       username: ${EDGE_DB_DUTY_USERNAME}
       password: ${EDGE_DB_DUTY_PASSWORD}
       maximum-pool-size: 1
@@ -21,7 +23,6 @@ app:
       idle-timeout: 60000
       max-lifetime: 1800000
     central:
-      jdbc-url: ${CENTRAL_DB_URL}
       username: ${CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME}
       password: ${CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD}
       connection-timeout: 15000

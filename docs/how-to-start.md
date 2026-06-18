@@ -36,10 +36,8 @@ chmod +x infra/scripts/*.sh
 Recommended order
 
 0) Nuke existing cluster (Optional but recommended)
-- What: Completely destroys the existing OrbStack native Kubernetes cluster to ensure a completely fresh state.
-- Script:
-```bash
-infra/scripts/orbstack-nuke-dev.sh
+we need acnuke script
+
 ```
 
 1) Deploy core infrastructure

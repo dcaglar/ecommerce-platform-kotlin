@@ -7,27 +7,28 @@ cd "$REPO_ROOT"
 
 VALUES_FILE="$REPO_ROOT/infra/helm-values/monitoring-stack-values-local.yaml"
 
-echo "▶️  Deploying kube-prometheus-stack with values: $VALUES_FILE"
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null
-helm repo update >/dev/null
 
-helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
-  -n monitoring --create-namespace -f "$VALUES_FILE" \
-  --wait --timeout 10m
+resource "kubernetes_namespace" "monitoring" {
+  metadata {
+    name = "monitoring"
+  }
+}
 
-echo "⏳ Waiting for Prometheus Operator..."
-kubectl -n monitoring rollout status deploy/prometheus-stack-kube-prom-operator --timeout=5m
+resource "helm_release" "prometheus_stack" {
+  name       = "prometheus-stack"
+  repository = "https://prometheus-community.github.io/helm-charts"
+  chart      = "kube-prometheus-stack"
+  namespace  = kubernetes_namespace.monitoring.metadata[0].name
+  
+  # Maps to your -f "$VALUES_FILE"
+  values = [
+    file("$VALUES_FILE")
+  ]
 
-# Wait for Prometheus StatefulSet (name is stable for this chart)
-echo "⏳ Waiting for Prometheus StatefulSet..."
-kubectl -n monitoring rollout status statefulset/prometheus-prometheus-stack-kube-prom-prometheus --timeout=10m
-
-# Sanity: show the Prometheus service we will use for the adapter later
-kubectl -n monitoring get svc prometheus-stack-kube-prom-prometheus
-echo "✅ kube-prometheus-stack is up."
-
-echo "🚀 Toggling ServiceMonitors to 'true' in application Helm values..."
-yq -i '.controller.metrics.serviceMonitor.enabled = true' "$REPO_ROOT/infra/helm-values/ingress-values.yaml"
-yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/infra/helm-values/payment-edge-cell-values-local.yaml"
-yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/infra/helm-values/payment-consumers-values-local.yaml"
-echo "✅ Monitoring switched ON! Applications will now deploy with metrics enabled."
+  wait    = true
+  timeout = 600 # 10 minutes, matching your bash script
+  
+  depends_on = [
+    azurerm_kubernetes_cluster.aks
+  ]
+}
