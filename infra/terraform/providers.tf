@@ -6,8 +6,13 @@ terraform {
     }
   }
   
-  # We use local backend for simplicity right now. In a real team environment, this would be backed by Azure Storage.
-  backend "local" {}
+  # Remote backend using Azure Storage Account (configured via CI/CD pipelines)
+  backend "azurerm" {
+    resource_group_name  = "rg-terraform-state"
+    storage_account_name = "tfstateloadtestdc"
+    container_name       = "tfstate"
+    key                  = "loadtest.terraform.tfstate"
+  }
 }
 
 provider "azurerm" {

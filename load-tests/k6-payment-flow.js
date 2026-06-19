@@ -32,11 +32,11 @@ const SCENARIOS = {
         startRate: 0,
         timeUnit: '1s',
         preAllocatedVUs: 50,
-        maxVUs: 1000,
+        maxVUs: 500,
         stages: [
-            { duration: '2m', target: 150 },  // Warm-up to 150 RPS
-            { duration: '15m', target: 150 },  // Maintain 150 RPS
-            { duration: '2m', target: 0 },   // Cool-down
+            { duration: '2m', target: 80 },   // Warm-up to 80 RPS (~60% of single-pod ceiling)
+            { duration: '15m', target: 80 },   // Maintain 80 RPS
+            { duration: '2m', target: 0 },     // Cool-down
         ],
         tags: { test_type: 'average_load' },
     },
@@ -46,22 +46,22 @@ const SCENARIOS = {
         startRate: 0,
         timeUnit: '1s',
         preAllocatedVUs: 100,
-        maxVUs: 3000,
+        maxVUs: 1500,
         stages: [
-            { duration: '3m', target: 100 }, // Ramps up to 100 RPS
-            { duration: '10m', target: 100 },// Maintains sustained 100 RPS
-            { duration: '2m', target: 0 },   // Cool-down
+            { duration: '3m', target: 130 },  // Ramp to ~100% of single-pod ceiling
+            { duration: '10m', target: 130 },  // Sustained — should trigger HPA
+            { duration: '2m', target: 0 },     // Cool-down
         ],
         tags: { test_type: 'stress' },
     },
     // D. Soak Test: Continuous moderate load over a long time to check memory leaks & slow degradation (RPS)
     soak: {
         executor: 'constant-arrival-rate',
-        rate: 30,
+        rate: 50,
         timeUnit: '1s',
         duration: '1h',
         preAllocatedVUs: 50,
-        maxVUs: 1000,
+        maxVUs: 500,
         tags: { test_type: 'soak' },
     },
     // E. Spike Test: Sudden extreme burst of massive traffic to test caching, buffering, and fast autoscaling (RPS)
@@ -70,12 +70,12 @@ const SCENARIOS = {
         startRate: 0,
         timeUnit: '1s',
         preAllocatedVUs: 50,
-        maxVUs: 5000,
+        maxVUs: 3000,
         stages: [
-            { duration: '10s', target: 5 },   // Normal baseline 5 RPS
-            { duration: '10s', target: 400 }, // Sudden immediate spike to 400 RPS!
-            { duration: '3m', target: 400 },  // Hold peak 400 RPS
-            { duration: '1m', target: 0 },    // Ramp down
+            { duration: '10s', target: 5 },    // Normal baseline 5 RPS
+            { duration: '10s', target: 250 },  // Sudden spike to 250 RPS (tests 2-pod autoscale)
+            { duration: '3m', target: 250 },   // Hold peak 250 RPS
+            { duration: '1m', target: 0 },     // Ramp down
         ],
         tags: { test_type: 'spike' },
     },
@@ -85,9 +85,9 @@ const SCENARIOS = {
         startRate: 0,
         timeUnit: '1s',
         preAllocatedVUs: 50,
-        maxVUs: 10000,
+        maxVUs: 5000,
         stages: [
-            { duration: '15m', target: 1000 }, // Slowly ramp up to 1000 RPS until failure
+            { duration: '15m', target: 350 },  // Ramp to find true 2-pod ceiling
         ],
         tags: { test_type: 'breakpoint' },
     }
