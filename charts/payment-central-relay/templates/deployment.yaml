@@ -53,7 +53,7 @@ spec:
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: "{{ .Values.kafka.bootstrapServers }}"
             - name: CENTRAL_DB_URL
-              valueFrom: { configMapKeyRef: { name: payment-platform-config, key: CENTRAL_DB_URL } }
+              valueFrom: { configMapKeyRef: { name: central-hub-config, key: CENTRAL_DB_URL } }
             - name: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME
               valueFrom:
                 secretKeyRef:

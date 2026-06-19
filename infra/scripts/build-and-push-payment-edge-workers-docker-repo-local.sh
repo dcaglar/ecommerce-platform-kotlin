@@ -1,6 +1,6 @@
 #!/bin/bash
-# Usage: build-and-push-payment-edge-workers-docker-repo-local.sh <dockerhub-username> <tag>
-# Example: ./build-and-push-payment-edge-workers-docker-repo-local.sh mydockeruser v1.0.0
+# Usage: build-and-push-payment-service-docker-repo-local.sh <dockerhub-username> <tag>
+# Example: ./build-and-push-payment-service-docker-repo-local.sh mydockeruser v1.0.0
 set -e
 export DOCKER_BUILDKIT=1
 

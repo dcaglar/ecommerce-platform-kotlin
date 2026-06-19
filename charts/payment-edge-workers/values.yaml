@@ -1,6 +1,6 @@
-paymentService:
+edgeWorker:
   image:
-    repository: dcaglar1987/payment-service
+    repository: dcaglar1987/payment-edge-workers
     tag: "latest"
 
 serviceMonitor:
@@ -11,10 +11,6 @@ serviceMonitor:
 
 runPrivilegeGrantJob: true
 
-edgeWorker:
-  image:
-    repository: dcaglar1987/payment-edge-workers
-    tag: "latest"
 
 edgeDb:
   image:

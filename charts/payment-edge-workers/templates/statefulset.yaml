@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "payment-edge-cell.fullname" . }}
+  name: {{ include "payment-edge-workes.fullname" . }}
   labels:
     {{- include "payment-edge-cell.labels" . | nindent 4 }}
 spec:
@@ -29,7 +29,7 @@ spec:
         {{- toYaml .Values.topologySpreadConstraints | nindent 8 }}
       {{- end }}
       initContainers:
-          ## we alsop remopbved central-db
+        ## we alsop remopbved central-db
         - name: edge-db
           image: postgres:15
           restartPolicy: Always   # <--- K8s 1.28
@@ -144,22 +144,22 @@ spec:
             - name: EDGE_DB_DUTY_PASSWORD
               valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_DUTY_PASSWORD}}
               ## central db is sperate db  so not sure where to define them but edge-worker app simply needs it in order to start that, but then question is maybe edge-worker sercice dont have to be same pod, because its asyrnouis path
-#           ## actually we might have mutlti threaded localoubox forwwardder jon runs outside , maybe on central cluster, as standalone job,and simply from eacj working edge pull certain outbox and add to central, update forwarded to
+            #           ## actually we might have mutlti threaded localoubox forwwardder jon runs outside , maybe on central cluster, as standalone job,and simply from eacj working edge pull certain outbox and add to central, update forwarded to
             #- name: CENTRAL_DB_URL
-#              valueFrom:
-#                configMapKeyRef:
-#                  name: payment-platform-config
-#                  key: CENTRAL_DB_URL
-#            - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
-#              valueFrom:
-#                secretKeyRef:
-#                  name: central-db-credentials
-#                  key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
-#            - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
-#              valueFrom:
-#                secretKeyRef:
-#                  name: central-db-credentials
-#                  key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+          #              valueFrom:
+          #                configMapKeyRef:
+          #                  name: payment-platform-config
+          #                  key: CENTRAL_DB_URL
+          #            - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
+          #              valueFrom:
+          #                secretKeyRef:
+          #                  name: central-db-credentials
+          #                  key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
+          #            - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+          #              valueFrom:
+          #                secretKeyRef:
+          #                  name: central-db-credentials
+          #                  key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
           startupProbe:
             httpGet: {path: /actuator/health/liveness, port: 9001}
             initialDelaySeconds: 10

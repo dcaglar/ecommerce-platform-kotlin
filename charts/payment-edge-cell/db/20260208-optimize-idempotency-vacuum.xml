@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+    <changeSet id="20260208-optimize-idempotency-vacuum" author="dogancaglar" runInTransaction="false">
+
+        <sql>
+            ALTER TABLE idempotency_keys SET (
+            fillfactor = 70,
+            autovacuum_vacuum_scale_factor = 0.01,
+            autovacuum_vacuum_cost_limit = 1000
+            );
+            VACUUM FULL idempotency_keys;
+        </sql>
+
+    </changeSet>
+
+
+</databaseChangeLog>

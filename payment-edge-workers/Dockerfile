@@ -32,7 +32,7 @@ COPY payment-infrastructure/ payment-infrastructure/
 COPY payment-edge-workers/ payment-edge-workers/
 
 
-# Build the payment-service jar
+# Build the payment-edge-worker jar
 RUN --mount=type=cache,target=/root/.m2 mvn -pl payment-edge-workers -am package -DskipTests
 
 FROM eclipse-temurin:21-jre-jammy

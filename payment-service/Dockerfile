@@ -28,7 +28,6 @@ COPY common-test/ common-test/
 COPY payment-application/ payment-application/
 COPY payment-infrastructure/ payment-infrastructure/
 COPY payment-service/ payment-service/
-# Do NOT copy payment-consumers/
 
 # Build the payment-service jar
 RUN --mount=type=cache,target=/root/.m2 mvn -pl payment-service -am package -DskipTests

@@ -57,15 +57,3 @@ resource "azurerm_kubernetes_cluster_node_pool" "edge" {
     "pool" = "edge"
   }
 }
-
-# Edge DB Node Pool (YugabyteDB - Dedicated Edge Infrastructure)
-resource "azurerm_kubernetes_cluster_node_pool" "edgedb" {
-  name                  = "edgedbpool"
-  kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
-  vm_size               = "Standard_D8s_v5"
-  node_count            = 3
-  
-  node_labels = {
-    "pool" = "edgedb"
-  }
-}

@@ -40,8 +40,8 @@ we need acnuke script
 
 ```
 
-1) Deploy core infrastructure
-- What: Config, Keycloak, Postgres, Redis, and Kafka in the payment namespace.
+1) Deploy entire system (Declarative)
+- What: Deploys all core infrastructure (Keycloak, Postgres, Redis, Kafka, Yugabyte) AND all applications (Edge Cell, Workers, Consumers, Relay) in one shot. Kubernetes will handle startup ordering natively via initContainers.
 - Note on Secrets: Local secrets are deployed automatically. If you need to rotate them, update the untracked `decrypted_secrets.yaml`, re-encrypt it using `sops -e decrypted_secrets.yaml > payment-platform-config-secrets-local.yaml`, and re-run `infra/scripts/deploy-payment-platform-config.sh`.
 - Tip: You can verify existing secrets at runtime by running `kubectl get secret -n payment edge-db-credentials -o json` to print the secret aliases and encrypted values.
 ```bash
@@ -71,29 +71,6 @@ infra/scripts/build-and-push-payment-service-docker-repo.sh
 infra/scripts/build-and-push-payment-edge-workers-docker-repo.sh
 infra/scripts/build-and-push-payment-consumers-docker-repo.sh
 ```
-
-5) Payment Edge Cell
-- What: Deploys the complete Atomic Edge Cell (REST API, Local DB, and Local Forwarder) and sets up ingress. Writes infra/endpoints.json.
-- Run:
-```bash
-infra/scripts/deploy-payment-edge-cell-local.sh
-```
-
-
-6) Payment Consumers
-- What: Deploys the Kafka consumer workers for payment flows.
-- Run:
-```bash
-infra/scripts/deploy-payment-consumers-local.sh
-```
-
-7) Payment Central Relay
-- What: Deploys the OutboxRelayJob which acts as the sole publisher to Kafka (enforcing the Separation of Powers architectural rule).
-- Run:
-```bash
-infra/scripts/deploy-payment-central-relay-local.sh
-```
-
 
 
 

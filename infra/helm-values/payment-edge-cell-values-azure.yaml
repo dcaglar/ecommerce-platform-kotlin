@@ -48,7 +48,6 @@ autoscaling:
 # ── payment-service ──────────────────────────────────────────────────────────
 # Manages TWO HikariCP pools simultaneously:
 #   Pool 1: EDGE_DB_URL    → localhost:5432  (transactional outbox, local sidecar)
-#   Pool 2: YUGABYTE_DB_URL → yb-tservers:5433 (cross-cell idempotency checks)
 # +1Gi RAM vs local to absorb dual JDBC buffer + thread-stack overhead.
 # MaxRAMPercentage bumped to 60% (was 45%) — we have 4Gi limit, JVM can use ~2.4Gi.
 paymentService:
@@ -69,7 +68,6 @@ paymentService:
 
 # ── payment-edge-workers ─────────────────────────────────────────────────────
 # Outbox forwarder: reads edge-db, batch-inserts to central-db.
-# Single datasource (EDGE_DB_URL only) — no Yugabyte connection.
 edgeWorker:
   image:
     pullPolicy: Always

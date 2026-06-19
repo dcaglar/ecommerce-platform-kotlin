@@ -12,7 +12,7 @@ import com.dogancaglar.paymentservice.domain.model.vo.PaymentId
 import com.dogancaglar.paymentservice.domain.model.vo.PaymentIntentId
 import com.dogancaglar.common.db.entity.PaymentEntity
 
-object aPaymentEntityMapper {
+object PaymentEntityMapper {
 
     fun toDomain(entity: PaymentEntity, splits: List<com.dogancaglar.paymentservice.domain.model.payment.PaymentSplit>): Payment {
         val currency = Currency(entity.currency)

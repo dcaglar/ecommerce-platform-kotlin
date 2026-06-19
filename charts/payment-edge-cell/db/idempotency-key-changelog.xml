@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+<changeSet id="idempotency-key-changelog" author="dogancaglar">
+
+    <!-- 1️⃣ Table definition -->
+    <createTable tableName="idempotency_keys">
+
+        <!-- Internal optimized sequence ID as Primary Key -->
+        <column name="id" type="bigint" autoIncrement="true">
+            <constraints primaryKey="true" primaryKeyName="pk_idempotency_keys_id" nullable="false"/>
+        </column>
+
+        <!-- External merchant idempotency key -->
+        <column name="idempotency_key" type="uuid">
+            <constraints nullable="false"/>
+        </column>
+
+        <column name="payment_intent_id" type="BIGINT">
+            <constraints nullable="true"/>
+        </column>
+        <column name="request_hash" type="VARCHAR(128)">
+            <constraints  nullable="true"/>
+        </column>
+
+        <column name="response_payload" type="jsonb">
+            <constraints nullable="true"/>
+        </column>
+
+        <column name="status" type="VARCHAR(20)">
+            <constraints nullable="true"/>
+        </column>
+
+        <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE"
+                defaultValueComputed="(now() AT TIME ZONE 'UTC')">
+            <constraints nullable="false"/>
+        </column>
+    </createTable>
+
+    <!-- 2️⃣ Ensure merchant idempotency key is strictly unique -->
+    <addUniqueConstraint tableName="idempotency_keys" columnNames="idempotency_key" constraintName="uk_idempotency_key"/>
+
+    <!-- 3️⃣ Constraints (SQL for cross-version Liquibase compatibility) -->
+    <sql>
+        ALTER TABLE idempotency_keys
+        ADD CONSTRAINT chk_idem_req_status
+        CHECK (status IN (
+        'PENDING', 'COMPLETED'
+        ));
+    </sql>
+
+    <!-- 4️⃣ Useful indexes -->
+    <createIndex indexName="idx_idempotency_request_hash"
+                 tableName="idempotency_keys">
+        <column name="request_hash"/>
+    </createIndex>
+
+    <createIndex indexName="idx_idempotency_payment_intent_id"
+                 tableName="idempotency_keys">
+        <column name="payment_intent_id"/>
+    </createIndex>
+
+    <!-- 5️⃣ Rollback -->
+    <rollback>
+        <dropTable tableName="idempotency_keys"/>
+    </rollback>
+
+</changeSet>
+
+</databaseChangeLog>

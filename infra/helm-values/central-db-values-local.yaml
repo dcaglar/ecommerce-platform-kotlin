@@ -8,73 +8,70 @@ image:
 postgresqlSharedPreloadLibraries: "pgaudit,pg_stat_statements"
 
 auth:
-  existingSecret: central-db-credentials
+  existingSecret: central-hub-credentials
   secretKeys:
     adminPasswordKey: CENTRAL_DB_POSTGRES_PASSWORD
 
 
-
-
-
 primary:
-  extraEnvVarsSecret: central-db-credentials
+  extraEnvVarsSecret: central-hub-credentials
   extraEnvVars:
     - name: CENTRAL_DB_NAME
       valueFrom:
         configMapKeyRef:
-          name: payment-platform-config
+          name: central-hub-config
           key: CENTRAL_DB_NAME
     - name: POSTGRES_DB
       valueFrom:
         configMapKeyRef:
-          name: payment-platform-config
+          name: central-hub-config
           key: CENTRAL_DB_NAME
     - name: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME
       valueFrom:
         secretKeyRef:
-          name: central-db-credentials
+          name: central-hub-credentials
           key: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME
     - name: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD
       valueFrom:
         secretKeyRef:
-          name: central-db-credentials
+          name: central-hub-credentials
           key: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD
     - name: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME
       valueFrom:
         secretKeyRef:
-          name: central-db-credentials
+          name: central-hub-credentials
           key: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME
     - name: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_PASSWORD
       valueFrom:
         secretKeyRef:
-          name: central-db-credentials
+          name: central-hub-credentials
           key: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_PASSWORD
     - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
       valueFrom:
         secretKeyRef:
-          name: central-db-credentials
+          name: central-hub-credentials
           key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
     - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
       valueFrom:
         secretKeyRef:
-          name: central-db-credentials
+          name: central-hub-credentials
           key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
     - name: CENTRAL_DB_DUTY_USERNAME
       valueFrom:
         secretKeyRef:
-          name: central-db-credentials
+          name: central-hub-credentials
           key: CENTRAL_DB_DUTY_USERNAME
     - name: CENTRAL_DB_DUTY_PASSWORD
       valueFrom:
         secretKeyRef:
-          name: central-db-credentials
+          name: central-hub-credentials
           key: CENTRAL_DB_DUTY_PASSWORD
     - name: POSTGRES_USER
       value: postgres
     - name: PGPASSWORD
       valueFrom:
         secretKeyRef:
-          name: central-db-credentials
+          name: central-hub-credentials
           key: CENTRAL_DB_POSTGRES_PASSWORD
   initdb:
     scriptsConfigMap: central-db-init-scripts
@@ -145,3 +142,63 @@ primary:
 
 metrics:
   enabled: false
+
+
+
+  apiVersion: v1
+  kind: Secretdsdf
+:q:
+
+  metadata:
+    name: edge-db-credentials
+    namespace: {{.Release.Namespace}}
+  type: Opaque
+  stringData:
+    EDGE_DB_PAYMENT_SERVICE_USERNAME: {{.Values.EDGE_DB_PAYMENT_SERVICE_USERNAME | quote}}
+    EDGE_DB_PAYMENT_SERVICE_PASSWORD: {{.Values.EDGE_DB_PAYMENT_SERVICE_PASSWORD | quote}}
+    EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME: {{.Values.EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME | quote}}
+    EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD: {{.Values.EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD | quote}}
+
+    EDGE_DB_DUTY_USERNAME: {{.Values.EDGE_DB_DUTY_USERNAME | quote}}
+    EDGE_DB_DUTY_PASSWORD: {{.Values.EDGE_DB_DUTY_PASSWORD | quote}}
+    EDGE_DB_POSTGRES_PASSWORD: {{.Values.EDGE_DB_POSTGRES_PASSWORD | quote}}
+
+  ---
+  apiVersion: v1
+  kind: Secret
+  metadata:
+    name: central-hub-credentials
+    namespace: {{.Release.Namespace}}
+  type: Opaque
+  stringData:
+    CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME: {{.Values.CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME | quote}}
+    CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD: {{.Values.CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD | quote}}
+    CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME: {{.Values.CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME | quote}}
+    CENTRAL_DB_PAYMENT_CENTRAL_RELAY_PASSWORD: {{.Values.CENTRAL_DB_PAYMENT_CENTRAL_RELAY_PASSWORD | quote}}
+    CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME: {{.Values.CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME | quote}}
+    CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD: {{.Values.CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD | quote}}
+
+    CENTRAL_DB_DUTY_USERNAME: {{.Values.CENTRAL_DB_DUTY_USERNAME | quote}}
+    CENTRAL_DB_DUTY_PASSWORD: {{.Values.CENTRAL_DB_DUTY_PASSWORD | quote}}
+    CENTRAL_DB_POSTGRES_PASSWORD: {{.Values.CENTRAL_DB_POSTGRES_PASSWORD | quote}}
+  ---
+  apiVersion: v1
+  kind: Secret
+  metadata:
+    name: kafka-credentials
+    namespace: {{.Release.Namespace}}
+  type: Opaque
+  stringData:
+    KAFKA_CLIENT_PASSWORD: {{.Values.KAFKA_CLIENT_PASSWORD | quote}}
+  ---
+  apiVersion: v1
+  kind: Secret
+  metadata:
+    name: yugabyte-db-credentials
+    namespace: {{.Release.Namespace}}
+  type: Opaque
+  stringData:
+    YUGABYTE_DB_PAYMENT_SERVICE_USERNAME: {{.Values.YUGABYTE_DB_PAYMENT_SERVICE_USERNAME | quote}}
+    YUGABYTE_DB_PAYMENT_SERVICE_PASSWORD: {{.Values.YUGABYTE_DB_PAYMENT_SERVICE_PASSWORD | quote}}
+    YUGABYTE_DB_DUTY_USERNAME: {{.Values.YUGABYTE_DB_DUTY_USERNAME | quote}}
+    YUGABYTE_DB_DUTY_PASSWORD: {{.Values.YUGABYTE_DB_DUTY_PASSWORD | quote}}
