@@ -25,14 +25,14 @@ class CaptureCommandExecutor(
     }
 
     @KafkaListener(
-        topics = [Topics.CAPTURE_COMMANDS],
+        topics = [Topics.CAPTURE_REQUESTED],
         containerFactory = CONSUMER_GROUPS.CAPTURE_COMMAND_EXECUTOR + "-factory",
         groupId = CONSUMER_GROUPS.CAPTURE_COMMAND_EXECUTOR
     )
     fun consume(record: ConsumerRecord<String, EventEnvelope<CaptureRequested>>) {
         val envelope = record.value()
         EventLogContext.with(envelope) {
-            val eventId = envelope.eventId
+            val eventId = envelope.data.deterministicEventId()
             if (dedupe.exists(eventId)) {
                 logger.warn("⚠️ Event is processed already, skipping eventId=\$eventId")
                 return@with

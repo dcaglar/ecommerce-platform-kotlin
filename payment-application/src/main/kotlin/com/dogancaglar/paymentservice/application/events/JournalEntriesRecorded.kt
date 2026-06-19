@@ -17,7 +17,7 @@ data class JournalEntriesRecorded(
 
     override val eventType: String = EVENT_TYPE
 
-    // deterministicEventId() inherited from base: "$publicPaymentIntentId:$eventType"
+   override  fun  deterministicEventId() = ledgerBatchId
 
     companion object {
         const val EVENT_TYPE = EventType.JOURNAL_ENTRIES_RECORDED

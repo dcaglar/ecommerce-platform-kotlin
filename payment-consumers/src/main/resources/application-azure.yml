@@ -1,11 +1,10 @@
 app:
   kafka:
     specs:
-      psp-result-queue:                           { partitions: 24, replicas: 3, createDlq: true }
-      ledger_entries_recorded_topic:              { partitions: 48, replicas: 3, createDlq: true }
-      capture-execution-queue:                    { partitions: 24, replicas: 3, createDlq: true }
-      capture_psp_performed_queue:                { partitions: 24, replicas: 3, createDlq: true }
-      internal-transfer-queue:                    { partitions: 24, replicas: 3, createDlq: true }
+      payment.psp.results:                        { partitions: 24, replicas: 3, createDlq: true }
+      journal.entries.recorded:                   { partitions: 48, replicas: 3, createDlq: true }
+      gateway.capture.commands:                   { partitions: 24, replicas: 3, createDlq: true }
+      gateway.capture.submitted:                  { partitions: 24, replicas: 3, createDlq: true }
 
 spring:
   datasource:

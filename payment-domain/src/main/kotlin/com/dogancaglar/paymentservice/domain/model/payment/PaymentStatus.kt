@@ -8,7 +8,7 @@ package com.dogancaglar.paymentservice.domain.model.payment
  * mutation methods and are never allowed to transition backwards.
  *
  * State machine (happy path):
- *   AUTHORIZED → SENT_FOR_SETTLE → CAPTURED
+ *   AUTHORIZED → SENT_FOR_SETTLE → CAPTURED → SETTLED
  *
  * Partial capture path:
  *   AUTHORIZED → SENT_FOR_SETTLE → PARTIALLY_CAPTURED → CAPTURED
@@ -64,5 +64,6 @@ enum class PaymentStatus {
     PARTIALLY_CAPTURED,
     VOIDED,
     PARTIALLY_REFUNDED,
-    REFUNDED
+    REFUNDED,
+    SETTLED
 }

@@ -13,23 +13,55 @@ import org.springframework.boot.autoconfigure.liquibase.LiquibaseDataSource
 import org.springframework.beans.factory.annotation.Value
 
 @Configuration
-class MultiDataSourceConfig {
+class MultiDataSourceConfig(@Value("\${app.pod-name}") private val podName: String,
+                            @Value("\${app.edge-cell-base-url}") private val baseUrl: String,
+                            @Value("\${app.edge-cell-headless-service}") private val headlessService: String) {
+
+
+    // If you need to change the URL format, you change this one line.
+    private fun buildEdgeDbUrl(podName: String): String {
+        val ordinal = podName.substringAfterLast("-")
+        return "jdbc:postgresql://payment-edge-cell-${ordinal}.payment-edge-cell-headless:5432/edge-db?options=-c%20timezone=UTC"
+    }
 
     // -------- DataSources --------
+
+    private fun buildDynamicEdgeUrl(): String {
+        val ordinal = podName.substringAfterLast("-")
+        return "jdbc:postgresql://${baseUrl}-${ordinal}.${headlessService}:5432/edge-db?options=-c%20timezone=UTC"
+    }
 
     @Bean("outboxDataSource")
     @Primary
     @LiquibaseDataSource
     @ConfigurationProperties("app.datasource.outbox")
-    fun outboxDataSource(): HikariDataSource = HikariDataSource().apply { poolName = "edge-outbox-pool" }
+    fun outboxDataSource(): HikariDataSource {
+        return HikariDataSource().apply {
+            poolName = "edge-outbox-pool"
+            // We set the URL manually to bypass the YAML/Environment variable logic
+            jdbcUrl = buildDynamicEdgeUrl()
+            // All other properties (timeouts, pool-size) defined in YAML
+            // will be automatically applied by @ConfigurationProperties after this method returns.
+        }
+    }
 
     @Bean("maintenanceDataSource")
     @ConfigurationProperties("app.datasource.maintenance")
-    fun maintenanceDataSource(): HikariDataSource = HikariDataSource().apply { poolName = "edge-maintenance-pool" }
+    fun maintenanceDataSource(): HikariDataSource {
+        return HikariDataSource().apply {
+            poolName = "edge-maintenance-pool"
+            jdbcUrl = buildDynamicEdgeUrl()
+        }
+    }
 
     @Bean("centralDataSource")
     @ConfigurationProperties("app.datasource.central")
-    fun centralDataSource(): HikariDataSource = HikariDataSource().apply { poolName = "central-edge-worker-pool"}
+    fun centralDataSource(): HikariDataSource {
+        return HikariDataSource().apply {
+            poolName = "central-edge-worker-pool"
+            // No URL override here, it will use the value from YAML (central_db_url)
+        }
+    }
 
     // -------- TxManagers --------
 
@@ -57,4 +89,6 @@ class MultiDataSourceConfig {
 
     @Bean("maintenanceJdbcTemplate")
     fun maintenanceJdbc(@Qualifier("maintenanceDataSource") ds: DataSource) = JdbcTemplate(ds)
+
+
 }

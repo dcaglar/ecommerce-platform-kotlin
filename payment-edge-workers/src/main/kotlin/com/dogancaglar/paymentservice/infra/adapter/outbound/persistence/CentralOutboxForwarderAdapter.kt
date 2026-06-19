@@ -35,6 +35,10 @@ class CentralOutboxForwarderAdapter(
         mapper.upsert(EdgeWatermarkEntity(edgeNodeId, forwardedUpTo))
     }
 
+    override fun isSchemaReady():Boolean{
+        return mapper.isSchemaReady()
+    }
+
     override fun deleteWatermark(edgeNodeId: String) {
         mapper.deleteWatermark(edgeNodeId)
     }

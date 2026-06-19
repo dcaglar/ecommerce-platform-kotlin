@@ -55,7 +55,7 @@
                                  referencedTableName="payment_tx" referencedColumnNames="tx_id"/>
 
         <sql>
-            ALTER TABLE payment_tx ADD CONSTRAINT chk_tx_type CHECK (tx_type IN ('AUTHORIZATION', 'CAPTURE', 'REFUND', 'SETTLE'));
+            ALTER TABLE payment_tx ADD CONSTRAINT chk_tx_type CHECK (tx_type IN ('AUTHORIZATION', 'CAPTURE', 'REFUND', 'SETTLEMENT', 'INTERNAL_TRANSFER', 'COMMISSION_FEE','REVENUE_RECOGNITION','PAYOUT','ADJUSTMENT'));
             ALTER TABLE payment_tx ADD CONSTRAINT chk_tx_amount_positive CHECK (amount_value > 0);
             ALTER TABLE payment_tx ADD CONSTRAINT chk_tx_currency CHECK (amount_currency ~ '^[A-Z]{3}$');
             ALTER TABLE payment_tx ADD CONSTRAINT chk_tx_status CHECK (status IN ('PENDING', 'SUCCESS', 'FAILED'));

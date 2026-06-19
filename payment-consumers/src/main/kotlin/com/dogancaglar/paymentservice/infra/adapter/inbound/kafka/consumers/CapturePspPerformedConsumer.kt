@@ -30,7 +30,7 @@ class CapturePspPerformedConsumer(
     fun consume(record: ConsumerRecord<String, EventEnvelope<CaptureSubmitted>>) {
         val envelope = record.value()
         EventLogContext.with(envelope) {
-            val eventId = envelope.eventId
+            val eventId = envelope.data.deterministicEventId()
             if (dedupe.exists(eventId)) {
                 logger.warn("⚠️ Event is processed already, skipping eventId=\$eventId")
                 return@with

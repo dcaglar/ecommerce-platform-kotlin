@@ -4,11 +4,10 @@ app:
     api-key: secretpaymentapikey12345
   kafka:
     specs:
-      psp-result-queue:                           { partitions: 12, replicas: 1, createDlq: true }
-      ledger_entries_recorded_topic:              { partitions: 24, replicas: 1, createDlq: true }
-      capture-execution-queue:                    { partitions: 12, replicas: 1, createDlq: true }
-      capture_psp_performed_queue:                { partitions: 12, replicas: 1, createDlq: true }
-      internal-transfer-queue:                    { partitions: 12, replicas: 1, createDlq: true }
+      payment.psp.results:                        { partitions: 12, replicas: 1, createDlq: true }
+      journal.entries.recorded:                   { partitions: 24, replicas: 1, createDlq: true }
+      gateway.capture.commands:                   { partitions: 12, replicas: 1, createDlq: true }
+      gateway.capture.submitted:                  { partitions: 12, replicas: 1, createDlq: true }
 
 spring:
   datasource:

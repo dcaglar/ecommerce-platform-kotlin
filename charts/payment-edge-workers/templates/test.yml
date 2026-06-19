@@ -1,0 +1,664 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "payment-edge-cell.fullname" . }}
+  labels:
+    {{- include "payment-edge-cell.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "payment-edge-cell.fullname" . }}-headless
+  updateStrategy:
+    type: RollingUpdate
+  replicas: {{ .Values.replicaCount }}
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: {{ include "payment-edge-cell.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "payment-edge-cell.fullname" . }}
+      annotations:
+        rollout/reboot: "{{ now | unixEpoch }}"
+    spec:
+      {{- if .Values.serviceAccount }}
+      serviceAccountName: {{ .Values.serviceAccount.name | default "default" }}
+      {{- end }}
+      terminationGracePeriodSeconds: 120
+      {{- if .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml .Values.topologySpreadConstraints | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: local-edge-db
+          image: "{{ .Values.edgeDb.image.repository }}:{{ .Values.edgeDb.image.tag }}"
+          args:
+            {{- toYaml .Values.edgeDb.args | nindent 12}}
+
+
+
+      envFrom:
+        - secretRef:
+            name: edge-db-credentials
+        - configMapRef:
+            name: edge-cell-config
+
+
+
+        ports:
+          - containerPort: 5432
+        volumeMounts:
+          - name: postgres-data
+            mountPath: /var/lib/postgresql/data
+          # We mount the ConfigMap here so Postgres creates the users on boot
+          - name: init-roles
+            mountPath: /docker-entrypoint-initdb.d
+        # K8s waits here until Postgres is fully up and users are created
+        startupProbe:
+          exec:
+            command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "$(POSTGRES_DB)"]
+          periodSeconds: 2
+          failureThreshold: 30
+        # STEP 2.5: EXTRACT CHANGELOGS FROM APP IMAGE
+        # Boot your payment-service image, copy the files to the shared volume, and exit.
+        # ==========================================
+        - name: extract-migrations
+          image: your-registry/payment-service:latest # <--- Your normal app image
+          command:
+            - "sh"
+            - "-c"
+            # NOTE: Adjust this path based on how your Dockerfile packages the Maven app.
+            # If it's an exploded directory:
+            - "cp -R /app/resources/db/changelog/* /shared-workspace/"
+            # (If it's a Fat JAR, you would use: unzip -j /app/payment-service.jar 'BOOT-INF/classes/db/changelog/*' -d /shared-workspace/)
+          volumeMounts:
+            - name: liquibase-workspace
+              mountPath: /shared-workspace
+
+        # ==========================================
+        # STEP 3: VANILLA LIQUIBASE HANDLES SCHEMAS
+        # Boots the standard image and reads the files we just extracted.
+        # ==========================================
+        - name: liquibase-migration
+          image: liquibase/liquibase:4.24.0 # <--- The official vanilla image
+          env:
+            - name: POSTGRES_DB
+              valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_NAME}}
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: edge-db-admin-pwd}}
+          # Point Liquibase at the extracted files on the shared volume
+          args: ["update", "--changelog-file=/shared-workspace/db.changelog-master.yaml"]
+          volumeMounts:
+            - name: liquibase-workspace
+              mountPath: /shared-workspace
+
+
+      containers:
+        -   name: edge-db
+            image: postgres:15
+            readinessProbe:
+              exec:
+                #not only port but if db created
+                command: ["psql", "-U", "postgres", "-d", "edge-db", "-c", "bu query liquibase in calistirdigi en son changesetid bizim bekledigimiz id mi onunla kiyaslayqacak"]
+              initialDelaySeconds: 5
+              periodSeconds: 5
+            volumeMounts:
+              - name: db-init-scripts
+                mountPath: /docker-entrypoint-initdb.d
+            envFrom:
+              - secretRef:
+                  name: edge-cell-credentials
+              - configMapRef:
+                  name: edge-cell-config
+            env:
+              - name: POSTGRES_DB
+                valueFrom: {configMapKeyRef: {name: edge-cell-credentials, key: EDGE_DB_NAME}}
+              - name: POSTGRES_USER
+                value: postgres
+              - name: POSTGRES_PASSWORD
+                valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_POSTGRES_PASSWORD}}
+
+
+        - name: liquibase-migration
+          image: liquibase/liquibase:4.24.0 # <--- The official vanilla image
+          env:
+            - name: LIQUIBASE_COMMAND_URL
+              value: "jdbc:postgresql://localhost:5432/edge_ledger"
+            - name: LIQUIBASE_COMMAND_USERNAME
+              value: "liquibase_user"
+            - name: LIQUIBASE_COMMAND_PASSWORD
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: edge-liquibase-pwd}}
+          # Point Liquibase at the extracted files on the shared volume
+          args: ["update", "--changelog-file=/shared-workspace/db.changelog-master.yaml"]
+          volumeMounts:
+            - name: liquibase-workspace
+              mountPath: /shared-workspace
+
+        - name: payment-service
+          image: "{{ .Values.paymentService.image.repository }}:{{ .Values.paymentService.image.tag }}"
+          imagePullPolicy: {{.Values.paymentService.image.pullPolicy}}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: mgmt
+              containerPort: 9000
+              protocol: TCP
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: JAVA_TOOL_OPTIONS
+              value: "{{ .Values.paymentService.jvmOpts }}"
+            - name: SPRING_PROFILES_ACTIVE
+              value: "{{ .Values.spring.profile }}"
+            - name: SPRING_DATA_REDIS_URL
+              value: "{{ .Values.redis.url }}"
+            - name: EDGE_DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_NAME
+            - name: SPRING_DATASOURCE_EDGE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_URL
+            - name: EDGE_DB_PAYMENT_SERVICE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_SERVICE_USERNAME
+            - name: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+            - name: YUGABYTE_DB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: YUGABYTE_DB_URL
+            - name: YUGABYTE_DB_PAYMENT_SERVICE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: yugabyte-db-credentials
+                  key: YUGABYTE_DB_PAYMENT_SERVICE_USERNAME
+            - name: YUGABYTE_DB_PAYMENT_SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: yugabyte-db-credentials
+                  key: YUGABYTE_DB_PAYMENT_SERVICE_PASSWORD
+
+            - name: SPRING_LIQUIBASE_ENABLED
+              value: "false"
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "{{ .Values.kafka.bootstrapServers }}"
+            - name: SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: KEYCLOAK_ISSUER_URL
+          startupProbe:
+            httpGet: {path: /actuator/health/liveness, port: 9000}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: 9000}
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: 9000}
+            periodSeconds: 15
+            failureThreshold: 4
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.paymentService.resources | nindent 12}}
+
+        # 2. THE LOCAL WORKER (Forwards to Central)
+
+        # 2. THE LOCAL WORKER (Forwards to Central)
+        - name: payment-edge-workers
+          image: "{{ .Values.edgeWorker.image.repository }}:{{ .Values.edgeWorker.image.tag }}"
+          imagePullPolicy: {{ .Values.edgeWorker.image.pullPolicy }}
+          ports:
+            - name: http-worker
+              containerPort: 8081
+              protocol: TCP
+            - name: mgmt-worker
+              containerPort: 9001
+              protocol: TCP
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "{{ .Values.spring.profile }}"
+            - name: SPRING_DATA_REDIS_URL
+              value: "{{ .Values.redis.url }}"
+            - name: EDGE_DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_NAME
+            - name: EDGE_DB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_URL
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+            - name: EDGE_DB_DUTY_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_DUTY_USERNAME
+            - name: EDGE_DB_DUTY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_DUTY_PASSWORD
+            - name: CENTRAL_DB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: CENTRAL_DB_URL
+            - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: central-db-credentials
+                  key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
+            - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: central-db-credentials
+                  key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+          startupProbe:
+            httpGet: {path: /actuator/health/liveness, port: 9001}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: 9001}
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: 9001}
+            periodSeconds: 15
+            failureThreshold: 4
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.edgeWorker.resources | nindent 12}}
+
+      volumes:
+        - name: db-init-scripts
+          configMap:
+            name: edge-db-init-configmap
+        - name: liquibase-changelog-volume
+          configMap:
+            name: payment-edge-changelogs
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "payment-edge-cell.fullname" . }}
+  labels:
+    {{- include "payment-edge-cell.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "payment-edge-cell.fullname" . }}-headless
+  updateStrategy:
+    type: RollingUpdate
+  replicas: {{ .Values.replicaCount }}
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: {{ include "payment-edge-cell.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "payment-edge-cell.fullname" . }}
+      annotations:
+        rollout/reboot: "{{ now | unixEpoch }}"
+    spec:
+      {{- if .Values.serviceAccount }}
+      serviceAccountName: {{ .Values.serviceAccount.name | default "default" }}
+      {{- end }}
+      terminationGracePeriodSeconds: 120
+      {{- if .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml .Values.topologySpreadConstraints | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # 3. THE LOCAL DATABASE (Edge NVMe Storage) - Native Sidecar
+        - name: local-edge-db
+          image: "{{ .Values.edgeDb.image.repository }}:{{ .Values.edgeDb.image.tag }}"
+          args:
+            {{- toYaml .Values.edgeDb.args | nindent 12}}
+          restartPolicy: Always
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_NAME
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_POSTGRES_PASSWORD
+            - name: EDGE_DB_PAYMENT_SERVICE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_SERVICE_USERNAME
+            - name: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+            - name: EDGE_DB_DUTY_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_DUTY_USERNAME
+            - name: EDGE_DB_DUTY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_DUTY_PASSWORD
+          startupProbe:
+            exec:
+              command:
+                - pg_isready
+                - -h
+                - 127.0.0.1
+                - -U
+                - postgres
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            failureThreshold: 30
+          volumeMounts:
+            - name: edge-db-data
+              mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d/init-edge-db.sh
+              subPath: init-edge-db.sh
+          resources:
+            {{- toYaml .Values.edgeDb.resources | nindent 12}}
+
+        # 4. LIQUIBASE JOB (Runs after DB is ready)
+        - name: payment-service-liquibase
+          image: "{{ .Values.paymentService.image.repository }}:{{ .Values.paymentService.image.tag }}"
+          imagePullPolicy: {{ .Values.paymentService.image.pullPolicy }}
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "liquibase-job"
+            - name: SPRING_MAIN_WEB_APPLICATION_TYPE
+              value: "none"
+            - name: EDGE_DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_NAME
+            - name: EDGE_DB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_URL
+            - name: EDGE_DB_PAYMENT_SERVICE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_SERVICE_USERNAME
+            - name: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+            - name: YUGABYTE_DB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: YUGABYTE_DB_URL
+            - name: YUGABYTE_DB_PAYMENT_SERVICE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: yugabyte-db-credentials
+                  key: YUGABYTE_DB_PAYMENT_SERVICE_USERNAME
+            - name: YUGABYTE_DB_PAYMENT_SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: yugabyte-db-credentials
+                  key: YUGABYTE_DB_PAYMENT_SERVICE_PASSWORD
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        # 5. POSTGRES EXPORTER SIDECAR
+        - name: postgres-exporter
+          image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+          ports:
+            - name: metrics-db
+              containerPort: 9187
+              protocol: TCP
+          env:
+            - name: EDGE_DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_NAME
+            - name: DATA_SOURCE_URI
+              value: "localhost:5432/$(EDGE_DB_NAME)?sslmode=disable"
+            - name: DATA_SOURCE_USER
+              value: "postgres"
+            - name: DATA_SOURCE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_POSTGRES_PASSWORD
+          resources:
+            {{- toYaml .Values.postgresExporter.resources | nindent 12}}
+
+        # 1. THE WEB API (Accepts Traffic)
+        - name: payment-service
+          image: "{{ .Values.paymentService.image.repository }}:{{ .Values.paymentService.image.tag }}"
+          imagePullPolicy: {{ .Values.paymentService.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: mgmt
+              containerPort: 9000
+              protocol: TCP
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: JAVA_TOOL_OPTIONS
+              value: "{{ .Values.paymentService.jvmOpts }}"
+            - name: SPRING_PROFILES_ACTIVE
+              value: "{{ .Values.spring.profile }}"
+            - name: SPRING_DATA_REDIS_URL
+              value: "{{ .Values.redis.url }}"
+            - name: EDGE_DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_NAME
+            - name: SPRING_DATASOURCE_EDGE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_URL
+            - name: EDGE_DB_PAYMENT_SERVICE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_SERVICE_USERNAME
+            - name: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+            - name: YUGABYTE_DB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: YUGABYTE_DB_URL
+            - name: YUGABYTE_DB_PAYMENT_SERVICE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: yugabyte-db-credentials
+                  key: YUGABYTE_DB_PAYMENT_SERVICE_USERNAME
+            - name: YUGABYTE_DB_PAYMENT_SERVICE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: yugabyte-db-credentials
+                  key: YUGABYTE_DB_PAYMENT_SERVICE_PASSWORD
+
+            - name: SPRING_LIQUIBASE_ENABLED
+              value: "false"
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "{{ .Values.kafka.bootstrapServers }}"
+            - name: SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: KEYCLOAK_ISSUER_URL
+          startupProbe:
+            httpGet: {path: /actuator/health/liveness, port: 9000}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: 9000}
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: 9000}
+            periodSeconds: 15
+            failureThreshold: 4
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.paymentService.resources | nindent 12}}
+
+        # 2. THE LOCAL WORKER (Forwards to Central)
+        - name: payment-edge-workers
+          image: "{{ .Values.edgeWorker.image.repository }}:{{ .Values.edgeWorker.image.tag }}"
+          imagePullPolicy: {{ .Values.edgeWorker.image.pullPolicy }}
+          ports:
+            - name: http-worker
+              containerPort: 8081
+              protocol: TCP
+            - name: mgmt-worker
+              containerPort: 9001
+              protocol: TCP
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "{{ .Values.spring.profile }}"
+            - name: SPRING_DATA_REDIS_URL
+              value: "{{ .Values.redis.url }}"
+            - name: EDGE_DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_NAME
+            - name: EDGE_DB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: EDGE_DB_URL
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+            - name: EDGE_DB_DUTY_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_DUTY_USERNAME
+            - name: EDGE_DB_DUTY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: edge-db-credentials
+                  key: EDGE_DB_DUTY_PASSWORD
+            - name: CENTRAL_DB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-platform-config
+                  key: CENTRAL_DB_URL
+            - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: central-db-credentials
+                  key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
+            - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: central-db-credentials
+                  key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+          startupProbe:
+            httpGet: {path: /actuator/health/liveness, port: 9001}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: 9001}
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: 9001}
+            periodSeconds: 15
+            failureThreshold: 4
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.edgeWorker.resources | nindent 12}}
+
+
+
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: {{ include "payment-edge-cell.fullname" . }}-init-db
+            defaultMode: 0755
+  volumeClaimTemplates:
+    - metadata:
+        name: edge-db-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: {{ .Values.edgeDb.storage.size }}

@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "payment-edge-cell.fullname" . }}-init-db
+  name: edge-db-init-configmap
   namespace: {{.Release.Namespace}}
 data:
   init-edge-db.sh: |

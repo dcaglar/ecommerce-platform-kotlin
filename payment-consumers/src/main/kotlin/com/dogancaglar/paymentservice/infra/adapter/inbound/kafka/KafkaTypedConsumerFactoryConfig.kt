@@ -22,7 +22,6 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.kafka.core.*
 import org.springframework.kafka.listener.ConsumerRecordRecoverer
-import org.springframework.kafka.listener.ContainerProperties
 import org.springframework.kafka.listener.DefaultErrorHandler
 import org.springframework.kafka.listener.RecordInterceptor
 import org.springframework.kafka.listener.adapter.RecordFilterStrategy
@@ -40,6 +39,7 @@ import org.apache.kafka.common.errors.SerializationException
 import org.apache.kafka.common.header.internals.RecordHeaders
 import org.apache.kafka.common.serialization.ByteArraySerializer
 import org.apache.kafka.common.serialization.StringSerializer
+import org.springframework.context.annotation.Profile
 import org.springframework.core.convert.ConversionException
 import org.springframework.dao.CannotAcquireLockException
 import org.springframework.dao.DataIntegrityViolationException
@@ -230,8 +230,8 @@ class KafkaTypedConsumerFactoryConfig(
         )
     }
 
-    @Bean(CONSUMER_GROUPS.GROSS_CAPTURE_ALLOCATION_CONSUMER + "-factory")
-    fun marketPlaceSplitConsumer(
+    @Bean(CONSUMER_GROUPS.WEBHOOK_CAPTURE_CONFIRMED_PROCESSOR + "-factory")
+    fun marketPlaceSplitConsumerFactory(
         interceptor: RecordInterceptor<String, EventEnvelope<*>>,
         @Qualifier("custom-kafka-consumer-factory-for-micrometer")
         customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
@@ -246,6 +246,26 @@ class KafkaTypedConsumerFactoryConfig(
             expectedEventType = null
         )
     }
+
+    @Profile("test", "local","azure")
+    @Bean(CONSUMER_GROUPS.SETTLEMENT_RECORD_SIMULATOR + "-factory")
+    fun settlementSimulatorFactory(
+        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
+        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
+        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
+        errorHandler: DefaultErrorHandler
+    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<Event>> {
+        return createFactory(
+            clientId = CONSUMER_GROUPS.SETTLEMENT_RECORD_SIMULATOR,
+            concurrency = 1,
+            interceptor = interceptor,
+            consumerFactory = customFactory,
+            errorHandler = errorHandler,
+            expectedEventType = null
+        )
+    }
+
+
 
     @Bean(CONSUMER_GROUPS.ACCOUNT_BALANCE_CONSUMER + "-factory")
     fun journalEntriesRecordedFactory(
@@ -292,23 +312,6 @@ class KafkaTypedConsumerFactoryConfig(
     ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<Event>> {
         return createFactory(
             clientId = "capture-psp-performed-consumer",
-            concurrency = 3,
-            interceptor = interceptor,
-            consumerFactory = customFactory,
-            errorHandler = errorHandler,
-            expectedEventType = null
-        )
-    }
-
-    @Bean(CONSUMER_GROUPS.INTERNAL_TRANSFER_CONSUMER + "-factory")
-    fun internalTransfersFactory(
-        interceptor: RecordInterceptor<String, EventEnvelope<*>>,
-        @Qualifier("custom-kafka-consumer-factory-for-micrometer")
-        customFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
-        errorHandler: DefaultErrorHandler
-    ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<Event>> {
-        return createFactory(
-            clientId = "internal-transfer-executor",
             concurrency = 3,
             interceptor = interceptor,
             consumerFactory = customFactory,

@@ -62,13 +62,17 @@ open class PaymentConsumerConfig {
         centralDbTransactionalFacadePort: CentralDbTransactionalFacadePort,
         paymentRepository: PaymentRepository,
         paymentTxPort: PaymentTxPort,
-        idGeneratorPort: IdGeneratorPort
+        idGeneratorPort: IdGeneratorPort,
+        serializationPort: SerializationPort,
+        pspSimulationRulesPort: com.dogancaglar.paymentservice.ports.outbound.PspSimulationRulesPort
     ): com.dogancaglar.paymentservice.application.service.RecordCaptureSubmissionService {
         return com.dogancaglar.paymentservice.application.service.RecordCaptureSubmissionService(
             centralDbTransactionalFacadePort = centralDbTransactionalFacadePort,
             paymentRepository = paymentRepository,
             paymentTxPort = paymentTxPort,
-            idGeneratorPort = idGeneratorPort
+            idGeneratorPort = idGeneratorPort,
+            serializationPort = serializationPort,
+            pspSimulationRulesPort = pspSimulationRulesPort
         )
     }
 

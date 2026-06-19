@@ -40,17 +40,6 @@ spring:
       leak-detection-threshold: 60000
       connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
       maximum-pool-size: 15
-    yugabyte:
-      url: ${YUGABYTE_DB_URL}
-      username: ${YUGABYTE_DB_PAYMENT_SERVICE_USERNAME}
-      password: ${YUGABYTE_DB_PAYMENT_SERVICE_PASSWORD}
-      connection-timeout: 5000
-      validation-timeout: 1000
-      idle-timeout: 600000
-      max-lifetime: 1800000
-      leak-detection-threshold: 60000
-      connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
-      maximum-pool-size: 15
 
 outbox-dispatcher:
   thread-count: 2

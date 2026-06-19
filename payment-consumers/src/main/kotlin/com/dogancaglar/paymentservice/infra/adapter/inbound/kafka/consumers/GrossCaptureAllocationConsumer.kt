@@ -41,15 +41,15 @@ class GrossCaptureAllocationConsumer(
 
     @KafkaListener(
         topics = [Topics.JOURNAL_ENTRIES_RECORDED],
-        containerFactory = CONSUMER_GROUPS.GROSS_CAPTURE_ALLOCATION_CONSUMER + "-factory",
-        groupId = CONSUMER_GROUPS.GROSS_CAPTURE_ALLOCATION_CONSUMER
+        containerFactory = CONSUMER_GROUPS.WEBHOOK_CAPTURE_CONFIRMED_PROCESSOR + "-factory",
+        groupId = CONSUMER_GROUPS.WEBHOOK_CAPTURE_CONFIRMED_PROCESSOR
     )
     fun onLedgerEntriesRecorded(
         record: ConsumerRecord<String, EventEnvelope<JournalEntriesRecorded>>
     ) {
         val envelope = record.value() as EventEnvelope<JournalEntriesRecorded>
         EventLogContext.with(envelope) {
-            val eventId = envelope.eventId
+            val eventId = envelope.data.deterministicEventId()
             if (dedupe.exists(eventId)) {
                 logger.warn("⚠️ Event is processed already, skipping eventId=$eventId")
                 return@with
@@ -67,18 +67,24 @@ class GrossCaptureAllocationConsumer(
                     return@with
                 }
 
-                val paymentIntentIdValue = event.paymentIntentId.toLongOrNull() ?: 0L
+                val rawPaymentIntentId = event.paymentIntentId.trim()
+                val paymentIntentIdValue = rawPaymentIntentId.toLongOrNull() ?: 0L
                 val paymentIntentId = PaymentIntentId(paymentIntentIdValue)
                 val payment = paymentRepository.findByPaymentIntentId(paymentIntentId)
-                    ?: throw IllegalStateException("Payment data entity not found for paymentIntentId=${event.paymentIntentId}")
+                if (payment == null) {
+                    logger.error("🛑 POISON PILL DETECTED: Payment data entity not found for paymentIntentId='$rawPaymentIntentId'. This usually happens if the database was wiped but Kafka retained old data. Skipping event to unblock partition.")
+                    dedupe.markProcessed(eventId, 3600)
+                    return@with
+                }
 
                 val txs = paymentTxPort.findByPaymentId(payment.paymentId.value)
                 val captureTx = txs.find { it.txType == "CAPTURE" && it.status == TxStatus.SUCCESS }
                     ?: throw IllegalStateException("Successful CaptureTx record missing for paymentId=${payment.paymentId.value}")
 
                 // 1. Resolve Global Platform Accounts
-                val grossSuspenseAccount = accountDirectory.getAccountProfile(AccountType.MERCHANT_GROSS_CAPTURE_SUSPENSE, payment.merchantAccount)
-                val platformEscrowAccount = accountDirectory.getAccountProfile(AccountType.PLATFORM_COMMISSION_ESCROW, payment.merchantAccount)
+                val masterAccountCode = "${payment.merchantAccount}.${captureTx.amount.currency.currencyCode}"
+                val grossSuspenseAccount = accountDirectory.getAccountProfile(AccountType.MERCHANT_GROSS_CAPTURE_SUSPENSE, masterAccountCode)
+                val platformEscrowAccount = accountDirectory.getAccountProfile(AccountType.PLATFORM_COMMISSION_ESCROW, masterAccountCode)
 
                 // Fixed infrastructure fee Mor-DC charges for processing this tx (e.g., €0.50)
                 val morDcPlatformFee = Amount.of(50, captureTx.amount.currency)
@@ -89,7 +95,7 @@ class GrossCaptureAllocationConsumer(
 
                     val merchantDirectRevenueAccount = accountDirectory.getAccountProfile(
                         AccountType.MARKETPLACE_DIRECT_REVENUE_BALANCE_ACCOUNT,
-                        payment.merchantAccount
+                        masterAccountCode
                     )
                         // A1. Move 100% of funds from suspense to direct merchant revenue
                     recordInternalTransferSubmissionUseCase.recordSubmission(
@@ -135,7 +141,7 @@ class GrossCaptureAllocationConsumer(
                 }
 
                 // B2. Charge Mor-DC's infrastructure fee straight from the operator's revenue share profile account
-                val operatorCommissionAccount = accountDirectory.getAccountProfile(AccountType.MARKETPLACE_COMMISSION_REVENUE_BALANCE_ACCOUNT, payment.merchantAccount)
+                val operatorCommissionAccount = accountDirectory.getAccountProfile(AccountType.MARKETPLACE_COMMISSION_REVENUE_BALANCE_ACCOUNT, masterAccountCode)
 
                 recordInternalTransferSubmissionUseCase.recordSubmission(
                     paymentId = payment.paymentId, paymentIntentId = paymentIntentId, publicPaymentIntentId = event.publicPaymentIntentId, captureTxId = captureTx.txId,

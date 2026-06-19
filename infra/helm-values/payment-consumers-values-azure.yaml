@@ -5,7 +5,7 @@ image:
   tag: latest
   pullPolicy: Always
 resources:
-  requests: {cpu: "150m", memory: "1024Mi"}
+  requests: {cpu: "100m", memory: "1024Mi"}
   limits:   {cpu: "1000m", memory: "2048Mi"}
 jvmOpts: >-
   -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication

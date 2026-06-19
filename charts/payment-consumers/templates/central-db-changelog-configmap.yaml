@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: central-db-changelog-configmap
+data:
+  # "db/" kısmını anahtarlardan temizler, sadece dosya adını bırakır.
+    {{- range $path, $bytes := .Files.Glob "db/*" }}
+    {{ base $path }}: |-
+  {{ $bytes | toString | indent 4 }}
+  {{- end }}

@@ -1,8 +1,10 @@
 package com.dogancaglar.paymentservice.application.service
 
 import com.dogancaglar.common.event.EventEnvelopeFactory
-import com.dogancaglar.common.time.Utc
+import com.dogancaglar.common.logging.EventLogContext
+import com.dogancaglar.paymentservice.application.events.CaptureConfirmed
 import com.dogancaglar.paymentservice.application.events.CaptureSubmitted
+import com.dogancaglar.paymentservice.ports.outbound.PspSimulationRulesPort
 import com.dogancaglar.paymentservice.domain.model.common.Amount
 import com.dogancaglar.paymentservice.domain.model.common.Currency
 import com.dogancaglar.paymentservice.domain.model.ledger.Tx
@@ -15,13 +17,16 @@ import com.dogancaglar.paymentservice.ports.outbound.CentralDbTransactionalFacad
 import com.dogancaglar.paymentservice.ports.outbound.IdGeneratorPort
 import com.dogancaglar.paymentservice.ports.outbound.PaymentRepository
 import com.dogancaglar.paymentservice.ports.outbound.PaymentTxPort
+import com.dogancaglar.paymentservice.ports.outbound.SerializationPort
 import org.slf4j.LoggerFactory
 
 open class RecordCaptureSubmissionService(
     private val centralDbTransactionalFacadePort: CentralDbTransactionalFacadePort,
     private val paymentRepository: PaymentRepository,
     private val paymentTxPort: PaymentTxPort,
-    private val idGeneratorPort: IdGeneratorPort
+    private val idGeneratorPort: IdGeneratorPort,
+    private val serializationPort: SerializationPort,
+    private val pspSimulationRulesPort: PspSimulationRulesPort
 ) : RecordCaptureSubmissionUseCase {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -53,12 +58,36 @@ open class RecordCaptureSubmissionService(
             status = PENDING
         )
 
+        //TODO simulation ,here also just create one Outbox<CaptureConfirmed> for simulator purposes.
+        val outboxEvents = mutableListOf<OutboxEvent>()
+        if (pspSimulationRulesPort.isSimulationTarget(event.merchantAccount)) {
+            logger.info("Simulation target profile verified for merchant=${event.merchantAccount}. Generating automatic Stage 2 loopback confirmation.")
+            val captureConfirmed = CaptureConfirmed(
+                paymentIntentId = event.paymentIntentId,
+                publicPaymentIntentId = event.publicPaymentIntentId,
+                merchantAccount = event.merchantAccount,
+                amountValue = event.amountValue,
+                currency = event.currency
+            )
 
-        /*
-        also actually another thing currently the system behaves like default manual capture is needed, i mean that means merchant do have to send auth and capture seperately, but i do want actually defauk behavior  , so that when the payment is authorized once then we should simply also
-         */
+            val captureConfirmedEnvelope = EventEnvelopeFactory.envelopeFor(
+                traceId = EventLogContext.getTraceId(),
+                data = captureConfirmed,
+                aggregateId = event.publicPaymentIntentId,
+                parentEventId = EventLogContext.getEventId()
+            )
+
+            val captureConfirmedOutboxEvent = OutboxEvent.createNew(
+                oeid = idGeneratorPort.generateId(),
+                eventType = captureConfirmedEnvelope.eventType,
+                aggregateId = captureConfirmedEnvelope.aggregateId,
+                payload = serializationPort.toJson(captureConfirmedEnvelope)
+            )
+            outboxEvents.add(captureConfirmedOutboxEvent)
+        }
+
         // 5. Commit atomic units through outbound database gateways
         logger.info("Atomically persisting pending state modifications and transaction outbox event for track ref=${event.pspReference}")
-        centralDbTransactionalFacadePort.recordPaymentOperationInLedger(updatedPayment, captureTx, emptyList(), emptyList())
+        centralDbTransactionalFacadePort.recordPaymentOperationInLedger(updatedPayment, captureTx, emptyList(), outboxEvents)
     }
 }

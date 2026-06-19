@@ -1,0 +1,188 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "payment-edge-workes.fullname" . }}
+  labels:
+    {{- include "payment-edge-cell.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "payment-edge-cell.fullname" . }}-headless
+  updateStrategy:
+    type: RollingUpdate
+  replicas: {{ .Values.replicaCount }}
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: {{ include "payment-edge-cell.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "payment-edge-cell.fullname" . }}
+      annotations:
+        rollout/reboot: "{{ now | unixEpoch }}"
+    spec:
+      {{- if .Values.serviceAccount }}
+      serviceAccountName: {{ .Values.serviceAccount.name | default "default" }}
+      {{- end }}
+      terminationGracePeriodSeconds: 120
+      {{- if .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml .Values.topologySpreadConstraints | nindent 8 }}
+      {{- end }}
+      initContainers:
+        ## we alsop remopbved central-db
+        - name: edge-db
+          image: postgres:15
+          restartPolicy: Always   # <--- K8s 1.28
+          readinessProbe:
+            exec:
+              command:
+                - psql
+                - -U
+                - postgres
+                - -d
+                - edge-db
+                - -tAc
+                - "SELECT 1 FROM databasechangelog WHERE id = '20260208-optimize-idempotency-vacuum' AND author = 'dogancaglar' AND exectype = 'EXECUTED';"
+              initialDelaySeconds: 10
+              periodSeconds: 5
+          volumeMounts:
+            - name: db-init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+          envFrom:
+            - secretRef:
+                name: edge-cell-credentials
+            - configMapRef:
+                name: edge-cell-config
+          env:
+            - name: POSTGRES_DB
+              valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_NAME}}
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_POSTGRES_PASSWORD}}
+
+
+        - name: liquibase-migration
+          image: liquibase/liquibase:4.24.0 # <--- The official vanilla image
+          env:
+            - name: LIQUIBASE_COMMAND_URL
+              valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_URL}}
+            - name: LIQUIBASE_COMMAND_USERNAME
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_SERVICE_USERNAME}}
+            - name: LIQUIBASE_COMMAND_PASSWORD
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_SERVICE_PASSWORD}}
+          # Point Liquibase at the extracted files on the shared volume
+          args: ["update", "--changelog-file=/shared-workspace/changelog.edge.xml"]
+          volumeMounts:
+            - name: liquibase-workspace
+              mountPath: /shared-workspace
+      containers:
+        - name: payment-service
+          image: "{{ .Values.paymentService.image.repository }}:{{ .Values.paymentService.image.tag }}"
+          imagePullPolicy: {{.Values.paymentService.image.pullPolicy}}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: mgmt
+              containerPort: 9000
+              protocol: TCP
+          envFrom:
+            - secretRef:
+              name: edge-cell-credentials
+            - configMapRef:
+              name: edge-cell-config
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: JAVA_TOOL_OPTIONS
+              value: "{{ .Values.paymentService.jvmOpts }}"
+            - name: SPRING_PROFILES_ACTIVE
+              value: "{{ .Values.spring.profile }}"
+            - name: SPRING_DATA_REDIS_URL
+              value: "{{ .Values.redis.url }}"
+            - name: EDGE_DB_NAME
+              valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_NAME}}
+            - name: EDGE_DB_URL
+              valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_URL}}
+            - name: EDGE_DB_PAYMENT_SERVICE_USERNAME
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_SERVICE_USERNAME}}
+            - name: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_SERVICE_PASSWORD}}
+            - name: SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
+              valueFrom: {configMapKeyRef: {name: edge-cell-config, key: KEYCLOAK_ISSUER_URL}}
+
+
+        # 2. THE LOCAL WORKER (Forwards to Central)
+        - name: payment-edge-workers
+          image: "{{ .Values.edgeWorker.image.repository }}:{{ .Values.edgeWorker.image.tag }}"
+          imagePullPolicy: {{ .Values.edgeWorker.image.pullPolicy }}
+          ports:
+            - name: http-worker
+              containerPort: 8081
+              protocol: TCP
+            - name: mgmt-worker
+              containerPort: 9001
+              protocol: TCP
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "{{ .Values.spring.profile }}"
+            - name: SPRING_DATA_REDIS_URL
+              value: "{{ .Values.redis.url }}"
+            - name: EDGE_DB_NAME
+              valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_NAME}}
+            - name: EDGE_DB_URL
+              valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_URL}}
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME}}
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD}}
+            - name: EDGE_DB_DUTY_USERNAME
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_DUTY_USERNAME}}
+            - name: EDGE_DB_DUTY_PASSWORD
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_DUTY_PASSWORD}}
+              ## central db is sperate db  so not sure where to define them but edge-worker app simply needs it in order to start that, but then question is maybe edge-worker sercice dont have to be same pod, because its asyrnouis path
+            #           ## actually we might have mutlti threaded localoubox forwwardder jon runs outside , maybe on central cluster, as standalone job,and simply from eacj working edge pull certain outbox and add to central, update forwarded to
+            #- name: CENTRAL_DB_URL
+          #              valueFrom:
+          #                configMapKeyRef:
+          #                  name: payment-platform-config
+          #                  key: CENTRAL_DB_URL
+          #            - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
+          #              valueFrom:
+          #                secretKeyRef:
+          #                  name: central-db-credentials
+          #                  key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
+          #            - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+          #              valueFrom:
+          #                secretKeyRef:
+          #                  name: central-db-credentials
+          #                  key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+          startupProbe:
+            httpGet: {path: /actuator/health/liveness, port: 9001}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: 9001}
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: 9001}
+            periodSeconds: 15
+            failureThreshold: 4
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values
+                .edgeWorker.resources | nindent 12}}
+
+      volumes:
+        - name: db-init-scripts
+          configMap:
+            name: edge-db-init-configmap
+        - name: liquibase-workspace
+          configMap:
+            name: edge-db-changelog-configmap

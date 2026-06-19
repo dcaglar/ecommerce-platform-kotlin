@@ -53,16 +53,16 @@ spec:
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: "{{ .Values.kafka.bootstrapServers }}"
             - name: CENTRAL_DB_URL
-              valueFrom: { configMapKeyRef: { name: payment-platform-config, key: CENTRAL_DB_URL } }
+              valueFrom: { configMapKeyRef: { name: central-hub-config, key: CENTRAL_DB_URL } }
             - name: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: central-db-credentials
+                  name: central-hub-credentials
                   key: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME
             - name: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: central-db-credentials
+                  name: central-hub-credentials
                   key: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD
           startupProbe:
             httpGet: {path: /actuator/health/liveness, port: http}

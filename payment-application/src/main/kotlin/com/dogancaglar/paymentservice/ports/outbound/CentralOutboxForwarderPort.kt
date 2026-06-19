@@ -8,4 +8,5 @@ interface CentralOutboxForwarderPort {
     fun insertBatch(edgeNodeId: String, entries: List<OutboxEvent>)
     fun updateWatermark(edgeNodeId: String, forwardedUpTo: Instant)
     fun deleteWatermark(edgeNodeId: String)
+    fun isSchemaReady(): Boolean
 }
