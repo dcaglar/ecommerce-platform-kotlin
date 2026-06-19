@@ -60,25 +60,13 @@ paymentService:
     -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
   resources:
     requests:
-      cpu: "2000m"
-      memory: "2.5Gi"
+      cpu: "1500m"
+      memory: "2Gi"
     limits:
-      cpu: "3000m"
-      memory: "3.5Gi"  # single HikariCP pool (YugabyteDB removed in Phase 15)
+      cpu: "2500m"
+      memory: "3Gi"  # single HikariCP pool (YugabyteDB removed in Phase 15)
 
-# ── payment-edge-workers ─────────────────────────────────────────────────────
-# Outbox forwarder: reads edge-db, batch-inserts to central-db.
-edgeWorker:
-  image:
-    pullPolicy: Always
-  jvmOpts: >-
-    -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication
-    -XX:MaxRAMPercentage=45 -XX:InitialRAMPercentage=45
-    -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m
-    -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
-  resources:
-    requests: {cpu: "1000m", memory: "1Gi"}
-    limits:   {cpu: "2000m", memory: "2Gi"}
+
 
 # ── edge-db (local PostgreSQL sidecar) ───────────────────────────────────────
 # Sized for D8s_v5 (8 vCPU / 32GB node).
@@ -89,8 +77,8 @@ edgeDb:
   storage:
     size: 100Gi
   resources:
-    requests: {cpu: "2000m", memory: "2Gi"}
-    limits:   {cpu: "3000m", memory: "4Gi"}
+    requests: {cpu: "1000m", memory: "1.5Gi"}
+    limits:   {cpu: "2000m", memory: "3Gi"}
   args:
     - "-c"
     - "shared_preload_libraries=pg_stat_statements"
@@ -178,3 +166,8 @@ postgresExporter:
   resources:
     requests: {cpu: "100m", memory: "128Mi"}
     limits:   {cpu: "200m", memory: "256Mi"}
+
+config:
+  KEYCLOAK_ISSUER_URL: "http://keycloak.payment.svc.cluster.local:8080/realms/ecommerce-platform"
+  EDGE_DB_URL: "jdbc:postgresql://localhost:5432/edge-db?options=-c%20timezone=UTC"
+  EDGE_DB_NAME: "edge-db"

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: central-db-postgresql
+  labels:
+    app: {{ include "central-db.fullname" . }}
+spec:
+  clusterIP: None
+  selector:
+    app: {{ include "central-db.fullname" . }}
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: 5432
+      protocol: TCP

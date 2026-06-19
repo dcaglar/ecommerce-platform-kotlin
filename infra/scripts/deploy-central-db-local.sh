@@ -5,26 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR/../.."
 cd "$REPO_ROOT"
 
-
-VALUES_FILE="$REPO_ROOT/infra/helm-values/central-db-values-local.yaml"
-
-# You can override PG_TAG when calling the script
-PG_TAG="${PG_TAG:-16.4.0-debian-12-r0}"
-
-# Fail fast if the tag doesn't exist (prevents ImagePullBackOff surprises)
-if ! docker manifest inspect "docker.io/bitnamilegacy/postgresql:${PG_TAG}" >/dev/null 2>&1; then
-  echo "❌ Tag not found: bitnamilegacy/postgresql:${PG_TAG}"
-  echo "central-db   Try another legacy tag you've verified with: docker manifest inspect docker.io/bitnamilegacy/postgresql:<tag>"
-  exit 1
-fi
-
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update
-
-helm upgrade --install central-db bitnami/postgresql \
+helm upgrade --install central-db "$REPO_ROOT/charts/central-db" \
   -n payment --create-namespace \
-  --version 15.5.1 \
-  -f "$VALUES_FILE" \
-  --set image.tag="${PG_TAG}"
+  -f "$REPO_ROOT/charts/central-db/values.yaml" \
+  -f "$REPO_ROOT/charts/central-db/local/values.yaml"
 
-echo "✅ central-db deployed (image=bitnamilegacy/postgresql:${PG_TAG})"
+echo "✅ central-db deployed (Local configuration)"

@@ -44,14 +44,7 @@ paymentService:
     limits:
       cpu: 1500m
       memory: 768Mi
-edgeWorker:
-  image:
-    pullPolicy: Always
-  resources:
-    requests: {cpu: "250m", memory: "512Mi"}
-    limits: {cpu: "500m", memory: "768Mi"}
-  jvmOpts: >-
-    -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication -XX:MaxRAMPercentage=45 -XX:InitialRAMPercentage=45 -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
+
 edgeDb:
   storage:
     size: 20Gi
@@ -137,7 +130,4 @@ postgresExporter:
 config:
   KEYCLOAK_ISSUER_URL: "http://keycloak:8080/realms/ecommerce-platform"
   EDGE_DB_URL: "jdbc:postgresql://localhost:5432/edge-db?options=-c%20timezone=UTC"
-  CENTRAL_DB_URL: "jdbc:postgresql://central-db-postgresql:5432/central-db?options=-c%20timezone=UTC"
   EDGE_DB_NAME: "edge-db"
-  CENTRAL_DB_NAME: "central-db"
-  YUGABYTE_DB_URL: "jdbc:postgresql://yb-tservers:5433/yugabyte?options=-c%20timezone=UTC"

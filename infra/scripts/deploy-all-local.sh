@@ -31,13 +31,6 @@ helm upgrade --install keycloak bitnami/keycloak \
   --version 17.3.2 \
   -f "$REPO_ROOT/infra/helm-values/keycloak-values-local.yaml"
 
-# 2. Central Database
-helm upgrade --install central-db bitnami/postgresql \
-  -n "$NS" --create-namespace \
-  --version 15.5.1 \
-  -f "$REPO_ROOT/infra/helm-values/central-db-values-local.yaml" \
-  --set image.tag="16.4.0-debian-12-r0"
-
 # 3. Redis
 helm upgrade --install redis bitnami/redis \
   -n "$NS" --create-namespace \
@@ -51,31 +44,39 @@ helm upgrade --install kafka bitnami/kafka \
   -f "$REPO_ROOT/infra/helm-values/kafka-values-local.yaml"
 
 # 5. KEDA
-helm repo add kedacore https://kedacore.github.io/charts >/dev/null 2>&1 || true
-helm repo update >/dev/null 2>&1 || true
-helm upgrade --install keda kedacore/keda \
-  -n keda --create-namespace \
-  --version 2.12.0 \
-  -f "$REPO_ROOT/infra/helm-values/keda-values-local.yaml"
+# helm repo add kedacore https://kedacore.github.io/charts >/dev/null 2>&1 || true
+# helm repo update >/dev/null 2>&1 || true
+# helm upgrade --install keda kedacore/keda \
+#   -n keda --create-namespace \
+#   --version 2.12.0 \
+#   -f "$REPO_ROOT/infra/helm-values/keda-values-local.yaml"
 
 
 
 # 6. Ingress-nginx
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx >/dev/null 2>&1 || true
-helm repo update >/dev/null 2>&1 || true
-helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-  -n ingress-nginx --create-namespace \
-  -f "$REPO_ROOT/infra/helm-values/ingress-nginx-values-local.yaml"
+# helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx >/dev/null 2>&1 || true
+# helm repo update >/dev/null 2>&1 || true
+# helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+#   -n ingress-nginx --create-namespace \
+#   -f "$REPO_ROOT/infra/helm-values/ingress-nginx-values-local.yaml"
+
+# 6.5 Central Database
+helm upgrade --install central-db "$REPO_ROOT/charts/central-db" \
+  -n "$NS" --create-namespace \
+  -f "$REPO_ROOT/charts/central-db/values.yaml" \
+  -f "$REPO_ROOT/charts/central-db/local/values.yaml"
 
 # 7. Payment Edge Cell
 helm upgrade --install payment-edge-cell "$REPO_ROOT/charts/payment-edge-cell" \
   -n "$NS" --create-namespace \
-  -f "$REPO_ROOT/infra/helm-values/payment-edge-cell-values-local.yaml"
+  -f "$REPO_ROOT/charts/payment-edge-cell/values.yaml" \
+  -f "$REPO_ROOT/charts/payment-edge-cell/local/values.yaml"
 
 # 8. Payment Edge Workers
 helm upgrade --install payment-edge-workers "$REPO_ROOT/charts/payment-edge-workers" \
   -n "$NS" --create-namespace \
-  -f "$REPO_ROOT/infra/helm-values/payment-edge-workers-values-local.yaml"
+  -f "$REPO_ROOT/charts/payment-edge-workers/values.yaml" \
+  -f "$REPO_ROOT/charts/payment-edge-workers/local/values.yaml"
 
 # 9. Payment Consumers
 helm upgrade --install payment-consumers "$REPO_ROOT/charts/payment-consumers" \

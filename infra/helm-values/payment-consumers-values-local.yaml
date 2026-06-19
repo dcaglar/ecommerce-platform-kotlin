@@ -51,3 +51,7 @@ redis:
   url: redis://redis-master:6379
 kafka:
   bootstrapServers: kafka.payment.svc.cluster.local:9092
+
+config:
+  CENTRAL_DB_URL: "jdbc:postgresql://payment-consumers-0.payment-consumers.payment.svc.cluster.local:5432/central-db?options=-c%20timezone=UTC"
+  CENTRAL_DB_NAME: "central-db"

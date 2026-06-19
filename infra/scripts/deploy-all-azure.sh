@@ -6,9 +6,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR/../.."
 cd "$REPO_ROOT"
 
-echo "🚀 Deploying central databases..."
-"$SCRIPT_DIR/deploy-central-db-azure.sh"
-
 echo "🚀 Deploying redis..."
 "$SCRIPT_DIR/deploy-redis-azure.sh"
 
