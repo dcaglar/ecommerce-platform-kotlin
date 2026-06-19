@@ -20,7 +20,7 @@ topologySpreadConstraints:
 autoscaling:
   enabled: true
   minReplicas: 1
-  maxReplicas: 3  # matches edgepool max_count in Terraform
+  maxReplicas: 2  # matches edgepool + edgepool2 total capacity in Terraform
   metrics:
     - type: ContainerResource
       containerResource:
@@ -46,10 +46,10 @@ autoscaling:
           periodSeconds: 15
 
 # ── payment-service ──────────────────────────────────────────────────────────
-# Manages TWO HikariCP pools simultaneously:
-#   Pool 1: EDGE_DB_URL    → localhost:5432  (transactional outbox, local sidecar)
-# +1Gi RAM vs local to absorb dual JDBC buffer + thread-stack overhead.
-# MaxRAMPercentage bumped to 60% (was 45%) — we have 4Gi limit, JVM can use ~2.4Gi.
+# Single HikariCP pool: EDGE_DB_URL → localhost:5432 (transactional outbox + idempotency).
+# YugabyteDB was removed (Phase 15) — idempotency keys now live in edge-db.
+# RAM reduced from 4Gi to 3.5Gi since we no longer carry dual JDBC pool overhead.
+# MaxRAMPercentage at 60% — JVM can use ~2.1Gi of the 3.5Gi limit.
 paymentService:
   image:
     pullPolicy: Always
@@ -61,10 +61,10 @@ paymentService:
   resources:
     requests:
       cpu: "2000m"
-      memory: "3Gi"
+      memory: "2.5Gi"
     limits:
       cpu: "3000m"
-      memory: "4Gi"   # +1Gi vs local (768Mi) — dual HikariCP pool overhead
+      memory: "3.5Gi"  # single HikariCP pool (YugabyteDB removed in Phase 15)
 
 # ── payment-edge-workers ─────────────────────────────────────────────────────
 # Outbox forwarder: reads edge-db, batch-inserts to central-db.

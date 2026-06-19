@@ -329,3 +329,108 @@ The edge layer (`payment-service` + `edge-db` + `payment-edge-workers` + Yugabyt
 3. **Liveness Probes (Loose):** Increased failure threshold to allow up to 60 seconds of unresponsiveness. This prevents Kubernetes from `SIGKILL`ing a pod that is simply paused for a heavy Garbage Collection cycle during the k6 load test.
 
 **Result:** A massive reduction in false-positive pod restarts locally, and guaranteed GC pause tolerance during the Azure load test.
+
+
+
+### 2026-06-15: Phase 13 - Complete declarative infra as code migration completed ✅ COMPLETED
+-From now on we do declrative infra a s code yapiyoruz
+
+### 2026-06-16: Phase 14- payment-edge-worker is out of  payment-edge cell,  so they are gonan be in seperetea DB .
+-this will make payment-edge-cel quite lighter , and aslos agile , we need include this t o capacity estiamtion
+### 2026-06-17: Phase 15- YUGOBYTE WAS REMOVED from poject, instead idempotenct wil be in its previoius place which is edge-db
+-Yugabyte project was saslso stopped, during the capacitiy estimation ,assume idmepteincy will bee in edge=-db
+### 2026-06-19 MAJOR UPDATE ON  Quota request on Standard DSv5 Family vCPUs REJECTED AVAIAKLBLE OPTIONS ARE in the list below where  the (limit values  greater rhan zero)
+
+Quota,Region,Usage,Current Limit,Usage%
+Standard Dadsv7 Family vCPUs,West Europe,0,10,0%
+Standard Daldsv7 Family vCPUs,West Europe,0,10,0%
+Standard Ddsv6 Family vCPUs,West Europe,0,10,0%
+Standard Ddsv7 Family vCPUs,West Europe,0,10,0%
+Standard Dldsv6 Family vCPUs,West Europe,0,10,0%
+Standard Dldsv7 Family vCPUs,West Europe,0,10,0%
+Standard Dsv6 Family vCPUs,West Europe,0,10,0%
+Standard Dsv7 Family vCPUs,West Europe,0,10,0%
+Standard DADSv5 Family vCPUs,West Europe,0,0,0%
+Standard DDSv4 Family vCPUs,West Europe,0,10,0%
+Standard DDSv5 Family vCPUs,West Europe,0,0,0%
+Standard DLDSv5 Family vCPUs,West Europe,0,0,0%
+Standard DPDSv5 Family vCPUs,West Europe,0,0,0%
+Standard Dpdsv6 Family vCPUs,West Europe,0,10,0%
+Standard DPLDSv5 Family vCPUs,West Europe,0,0,0%
+Standard Dpldsv6 Family vCPUs,West Europe,0,10,0%
+Standard DSv3 Family vCPUs,West Europe,0,10,0%
+Standard DSv4 Family vCPUs,West Europe,0,10,0%
+Standard DSv5 Family vCPUs,West Europe,0,0,0%
+Standard DCADSv5 Family vCPUs,West Europe,0,0,0%
+Standard DCadsv6 Family vCPUs,West Europe,0,0,0%
+Standard DSv2 Family vCPUs,West Europe,0,10,0%
+Standard DSv2 Promo Family vCPUs,West Europe,0,10,0%
+Standard EIDSv5 Family vCPUs,West Europe,0,0,0%
+Standard EIADSv5 Family vCPUs,West Europe,0,0,0%
+Standard EIBDSv5 Family vCPUs,West Europe,0,0,0%
+Standard Eadsv7 Family vCPUs,West Europe,0,10,0%
+Standard Edsv6 Family vCPUs,West Europe,0,10,0%
+Standard Edsv7 Family vCPUs,West Europe,0,10,0%
+Standard EADSv5 Family vCPUs,West Europe,0,0,0%
+Standard EDSv4 Family vCPUs,West Europe,0,10,0%
+Standard EDSv5 Family vCPUs,West Europe,0,0,0%
+Standard EBDSv5 Family vCPUs,West Europe,0,10,0%
+Standard EPDSv5 Family vCPUs,West Europe,0,0,0%
+Standard Epdsv6 Family vCPUs,West Europe,0,10,0%
+Standard EIDSv4 Family vCPUs,West Europe,0,0,0%
+Standard ECADSv5 Family vCPUs,West Europe,0,0,0%
+Standard ECadsv6 Family vCPUs,West Europe,0,0,0%
+Standard ECIADSv5 Family vCPUs,West Europe,0,0,0%
+Standard Famdsv7 Family vCPUs,West Europe,0,10,0%
+Standard Fadsv7 Family vCPUs,West Europe,0,10,0%
+Standard Faldsv7 Family vCPUs,West Europe,0,10,0%
+Standard FXmdsv2 Family vCPUs,West Europe,0,10,0%
+Standard NDSv2 Family vCPUs,West Europe,0,0,0%
+Standard NDSv3 Family vCPUs,West Europe,0,0,0%
+Standard NGADSV620v1 Family vCPUs,West Europe,0,0,0%
+Standard NVadsV710v5 Family vCPUs,West Europe,0,0,0%
+
+Standard DSv5 Family vCPUs
+
+### 2026-06-19: Phase 16 - Quota Pivot & Capacity Re-estimation ✅ COMPLETED
+
+**Context:** The Standard DSv5 Family vCPU quota request for West Europe was **REJECTED** (limit = 0). All three node pools (`systempool`, `centralpool`, `edgepool`) used DSv5 SKUs and were completely blocked.
+
+**Action:** Redesigned the entire VM topology to spread across 4 VM families that have available quota (10 vCPU each), and re-estimated all capacity budgets to account for Phase 14 (edge-workers separation) and Phase 15 (YugabyteDB removal).
+
+**Terraform Changes (`infra/terraform/main.tf`):**
+
+| Pool | Old SKU (BLOCKED) | New SKU | VM Family | Quota Used |
+|------|-------------------|---------|-----------|:----------:|
+| `systempool` | Standard_D2s_v5 | **Standard_D2s_v4** | DSv4 | 2/10 |
+| `centralpool` | Standard_D8s_v5 | **Standard_D8ds_v4** | DDSv4 | 8/10 |
+| `edgepool` | Standard_D8s_v5 (autoscale 1-3) | **Standard_D8ds_v6** (fixed 1) | Ddsv6 | 8/10 |
+| `edgepool2` (NEW) | — | **Standard_D8ds_v7** (autoscale 0-1) | Ddsv7 | 0-8/10 |
+
+**Architecture-Informed Capacity Changes:**
+- **Edge cell pod budget (post Phase 14+15):** 5,115m CPU / 6.2Gi RAM request — fits an 8-vCPU node at 64% utilization with full `Guaranteed` QoS.
+- **payment-service RAM** reduced from 4Gi → 3.5Gi limit (single HikariCP pool — no YugabyteDB dual-pool overhead).
+- **HPA maxReplicas** reduced from 3 → 2 (matching the 2-node edge topology).
+- **payment-consumers CPU request** reduced from 150m → 100m (creates KEDA scaling headroom on the centralpool).
+- **Centralpool total CPU requests:** ~7,495m / 8,000m available — 505m headroom, sufficient for 4+ consumer replicas.
+
+**Stale Reference Cleanup:**
+- Removed `deploy-yugabyte-azure.sh` call from `deploy-all-azure.sh` (stale after Phase 15).
+- Rewrote `deploy-monitoring-stack-local.sh` from Terraform HCL back to bash (matching azure counterpart style).
+
+**Revised k6 Load Test Targets:**
+
+| Profile | Old Target | New Target | Rationale |
+|---------|:----------:|:----------:|-----------|
+| `average` | 150 flows/sec | 80 flows/sec | ~60% of single-pod ceiling |
+| `stress` | 100 flows/sec | 130 flows/sec | ~100% of ceiling, triggers HPA |
+| `soak` | 30 flows/sec | 50 flows/sec | ~40% of ceiling, 1hr endurance |
+| `spike` | 400 flows/sec | 250 flows/sec | Tests 2-pod autoscale |
+| `breakpoint` | 1000 flows/sec | 350 flows/sec | Finds true 2-pod ceiling |
+
+**Expected Capacity:**
+- Single edge cell: **100-150 flows/sec** (200-300 API req/sec), p99 < 500ms
+- Autoscaled (2 pods): **180-280 flows/sec** (360-560 API req/sec)
+- Cost: **$1.01-$1.45/hr** (vs. original $1.20/hr with DSv5)
+
+**Result:** The Azure deployment is unblocked and ready for load testing within the available quota constraints. The edge cell is lighter (single HikariCP pool, no YugabyteDB), and the new multi-family topology provides autoscaling capability despite the per-family quota cap.
