@@ -12,6 +12,7 @@ terraform {
     storage_account_name = "tfstateloadtestdc"
     container_name       = "tfstate"
     key                  = "loadtest.terraform.tfstate"
+    use_azuread_auth     = true
   }
 }
 
