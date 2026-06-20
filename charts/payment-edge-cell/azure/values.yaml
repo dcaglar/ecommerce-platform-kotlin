@@ -31,7 +31,7 @@ autoscaling:
           averageUtilization: 70
   behavior:
     scaleUp:
-      stabilizationWindowSeconds: 15
+      stabilizationWindowSeconds: 300
       selectPolicy: Max
       policies:
         - type: Pods

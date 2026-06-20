@@ -1,11 +1,11 @@
-  spring:
+spring:
   profile: "local"
 topologySpreadConstraints: []
 runPrivilegeGrantJob: true
 autoscaling:
   enabled: true
   minReplicas: 1
-  maxReplicas: 2
+  maxReplicas: 1
   metrics:
     - type: ContainerResource
       containerResource:
@@ -17,7 +17,7 @@ autoscaling:
           averageUtilization: 85
   behavior:
     scaleUp:
-      stabilizationWindowSeconds: 15
+      stabilizationWindowSeconds: 300
       selectPolicy: Max
       policies:
         - type: Pods
@@ -81,7 +81,7 @@ edgeDb:
 ingress:
   enabled: true
   className: nginx
-  host: ${INGRESS_HOST}
+  host: edge.payment.local
   path: /
   pathType: Prefix
   annotations:
@@ -102,7 +102,7 @@ ingress:
     nginx.ingress.kubernetes.io/limit-connections: "350"
   tls: [] # HTTP for minikube
 serviceMonitor:
-  enabled: true
+  enabled: false
   path: /actuator/prometheus
   interval: 15s
   scrapeTimeout: 10s

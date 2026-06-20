@@ -1,10 +1,10 @@
 
-# ingress-values.yaml
+# ingress-controllers-values-local.yaml
 controller:
   metrics:
     enabled: true
     serviceMonitor:
-      enabled: true
+      enabled: false
       namespace: ingress-nginx # or wherever your operator is
       additionalLabels:
         release: prometheus-stack # Match the label your operator looks for

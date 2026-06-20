@@ -13,9 +13,6 @@ spring:
     edge:
       driver-class-name: org.postgresql.Driver
       pool-name: edge-pool
-    yugabyte:
-      driver-class-name: org.postgresql.Driver
-      pool-name: yugabyte-pool
   cache:
     ttl-seconds: 3600
   account-balance:

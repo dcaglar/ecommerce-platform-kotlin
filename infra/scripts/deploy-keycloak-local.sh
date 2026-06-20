@@ -4,7 +4,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR/../.."
 cd "$REPO_ROOT"
-
 VALUES_FILE="$REPO_ROOT/infra/helm-values/keycloak-values-local.yaml"
 
 helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null

@@ -58,7 +58,7 @@ helm upgrade --install kafka bitnami/kafka \
 # helm repo update >/dev/null 2>&1 || true
 # helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
 #   -n ingress-nginx --create-namespace \
-#   -f "$REPO_ROOT/infra/helm-values/ingress-nginx-values-local.yaml"
+#   -f "$REPO_ROOT/infra/helm-values/ingress-controllers-values-local.yaml"
 
 # 6.5 Central Database
 helm upgrade --install central-db "$REPO_ROOT/charts/central-db" \
