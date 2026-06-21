@@ -3,16 +3,16 @@ kind: StatefulSet
 metadata:
   name: {{ include "payment-edge-workers.fullname" . }}
   labels:
-    {{- include "payment-edge-cell.labels" . | nindent 4 }}
+    {{- include "payment-edge-workers.labels" . | nindent 4 }}
 spec:
-  serviceName: {{ include "payment-edge-cell.fullname" . }}-headless
+  serviceName: {{ include "payment-edge-workes.fullname" . }}-headless
   updateStrategy:
     type: RollingUpdate
   replicas: {{ .Values.replicaCount }}
   podManagementPolicy: Parallel
   selector:
     matchLabels:
-      app: {{ include "payment-edge-cell.fullname" . }}
+      app: {{ include "payment-edge-workers.fullname" . }}
   template:
     metadata:
       labels:
@@ -33,6 +33,7 @@ spec:
         - name: payment-edge-workers
           image: "{{ .Values.edgeWorker.image.repository }}:{{ .Values.edgeWorker.image.tag }}"
           imagePullPolicy: {{ .Values.edgeWorker.image.pullPolicy }}
+
           ports:
             - name: http-worker
               containerPort: 8081
@@ -40,13 +41,19 @@ spec:
             - name: mgmt-worker
               containerPort: 9001
               protocol: TCP
+          envFrom:
+            - secretRef:
+                name: edge-worker-credentials
+            - configMapRef:
+                name: edge-worker-config
+
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "{{ .Values.spring.profile }}"
             - name: SPRING_DATA_REDIS_URL
               value: "{{ .Values.redis.url }}"
             - name: EDGE_DB_NAME
-              valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_NAME}}
+              valueFrom: {configMapKeyRef: {name: edge-worker-config, key: EDGE_DB_NAME}}
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -56,24 +63,20 @@ spec:
             - name: EDGE_CELL_HEADLESS_SERVICE
               value: "{{ include "payment-edge-cell.fullname" . }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
             - name: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
-              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME}}
+              valueFrom: {secretKeyRef: {name: edge-worker-credentials, key: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME}}
             - name: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
-              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD}}
-            - name: EDGE_DB_DUTY_USERNAME
-              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_DUTY_USERNAME}}
-            - name: EDGE_DB_DUTY_PASSWORD
-              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_DUTY_PASSWORD}}
+              valueFrom: {secretKeyRef: {name: edge-worker-credentials, key: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD}}
             - name: CENTRAL_DB_URL
-              value: "{{ .Values.config.CENTRAL_DB_URL }}"
+              valueFrom: {configMapKeyRef: {name: edge-worker-config, key: CENTRAL_DB_URL}}
             - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: central-db-credentials
+                  name: edge-worker-credentials
                   key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
             - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: central-db-credentials
+                  name: edge-worker-credentials
                   key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
           startupProbe:
             httpGet: {path: /actuator/health/liveness, port: 9001}

@@ -23,6 +23,7 @@ app:
       idle-timeout: 60000
       max-lifetime: 1800000
     central:
+      centralDbUrl: ${CENTRAL_DB_URL}
       username: ${CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME}
       password: ${CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD}
       connection-timeout: 15000

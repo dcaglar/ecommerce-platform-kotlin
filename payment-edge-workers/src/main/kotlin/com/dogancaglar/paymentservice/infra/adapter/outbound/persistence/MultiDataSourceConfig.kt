@@ -56,9 +56,10 @@ class MultiDataSourceConfig(@Value("\${app.pod-name}") private val podName: Stri
 
     @Bean("centralDataSource")
     @ConfigurationProperties("app.datasource.central")
-    fun centralDataSource(): HikariDataSource {
+    fun centralDataSource(@Value("\${app.datasource.central.centralDbUrl}") centralDbUrl: String): HikariDataSource {
         return HikariDataSource().apply {
             poolName = "central-edge-worker-pool"
+            jdbcUrl =  centralDbUrl
             // No URL override here, it will use the value from YAML (central_db_url)
         }
     }

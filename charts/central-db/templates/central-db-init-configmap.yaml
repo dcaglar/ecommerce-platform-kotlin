@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: central-db-init-scripts
+  name: central-db-init-configmap
   namespace: {{.Release.Namespace}}
 data:
   init-central-db.sh: |
@@ -11,7 +11,7 @@ data:
     echo "Creating payment_consumers user..."
   
     
-    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$CENTRAL_DB_NAME" <<EOSQL
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<EOSQL
         DO \$\$
         BEGIN
             IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME') THEN
@@ -32,7 +32,7 @@ data:
     EOSQL
 
     echo "Creating payment-central-relay user..."
-    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$CENTRAL_DB_NAME" <<-EOSQL
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
     
         DO \$\$
         BEGIN
@@ -49,7 +49,7 @@ data:
     EOSQL
 
     echo "Creating payment_edge_Workers user..."
-    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$CENTRAL_DB_NAME" <<-EOSQL
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
       DO \$\$
         BEGIN
             IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME') THEN
@@ -65,7 +65,7 @@ data:
     EOSQL
 
     echo "Creating duty user..."
-    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$CENTRAL_DB_NAME" <<-EOSQL
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
     
     DO \$\$
         BEGIN
@@ -83,7 +83,7 @@ data:
     EOSQL
 
     echo "Configuring default privileges for future tables..."
-    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$CENTRAL_DB_NAME" <<-EOSQL
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
         -- When payment_consumers creates tables/sequences (via Liquibase), automatically grant access to edge_workers, relay, and duty
         ALTER DEFAULT PRIVILEGES FOR ROLE "$CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME" IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO "$CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME";
         ALTER DEFAULT PRIVILEGES FOR ROLE "$CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME" IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO "$CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME";

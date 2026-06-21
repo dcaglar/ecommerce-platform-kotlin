@@ -1,4 +1,4 @@
-  spring:
+spring:
   profile: "local"
 topologySpreadConstraints: []
 runPrivilegeGrantJob: true
@@ -17,7 +17,7 @@ autoscaling:
           averageUtilization: 85
   behavior:
     scaleUp:
-      stabilizationWindowSeconds: 15
+      stabilizationWindowSeconds: 300
       selectPolicy: Max
       policies:
         - type: Pods
@@ -63,3 +63,4 @@ config:
   CENTRAL_DB_URL: "jdbc:postgresql://central-db-postgresql:5432/central-db?options=-c%20timezone=UTC"
   EDGE_DB_NAME: "edge-db"
   CENTRAL_DB_NAME: "central-db"
+## edge db url is generated dynamically

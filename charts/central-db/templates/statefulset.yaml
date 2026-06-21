@@ -5,7 +5,7 @@ metadata:
   labels:
     app: {{ include "central-db.fullname" . }}
 spec:
-  serviceName: {{ include "central-db.fullname" . }}
+  serviceName: {{ include "central-db.fullname" . }}-headless
   replicas: 1
   selector:
     matchLabels:
@@ -21,14 +21,19 @@ spec:
       initContainers:
         - name: liquibase-migration
           image: liquibase/liquibase:4.24.0
+          envFrom:
+          - secretRef:
+              name: central-db-credentials
+              optional: true
+
           env:
             - name: LIQUIBASE_COMMAND_URL
               value: "jdbc:postgresql://localhost:5432/central-db?options=-c%20timezone=UTC"
             - name: LIQUIBASE_COMMAND_USERNAME
-              valueFrom: {secretKeyRef: {name: central-hub-credentials, key: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME}}
+              valueFrom: {secretKeyRef: {name: central-db-credentials, key: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME}}
             - name: LIQUIBASE_COMMAND_PASSWORD
-              valueFrom: {secretKeyRef: {name: central-hub-credentials, key: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD}}
-          args: ["update", "--changelog-file=/shared-workspace/changelog.central.xml"]
+              valueFrom: {secretKeyRef: {name: central-db-credentials, key: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD}}
+          args: ["--search-path=/shared-workspace", "update", "--changelog-file=changelog.central.xml"]
           volumeMounts:
             - name: liquibase-workspace
               mountPath: /shared-workspace
@@ -40,10 +45,10 @@ spec:
             - containerPort: 5432
               name: postgres
           args:
-            {{- range $key, $value := .Values.postgres.config }}
+            {{- range $key, $value := .Values.postgres.config}}
             - "-c"
             - "{{ $key }}={{ $value }}"
-            {{- end }}
+            {{- end}}
           readinessProbe:
             exec:
               command:
@@ -53,48 +58,47 @@ spec:
                 - -d
                 - central-db
                 - -tAc
-                - "SELECT 1 FROM databasechangelog WHERE id = '2026-06-09-create-transfers-table' AND author = 'dogancaglar' AND exectype = 'EXECUTED';"
             initialDelaySeconds: 10
             periodSeconds: 5
           volumeMounts:
-            - name: db-init-scripts
+            - name: db-init-script
               mountPath: /docker-entrypoint-initdb.d
             - name: data
               mountPath: /var/lib/postgresql/data
           envFrom:
             - secretRef:
-                name: central-hub-credentials
+                name: central-db-credentials
                 optional: true
           env:
             - name: POSTGRES_DB
               valueFrom:
                 configMapKeyRef:
-                  name: central-hub-config
+                  name: central-db-config
                   key: CENTRAL_DB_NAME
             - name: POSTGRES_USER
               value: "postgres"
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: central-hub-credentials
+                  name: central-db-credentials
                   key: CENTRAL_DB_POSTGRES_PASSWORD
             # Pass the credentials the script needs to create
             - name: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME
-              valueFrom: {secretKeyRef: {name: central-hub-credentials, key: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME}}
+              valueFrom: {secretKeyRef: {name: central-db-credentials, key: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME}}
             - name: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD
-              valueFrom: {secretKeyRef: {name: central-hub-credentials, key: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD}}
+              valueFrom: {secretKeyRef: {name: central-db-credentials, key: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD}}
             - name: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME
-              valueFrom: {secretKeyRef: {name: central-hub-credentials, key: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME}}
+              valueFrom: {secretKeyRef: {name: central-db-credentials, key: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME}}
             - name: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_PASSWORD
-              valueFrom: {secretKeyRef: {name: central-hub-credentials, key: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_PASSWORD}}
+              valueFrom: {secretKeyRef: {name: central-db-credentials, key: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_PASSWORD}}
             - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME
-              valueFrom: {secretKeyRef: {name: central-hub-credentials, key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME}}
+              valueFrom: {secretKeyRef: {name: central-db-credentials, key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME}}
             - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD
-              valueFrom: {secretKeyRef: {name: central-hub-credentials, key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD}}
+              valueFrom: {secretKeyRef: {name: central-db-credentials, key: CENTRAL_DB_PAYMENT_EDGE_WORKERS_PASSWORD}}
             - name: CENTRAL_DB_DUTY_USERNAME
-              valueFrom: {secretKeyRef: {name: central-hub-credentials, key: CENTRAL_DB_DUTY_USERNAME}}
+              valueFrom: {secretKeyRef: {name: central-db-credentials, key: CENTRAL_DB_DUTY_USERNAME}}
             - name: CENTRAL_DB_DUTY_PASSWORD
-              valueFrom: {secretKeyRef: {name: central-hub-credentials, key: CENTRAL_DB_DUTY_PASSWORD}}
+              valueFrom: {secretKeyRef: {name: central-db-credentials, key: CENTRAL_DB_DUTY_PASSWORD}}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
@@ -104,5 +108,11 @@ spec:
         - name: liquibase-workspace
           configMap:
             name: central-db-changelog-configmap
-        - name: data
-          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 5Gi
