@@ -60,7 +60,7 @@ infra/scripts/deploy-monitoring-stack.sh
 - Run:
 ```bash
 infra/scripts/deploy-kafka-exporter-local.sh
-infra/scripts/deploy-postgresql-exporter-local.sh
+infra/scripts/|deploy-postgresql-exporter-local.sh
 ```
 
 4) Build Docker Images
@@ -158,10 +158,8 @@ Tokens are intentionally scoped to those roles so you can exercise each endpoint
 **Step 1: Create Payment Intent**
 
 ```bash
-# Generate a pseudo-UUIDv7 idempotency key
 IDEMPOTENCY_KEY=$(printf '%08x-%04x-7%03x-8%03x-%04x%08x' $((RANDOM*RANDOM)) $((RANDOM)) $((RANDOM%4096)) $((RANDOM%4096)) $((RANDOM)) $((RANDOM*RANDOM)))
 echo "Using Idempotency-Key=$IDEMPOTENCY_KEY"
-
 curl -i -X POST "http://payment.k8s.orb.local/api/v1/payments" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \

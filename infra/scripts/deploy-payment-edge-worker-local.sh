@@ -7,8 +7,7 @@ cd "$REPO_ROOT"
 CHART_ROOT="$REPO_ROOT/charts/payment-edge-workers"
 
 
-helm secrets upgrade --install payment-edge-cell "$CHART_ROOT" \
+helm  upgrade --install payment-edge-workers "$CHART_ROOT" \
   -n payment --create-namespace \
   -f "$CHART_ROOT/values.yaml" \
   -f "$CHART_ROOT/local/values.yaml" \
-  -f "secrets://$REPO_ROOT/edge-cell-sops-secrets.yaml"

@@ -1,8 +1,2 @@
-postgres:
-  image:
-    repository: postgres
-    tag: 15
-    pullPolicy: IfNotPresent
-  config: {}
 resources: {}
 nodeSelector: {}

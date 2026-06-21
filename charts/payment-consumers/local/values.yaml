@@ -39,7 +39,7 @@ keda:
         topic: payment.psp.results
         lagThreshold: "2400"
 serviceMonitor:
-  enabled: true
+  enabled: false
   path: /actuator/prometheus
   interval: 15s
   scrapeTimeout: 10s
@@ -53,5 +53,5 @@ kafka:
   bootstrapServers: kafka.payment.svc.cluster.local:9092
 
 config:
-  CENTRAL_DB_URL: "jdbc:postgresql://payment-consumers-0.payment-consumers.payment.svc.cluster.local:5432/central-db?options=-c%20timezone=UTC"
+  CENTRAL_DB_URL: "jdbc:postgresql://central-db-postgresql:5432/central-db?options=-c%20timezone=UTC"
   CENTRAL_DB_NAME: "central-db"

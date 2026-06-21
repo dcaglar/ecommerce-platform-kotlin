@@ -24,34 +24,21 @@ echo "🚀 Submitting declarative infrastructure to Kubernetes..."
 
 
 # 1. Keycloak
-helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null 2>&1 || true
-helm repo update >/dev/null 2>&1 || true
-helm upgrade --install keycloak bitnami/keycloak \
-  -n "$NS" --create-namespace \
-  --version 17.3.2 \
-  -f "$REPO_ROOT/infra/helm-values/keycloak-values-local.yaml"
+deploy-keycloak-local.sh
 
 # 3. Redis
-helm upgrade --install redis bitnami/redis \
-  -n "$NS" --create-namespace \
-  --version 18.14.0 \
-  -f "$REPO_ROOT/infra/helm-values/redis-values-local.yaml"
+deploy-redis-local.sh
 
 # 4. Kafka
-helm upgrade --install kafka bitnami/kafka \
-  -n "$NS" --create-namespace \
-  --version 26.6.1 \
-  -f "$REPO_ROOT/infra/helm-values/kafka-values-local.yaml"
+deploy-kafka-local.sh
+
+# 5.
+deploy-kafka-local.sh
 
 # 5. KEDA
-# helm repo add kedacore https://kedacore.github.io/charts >/dev/null 2>&1 || true
-# helm repo update >/dev/null 2>&1 || true
-# helm upgrade --install keda kedacore/keda \
-#   -n keda --create-namespace \
-#   --version 2.12.0 \
-#   -f "$REPO_ROOT/infra/helm-values/keda-values-local.yaml"
+deploy-keda-local.sh
 
-
+deploy-ingress-controller-locall.sh
 
 # 6. Ingress-nginx
 # helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx >/dev/null 2>&1 || true
@@ -81,12 +68,14 @@ helm upgrade --install payment-edge-workers "$REPO_ROOT/charts/payment-edge-work
 # 9. Payment Consumers
 helm upgrade --install payment-consumers "$REPO_ROOT/charts/payment-consumers" \
   -n "$NS" --create-namespace \
-  -f "$REPO_ROOT/infra/helm-values/payment-consumers-values-local.yaml"
+  -f "$REPO_ROOT/charts/payment-consumers/values.yaml" \
+  -f "$REPO_ROOT/charts/payment-consumers/local/values.yaml"
 
 # 10. Payment Central Relay
 helm upgrade --install payment-central-relay "$REPO_ROOT/charts/payment-central-relay" \
   -n "$NS" --create-namespace \
-  -f "$REPO_ROOT/infra/helm-values/payment-central-relay-values-local.yaml"
+  -f "$REPO_ROOT/charts/payment-central-relay/values.yaml" \
+  -f "$REPO_ROOT/charts/payment-central-relay/local/values.yaml"
 
 echo ""
 echo "✅ All manifests successfully submitted to Kubernetes!"

@@ -53,26 +53,26 @@ spec:
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: "{{ .Values.kafka.bootstrapServers }}"
             - name: CENTRAL_DB_URL
-              valueFrom: { configMapKeyRef: { name: central-hub-config, key: CENTRAL_DB_URL } }
+              valueFrom: { configMapKeyRef: { name: payment-central-relay-job-config, key: CENTRAL_DB_URL } }
             - name: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: central-db-credentials
+                  name: payment-central-relay-job-credentials
                   key: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME
             - name: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: central-db-credentials
+                  name: payment-central-relay-job-credentials
                   key: CENTRAL_DB_PAYMENT_CENTRAL_RELAY_PASSWORD
             - name: CENTRAL_DB_DUTY_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: central-db-credentials
+                  name: payment-central-relay-job-credentials
                   key: CENTRAL_DB_DUTY_USERNAME
             - name: CENTRAL_DB_DUTY_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: central-db-credentials
+                  name: payment-central-relay-job-credentials
                   key: CENTRAL_DB_DUTY_PASSWORD
           startupProbe:
             httpGet: {path: /actuator/health/liveness, port: management}

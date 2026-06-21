@@ -7,6 +7,10 @@ data:
   init-central-db.sh: |
     #!/bin/bash
     set -e
+    
+    POSTGRES_USER=${POSTGRES_USER:-"postgres"}
+    POSTGRES_DB=${POSTGRES_DB:-"central-db"}
+    export PGPASSWORD=${CENTRAL_DB_POSTGRES_PASSWORD}
 
     echo "Creating payment_consumers user..."
   

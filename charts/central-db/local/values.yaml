@@ -1,21 +1,30 @@
-postgres:
-  config:
-    shared_buffers: 256MB
-    effective_cache_size: 512MB
-    work_mem: 3MB
-    maintenance_work_mem: 64MB
-    max_parallel_workers_per_gather: 0
-    max_parallel_workers: 4
-    max_worker_processes: 4
-    temp_file_limit: 2GB
-    max_connections: 85
-    fsync: on
-    synchronous_commit: on
-    jit: off
-    log_min_duration_statement: 1000
-    log_statement: none
-    bgwriter_lru_maxpages: 400
-    bgwriter_lru_multiplier: 2
+postgresql:
+  auth:
+    database: central-db
+    existingSecret: central-db-credentials
+    secretKeys:
+      adminPasswordKey: CENTRAL_DB_POSTGRES_PASSWORD
+  primary:
+    extraEnvVarsSecret: central-db-credentials
+    initdb:
+      scriptsConfigMap: central-db-init-configmap
+    extendedConfiguration: |-
+      shared_buffers=256MB
+      effective_cache_size=512MB
+      work_mem=3MB
+      maintenance_work_mem=64MB
+      max_parallel_workers_per_gather=0
+      max_parallel_workers=4
+      max_worker_processes=4
+      temp_file_limit=2GB
+      max_connections=85
+      fsync=on
+      synchronous_commit=on
+      jit=off
+      log_min_duration_statement=1000
+      log_statement=none
+      bgwriter_lru_maxpages=400
+      bgwriter_lru_multiplier=2
 
 resources:
   requests:
@@ -24,3 +33,5 @@ resources:
   limits:
     cpu: 500m
     memory: 768Mi
+config:
+  CENTRAL_DB_URL: "jdbc:postgresql://central-db-postgresql:5432/central-db?options=-c%20timezone=UTC"

@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "payment-edge-workers.labels" . | nindent 4 }}
 spec:
-  serviceName: {{ include "payment-edge-workes.fullname" . }}-headless
+  serviceName: {{ include "payment-edge-workers.fullname" . }}-headless
   updateStrategy:
     type: RollingUpdate
   replicas: {{ .Values.replicaCount }}
@@ -16,7 +16,7 @@ spec:
   template:
     metadata:
       labels:
-        app: {{ include "payment-edge-cell.fullname" . }}
+        app: {{ include "payment-edge-workers.fullname" . }}
       annotations:
         rollout/reboot: "{{ now | unixEpoch }}"
     spec:
@@ -42,11 +42,8 @@ spec:
               containerPort: 9001
               protocol: TCP
           envFrom:
-            - secretRef:
-                name: edge-worker-credentials
             - configMapRef:
                 name: edge-worker-config
-
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "{{ .Values.spring.profile }}"
@@ -59,9 +56,9 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: EDGE_CELL_BASE_URL
-              value: "{{ include "payment-edge-cell.fullname" . }}"
+              value: "payment-edge-cell"
             - name: EDGE_CELL_HEADLESS_SERVICE
-              value: "{{ include "payment-edge-cell.fullname" . }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
+              value: "payment-edge-cell-headless.{{ .Release.Namespace }}.svc.cluster.local"
             - name: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
               valueFrom: {secretKeyRef: {name: edge-worker-credentials, key: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME}}
             - name: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
@@ -94,5 +91,4 @@ spec:
             failureThreshold: 4
             timeoutSeconds: 5
           resources:
-            {{- toYaml .Values
-                .edgeWorker.resources | nindent 12}}
+            {{- toYaml .Values.edgeWorker.resources | nindent 12 }}

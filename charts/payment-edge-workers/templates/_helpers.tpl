@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "payment-edge-cell.name" -}}
+{{- define "payment-edge-workers.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "payment-edge-cell.fullname" -}}
+{{- define "payment-edge-workers.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "payment-edge-cell.chart" -}}
+{{- define "payment-edge-workers.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "payment-edge-cell.labels" -}}
-helm.sh/chart: {{ include "payment-edge-cell.chart" . }}
-{{ include "payment-edge-cell.selectorLabels" . }}
+{{- define "payment-edge-workers.labels" -}}
+helm.sh/chart: {{ include "payment-edge-workers.chart" . }}
+{{ include "payment-edge-workers.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -45,7 +45,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "payment-edge-cell.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "payment-edge-cell.name" . }}
+{{- define "payment-edge-workers.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "payment-edge-workers.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
