@@ -81,7 +81,7 @@ edgeDb:
 ingress:
   enabled: true
   className: nginx
-  host: edge.payment.local
+  host: ""
   path: /
   pathType: Prefix
   annotations:

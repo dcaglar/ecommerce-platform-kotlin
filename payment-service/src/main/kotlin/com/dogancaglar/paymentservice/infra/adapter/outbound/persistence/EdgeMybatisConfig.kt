@@ -15,7 +15,7 @@ import javax.sql.DataSource
 @Configuration
 @Profile("!liquibase-job")
 @MapperScan(
-    basePackages = ["com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper.edge"],
+    basePackages = ["com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper"],
     sqlSessionFactoryRef = "edgeSqlSessionFactory"
 )
 public class EdgeMyBatisConfig {
@@ -28,7 +28,7 @@ public class EdgeMyBatisConfig {
         sessionFactory.setDataSource(dataSource)
         sessionFactory.setTypeAliasesPackage("com.dogancaglar.common.db.entity")
         sessionFactory.setTypeHandlersPackage("com.dogancaglar.common.db.typehandler")
-        sessionFactory.setMapperLocations(*PathMatchingResourcePatternResolver().getResources("classpath*:mapper/edge/**/*.xml"))
+        sessionFactory.setMapperLocations(*PathMatchingResourcePatternResolver().getResources("classpath*:mapper/**/*.xml"))
         return sessionFactory.`object`!!
     }
 }
