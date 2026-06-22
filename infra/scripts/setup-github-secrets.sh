@@ -45,6 +45,9 @@ AZ_CLIENT_ID=$(echo "$SP_JSON" | jq -r .appId)
 AZ_CLIENT_SECRET=$(echo "$SP_JSON" | jq -r .password)
 AZ_TENANT_ID=$(echo "$SP_JSON" | jq -r .tenant)
 
+echo "⏳ Assigning Storage Blob Data Contributor role for Terraform Remote State..."
+az role assignment create --assignee "$AZ_CLIENT_ID" --role "Storage Blob Data Contributor" --scope /subscriptions/$SUB_ID -o none
+
 # 4. Push all secrets directly to GitHub using the gh CLI!
 echo "🚀 Pushing secrets directly to your GitHub repository..."
 

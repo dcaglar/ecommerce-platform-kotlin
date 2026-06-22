@@ -41,7 +41,7 @@ open class RecordCaptureSubmissionService(
 
         // 2. Link parent Authorization transaction context
         val txs = paymentTxPort.findByPaymentId(payment.paymentId.value)
-        val authTx = txs.find { it.txType == "AUTHORIZATION" }
+        val authTx = txs.find { it.txType == com.dogancaglar.paymentservice.domain.model.ledger.JournalType.AUTHORIZATION }
         val authTxIdValue = authTx?.txId ?: TxId(0L)
 
         // 3. Setup transaction tracking metadata record

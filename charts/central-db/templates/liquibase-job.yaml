@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "central-db.fullname" . }}-liquibase
+  labels:
+    app: {{ include "central-db.fullname" . }}-liquibase
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{ include "central-db.fullname" . }}-liquibase
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: liquibase-migration
+          image: liquibase/liquibase:4.24.0
+          envFrom:
+            - secretRef:
+                name: central-db-credentials
+                optional: true
+            - configMapRef:
+                name: central-db-config
+                optional: true
+          env:
+            - name: LIQUIBASE_COMMAND_URL
+              # Connect to the Bitnami headless service or cluster service. We'll use the cluster service.
+              valueFrom:
+                configMapKeyRef:
+                  name: central-db-config
+                  key: CENTRAL_DB_URL
+            - name: LIQUIBASE_COMMAND_USERNAME
+              valueFrom: 
+                secretKeyRef: 
+                  name: central-db-credentials
+                  key: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME
+            - name: LIQUIBASE_COMMAND_PASSWORD
+              valueFrom: 
+                secretKeyRef: 
+                  name: central-db-credentials
+                  key: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD
+          args: ["--search-path=/shared-workspace", "update", "--changelog-file=changelog.central.xml"]
+          volumeMounts:
+            - name: liquibase-workspace
+              mountPath: /shared-workspace
+      volumes:
+        - name: liquibase-workspace
+          configMap:
+            name: central-db-changelog-configmap

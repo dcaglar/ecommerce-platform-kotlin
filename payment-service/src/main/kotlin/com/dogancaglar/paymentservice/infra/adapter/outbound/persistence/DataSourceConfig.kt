@@ -28,20 +28,4 @@ class DataSourceConfig {
             .build()
     }
 
-    @Bean(name = ["yugabyteDataSource"])
-    @ConfigurationProperties(prefix = "spring.datasource.yugabyte")
-    fun yugabyteDataSource(
-        @Value("\${spring.datasource.yugabyte.url}") url: String,
-        @Value("\${spring.datasource.yugabyte.username}") user: String,
-        @Value("\${spring.datasource.yugabyte.password}") pass: String,
-        @Value("\${spring.datasource.yugabyte.driver-class-name}") driver: String
-    ): HikariDataSource {
-        return DataSourceBuilder.create()
-            .type(HikariDataSource::class.java)
-            .url(url)
-            .username(user)
-            .password(pass)
-            .driverClassName(driver)
-            .build()
-    }
 }

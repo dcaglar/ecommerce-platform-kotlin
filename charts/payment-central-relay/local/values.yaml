@@ -1,0 +1,24 @@
+
+redis:
+  url: redis://redis-master:6379
+kafka:
+  bootstrapServers: kafka.payment.svc.cluster.local:9092
+spring:
+  profile: local
+serviceMonitor:
+  enabled: false
+  labels:
+    release: prometheus-stack
+  path: /actuator/prometheus
+  interval: 30s
+  scrapeTimeout: 10s
+replicaCount: 1
+keda:
+  enabled: false
+resources:
+  requests: {cpu: "150m", memory: "256Mi"}
+  limits: {memory: "1024Mi"}
+config:
+  CENTRAL_DB_URL: "jdbc:postgresql://central-db-postgresql:5432/central-db?options=-c%20timezone=UTC"
+
+

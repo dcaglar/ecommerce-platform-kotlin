@@ -2,30 +2,20 @@ app:
   instance-id: ${POD_NAME:${HOSTNAME:${random.value}}}
   datasource:
     # ─── 1. CORE TRANSACTIONAL DATABASE POOL ───
-    outbox:
+    central-outbox:
       jdbc-url: ${CENTRAL_DB_URL}
       username: ${CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME}
       password: ${CENTRAL_DB_PAYMENT_CENTRAL_RELAY_PASSWORD}
       maximum-pool-size: 5
       minimum-idle: 2
-      pool-name: edge-outbox-pool
 
-      # ─── 2. MAINTENANCE POOL (Maps to @ConfigurationProperties("app.datasource.maintenance")) ───
+    # ─── 2. MAINTENANCE POOL ───
     maintenance:
       jdbc-url: ${CENTRAL_DB_URL}
       username: ${CENTRAL_DB_DUTY_USERNAME}
       password: ${CENTRAL_DB_DUTY_PASSWORD}
       maximum-pool-size: 2
       minimum-idle: 0
-      pool-name: edge-maintenance-pool
-
-    central:
-      jdbc-url: ${CENTRAL_DB_URL}
-      username: ${CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME}
-      password: ${CENTRAL_DB_PAYMENT_CENTRAL_RELAY_PASSWORD}
-      maximum-pool-size: 5
-      minimum-idle: 1
-      pool-name: central-edge-worker-pool
 
 outbox-relay:
   batch-size: 500

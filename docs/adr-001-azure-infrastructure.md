@@ -434,3 +434,16 @@ Standard DSv5 Family vCPUs
 - Cost: **$1.01-$1.45/hr** (vs. original $1.20/hr with DSv5)
 
 **Result:** The Azure deployment is unblocked and ready for load testing within the available quota constraints. The edge cell is lighter (single HikariCP pool, no YugabyteDB), and the new multi-family topology provides autoscaling capability despite the per-family quota cap.
+
+### 2026-06-19: Phase 17 - Unified Declarative Deployment & Auth Fixes ✅ COMPLETED
+
+**Context:** The deployment process still relied on multiple imperative scripts with implicit ordering. Furthermore, the Azure authentication for Terraform's remote state and the GitHub secrets pipeline needed fixes to ensure CI/CD success.
+
+**Action:**
+1. **True Declarative Deployments:** Completely rewrote both `deploy-all-local.sh` and `deploy-all-azure.sh` into single, unified scripts. They now submit all core infrastructure and applications to Kubernetes in one shot. Kubernetes natively resolves all startup dependencies in the background via `initContainers`.
+2. **Component Cleanup:** Explicitly removed `payment-platform-config` and `yugabyte` from the unified scripts, fully realizing the architectural pivots from Phases 14 and 15.
+3. **Obsolete Scripts Purged:** Permanently deleted the individual component deploy scripts (`deploy-payment-edge-cell`, `deploy-payment-consumers`, `deploy-payment-central-relay`, etc.) to eliminate clutter and enforce the new "single script" workflow.
+4. **Terraform AzureAD Auth:** Updated `providers.tf` backend configuration to include `use_azuread_auth = true`, allowing Terraform to authenticate natively to the Azure Blob Storage remote state using the Service Principal.
+5. **GitHub Secrets Pipeline:** Fixed `setup-github-secrets.sh` to ensure the Service Principal ID (`AZ_CLIENT_ID`) is properly parsed *before* attempting to assign it the "Storage Blob Data Contributor" role for Terraform state access.
+
+**Result:** The entire provisioning and deployment pipeline is now genuinely declarative. Developers and CI pipelines can spin up the full cluster (locally or in Azure) by executing a single script without any manual pauses, hacky port forwarding, or order-dependent steps. Remote state authentication is also fully stabilized.

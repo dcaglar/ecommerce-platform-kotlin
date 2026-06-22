@@ -1,4 +1,4 @@
-  spring:
+spring:
   profile: "local"
 topologySpreadConstraints: []
 runPrivilegeGrantJob: true
@@ -17,7 +17,7 @@ autoscaling:
           averageUtilization: 85
   behavior:
     scaleUp:
-      stabilizationWindowSeconds: 15
+      stabilizationWindowSeconds: 300
       selectPolicy: Max
       policies:
         - type: Pods
@@ -32,18 +32,6 @@ autoscaling:
         - type: Percent
           value: 100
           periodSeconds: 15
-paymentService:
-  image:
-    pullPolicy: Always
-  jvmOpts: >-
-    -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication -XX:MaxRAMPercentage=45 -XX:InitialRAMPercentage=45 -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
-  resources:
-    requests:
-      cpu: 150m
-      memory: 768Mi
-    limits:
-      cpu: 1500m
-      memory: 768Mi
 edgeWorker:
   image:
     pullPolicy: Always
@@ -52,14 +40,6 @@ edgeWorker:
     limits: {cpu: "500m", memory: "768Mi"}
   jvmOpts: >-
     -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication -XX:MaxRAMPercentage=45 -XX:InitialRAMPercentage=45 -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
-serviceMonitor:
-  enabled: true
-  path: /actuator/prometheus
-  interval: 15s
-  scrapeTimeout: 10s
-  scheme: http
-  labels:
-    release: prometheus-stack
 service:
   type: ClusterIP
   port: 8080
@@ -80,8 +60,7 @@ postgresExporter:
 
 config:
   KEYCLOAK_ISSUER_URL: "http://keycloak:8080/realms/ecommerce-platform"
-  EDGE_DB_URL: "jdbc:postgresql://localhost:5432/edge-db?options=-c%20timezone=UTC"
   CENTRAL_DB_URL: "jdbc:postgresql://central-db-postgresql:5432/central-db?options=-c%20timezone=UTC"
   EDGE_DB_NAME: "edge-db"
   CENTRAL_DB_NAME: "central-db"
-  YUGABYTE_DB_URL: "jdbc:postgresql://yb-tservers:5433/yugabyte?options=-c%20timezone=UTC"
+## edge db url is generated dynamically

@@ -36,6 +36,7 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+
       containers:
         - name: payment-consumers
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -53,16 +54,16 @@ spec:
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: "{{ .Values.kafka.bootstrapServers }}"
             - name: CENTRAL_DB_URL
-              valueFrom: { configMapKeyRef: { name: central-hub-config, key: CENTRAL_DB_URL } }
+              valueFrom: { configMapKeyRef: { name: central-db-config, key: CENTRAL_DB_URL } }
             - name: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: central-hub-credentials
+                  name: central-db-credentials
                   key: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME
             - name: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: central-hub-credentials
+                  name: central-db-credentials
                   key: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD
           startupProbe:
             httpGet: {path: /actuator/health/liveness, port: http}

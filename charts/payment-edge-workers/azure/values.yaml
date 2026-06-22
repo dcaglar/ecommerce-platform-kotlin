@@ -1,0 +1,62 @@
+spring:
+  profile: "azure"
+topologySpreadConstraints: []
+runPrivilegeGrantJob: true
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 2
+  metrics:
+    - type: ContainerResource
+      containerResource:
+        name: cpu
+        container: payment-edge-workers
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 15
+      selectPolicy: Max
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 45
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      selectPolicy: Max
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+edgeWorker:
+  image:
+    pullPolicy: Always
+  resources:
+    requests: {cpu: "1000m", memory: "1Gi"}
+    limits: {cpu: "2000m", memory: "2Gi"}
+  jvmOpts: >-
+    -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication -XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=60 -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
+service:
+  type: ClusterIP
+  port: 8080
+  portName: http
+nodeSelector:
+  pool: edge
+redis:
+  url: redis://redis-master:6379
+kafka:
+  bootstrapServers: kafka.payment.svc.cluster.local:9092
+postgresExporter:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+config:
+  KEYCLOAK_ISSUER_URL: "http://keycloak.payment.svc.cluster.local:8080/realms/ecommerce-platform"
+  CENTRAL_DB_URL: "jdbc:postgresql://central-db-postgresql.payment.svc.cluster.local:5432/central-db?options=-c%20timezone=UTC"
+  EDGE_DB_NAME: "edge-db"
+  CENTRAL_DB_NAME: "central-db"

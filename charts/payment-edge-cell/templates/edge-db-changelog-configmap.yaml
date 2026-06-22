@@ -3,8 +3,13 @@ kind: ConfigMap
 metadata:
   name: edge-db-changelog-configmap
 data:
-  # "db/" kısmını anahtarlardan temizler, sadece dosya adını bırakır.
-    {{- range $path, $bytes := .Files.Glob "db/*" }}
-    {{ base $path }}: |-
-  {{ $bytes | toString | indent 4 }}
-  {{- end }}
+  20260208-optimize-idempotency-vacuum.xml: |-
+{{ .Files.Get "db/20260208-optimize-idempotency-vacuum.xml" | indent 4 }}
+  changelog.edge.xml: |-
+{{ .Files.Get "db/changelog.edge.xml" | indent 4 }}
+  idempotency-key-changelog.xml: |-
+{{ .Files.Get "db/idempotency-key-changelog.xml" | indent 4 }}
+  local-outbox-changelog.xml: |-
+{{ .Files.Get "db/local-outbox-changelog.xml" | indent 4 }}
+  payment-intent-changelog.xml: |-
+{{ .Files.Get "db/payment-intent-changelog.xml" | indent 4 }}

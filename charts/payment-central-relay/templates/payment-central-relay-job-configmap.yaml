@@ -1,0 +1,6 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-central-relay-job-config
+data:
+  {{- toYaml .Values.config | nindent 2 }}

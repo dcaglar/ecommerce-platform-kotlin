@@ -16,7 +16,7 @@ edgeDb:
   image:
     repository: postgres
     tag: "15-alpine"
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
 
 topologySpreadConstraints:
   - maxSkew: 1

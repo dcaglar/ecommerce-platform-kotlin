@@ -34,32 +34,74 @@ class MultiDataSourceConfig(@Value("\${app.pod-name}") private val podName: Stri
     @Bean("outboxDataSource")
     @Primary
     @LiquibaseDataSource
-    @ConfigurationProperties("app.datasource.outbox")
-    fun outboxDataSource(): HikariDataSource {
+    fun outboxDataSource(
+        @Value("\${app.datasource.outbox.username}") user: String,
+        @Value("\${app.datasource.outbox.password}") pass: String,
+        @Value("\${app.datasource.outbox.connection-timeout:15000}") cTimeout: Long,
+        @Value("\${app.datasource.outbox.validation-timeout:15000}") vTimeout: Long,
+        @Value("\${app.datasource.outbox.idle-timeout:600000}") iTimeout: Long,
+        @Value("\${app.datasource.outbox.max-lifetime:1800000}") mLife: Long,
+        @Value("\${app.datasource.outbox.maximum-pool-size:20}") mPool: Int
+    ): HikariDataSource {
         return HikariDataSource().apply {
             poolName = "edge-outbox-pool"
-            // We set the URL manually to bypass the YAML/Environment variable logic
             jdbcUrl = buildDynamicEdgeUrl()
-            // All other properties (timeouts, pool-size) defined in YAML
-            // will be automatically applied by @ConfigurationProperties after this method returns.
+            username = user
+            password = pass
+            connectionTimeout = cTimeout
+            validationTimeout = vTimeout
+            idleTimeout = iTimeout
+            maxLifetime = mLife
+            maximumPoolSize = mPool
         }
     }
 
     @Bean("maintenanceDataSource")
-    @ConfigurationProperties("app.datasource.maintenance")
-    fun maintenanceDataSource(): HikariDataSource {
+    fun maintenanceDataSource(
+        @Value("\${app.datasource.maintenance.username}") user: String,
+        @Value("\${app.datasource.maintenance.password}") pass: String,
+        @Value("\${app.datasource.maintenance.connection-timeout:15000}") cTimeout: Long,
+        @Value("\${app.datasource.maintenance.validation-timeout:15000}") vTimeout: Long,
+        @Value("\${app.datasource.maintenance.idle-timeout:60000}") iTimeout: Long,
+        @Value("\${app.datasource.maintenance.max-lifetime:1800000}") mLife: Long,
+        @Value("\${app.datasource.maintenance.maximum-pool-size:1}") mPool: Int,
+        @Value("\${app.datasource.maintenance.minimum-idle:0}") minIdleConns: Int
+    ): HikariDataSource {
         return HikariDataSource().apply {
             poolName = "edge-maintenance-pool"
             jdbcUrl = buildDynamicEdgeUrl()
+            username = user
+            password = pass
+            connectionTimeout = cTimeout
+            validationTimeout = vTimeout
+            idleTimeout = iTimeout
+            maxLifetime = mLife
+            maximumPoolSize = mPool
+            minimumIdle = minIdleConns
         }
     }
 
     @Bean("centralDataSource")
-    @ConfigurationProperties("app.datasource.central")
-    fun centralDataSource(): HikariDataSource {
+    fun centralDataSource(
+        @Value("\${app.datasource.central.jdbc-url}") url: String,
+        @Value("\${app.datasource.central.username}") user: String,
+        @Value("\${app.datasource.central.password}") pass: String,
+        @Value("\${app.datasource.central.connection-timeout:15000}") cTimeout: Long,
+        @Value("\${app.datasource.central.validation-timeout:15000}") vTimeout: Long,
+        @Value("\${app.datasource.central.idle-timeout:600000}") iTimeout: Long,
+        @Value("\${app.datasource.central.max-lifetime:1800000}") mLife: Long,
+        @Value("\${app.datasource.central.maximum-pool-size:10}") mPool: Int
+    ): HikariDataSource {
         return HikariDataSource().apply {
             poolName = "central-edge-worker-pool"
-            // No URL override here, it will use the value from YAML (central_db_url)
+            jdbcUrl = url
+            username = user
+            password = pass
+            connectionTimeout = cTimeout
+            validationTimeout = vTimeout
+            idleTimeout = iTimeout
+            maxLifetime = mLife
+            maximumPoolSize = mPool
         }
     }
 
@@ -69,7 +111,7 @@ class MultiDataSourceConfig(@Value("\${app.pod-name}") private val podName: Stri
     @Primary
     fun outboxTxManager(
         @Qualifier("outboxDataSource") ds: DataSource,
-        @Value("\${db.outbox.statement-timeout-ms:2000}") stmtMs: Long,
+        @Value("\${db.outbox.statement-timeout-ms:30000}") stmtMs: Long,
         @Value("\${db.outbox.lock-timeout-ms:200}") lockMs: Long,
         @Value("\${db.outbox.idle-in-tx-timeout-ms:0}") idleMs: Long
     ) = DBWriterTxManager(ds, stmtMs, lockMs, idleMs).apply {

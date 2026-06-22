@@ -137,9 +137,9 @@ FLUSHALL
 
 ## 🌐 6. API Gateway / Ingress
 
-- **Base API URL**: [http://payment.k8s.orb.local](http://payment.k8s.orb.local)
+- **Base API URL**: [http://localhost](http://localhost)
 
 **Verify Routing:**
 ```bash
-curl -I http://payment.k8s.orb.local/api/v1/payments
+curl -I http://localhost/api/v1/payments
 ```

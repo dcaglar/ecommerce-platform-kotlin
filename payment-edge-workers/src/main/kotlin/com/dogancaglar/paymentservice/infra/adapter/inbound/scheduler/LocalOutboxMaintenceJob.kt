@@ -1,0 +1,103 @@
+package com.dogancaglar.paymentservice.infra.adapter.inbound.scheduler
+
+import com.dogancaglar.common.time.Utc
+import com.dogancaglar.common.db.partitioning.AbstractOutboxPartitionCreator
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.boot.context.event.ApplicationReadyEvent
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
+import org.springframework.context.event.EventListener
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.scheduling.annotation.Scheduled
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
+import org.springframework.stereotype.Component
+import java.time.temporal.ChronoUnit
+
+
+@Component
+class LocalOutboxMaintenanceJob(
+    @param:Qualifier("maintenanceJdbcTemplate") jdbcTemplate: JdbcTemplate,
+    @param:Qualifier("outboxEventPartitionMaintenanceScheduler") private val taskScheduler: ThreadPoolTaskScheduler
+) : AbstractOutboxPartitionCreator(jdbcTemplate) {
+
+    @EventListener(ApplicationReadyEvent::class)
+    @Scheduled(
+        initialDelay = 30000,
+        fixedDelayString = "\${outbox-partition.fixed-delay:PT10M}"
+    )
+    fun ensureCurrentAndNextScheduled() {
+        taskScheduler.execute {
+            waitForParentTable()
+
+            val start = Utc.nowLocalDateTime()
+            ensureCurrentAndNext()
+            val end = Utc.nowLocalDateTime()
+            val durationMs = ChronoUnit.MILLIS.between(start, end)
+            logger.debug("Partition check complete started at $start, ended at $end, duration: $durationMs ")
+        }
+    }
+
+    private fun waitForParentTable() {
+        var attempts = 0
+        while (attempts < 20) {
+            try {
+                val exists = jdbcTemplate.queryForObject(
+                    "SELECT count(1) FROM pg_tables WHERE tablename = 'outbox_event'",
+                    Int::class.java
+                ) ?: 0
+                if (exists > 0) {
+                    logger.info("Found outbox_event table! Proceeding with partition creation.")
+                    return
+                }
+            } catch (e: Exception) {
+                // ignore and retry
+            }
+            attempts++
+            logger.info("Waiting for payment-service to create outbox_event table via Liquibase... (Attempt ${'$'}attempts/20)")
+            Thread.sleep(3000)
+        }
+        logger.error("Timed out waiting for outbox_event table to be created!")
+    }
+
+    @Scheduled(initialDelay = 45000, fixedDelay = 21 * 60 * 1000)
+    fun pruneOldPartitionsScheduled() {
+        taskScheduler.execute {
+            val start = Utc.nowLocalDateTime()
+            pruneOldPartitions()
+            val end = Utc.nowLocalDateTime()
+            val durationMs = ChronoUnit.MILLIS.between(start, end)
+            logger.debug("Partition prune complete started at $start, ended at $end, duration: $durationMs ")
+        }
+    }
+
+    @Scheduled(fixedDelay = 30 * 60 * 1000, initialDelay = 15 * 60 * 1000)
+    fun vacuumOldPartitionsWithNewRowsScheduled() {
+        taskScheduler.execute {
+            val start = Utc.nowLocalDateTime()
+            vacuumOldPartitionsWithNewRows()
+            val end = Utc.nowLocalDateTime()
+            val durationMs = ChronoUnit.MILLIS.between(start, end)
+            logger.debug("Partition vacuum check complete started at $start, ended at $end, duration: $durationMs ")
+        }
+    }
+}
+
+@Configuration
+class AsyncConfig {
+    @Bean("partitionCreationExecutor")
+    fun partitionCreationExecutor(): ThreadPoolTaskExecutor = ThreadPoolTaskExecutor().apply {
+        corePoolSize = 2
+        maxPoolSize = 2
+        setThreadNamePrefix("partition-creation-")
+        initialize()
+    }
+
+    @Bean("partitionRemovalExecutor")
+    fun partitionRemovalExecutor(): ThreadPoolTaskExecutor = ThreadPoolTaskExecutor().apply {
+        corePoolSize = 2
+        maxPoolSize = 2
+        setThreadNamePrefix("partition-removal-")
+        initialize()
+    }
+}

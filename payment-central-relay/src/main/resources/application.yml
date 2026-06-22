@@ -73,6 +73,7 @@ outbox-relay:
 
 app:
   datasource:
+    central-outbox:
+      driver-class-name: org.postgresql.Driver
     maintenance:
       driver-class-name: org.postgresql.Driver
-      pool-name: central-maint-pool

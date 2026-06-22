@@ -1,0 +1,32 @@
+postgres:
+  config:
+    shared_buffers: 4GB
+    effective_cache_size: 8GB
+    work_mem: 32MB
+    maintenance_work_mem: 512MB
+    max_parallel_workers_per_gather: 4
+    max_parallel_workers: 8
+    max_worker_processes: 8
+    temp_file_limit: 20GB
+    max_connections: 1000
+    checkpoint_timeout: 15min
+    max_wal_size: 10GB
+    min_wal_size: 2GB
+    checkpoint_completion_target: 0.9
+    wal_compression: on
+    jit: off
+    log_min_duration_statement: 1000
+    log_statement: none
+    bgwriter_lru_maxpages: 400
+    bgwriter_lru_multiplier: 2
+
+resources:
+  requests:
+    cpu: 2000m
+    memory: 4Gi
+  limits:
+    cpu: 6000m
+    memory: 12Gi
+
+nodeSelector:
+  pool: central

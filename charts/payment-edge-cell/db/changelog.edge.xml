@@ -7,6 +7,6 @@
     <include file="payment-intent-changelog.xml" relativeToChangelogFile="true"/>
     <include file="local-outbox-changelog.xml" relativeToChangelogFile="true"/>
     <include file="idempotency-key-changelog.xml" relativeToChangelogFile="true"/>
-    <include file="20260208-optimize-idempotency-vacuum" relativeToChangelogFile="true"/>
+    <include file="20260208-optimize-idempotency-vacuum.xml" relativeToChangelogFile="true"/>
     <!-- Epic 1: Payment aggregate moved to Central DB — remove from edge -->
 </databaseChangeLog>

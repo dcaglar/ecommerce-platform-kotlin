@@ -12,8 +12,10 @@ metadata:
 spec:
   ingressClassName: {{ .Values.ingress.className | default "nginx" }}
   rules:
-    - host: {{ required "ingress.host is required when ingress.enabled=true" .Values.ingress.host | quote }}
-      http:
+    - http:
+{{- if .Values.ingress.host }}
+      host: {{ .Values.ingress.host | quote }}
+{{- end }}
         paths:
           - path: {{ .Values.ingress.path | default "/" }}
             pathType: {{ .Values.ingress.pathType | default "Prefix" }}

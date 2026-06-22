@@ -66,7 +66,7 @@ function generateUuidV7() {
 // --- API Methods ---
 
 function createPaymentIntent() {
-    const url = `http://payment.k8s.orb.local/api/v1/payments`;
+    const url = `http://localhost/api/v1/payments`;
 
     const orderData = generateRandomOrder();
 
@@ -92,7 +92,7 @@ function createPaymentIntent() {
 }
 
 function authorizePayment(paymentId) {
-    const url = `http://payment.k8s.orb.local/api/v1/payments/${paymentId}/authorize`;
+    const url = `http://localhost/api/v1/payments/${paymentId}/authorize`;
 
     const payload = JSON.stringify({
         paymentMethod: {

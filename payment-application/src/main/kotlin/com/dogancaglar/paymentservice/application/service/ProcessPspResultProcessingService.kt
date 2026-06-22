@@ -172,7 +172,7 @@ open class ProcessPspResultProcessingService(
 
         // Find pending Capture Tx and mark success
         val txs = paymentTxPort.findByPaymentId(payment.paymentId.value)
-        val captureTx = txs.find { it.txType == "CAPTURE" && it.status == PENDING }
+        val captureTx = txs.find { it.txType == com.dogancaglar.paymentservice.domain.model.ledger.JournalType.CAPTURE && it.status == PENDING }
             ?: throw IllegalStateException("Pending CaptureTx not found for paymentId=\${payment.paymentId.value}")
 
         val updatedTx = (captureTx as CaptureTx).copy(
@@ -332,7 +332,7 @@ open class ProcessPspResultProcessingService(
         val txHistory = paymentTxPort.findByPaymentId(payment.paymentId.value)
 
         // 2. Filter out pure collections to feed into our aggregate root
-        val captureTransactions = txHistory.filter { it.txType == "CAPTURE" }.map { it as Tx.CaptureTx }
+        val captureTransactions = txHistory.filter { it.txType == com.dogancaglar.paymentservice.domain.model.ledger.JournalType.CAPTURE }.map { it as Tx.CaptureTx }
         val targetCaptureTx = captureTransactions.find { it.settleStatus == SettleStatus.UNMATCHED }
             ?: throw IllegalStateException("Outstanding UNMATCHED CaptureTx row not found for target paymentId=${payment.paymentId.value}")
 

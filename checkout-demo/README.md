@@ -39,7 +39,7 @@ A developer-facing internal demo page for testing payment creation requests with
    
    This script will:
    - Read the client secret from `keycloak/output/secrets.txt`
-   - Uses default http://payment.k8s.orb.local for API calls
+   - Uses default http://localhost for API calls
    - Generate a `.env` file with all required configuration
    
    **Option B - Manual:**
