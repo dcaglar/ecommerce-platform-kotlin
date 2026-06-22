@@ -16,7 +16,7 @@ import java.time.temporal.ChronoUnit
 
 
 @Component
-class EdgeOutboxPartitionCreator(
+class LocalOutboxMaintenanceJob(
     @param:Qualifier("maintenanceJdbcTemplate") jdbcTemplate: JdbcTemplate,
     @param:Qualifier("outboxEventPartitionMaintenanceScheduler") private val taskScheduler: ThreadPoolTaskScheduler
 ) : AbstractOutboxPartitionCreator(jdbcTemplate) {
@@ -29,7 +29,7 @@ class EdgeOutboxPartitionCreator(
     fun ensureCurrentAndNextScheduled() {
         taskScheduler.execute {
             waitForParentTable()
-            
+
             val start = Utc.nowLocalDateTime()
             ensureCurrentAndNext()
             val end = Utc.nowLocalDateTime()
@@ -43,7 +43,7 @@ class EdgeOutboxPartitionCreator(
         while (attempts < 20) {
             try {
                 val exists = jdbcTemplate.queryForObject(
-                    "SELECT count(1) FROM pg_tables WHERE tablename = 'outbox_event'", 
+                    "SELECT count(1) FROM pg_tables WHERE tablename = 'outbox_event'",
                     Int::class.java
                 ) ?: 0
                 if (exists > 0) {

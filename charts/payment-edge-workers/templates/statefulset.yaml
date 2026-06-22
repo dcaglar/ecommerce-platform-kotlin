@@ -63,6 +63,10 @@ spec:
               valueFrom: {secretKeyRef: {name: edge-worker-credentials, key: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME}}
             - name: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
               valueFrom: {secretKeyRef: {name: edge-worker-credentials, key: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD}}
+            - name: EDGE_DB_DUTY_USERNAME
+              valueFrom: {secretKeyRef: {name: edge-worker-credentials, key: EDGE_DB_DUTY_USERNAME}}
+            - name: EDGE_DB_DUTY_PASSWORD
+              valueFrom: {secretKeyRef: {name: edge-worker-credentials, key: EDGE_DB_DUTY_PASSWORD}}
             - name: CENTRAL_DB_URL
               valueFrom: {configMapKeyRef: {name: edge-worker-config, key: CENTRAL_DB_URL}}
             - name: CENTRAL_DB_PAYMENT_EDGE_WORKERS_USERNAME

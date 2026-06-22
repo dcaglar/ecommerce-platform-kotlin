@@ -5,7 +5,6 @@ Follow these steps to provision auth, get a token, test the API, and run load te
 This is a short, practical “start order” for spinning up the stack on OrbStack native Kubernetes, with one‑line notes on what each script does.
 
 Prereqs (once):
-- Docker Desktop (or Docker Engine) running
 - OrbStack native Kubernetes, kubectl, helm installed
 - Troubleshooting connectivity? See docs/troubleshooting/connectivity.md
 
@@ -33,44 +32,44 @@ cd /path/to/ecommerce-platform-kotlin
 chmod +x infra/scripts/*.sh
 ```
 
-Recommended order
 
-0) Nuke existing cluster (Optional but recommended)
-we need acnuke script
-
-```
-
-1) Deploy entire system (Declarative)
-- What: Deploys all core infrastructure (Keycloak, Postgres, Redis, Kafka, Yugabyte) AND all applications (Edge Cell, Workers, Consumers, Relay) in one shot. Kubernetes will handle startup ordering natively via initContainers.
-- Note on Secrets: Local secrets are deployed automatically. If you need to rotate them, update the untracked `decrypted_secrets.yaml`, re-encrypt it using `sops -e decrypted_secrets.yaml > payment-platform-config-secrets-local.yaml`, and re-run `infra/scripts/deploy-payment-platform-config.sh`.
-- Tip: You can verify existing secrets at runtime by running `kubectl get secret -n payment edge-db-credentials -o json` to print the secret aliases and encrypted values.
+1) Build and push the docker images of all payment platform service(also t§)  to remote image registry
+- What: Builds the latest source code of payment platform servcices into remote Docker images
+- Run:
 ```bash
-infra/scripts/deploy-all-local.sh
+infra/scripts/build-and-push.sh payment-service
+infra/scripts/build-and-push.sh payment-edge-workers
+infra/scripts/build-and-push.sh payment-central-relay
+infra/scripts/build-and-push.sh payment-consumers
 ```
 
-2) Monitoring stack (Prometheus + Grafana) (Optional)
+2) Deploy all external infra(keycloak, redis, kafka)  to the local environment local or azure,those are 
+```bash
+infra/scripts/deploy-all-external-infra-local.sh
+```  
+
+3) Deploy all payment platform services  to  local cluster(e.g payment-edge-cell, payment-edge-worker, payment-central-relay, payment-consuemrs)
+```bash
+infra/scripts/deploy-payment-platform-services-local.sh 
+```  
+
+
+4) Monitoring stack (optional)(Prometheus + Grafana) (Optional)
 - What: Installs kube-prometheus-stack into monitoring.
 - Run:
 ```bash
 infra/scripts/deploy-monitoring-stack.sh
 ```
 
-3) Exporters (Kafka & Postgresql) (Optional)
+5) Exporters (Kafka & Postgresql) (Only if monitoring installed)
 - What: Exposes Kafka consumer lag, offsets, etc. for Prometheus.
 - Run:
 ```bash
-infra/scripts/deploy-kafka-exporter-local.sh
-infra/scripts/|deploy-postgresql-exporter-local.sh
+infra/scripts/deploy-external-infra.sh kafka-exporter local
+infra/scripts/deploy-external-infra.sh postgresql-exporter) local
 ```
 
-4) Build Docker Images
-- What: Builds the latest source code into Docker images. Because OrbStack shares the Docker environment, these images are instantly available to your local Kubernetes pods without pushing to a registry.
-- Run:
-```bash
-infra/scripts/build-and-push-payment-service-docker-repo.sh
-infra/scripts/build-and-push-payment-edge-workers-docker-repo.sh
-infra/scripts/build-and-push-payment-consumers-docker-repo.sh
-```
+
 
 
 
@@ -83,7 +82,7 @@ infra/scripts/build-and-push-payment-consumers-docker-repo.sh
 - What: Creates realm, role, and OIDC confidential clients; writes secrets to keycloak/output/secrets.txt.
 - Run:
 ```bash
-KEYCLOAK_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/provision-keycloak.sh
+provision-keycloak.sh
 ```
 2) Generate access tokens for different operations
 - What: Get JWT tokens for different use cases; saves tokens under `keycloak/output/jwt`.
@@ -100,59 +99,9 @@ get-token.sh
 get-token.sh http://keycloak.payment.svc.cluster.local:8080 6
 ```
 
-**For Balance Queries - Finance/Admin (Backoffice user with FINANCE role):**
-```bash
-KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-finance.sh
-# Token saved to: keycloak/output/jwt/finance-<username>.token
-# Claims saved to: keycloak/output/jwt/finance-<username>.claims.json
-
-# Request a 4-hour token for finance-ops:
-./keycloak/get-token-finance.sh finance-ops finance123 http://keycloak.payment.svc.cluster.local:8080 4
-```
-> Example: running without arguments issues a token for the `finance-ops / finance123` user.
-> Optional CLI override (with TTL): `./keycloak/get-token-finance.sh finance-ops finance123 http://my-keycloak:8080 6`
-
-**For Balance Queries - Seller User (User Account with SELLER role, Case 1):**
-```bash
-# Default: seller-111 (SELLER-111)
-KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-seller.sh
-
-# Or specify a different seller
-KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-seller.sh seller-222 seller123
-# Token saved to: keycloak/output/jwt/seller-<username>.token
-# Claims saved to: keycloak/output/jwt/seller-<username>.claims.json
-
-# Request an 8-hour token for seller-222:
-./keycloak/get-token-seller.sh seller-222 seller123 http://keycloak.payment.svc.cluster.local:8080 8
-```
-> Example: running without arguments produces `keycloak/output/jwt/seller-seller-111.token`.
-> Optional CLI override: third argument can pass Keycloak URL; append a fourth argument for TTL (hours).
-
-**For Balance Queries - Merchant API (M2M with SELLER_API role, Case 3):**
-```bash
-# Default: SELLER-111
-KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-merchant-api.sh
-
-# Or specify a different merchant
-KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-merchant-api.sh SELLER-222
-# Token saved to: keycloak/output/jwt/merchant-api-<SELLER_ID>.token
-# Claims saved to: keycloak/output/jwt/merchant-api-<SELLER_ID>.claims.json
-
-# Request a 12-hour token for SELLER-222:
-./keycloak/get-token-merchant-api.sh SELLER-222 http://keycloak.payment.svc.cluster.local:8080 12
-```
-> Example: `SELLER_ID=SELLER-111` writes to `keycloak/output/jwt/merchant-api-SELLER-111.token`.
-> Optional CLI override: second argument can pass Keycloak URL; append a third argument for TTL (hours).
-
-Each script issues a token from a different principal:
-- **payment-service** → service account with `payment:write`
-- **finance-* user** → backoffice user with `FINANCE`
-- **seller-* user** → interactive user with `SELLER`
-- **merchant-api-* client** → machine-to-machine client with `SELLER_API`
-
 Tokens are intentionally scoped to those roles so you can exercise each endpoint with the appropriate identity.
 
-##   2️⃣ Test the 2 step authorization flow 
+##   2️⃣ Test the payment flow
 
 
 **Step 1: Create Payment Intent**
@@ -160,7 +109,7 @@ Tokens are intentionally scoped to those roles so you can exercise each endpoint
 ```bash
 IDEMPOTENCY_KEY=$(printf '%08x-%04x-7%03x-8%03x-%04x%08x' $((RANDOM*RANDOM)) $((RANDOM)) $((RANDOM%4096)) $((RANDOM%4096)) $((RANDOM)) $((RANDOM*RANDOM)))
 echo "Using Idempotency-Key=$IDEMPOTENCY_KEY"
-curl -i -X POST "http://payment.k8s.orb.local/api/v1/payments" \
+curl -i -X POST "http://localhost/api/v1/payments" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
   -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
@@ -188,15 +137,6 @@ curl -i -X POST "http://payment.k8s.orb.local/api/v1/payments" \
 }
 ```
 
-**Pending Response (202 Accepted):**
-If Stripe API call is still processing, you'll receive:
-```json
-{
-  "paymentIntentId": "pi_AcqzYyHCcAA",
-  "status": "CREATED_PENDING"
-}
-```
-
 > **Note on Idempotency-Key**: The header is required for all payment intent creation requests. Use the same key for retries of the same payment request to ensure idempotent behavior. Generate a unique UUID for each new payment request.
 
 **Step 2: Authorize Payment Intent**
@@ -205,7 +145,7 @@ If Stripe API call is still processing, you'll receive:
 
 ```bash
 # Step 2: Authorize the payment intent
-curl -i -X POST "http://payment.k8s.orb.local/api/v1/payments/pi_AqnVrI0CAAA/authorize" \
+curl -i -X POST "http://localhost/api/v1/payments/pi_ArQ0QuWCAAA/authorize" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
   -d '{}'
@@ -322,113 +262,6 @@ The checkout demo uses a production-like flow with Stripe Payment Element:
 infra/scripts/deploy-observability-stack.sh
 ```
 
-
-**Troubleshooting:**
-
-- **"Client secret not found"**: Run `npm run setup-env` after provisioning Keycloak
-- **"Cannot reach Keycloak"**: Verify OrbStack is running and the DNS `keycloak.payment.svc.cluster.local` is resolving.
-- **"Stripe publishable key not configured"**: Add `VITE_STRIPE_PUBLISHABLE_KEY` to `.env` file
-- **Payment request errors**: Check proxy console for detailed error messages (it logs token and payment-service call errors)
-- **Network errors**: Verify payment service is running and `infra/endpoints.json` is correct
-- **Payment Element not loading**: Check browser console for Stripe.js errors and verify publishable key is correct
-- **Payment pending (202 status)**: This is normal - the frontend will automatically poll for client secret when payment creation is pending
-
-For more details, see `checkout-demo/README.md`.
-
-## 3️⃣ Query Balance Endpoints
-
-Balance endpoints support three authentication scenarios (matching real-world marketplace patterns):
-
-### Case 1: Seller User via Customer Area Frontend
-- **Endpoint**: `GET /api/v1/sellers/me/balance`
-- **Authorization**: Requires `SELLER` role and `seller_id` claim in JWT
-- **Token Type**: User token (OIDC Authorization Code flow or Direct Access Grants for testing)
-- **Use Case**: Merchant logs into customer-area web app and views their balance
-- **Client**: `customer-area-frontend`
-
-**Steps:**
-1. Get a token for a seller user:
-```bash
-# Default: seller-111 (SELLER-111)
-KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-seller.sh
-
-# Or specify a different seller
-KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-seller.sh seller-222 seller123
-# Token saved to: keycloak/output/jwt/seller-<username>.token
-```
-
-2. Query your own balance (dynamic):
-```bash
-curl -i -X GET "http://payment.k8s.orb.local/api/v1/sellers/me/balance" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $(cat ./keycloak/output/jwt/seller-SELLER-111.token)" 
-```
-
-### Case 2: Finance/Admin User via Backoffice
-- **Endpoint**: `GET /api/v1/sellers/{sellerId}/balance`
-- **Authorization**: Requires `FINANCE` or `ADMIN` role
-- **Token Type**: User token (OIDC Authorization Code flow / Direct Access Grants for testing)
-- **Use Case**: Internal finance or support staff log into backoffice app and check any seller's balance
-- **Client**: `backoffice-ui`
-
-**Steps:**
-1. Get a token with FINANCE role (backoffice user for testing):
-```bash
-KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-finance.sh
-# Token saved to: keycloak/output/jwt/finance-<username>.token
-```
-
-2. Query balance for any seller (dynamic):
-```bash
-curl -i -X GET "http://payment.k8s.orb.local/api/v1/sellers/SELLER-111/balance" \
-  -H "Authorization: Bearer $(cat ./keycloak/output/jwt/finance-finance-ops.token)"
-```
-
-
-### Case 3: Merchant API (Machine-to-Machine)
-- **Endpoint**: `GET /api/v1/sellers/me/balance`
-- **Authorization**: Requires `SELLER_API` role and `seller_id` claim in JWT
-- **Token Type**: Machine token (Client Credentials flow)
-- **Use Case**: Merchant's system (ERP, OMS) calls Seller API directly to retrieve balances
-- **Client**: `merchant-api-{SELLER_ID}` (one per merchant)
-
-**Steps:**
-1. Get a token for merchant API (M2M):
-```bash
-# Default: SELLER-111
-KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-merchant-api.sh
-
-# Or specify a different merchant
-KC_URL=http://keycloak.payment.svc.cluster.local:8080 ./keycloak/get-token-merchant-api.sh SELLER-222
-# Token saved to: keycloak/output/jwt/merchant-api-<SELLER_ID>.token
-```
-
-2. Query balance via merchant API (dynamic):
-```bash
-curl -i -X GET "http://payment.k8s.orb.local/api/v1/sellers/me/balance" \
-  -H "Authorization: Bearer $(cat ./keycloak/output/jwt/merchant-api-SELLER-111.token)"  
-```
-
-
-**Expected Response (all cases):**
-```json
-{
-  "balance": 50000,
-  "currency": "EUR",
-  "accountCode": "MARKETPLACE_SELLER_BALANCE_ACCOUNT.SELLER-1-1.EUR",
-  "sellerId": "SELLER-1-1"
-}
-```
-
-**Test Credentials Created by Provisioning:**
-- **User Accounts (Case 1):**
-  - `seller-111` / `seller123` → seller_id: `SELLER-111`
-  - `seller-222` / `seller123` → seller_id: `SELLER-222`
-  - `seller-333` / `seller123` → seller_id: `SELLER-333`
-- **Merchant API Clients (Case 3):**
-  - `merchant-api-SELLER-111` → Client Credentials, SELLER_API role
-  - `merchant-api-SELLER-222` → Client Credentials, SELLER_API role
-  - `merchant-api-SELLER-333` → Client Credentials, SELLER_API role
 
 
 

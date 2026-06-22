@@ -59,7 +59,7 @@ class RecordInternalTransferSubmissionService(
             amount = transferAmount,
             sourceAccount = sourceAccount,
             targetAccount = targetAccount,
-            txType = journalType.name,
+            txType = journalType,
             status = TxStatus.PENDING
         )
 

@@ -96,7 +96,7 @@ const CLIENT_SECRET = getClientSecret();
 // Priority: env var > .env file > defaults
 const PAYMENT_API_BASE_URL = process.env.PAYMENT_API_BASE_URL || 
                               envFile.API_BASE_URL || 
-                              'http://payment.k8s.orb.local';
+                              'http://localhost';
 
 // Helper function to get access token from Keycloak
 async function getAccessToken() {

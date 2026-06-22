@@ -1,5 +1,5 @@
 
-# ingress-controllers-values-local.yaml
+# ingress-controller-values-local.yaml
 controller:
   metrics:
     enabled: true
@@ -21,6 +21,7 @@ controller:
       cpu: 300m
       memory: 912Mi
   admissionWebhooks:
+    enabled: false
     patch:
       resources:
         requests:

@@ -16,7 +16,7 @@ import java.time.temporal.ChronoUnit
 import com.dogancaglar.common.db.partitioning.AbstractOutboxPartitionCreator
 
 @Component
-class CentralOutboxPartitionCreator(
+class CentralOutboxMaintenanceJob(
     @Qualifier("maintenanceJdbcTemplate") jdbcTemplate: JdbcTemplate,
     @param:Qualifier("centralOutboxEventPartitionMaintenanceScheduler") private val taskScheduler: ThreadPoolTaskScheduler
 ) : AbstractOutboxPartitionCreator(jdbcTemplate) {

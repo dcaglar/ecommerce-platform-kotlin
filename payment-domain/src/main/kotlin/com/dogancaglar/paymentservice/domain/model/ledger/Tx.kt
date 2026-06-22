@@ -21,7 +21,7 @@ import java.time.Instant
 sealed class Tx {
 
     abstract val txId: TxId
-    abstract val txType: String
+    abstract val txType: JournalType
     abstract val paymentId: PaymentId
     abstract val paymentIntentId: PaymentIntentId
     abstract val status: TxStatus
@@ -40,7 +40,7 @@ sealed class Tx {
         override val status: TxStatus = TxStatus.SUCCESS,
         override val createdAt: Instant = Instant.now()
     ) : Tx() {
-        override val txType = "AUTHORIZATION"
+        override val txType = JournalType.AUTHORIZATION
     }
 
     // -------------------------------------------------------------------------
@@ -57,7 +57,7 @@ sealed class Tx {
         val settleStatus: SettleStatus = SettleStatus.UNMATCHED,
         override val createdAt: Instant = Instant.now()
     ) : Tx() {
-        override val txType = "CAPTURE"
+        override val txType = JournalType.CAPTURE
 
         /**
          * Progresses the settlement state of an outstanding capture record.
@@ -86,7 +86,7 @@ sealed class Tx {
         override val amount: Amount,
         override val status: TxStatus = TxStatus.SUCCESS,
         override val createdAt: Instant = Instant.now(),
-        override val txType: String
+        override val txType: JournalType
     ) : Tx() {
 
 
@@ -125,7 +125,7 @@ sealed class Tx {
         override val status: TxStatus = TxStatus.SUCCESS,
         override val createdAt: Instant = Instant.now()
     ) : Tx() {
-        override val txType = "PSP_FEE"
+        override val txType = JournalType.PSP_FEE
     }
 
     // -------------------------------------------------------------------------
@@ -141,7 +141,7 @@ sealed class Tx {
         override val status: TxStatus = TxStatus.PENDING,
         override val createdAt: Instant = Instant.now()
     ) : Tx() {
-        override val txType = "REFUND"
+        override val txType = JournalType.REFUND
     }
 
     // -------------------------------------------------------------------------
@@ -161,7 +161,7 @@ sealed class Tx {
         override val status: TxStatus = TxStatus.SUCCESS,
         override val createdAt: Instant = Instant.now()
     ) : Tx() {
-        override val txType = "SETTLE"
+        override val txType = JournalType.SETTLEMENT
     }
 
     // -------------------------------------------------------------------------
@@ -177,7 +177,7 @@ sealed class Tx {
         override val status: TxStatus = TxStatus.PENDING,
         override val createdAt: Instant = Instant.now()
     ) : Tx() {
-        override val txType = "PAYOUT"
+        override val txType = JournalType.PAYOUT
     }
 
     // -------------------------------------------------------------------------
@@ -227,7 +227,7 @@ sealed class Tx {
             sourceAccount: String,
             targetAccount: String,
             amount: Amount,
-            txType: String,
+            txType: JournalType,
             status: TxStatus = TxStatus.SUCCESS,
         ): InternalTransferTx = InternalTransferTx(
             txId = txId,

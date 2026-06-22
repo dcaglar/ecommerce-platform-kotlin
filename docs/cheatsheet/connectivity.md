@@ -101,7 +101,7 @@ Ingress and service access
 - On OrbStack, the ingress LoadBalancer automatically gets an IP and `.k8s.orb.local` DNS routing works out of the box.
 ```bash
 # Verify base URL natively responds:
-curl -I http://payment.k8s.orb.local
+curl -I http://localhost
 ```
 
 Keycloak and tokens

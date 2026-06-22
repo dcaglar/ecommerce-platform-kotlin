@@ -28,8 +28,12 @@ helm uninstall -n payment  redis  --ignore-not-found
 
 
 
-echo "🚀deleting   payment-platform-config"
-helm uninstall -n payment  payment-platform-config --ignore-not-found
+echo "🚀 Deleting application services..."
+"$SCRIPT_DIR/delete.sh" payment-central-relay local
+"$SCRIPT_DIR/delete.sh" payment-consumers local
+"$SCRIPT_DIR/delete.sh" payment-edge-workers local
+"$SCRIPT_DIR/delete.sh" payment-edge-cell local
+"$SCRIPT_DIR/delete.sh" central-db local
 
 
 
@@ -47,7 +51,6 @@ if [ -n "$PVS" ]; then
       kubectl delete pv "$pv" --wait=false || true
     fi
   done
-else
   echo "✅ No PVs found for namespace payment"
 fi
 

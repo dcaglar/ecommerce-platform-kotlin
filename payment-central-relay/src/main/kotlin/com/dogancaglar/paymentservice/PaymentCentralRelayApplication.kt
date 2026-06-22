@@ -11,7 +11,6 @@ import org.springframework.context.annotation.Import
 @SpringBootApplication
 @EnableScheduling
 @EnableAsync
-@MapperScan(basePackages = ["com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper"])
 class PaymentCentralRelayApplication
 
 fun main(args: Array<String>) {

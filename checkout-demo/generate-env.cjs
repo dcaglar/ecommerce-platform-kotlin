@@ -19,7 +19,7 @@ const defaults = {
   VITE_KEYCLOAK_REALM: 'ecommerce-platform',
   VITE_KEYCLOAK_CLIENT_ID: 'payment-service',
   VITE_KEYCLOAK_CLIENT_SECRET: '',
-  VITE_API_BASE_URL: 'http://payment.k8s.orb.local',
+  VITE_API_BASE_URL: 'http://localhost',
 };
 
 function readSecrets() {

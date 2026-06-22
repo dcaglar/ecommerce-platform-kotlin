@@ -5,8 +5,7 @@ import org.apache.ibatis.session.SqlSessionFactory
 import org.mybatis.spring.SqlSessionFactoryBean
 import org.mybatis.spring.annotation.MapperScan
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.boot.context.properties.ConfigurationProperties
-import org.springframework.boot.context.properties.EnableConfigurationProperties
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver
@@ -14,22 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.datasource.DataSourceTransactionManager
 import javax.sql.DataSource
 
-@ConfigurationProperties(prefix = "app.datasource.central-outbox")
-data class CentralOutboxProps(
-    val jdbcUrl: String,
-    val username: String,
-    val password: String
-)
-
-@ConfigurationProperties(prefix = "app.datasource.maintenance")
-data class MaintenanceProps(
-    val jdbcUrl: String,
-    val username: String,
-    val password: String
-)
-
 @Configuration
-@EnableConfigurationProperties(CentralOutboxProps::class, MaintenanceProps::class)
 @MapperScan(
     basePackages = ["com.dogancaglar.paymentservice.infra.adapter.outbound.persistence.mapper"],
     sqlSessionFactoryRef = "centralOutboxSqlSessionFactory"
@@ -41,19 +25,34 @@ class CentralOutboxDataSourceConfig {
     // =========================================================================
 
     @Bean("centralOutboxDataSource")
-    @ConfigurationProperties("app.datasource.central-outbox")
-    fun centralOutboxDataSource(props: CentralOutboxProps): HikariDataSource {
+    fun centralOutboxDataSource(
+        @Value("\${app.datasource.central-outbox.jdbc-url}") jdbcUrl: String,
+        @Value("\${app.datasource.central-outbox.username}") username: String,
+        @Value("\${app.datasource.central-outbox.password}") password: String,
+        @Value("\${app.datasource.central-outbox.maximum-pool-size:5}") maxPoolSize: Int,
+        @Value("\${app.datasource.central-outbox.minimum-idle:2}") minIdle: Int,
+        @Value("\${app.datasource.central-outbox.connection-timeout:15000}") cTimeout: Long,
+        @Value("\${app.datasource.central-outbox.validation-timeout:10000}") vTimeout: Long,
+        @Value("\${app.datasource.central-outbox.idle-timeout:120000}") iTimeout: Long,
+        @Value("\${app.datasource.central-outbox.max-lifetime:180000}") mLife: Long
+    ): HikariDataSource {
         return HikariDataSource().apply {
-            poolName = "central-outbox-pool"
-            jdbcUrl = props.jdbcUrl
-            username = props.username
-            password = props.password
+            this.poolName = "central-outbox-pool"
+            this.jdbcUrl = jdbcUrl
+            this.username = username
+            this.password = password
+            this.maximumPoolSize = maxPoolSize
+            this.minimumIdle = minIdle
+            this.maxLifetime = mLife
+            this.idleTimeout = iTimeout
+            this.connectionTimeout = cTimeout
+            this.validationTimeout = vTimeout
         }
     }
 
     @Bean("centralOutboxTxManager")
     fun centralOutboxTxManager(@Qualifier("centralOutboxDataSource") ds: DataSource): DataSourceTransactionManager {
-        return DataSourceTransactionManager(ds).apply { defaultTimeout = 5 }
+        return DataSourceTransactionManager(ds).apply { defaultTimeout = 60 }
     }
 
     @Bean("centralOutboxSqlSessionFactory")
@@ -78,19 +77,34 @@ class CentralOutboxDataSourceConfig {
     // =========================================================================
 
     @Bean("maintenanceDataSource")
-    @ConfigurationProperties("app.datasource.maintenance")
-    fun maintenanceDataSource(props: MaintenanceProps): HikariDataSource {
+    fun maintenanceDataSource(
+        @Value("\${app.datasource.maintenance.jdbc-url}") jdbcUrl: String,
+        @Value("\${app.datasource.maintenance.username}") username: String,
+        @Value("\${app.datasource.maintenance.password}") password: String,
+        @Value("\${app.datasource.maintenance.maximum-pool-size:2}") maxPoolSize: Int,
+        @Value("\${app.datasource.maintenance.minimum-idle:0}") minIdle: Int,
+        @Value("\${app.datasource.maintenance.connection-timeout:15000}") cTimeout: Long,
+        @Value("\${app.datasource.maintenance.validation-timeout:10000}") vTimeout: Long,
+        @Value("\${app.datasource.maintenance.idle-timeout:120000}") iTimeout: Long,
+        @Value("\${app.datasource.maintenance.max-lifetime:180000}") mLife: Long
+    ): HikariDataSource {
         return HikariDataSource().apply {
-            poolName = "central-maintenance-pool"
-            jdbcUrl = props.jdbcUrl
-            username = props.username
-            password = props.password
+            this.poolName = "central-maintenance-pool"
+            this.jdbcUrl = jdbcUrl
+            this.username = username
+            this.password = password
+            this.maximumPoolSize = maxPoolSize
+            this.minimumIdle = minIdle
+            this.maxLifetime = mLife
+            this.idleTimeout = iTimeout
+            this.connectionTimeout = cTimeout
+            this.validationTimeout = vTimeout
         }
     }
 
     @Bean("maintenanceTxManager")
     fun maintenanceTxManager(@Qualifier("maintenanceDataSource") ds: DataSource): DataSourceTransactionManager {
-        return DataSourceTransactionManager(ds).apply { defaultTimeout = 5 }
+        return DataSourceTransactionManager(ds).apply { defaultTimeout = 60 }
     }
 
     @Bean("maintenanceJdbcTemplate")

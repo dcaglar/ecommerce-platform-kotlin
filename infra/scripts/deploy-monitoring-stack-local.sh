@@ -7,28 +7,19 @@ cd "$REPO_ROOT"
 
 VALUES_FILE="$REPO_ROOT/infra/helm-values/monitoring-stack-values-local.yaml"
 
+echo "▶️  Deploying kube-prometheus-stack with values: $VALUES_FILE"
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
 
-resource "kubernetes_namespace" "monitoring" {
-  metadata {
-    name = "monitoring"
-  }
-}
+helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
+  -n monitoring --create-namespace -f "$VALUES_FILE"
 
-resource "helm_release" "prometheus_stack" {
-  name       = "prometheus-stack"
-  repository = "https://prometheus-community.github.io/helm-charts"
-  chart      = "kube-prometheus-stack"
-  namespace  = kubernetes_namespace.monitoring.metadata[0].name
-  
-  # Maps to your -f "$VALUES_FILE"
-  values = [
-    file("$VALUES_FILE")
-  ]
+echo "✅ kube-prometheus-stack deployment requested."
 
-  wait    = true
-  timeout = 600 # 10 minutes, matching your bash script
-  
-  depends_on = [
-    azurerm_kubernetes_cluster.aks
-  ]
-}
+echo "🚀 Toggling ServiceMonitors to 'true' in application Helm values..."
+yq -i '.controller.metrics.serviceMonitor.enabled = true' "$REPO_ROOT/infra/helm-values/ingress-controller-values-local.yaml" || true
+yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-edge-cell/local/values.yaml" || true
+yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-consumers/local/values.yaml" || true
+yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-central-relay/local/values.yaml" || true
+yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-edge-workers/values.yaml" || true
+echo "✅ Monitoring switched ON! Applications will now deploy with metrics enabled."

@@ -3,4 +3,4 @@ kind: ConfigMap
 metadata:
   name: payment-central-relay-job-config
 data:
-  CENTRAL_DB_URL: {{ .Values.CENTRAL_DB_URL | quote }}
+  {{- toYaml .Values.config | nindent 2 }}

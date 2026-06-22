@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+NS="payment"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$SCRIPT_DIR/../.."
+cd "$REPO_ROOT"
+
+NS="payment"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$SCRIPT_DIR/../.."
+cd "$REPO_ROOT"
+
+echo "🛡️  Checking Kubernetes context..."
+CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "none")
+if [[ "$CURRENT_CONTEXT" != "orbstack" ]]; then
+  echo "⚠️  Current context is '$CURRENT_CONTEXT', but this script requires 'orbstack'."
+  if kubectl config get-contexts orbstack >/dev/null 2>&1; then
+    echo "🔄 Switching context to 'orbstack'..."
+    kubectl config use-context orbstack
+  else
+    echo "❌ OrbStack context not found! Is OrbStack running with Kubernetes enabled?"
+    exit 1
+  fi
+fi
+
+echo "🚀 Deployin all external infrasracture(Redis,Keycloak,Kafka) locally"
+
+
+
+
+
+
+
+# 1. Keycloak
+echo "Sending a deployment request of  KEYCLOAK to  local helm "
+
+"$SCRIPT_DIR/deploy-external-infra.sh" keycloak local
+echo "Deployment request of  KEYCLOAK was submitted to local helm"
+
+# 2.Redis
+echo "Sending a deployment request of  REDIS to  local helm "
+"$SCRIPT_DIR/deploy-external-infra.sh" redis local
+echo "Deployment request of  REDIS was submitted to local helm"
+
+# 3.Kafka
+echo "Sending a deployment request of  KAFKA to  local helm "
+"$SCRIPT_DIR/deploy-external-infra.sh" kafka local
+echo "Deployment request of  REDIS was submitted to local helm"
+
+
+# 4.keda
+echo "Sending a deployment request of  KEDA to  local helm "
+"$SCRIPT_DIR/deploy-external-infra.sh" keda local
+echo "Deployment request of  KEDA was submitted to local helm"
+
+echo ""
+echo "✅ All manifests successfully submitted to local Kubernetes via helm"
+echo "Kubernetes is now resolving dependencies natively via initContainers."
+echo "Check progress via: kubectl get pods -n payment -w"

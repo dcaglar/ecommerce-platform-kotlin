@@ -185,7 +185,7 @@ function generateRandomOrder() {
 
 // --- 4. Main User Journey ---
 export default function () {
-    const baseUrl = "http://payment.k8s.orb.local";
+    const baseUrl = "http://localhost";
 
     const headers = {
 

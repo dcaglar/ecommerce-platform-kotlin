@@ -38,11 +38,11 @@
     </changeSet>
 
     <!-- ========== SEED DATA ========== -->
-<!--    <changeSet id="20251104-seed-account-directory" author="dogancaglar">
+    <changeSet id="20251104-seed-account-directory" author="dogancaglar">
         <loadData
-                file="db/data/account_directory.csv"
-                relativeToChangelogFile="false"
+                file="account_directory.csv"
+                relativeToChangelogFile="true"
                 separator=","
                 tableName="account_directory"/>
-    </changeSet>-->
+    </changeSet>
 </databaseChangeLog>

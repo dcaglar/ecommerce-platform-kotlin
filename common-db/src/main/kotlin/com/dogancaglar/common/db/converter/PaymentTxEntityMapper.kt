@@ -16,7 +16,7 @@ object PaymentTxEntityMapper {
 
         is Tx.AuthorizationTx -> PaymentTxEntity(
             txId              = domain.txId.value,
-            txType            = domain.txType,
+            txType            = domain.txType.name,
             paymentId         = domain.paymentId.value,
             paymentIntentId   = domain.paymentIntentId.value,
             parentTxId        = null,
@@ -32,7 +32,7 @@ object PaymentTxEntityMapper {
 
         is Tx.CaptureTx -> PaymentTxEntity(
             txId              = domain.txId.value,
-            txType            = domain.txType,
+            txType            = domain.txType.name,
             paymentId         = domain.paymentId.value,
             paymentIntentId   = domain.paymentIntentId.value,
             parentTxId        = domain.authorizationTxId.value,
@@ -48,7 +48,7 @@ object PaymentTxEntityMapper {
 
         is Tx.RefundTx -> PaymentTxEntity(
             txId              = domain.txId.value,
-            txType            = domain.txType,
+            txType            = domain.txType.name,
             paymentId         = domain.paymentId.value,
             paymentIntentId   = domain.paymentIntentId.value,
             parentTxId        = domain.captureTxId.value,
@@ -64,7 +64,7 @@ object PaymentTxEntityMapper {
 
          is Tx.SettleTx -> PaymentTxEntity(
              txId               = domain.txId.value,
-             txType             = domain.txType,
+             txType             = domain.txType.name,
              paymentId          = domain.paymentId.value,
              paymentIntentId    = domain.paymentIntentId.value,
              parentTxId         = domain.captureTxId.value,
@@ -80,7 +80,7 @@ object PaymentTxEntityMapper {
 
         is Tx.InternalTransferTx -> PaymentTxEntity(
             txId              = domain.txId.value,
-            txType            = domain.txType,
+            txType            = domain.txType.name,
             paymentId         = domain.paymentId.value,
             paymentIntentId   = domain.paymentIntentId.value,
             parentTxId        = domain.parentCaptureTxId.value,
@@ -96,7 +96,7 @@ object PaymentTxEntityMapper {
 
         is Tx.PayoutTx -> PaymentTxEntity(
             txId              = domain.txId.value,
-            txType            = domain.txType,
+            txType            = domain.txType.name,
             paymentId         = domain.paymentId.value,
             paymentIntentId   = domain.paymentIntentId.value,
             parentTxId        = null,
@@ -112,7 +112,7 @@ object PaymentTxEntityMapper {
 
         is Tx.PspFeeTx -> PaymentTxEntity(
             txId              = domain.txId.value,
-            txType            = domain.txType,
+            txType            = domain.txType.name,
             paymentId         = domain.paymentId.value,
             paymentIntentId   = domain.paymentIntentId.value,
             parentTxId        = domain.parentTxId.value,
@@ -174,7 +174,7 @@ object PaymentTxEntityMapper {
                 createdAt         = createdAt
             )
 
-            "SETTLE" -> Tx.SettleTx(
+            "SETTLE", "SETTLEMENT" -> Tx.SettleTx(
                 txId                   = TxId(entity.txId),
                 paymentId              = PaymentId(entity.paymentId),
                 paymentIntentId        = paymentIntentId,
@@ -203,9 +203,46 @@ object PaymentTxEntityMapper {
                 createdAt              = createdAt
             )
 
+            "INTERNAL_TRANSFER", "COMMISSION_FEE", "REVENUE_RECOGNITION", "ADJUSTMENT" -> Tx.InternalTransferTx(
+                txId              = TxId(entity.txId),
+                paymentId         = PaymentId(entity.paymentId),
+                paymentIntentId   = paymentIntentId,
+                parentCaptureTxId = TxId(requireNotNull(entity.parentTxId) {
+                    "${entity.txType} row txId=${entity.txId} is missing parentTxId"
+                }),
+                sourceAccount     = "",
+                targetAccount     = "",
+                amount            = amount,
+                txType            = com.dogancaglar.paymentservice.domain.model.ledger.JournalType.valueOf(entity.txType),
+                status            = status,
+                createdAt         = createdAt
+            )
+
+            "PAYOUT" -> Tx.PayoutTx(
+                txId              = TxId(entity.txId),
+                paymentId         = PaymentId(entity.paymentId),
+                paymentIntentId   = paymentIntentId,
+                merchantEntityId  = "",
+                payoutBatchReference = entity.acquirerReference,
+                amount            = amount,
+                status            = status,
+                createdAt         = createdAt
+            )
+
+            "PSP_FEE" -> Tx.PspFeeTx(
+                txId              = TxId(entity.txId),
+                paymentId         = PaymentId(entity.paymentId),
+                paymentIntentId   = paymentIntentId,
+                parentTxId        = TxId(requireNotNull(entity.parentTxId) {
+                    "PSP_FEE row txId=${entity.txId} is missing parentTxId"
+                }),
+                amount            = amount,
+                status            = status,
+                createdAt         = createdAt
+            )
+
             else -> throw IllegalStateException(
-                "Unknown Tx type ${entity.txType} for txId={entity.txId}. " +
-                "Expected one of: AUTHORIZATION, CAPTURE, REFUND, SETTLE"
+                "Unknown Tx type ${entity.txType} for txId={entity.txId}."
             )
         }
     }

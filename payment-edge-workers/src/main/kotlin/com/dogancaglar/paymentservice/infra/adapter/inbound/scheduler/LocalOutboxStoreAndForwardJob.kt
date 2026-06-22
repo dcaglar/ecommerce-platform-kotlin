@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional
  * and updates the edge watermark.
  */
 @Service
-@DependsOn("edgeOutboxPartitionCreator")
+@DependsOn("localOutboxMaintenanceJob")
 class LocalOutboxStoreAndForwardJob(
     @param:Qualifier("localOutboxStoreAndForwardPort") private val localOutboxStoreAndForwardPort: LocalOutboxStoreAndForwardPort,
     private val centralOutboxRepository: CentralOutboxForwarderPort,
@@ -91,11 +91,9 @@ class LocalOutboxStoreAndForwardJob(
 
             true
         } catch (t: Throwable) {
-            val errorMessage = t.message ?: t.toString()
-            val truncatedError = if (errorMessage.length > 200) errorMessage.substring(0, 200) + "..." else errorMessage
             logger.warn(
-                "⚠️ Batch forward failed; will unclaim {} rows: {}",
-                events.size, truncatedError
+                "⚠️ Batch forward failed; will unclaim {} rows.",
+                events.size, t
             )
             false
         }
