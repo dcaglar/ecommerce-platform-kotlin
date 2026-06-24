@@ -31,9 +31,12 @@
     </select>
 
     <select id="countEligible" resultType="long">
-        SELECT COUNT(*) FROM outbox_event
-        WHERE status = 'NEW'
-          AND created_at &lt;= #{tSafe, typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
+        SELECT COUNT(*) FROM (
+            SELECT 1 FROM outbox_event
+            WHERE status = 'NEW'
+              AND created_at &lt;= #{tSafe, typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
+            LIMIT 10000
+        ) sub
     </select>
 
     <update id="markDispatched">

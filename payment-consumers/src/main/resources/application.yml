@@ -26,19 +26,21 @@ spring:
       driver-class-name: org.postgresql.Driver
       type: com.zaxxer.hikari.HikariDataSource
       hikari:
-        pool-name: PaymentConsumerHikariPool
+        pool-name: ${spring.application.name}-PaymentConsumerHikariPool
     account-snapshot-job:
       driver-class-name: org.postgresql.Driver
       type: com.zaxxer.hikari.HikariDataSource
       hikari:
-        pool-name: AccountSnapshotHikariPool
+        pool-name: ${spring.application.name}-AccountSnapshotHikariPool
 
 
   liquibase:
-    enabled: true
+    enabled: false
     change-log: classpath:db/changelog/changelog.central.xml
 
 management:
+  server:
+    port: 9000
   health:
     probes:
       enabled: true
@@ -56,7 +58,7 @@ management:
     tags:
       application: payment-consumers
     enable:
-      all: false
+      all: true
       hikaricp.connections: true
       hikaricp.connections.acquire: true
       process.cpu.usage: true
@@ -89,6 +91,7 @@ management:
       psp_call_latency: true
       psp_queue_delay: true
       psp_exec_duration: true
+      psp_refund_calls_total: true
       redis_retry_zset_size: true
       redis_retry_batch_size: true
       redis_retry_events_total: true

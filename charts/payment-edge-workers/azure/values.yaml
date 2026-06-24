@@ -1,34 +1,26 @@
 spring:
   profile: "azure"
-topologySpreadConstraints: []
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app: payment-edge-workers
 runPrivilegeGrantJob: true
-autoscaling:
+keda:
   enabled: true
-  minReplicas: 1
-  maxReplicas: 2
-  metrics:
-    - type: ContainerResource
-      containerResource:
-        name: cpu
-        container: payment-edge-workers
-        target:
-          type: Utilization
-          averageUtilization: 70
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 15
-      selectPolicy: Max
-      policies:
-        - type: Pods
-          value: 1
-          periodSeconds: 45
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      selectPolicy: Max
-      policies:
-        - type: Percent
-          value: 100
-          periodSeconds: 15
+  minReplicaCount: 1
+  maxReplicaCount: 2
+  pollingInterval: 15
+  cooldownPeriod: 300
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090
+        metricName: kube_pod_info
+        query: sum(kube_statefulset_replicas{statefulset="payment-edge-cell"})
+        threshold: "1"
 edgeWorker:
   image:
     pullPolicy: Always

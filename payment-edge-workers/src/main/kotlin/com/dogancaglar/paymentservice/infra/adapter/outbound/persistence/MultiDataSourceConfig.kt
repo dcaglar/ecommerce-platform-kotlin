@@ -15,7 +15,8 @@ import org.springframework.beans.factory.annotation.Value
 @Configuration
 class MultiDataSourceConfig(@Value("\${app.pod-name}") private val podName: String,
                             @Value("\${app.edge-cell-base-url}") private val baseUrl: String,
-                            @Value("\${app.edge-cell-headless-service}") private val headlessService: String) {
+                            @Value("\${app.edge-cell-headless-service}") private val headlessService: String,
+                            @Value("\${spring.application.name}") private val appName: String) {
 
 
     // If you need to change the URL format, you change this one line.
@@ -44,7 +45,7 @@ class MultiDataSourceConfig(@Value("\${app.pod-name}") private val podName: Stri
         @Value("\${app.datasource.outbox.maximum-pool-size:20}") mPool: Int
     ): HikariDataSource {
         return HikariDataSource().apply {
-            poolName = "edge-outbox-pool"
+            poolName = "$appName-edge-outbox-pool"
             jdbcUrl = buildDynamicEdgeUrl()
             username = user
             password = pass
@@ -68,7 +69,7 @@ class MultiDataSourceConfig(@Value("\${app.pod-name}") private val podName: Stri
         @Value("\${app.datasource.maintenance.minimum-idle:0}") minIdleConns: Int
     ): HikariDataSource {
         return HikariDataSource().apply {
-            poolName = "edge-maintenance-pool"
+            poolName = "$appName-edge-maintenance-pool"
             jdbcUrl = buildDynamicEdgeUrl()
             username = user
             password = pass
@@ -93,7 +94,7 @@ class MultiDataSourceConfig(@Value("\${app.pod-name}") private val podName: Stri
         @Value("\${app.datasource.central.maximum-pool-size:10}") mPool: Int
     ): HikariDataSource {
         return HikariDataSource().apply {
-            poolName = "central-edge-worker-pool"
+            poolName = "$appName-central-edge-worker-pool"
             jdbcUrl = url
             username = user
             password = pass

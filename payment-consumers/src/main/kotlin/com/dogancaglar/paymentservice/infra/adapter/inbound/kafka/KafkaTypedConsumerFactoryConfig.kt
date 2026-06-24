@@ -128,6 +128,12 @@ class KafkaTypedConsumerFactoryConfig(
                 valueBytes,
                 headers
             )
+            
+            meterRegistry.counter(
+                "kafka_consumer_error_total",
+                "client_id", rec.headers().lastHeader(CLIENT_ID_CONFIG)?.value()?.let { String(it) } ?: "unknown",
+                "topic", rec.topic()
+            ).increment()
 
             dlqTemplate.send(pr)
         }
@@ -182,7 +188,8 @@ class KafkaTypedConsumerFactoryConfig(
         consumerFactory: DefaultKafkaConsumerFactory<String, EventEnvelope<*>>,
         errorHandler: DefaultErrorHandler,
         expectedEventType: String? = null,
-        ackDiscarded: Boolean = true
+        ackDiscarded: Boolean = true,
+        batchListener: Boolean = false
     ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>> =
         ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<T>>().apply {
             this.consumerFactory = consumerFactory
@@ -198,6 +205,7 @@ class KafkaTypedConsumerFactoryConfig(
             setCommonErrorHandler(errorHandler)
             setConcurrency(concurrency)
             setAutoStartup(true)
+            isBatchListener = batchListener
 
             // enforce semantic type at the container level
             expectedEventType?.let {
@@ -280,7 +288,8 @@ class KafkaTypedConsumerFactoryConfig(
             interceptor = interceptor,
             consumerFactory = customFactory,
             errorHandler = errorHandler,
-            expectedEventType = null
+            expectedEventType = null,
+            batchListener = true
         )
     }
 

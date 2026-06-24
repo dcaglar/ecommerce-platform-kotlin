@@ -4,7 +4,7 @@ controller:
   metrics:
     enabled: true
     serviceMonitor:
-      enabled: false
+      enabled: true
       namespace: ingress-nginx # or wherever your operator is
       additionalLabels:
         release: prometheus-stack # Match the label your operator looks for
@@ -16,19 +16,17 @@ controller:
   resources:
     requests:
       cpu: 100m
-      memory: 90Mi
+      memory: 400Mi
     limits:
-      cpu: 300m
-      memory: 912Mi
+      memory: 400Mi
   admissionWebhooks:
     enabled: false
     patch:
       resources:
         requests:
           cpu: 20m
-          memory: 32Mi
+          memory: 64Mi
         limits:
-          cpu: 100m
           memory: 64Mi
     createSecretJob:
       resources:
@@ -36,5 +34,4 @@ controller:
           cpu: 20m
           memory: 32Mi
         limits:
-          cpu: 100m
           memory: 64Mi

@@ -68,6 +68,11 @@ if [[ "$ENV" == "local" ]]; then
   # Clean up the downloaded .tgz dependencies so they don't pollute the IDE/codebase
   rm -rf "$CHART_ROOT/charts"
   rm -f "$CHART_ROOT/Chart.lock"
+  
+  echo "🔄 Forcing pod restart to pull the latest image..."
+  kubectl rollout restart deployment "$SERVICE_NAME" -n payment 2>/dev/null || true
+  kubectl rollout restart statefulset "$SERVICE_NAME" -n payment 2>/dev/null || true
+
 elif [[ "$ENV" == "azure" ]]; then
   if [ ! -d "$CHART_ROOT" ]; then
     echo "❌ Error: Chart directory $CHART_ROOT does not exist."

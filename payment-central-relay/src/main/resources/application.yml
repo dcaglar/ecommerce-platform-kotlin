@@ -31,7 +31,7 @@ management:
     tags:
       application: payment-central-relay
     enable:
-      all: false
+      all: true
       hikaricp.connections: true
       hikaricp.connections.acquire: true
       process.cpu.usage: true
@@ -54,6 +54,18 @@ management:
       kafka.producer.bufferpool.wait.time.total: true
       central_outbox_backlog_size: true
       redis_retry_batch_size: true
+      relay_published_total: true
+      relay_publish_failed_total: true
+      relay_poll_duration: true
+      maintenance_job_error_total: true
+    distribution:
+      percentiles-histogram:
+        relay_poll_duration: true
+      percentiles:
+        relay_poll_duration: 0.5,0.95,0.99
+
+
+      
   data:
     redis:
       timeout: 10s

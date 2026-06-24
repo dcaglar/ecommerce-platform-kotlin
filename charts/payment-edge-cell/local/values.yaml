@@ -39,18 +39,16 @@ paymentService:
     -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication -XX:MaxRAMPercentage=45 -XX:InitialRAMPercentage=45 -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
   resources:
     requests:
-      cpu: 150m
+      cpu: 200m
       memory: 768Mi
     limits:
-      cpu: 1500m
       memory: 768Mi
-
 edgeDb:
   storage:
     size: 20Gi
   resources:
-    requests: {cpu: "150m", memory: "256Mi"}
-    limits: {cpu: "1000m", memory: "512Mi"}
+    requests: {cpu: 200m, memory: 500Mi}
+    limits: {memory: 500Mi}
   args:
     - "-c"
     - "shared_preload_libraries=pg_stat_statements"
@@ -102,7 +100,7 @@ ingress:
     nginx.ingress.kubernetes.io/limit-connections: "350"
   tls: [] # HTTP for minikube
 serviceMonitor:
-  enabled: false
+  enabled: true
   path: /actuator/prometheus
   interval: 15s
   scrapeTimeout: 10s
@@ -121,12 +119,9 @@ postgresExporter:
   resources:
     requests:
       cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 100m
       memory: 128Mi
-
-
+    limits:
+      memory: 128Mi
 config:
   KEYCLOAK_ISSUER_URL: "http://keycloak:8080/realms/ecommerce-platform"
   EDGE_DB_URL: "jdbc:postgresql://localhost:5432/edge-db?options=-c%20timezone=UTC"

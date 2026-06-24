@@ -54,25 +54,25 @@ class OutboxRelayJob(
     )
     fun poll() {
         val sample = Timer.start(meterRegistry)
-        val tSafe = centralOutboxRepository.computeTSafe() ?: com.dogancaglar.common.time.Utc.nowInstant()
+        try {
+            val tSafe = centralOutboxRepository.computeTSafe() ?: com.dogancaglar.common.time.Utc.nowInstant()
 
-        val batch = centralOutboxRepository.findEligible(tSafe, batchSize)
-        if (batch.isEmpty()) {
-            return
-        }
-        
-        logger.debug("Fetched {} eligible events (T_safe = {})", batch.size, tSafe)
+            val batch = centralOutboxRepository.findEligible(tSafe, batchSize)
+            if (batch.isEmpty()) {
+                return
+            }
+            
+            logger.debug("Fetched {} eligible events (T_safe = {})", batch.size, tSafe)
 
-        // Group events by aggregateId (e.g. sellerId) to preserve ordering per account
-        val groups = batch.groupBy { it.aggregateId }
+            val groups = batch.groupBy { it.aggregateId }
 
-        // Process each aggregate group concurrently, dispatching events to Kafka asynchronously
-        for ((_, events) in groups) {
-            executor.execute {
-                for (entry in events) {
-                    try {
-                        processEntryAsync(entry).thenAccept {
-                            logger.info("✅ Marked dispatched outboxevent with ${entry.eventType} and oeid ${entry.oeid}  and sstatus${entry.status}")
+            for ((_, events) in groups) {
+                executor.execute {
+                    for (entry in events) {
+                        val future = processEntryAsync(entry)
+                        
+                        future.thenAccept {
+                            logger.info("✅ Marked dispatched outboxevent with ${entry.eventType} and oeid ${entry.oeid}  and status ${entry.status}")
                             centralOutboxRepository.markDispatched(entry.oeid, com.dogancaglar.common.time.Utc.toInstant(entry.createdAt))
                             meterRegistry.counter("relay_published_total").increment()
                         }.exceptionally { exception ->
@@ -80,34 +80,41 @@ class OutboxRelayJob(
                             logger.error("Failed to publish event oeid=${entry.oeid} for aggregate ${entry.aggregateId}", exception)
                             null
                         }
-                    } catch (e: Exception) {
-                        logger.error("🛑 Breaking group processing for aggregate ${entry.aggregateId} due to synchronous failure", e)
-                        break
+
+                        // If the future failed synchronously, break the loop to preserve ordering
+                        if (future.isCompletedExceptionally) {
+                            logger.error("🛑 Breaking group processing for aggregate ${entry.aggregateId} due to synchronous failure")
+                            break
+                        }
                     }
                 }
             }
+        } finally {
+            sample.stop(meterRegistry.timer("relay_poll_duration"))
         }
-        sample.stop(meterRegistry.timer("relay_poll_duration"))
     }
     /*
 
      */
 
     private fun processEntryAsync(entry: OutboxEvent): CompletableFuture<*> {
-        logger.info("🚀 OutboxRelayJob: Processing outbox event oeid={} of type={}", entry.oeid, entry.eventType)
-        
-        return when (OutboxEventTypes.from(entry.eventType)) {
-            OutboxEventTypes.PAYMENT_AUTHORIZED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, PaymentAuthorized::class.java))
-            OutboxEventTypes.CAPTURE_REQUESTED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, CaptureRequested::class.java))
-            OutboxEventTypes.CAPTURE_SUBMITTED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, CaptureSubmitted::class.java))
-            OutboxEventTypes.CAPTURE_CONFIRMED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, CaptureConfirmed::class.java))
-            OutboxEventTypes.JOURNAL_ENTRIES_RECORDED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, JournalEntriesRecorded::class.java))
-            OutboxEventTypes.INTERNAL_TRANSFER_COMMAND -> kafkaPublisher.publishAsync(convertToEnvelope(entry, InternalTransferCommand::class.java))
-            OutboxEventTypes.SETTLEMENT_RECEIVED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, SettlementReceived::class.java))
-            else -> {
-                logger.warn("❓ Unknown outbox event type=${entry.eventType}, skipping oeid=${entry.oeid}")
-                CompletableFuture.completedFuture<Any>(null)
+        return try {
+            logger.info("🚀 OutboxRelayJob: Processing outbox event oeid={} of type={}", entry.oeid, entry.eventType)
+            when (OutboxEventTypes.from(entry.eventType)) {
+                OutboxEventTypes.PAYMENT_AUTHORIZED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, PaymentAuthorized::class.java))
+                OutboxEventTypes.CAPTURE_REQUESTED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, CaptureRequested::class.java))
+                OutboxEventTypes.CAPTURE_SUBMITTED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, CaptureSubmitted::class.java))
+                OutboxEventTypes.CAPTURE_CONFIRMED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, CaptureConfirmed::class.java))
+                OutboxEventTypes.JOURNAL_ENTRIES_RECORDED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, JournalEntriesRecorded::class.java))
+                OutboxEventTypes.INTERNAL_TRANSFER_COMMAND -> kafkaPublisher.publishAsync(convertToEnvelope(entry, InternalTransferCommand::class.java))
+                OutboxEventTypes.SETTLEMENT_RECEIVED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, SettlementReceived::class.java))
+                else -> {
+                    logger.warn("❓ Unknown outbox event type=${entry.eventType}, skipping oeid=${entry.oeid}")
+                    CompletableFuture.completedFuture<Any>(null)
+                }
             }
+        } catch (e: Exception) {
+            CompletableFuture.failedFuture<Any>(e)
         }
     }
 

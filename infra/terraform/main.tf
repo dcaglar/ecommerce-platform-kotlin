@@ -8,15 +8,15 @@ resource "azurerm_kubernetes_cluster" "aks" {
   name                = var.cluster_name
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
-  dns_prefix          = "payloadtest"
+  dns_prefix          = var.dns_prefix
 
   # System Node Pool — DSv4 family (quota: 2/10 vCPU)
   # Standard_D2s_v4: 2 vCPU, 8 GiB RAM
   # Hosts only AKS system pods (CoreDNS, kube-proxy, metrics-server).
   default_node_pool {
     name       = "systempool"
-    node_count = 1
-    vm_size    = "Standard_D2s_v4"
+    node_count = var.system_node_count
+    vm_size    = var.system_node_size
 
     # We only want AKS system pods (CoreDNS) to run here
     only_critical_addons_enabled = true
@@ -39,8 +39,8 @@ resource "azurerm_kubernetes_cluster" "aks" {
 resource "azurerm_kubernetes_cluster_node_pool" "central" {
   name                  = "centralpool"
   kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
-  vm_size               = "Standard_D8ds_v4"
-  node_count            = 1
+  vm_size               = var.central_node_size
+  node_count            = var.central_node_count
 
   node_labels = {
     "pool" = "central"
@@ -54,8 +54,8 @@ resource "azurerm_kubernetes_cluster_node_pool" "central" {
 resource "azurerm_kubernetes_cluster_node_pool" "edge" {
   name                  = "edgepool"
   kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
-  vm_size               = "Standard_D8s_v3"
-  node_count            = 1
+  vm_size               = var.edge_node_size
+  node_count            = var.edge_node_count
 
   node_labels = {
     "pool" = "edge"
@@ -70,12 +70,12 @@ resource "azurerm_kubernetes_cluster_node_pool" "edge" {
 resource "azurerm_kubernetes_cluster_node_pool" "edge2" {
   name                  = "edgepool2"
   kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
-  vm_size               = "Standard_E8ds_v4"
+  vm_size               = var.edge2_node_size
 
   # Autoscaler: 0 nodes at rest, 1 node when HPA demands a 2nd edge cell.
   auto_scaling_enabled = true
-  min_count            = 0
-  max_count            = 1
+  min_count            = var.edge2_min_count
+  max_count            = var.edge2_max_count
 
   node_labels = {
     "pool" = "edge"

@@ -14,3 +14,7 @@ spec:
       port: {{ .Values.service.port | default 8080 }}
       targetPort: {{ .Values.service.portName | default "http" }}
       protocol: TCP
+    - name: mgmt
+      port: 9000
+      targetPort: mgmt
+      protocol: TCP

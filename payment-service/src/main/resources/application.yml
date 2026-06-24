@@ -12,7 +12,7 @@ spring:
   datasource:
     edge:
       driver-class-name: org.postgresql.Driver
-      pool-name: edge-pool
+      pool-name: ${spring.application.name}-edge-pool
   cache:
     ttl-seconds: 3600
   account-balance:
@@ -53,7 +53,7 @@ management:
     tags:
       application: payment-service
     enable:
-      all: false
+      all: true
       tomcat.threads.current: true
       tomcat.threads.busy: true
       tomcat.threads.config.max: true
@@ -73,6 +73,8 @@ management:
       outbox_dispatch_failed_total: true
       outbox_event_backlog: true
       outbox_dispatcher_duration: true
+      psp_queue_delay: true
+      psp_exec_duration: true
     binders:
       tomcat:
         enabled: true

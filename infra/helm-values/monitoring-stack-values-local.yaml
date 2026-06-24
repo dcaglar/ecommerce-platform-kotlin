@@ -1,7 +1,7 @@
 prometheusOperator:
   resources:
     requests: { cpu: 30m,  memory: 96Mi }
-    limits:   { cpu: 150m, memory: 192Mi }
+    limits:   { memory: 96Mi }
   admissionWebhooks:
     enabled: false
     patch:
@@ -17,11 +17,11 @@ prometheus:
       - name: config-reloader
         resources:
           requests: { cpu: 5m,  memory: 24Mi }
-          limits:   { cpu: 30m, memory: 48Mi }
+          limits:   { memory: 24Mi }
     resources:
-      requests: { cpu: 150m, memory: 256Mi }
-      limits:   { cpu: 500m, memory: 512Mi }
-    retention: 6h
+      requests: { cpu: 150m, memory: 600Mi }
+      limits:   { memory: 600Mi }
+    retention: 2h
     walCompression: true
     scrapeInterval: 60s
     evaluationInterval: 60s
@@ -36,12 +36,13 @@ alertmanager:
       - name: config-reloader
         resources:
           requests: { cpu: 5m,  memory: 24Mi }
-          limits:   { cpu: 30m, memory: 48Mi }
+          limits:   { memory: 24Mi }
     resources:
       requests: { cpu: 30m, memory: 48Mi }
-      limits:   { cpu: 150m, memory: 128Mi }
+      limits:   { memory: 48Mi }
 
 grafana:
+  adminPassword: admin
   plugins: []
   readinessProbe:
     timeoutSeconds: 10
@@ -55,28 +56,32 @@ grafana:
     database:
       query_retries: 5
       transaction_retries: 5
+      wal: true
+  service:
+    type: NodePort
+    nodePort: 32000
   resources:
-    requests: { cpu: 100m, memory: 256Mi }
-    limits:   { cpu: 1000m, memory: 768Mi }
+    requests: { cpu: 200m, memory: 512Mi }
+    limits:   { memory: 1024Mi }
   sidecar:
     datasources:
       resources:
         requests: { cpu: 5m,  memory: 24Mi }
-        limits:   { cpu: 30m, memory: 48Mi }
+        limits:   { memory: 24Mi }
     dashboards:
       resources:
         requests: { cpu: 5m,  memory: 24Mi }
-        limits:   { cpu: 30m, memory: 48Mi }
+        limits:   { memory: 24Mi }
 
 kube-state-metrics:
   resources:
     requests: { cpu: 30m,  memory: 48Mi }
-    limits:   { cpu: 150m, memory: 128Mi }
+    limits:   { memory: 48Mi }
 
 prometheus-node-exporter:
   resources:
     requests: { cpu: 15m,  memory: 24Mi }
-    limits:   { cpu: 80m,  memory: 96Mi }
+    limits:   { memory: 24Mi }
 
 prometheusAdapter:
   enabled: false

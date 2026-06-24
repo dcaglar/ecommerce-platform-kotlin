@@ -5,7 +5,7 @@ app:
       jdbc-url: ${SPRING_DATASOURCE_URL}
       username: ${SPRING_DATASOURCE_MAINTENANCE_USERNAME}
       password: ${SPRING_DATASOURCE_MAINTENANCE_PASSWORD}
-      pool-name: central-maint-pool
+      pool-name: ${spring.application.name}-central-maint-pool
       maximum-pool-size: 1
       minimum-idle: 0
       connection-timeout: 15000

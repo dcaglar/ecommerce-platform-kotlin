@@ -6,7 +6,7 @@ kafka:
 spring:
   profile: local
 serviceMonitor:
-  enabled: false
+  enabled: true
   labels:
     release: prometheus-stack
   path: /actuator/prometheus
@@ -16,9 +16,7 @@ replicaCount: 1
 keda:
   enabled: false
 resources:
-  requests: {cpu: "150m", memory: "256Mi"}
-  limits: {memory: "1024Mi"}
+  requests: {cpu: 200m, memory: 700Mi}
+  limits: {memory: 700Mi}
 config:
   CENTRAL_DB_URL: "jdbc:postgresql://central-db-postgresql:5432/central-db?options=-c%20timezone=UTC"
-
-

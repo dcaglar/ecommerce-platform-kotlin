@@ -16,7 +16,7 @@ spec:
     matchNames:
       - {{ .Release.Namespace }}
   endpoints:
-    - port: {{ .Values.service.portName | default "http" }}
+    - port: mgmt
       path: {{ .Values.serviceMonitor.path | default "/actuator/prometheus" }}
       interval: {{ .Values.serviceMonitor.interval | default "30s" }}
       scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout | default "10s" }}

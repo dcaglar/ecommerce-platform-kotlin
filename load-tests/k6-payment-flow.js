@@ -21,9 +21,9 @@ const SCENARIOS = {
         executor: 'constant-arrival-rate',
         rate: 10,
         timeUnit: '1s',
-        duration: '5m',
-        preAllocatedVUs: 4,
-        maxVUs: 20,
+        duration: '2m',
+        preAllocatedVUs: 10,
+        maxVUs: 40,
         tags: { test_type: 'smoke' },
     },
     // B. Average Load Test: Simulates expected day-to-day typical user traffic (RPS)
@@ -35,7 +35,7 @@ const SCENARIOS = {
         maxVUs: 500,
         stages: [
             { duration: '2m', target: 80 },   // Warm-up to 80 RPS (~60% of single-pod ceiling)
-            { duration: '15m', target: 80 },   // Maintain 80 RPS
+            { duration: '50m', target: 80 },   // Maintain 80 RPS
             { duration: '2m', target: 0 },     // Cool-down
         ],
         tags: { test_type: 'average_load' },
@@ -48,8 +48,8 @@ const SCENARIOS = {
         preAllocatedVUs: 100,
         maxVUs: 1500,
         stages: [
-            { duration: '3m', target: 130 },  // Ramp to ~100% of single-pod ceiling
-            { duration: '10m', target: 130 },  // Sustained — should trigger HPA
+            { duration: '3m', target: 150 },  // Ramp to ~100% of single-pod ceiling
+            { duration: '10m', target: 150 },  // Sustained — should trigger HPA
             { duration: '2m', target: 0 },     // Cool-down
         ],
         tags: { test_type: 'stress' },
@@ -57,9 +57,9 @@ const SCENARIOS = {
     // D. Soak Test: Continuous moderate load over a long time to check memory leaks & slow degradation (RPS)
     soak: {
         executor: 'constant-arrival-rate',
-        rate: 50,
+        rate: 80,
         timeUnit: '1s',
-        duration: '1h',
+        duration: '30m',
         preAllocatedVUs: 50,
         maxVUs: 500,
         tags: { test_type: 'soak' },
@@ -72,7 +72,7 @@ const SCENARIOS = {
         preAllocatedVUs: 50,
         maxVUs: 3000,
         stages: [
-            { duration: '10s', target: 5 },    // Normal baseline 5 RPS
+            { duration: '1m', target: 5 },    // Normal baseline 5 RPS
             { duration: '10s', target: 250 },  // Sudden spike to 250 RPS (tests 2-pod autoscale)
             { duration: '3m', target: 250 },   // Hold peak 250 RPS
             { duration: '1m', target: 0 },     // Ramp down
@@ -140,18 +140,53 @@ function generateUuidV7() {
     return `${hexN(8)}-${hexN(4)}-7${hexN(3)}-8${hexN(3)}-${hexN(12)}`;
 }
 
-const MARKETPLACE = "MARKETPLACE-5";
-const SELLERS = Array.from({length: 10}, (_, i) => `SELLER-5-${i+1}`);
+// --- Marketplace Registry (mirrors account_directory.csv) ---
+// Each marketplace has exactly 10 sellers following the naming convention
+// SELLER-{marketplaceIndex}-{sellerIndex} as defined in the account directory.
+const MARKETPLACE_REGISTRY = [
+    {
+        account: 'MARKETPLACE-1',
+        sellers: Array.from({ length: 10 }, (_, i) => `SELLER-1-${i + 1}`)
+    },
+    {
+        account: 'MARKETPLACE-2',
+        sellers: Array.from({ length: 10 }, (_, i) => `SELLER-2-${i + 1}`)
+    },
+    {
+        account: 'MARKETPLACE-3',
+        sellers: Array.from({ length: 10 }, (_, i) => `SELLER-3-${i + 1}`)
+    },
+    {
+        account: 'MARKETPLACE-4',
+        sellers: Array.from({ length: 10 }, (_, i) => `SELLER-4-${i + 1}`)
+    },
+    {
+        account: 'MARKETPLACE-5',
+        sellers: Array.from({ length: 10 }, (_, i) => `SELLER-5-${i + 1}`)
+    },
+];
 
-function getUniqueSellers(count) {
-    const shuffled = SELLERS.slice().sort(() => 0.5 - Math.random());
+/**
+ * Picks a random marketplace from the registry on each call.
+ * Returns { account, sellers } so the caller knows which seller pool to use.
+ */
+function pickRandomMarketplace() {
+    return MARKETPLACE_REGISTRY[Math.floor(Math.random() * MARKETPLACE_REGISTRY.length)];
+}
+
+/**
+ * Returns `count` unique sellers sampled at random from the provided seller pool.
+ * Seller pool is always scoped to the chosen marketplace.
+ */
+function getUniqueSellers(sellerPool, count) {
+    const shuffled = sellerPool.slice().sort(() => 0.5 - Math.random());
     return shuffled.slice(0, count);
 }
 
-function generateRandomOrder() {
+function generateRandomOrder(sellerPool) {
     const totalQuantity = Math.floor(Math.random() * 9000) + 1000;
     const numSellers = Math.floor(Math.random() * 3) + 2;
-    const sellers = getUniqueSellers(numSellers);
+    const sellers = getUniqueSellers(sellerPool, numSellers);
     
     const splits = [];
     let remaining = totalQuantity;
@@ -187,20 +222,22 @@ function generateRandomOrder() {
 export default function () {
     const baseUrl = "http://localhost";
 
-    const headers = {
+    // Pick a random marketplace (and its scoped seller pool) for this iteration
+    const marketplace = pickRandomMarketplace();
 
+    const headers = {
         'Authorization': `Bearer ${ACCESS_TOKEN}`,
         'Content-Type': 'application/json',
     };
 
     // --- STEP A: Create a Payment Intent ---
     const createUrl = `${baseUrl}/api/v1/payments`;
-    const orderData = generateRandomOrder();
+    const orderData = generateRandomOrder(marketplace.sellers);
 
     const createPayload = JSON.stringify({
         orderId: randomId('ORD'),
         buyerId: randomId('BUYER'),
-        merchantAccount: MARKETPLACE,
+        merchantAccount: marketplace.account,
         processingModel: "MARKETPLACE",
         totalAmount: orderData.totalAmount,
         splits: orderData.splits

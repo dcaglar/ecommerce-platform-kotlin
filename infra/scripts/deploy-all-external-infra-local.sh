@@ -6,10 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR/../.."
 cd "$REPO_ROOT"
 
-NS="payment"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$SCRIPT_DIR/../.."
-cd "$REPO_ROOT"
+
 
 echo "🛡️  Checking Kubernetes context..."
 CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "none")
@@ -46,7 +43,8 @@ echo "Deployment request of  REDIS was submitted to local helm"
 # 3.Kafka
 echo "Sending a deployment request of  KAFKA to  local helm "
 "$SCRIPT_DIR/deploy-external-infra.sh" kafka local
-echo "Deployment request of  REDIS was submitted to local helm"
+echo "Deployment request of  kafka  was submitted to local helm"
+
 
 
 # 4.keda

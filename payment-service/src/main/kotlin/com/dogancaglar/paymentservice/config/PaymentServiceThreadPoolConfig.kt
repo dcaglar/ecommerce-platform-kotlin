@@ -14,7 +14,7 @@ import java.util.concurrent.ThreadPoolExecutor
 
 
 @Configuration
-class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val decorator: MdcTaskDecorator) {
+class PaymentServiceThreadPoolConfig(private val meterRegistry: MeterRegistry, private val decorator: MdcTaskDecorator) {
     @Bean("outboxJobTaskScheduler")
     fun outboxTaskScheduler(
         @Value("\${outbox-dispatcher.pool-size:2}") poolSize: Int,
@@ -49,6 +49,32 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
     }
 
 
+    @Bean("createPaymentIntentExecutor")
+    fun createPaymentIntentExecutor(decorator: TaskDecorator): ThreadPoolTaskExecutor =
+        ThreadPoolTaskExecutor().apply {
+            corePoolSize = 250          // Align with Tomcat max-threads
+            maxPoolSize = 250
+            queueCapacity = 50       // Minimal queue to ensure low latency
+            setThreadNamePrefix("po-psp-")
+            setTaskDecorator(decorator)
+            setRejectedExecutionHandler(ThreadPoolExecutor.DiscardPolicy())
+            initialize()
+        }
+
+
+    @Bean("authorizePaymentIntentExecutor")
+    fun authorizePaymentIntentExecutor(decorator: TaskDecorator): ThreadPoolTaskExecutor =
+        ThreadPoolTaskExecutor().apply {
+            corePoolSize = 80          // Align with Tomcat max-threads
+            maxPoolSize = 200
+            queueCapacity = 50       // Minimal queue to ensure low latency
+            setThreadNamePrefix("po-psp-")
+            setTaskDecorator(decorator)
+            setRejectedExecutionHandler(ThreadPoolExecutor.DiscardPolicy())
+            initialize()
+        }
+
+
     @Bean
     fun outboxEventPartitionMaintenanceScheduler(): ThreadPoolTaskScheduler {
         val scheduler = ThreadPoolTaskScheduler()
@@ -65,8 +91,8 @@ class ThreadPoolConfig(private val meterRegistry: MeterRegistry, private val dec
     @Bean("resilientExecutor")
     fun resilientExecutor(decorator: TaskDecorator): ThreadPoolTaskExecutor =
         ThreadPoolTaskExecutor().apply {
-            corePoolSize = 32
-            maxPoolSize = 32
+            corePoolSize = 200
+            maxPoolSize = 200
             queueCapacity = 500
             setThreadNamePrefix("resilient-callback-")
             setTaskDecorator(decorator)
