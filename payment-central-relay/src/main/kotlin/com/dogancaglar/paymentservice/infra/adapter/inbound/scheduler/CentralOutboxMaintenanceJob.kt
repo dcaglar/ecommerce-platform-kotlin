@@ -24,7 +24,7 @@ class CentralOutboxMaintenanceJob(
 
     @EventListener(ApplicationReadyEvent::class)
     @Scheduled(
-        initialDelay = 30000,
+        initialDelay = 0,
         fixedDelayString = "\${outbox-partition.fixed-delay:PT10M}"
     )
     fun ensureCurrentAndNextScheduled() {

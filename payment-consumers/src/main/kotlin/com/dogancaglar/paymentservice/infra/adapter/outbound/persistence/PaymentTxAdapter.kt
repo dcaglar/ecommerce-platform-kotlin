@@ -37,7 +37,7 @@ class PaymentTxAdapter(
 
     override fun save(tx: Tx) {
         val entity = PaymentTxEntityMapper.toEntity(tx)
-        mapper.insert(entity)
+        mapper.upsert(entity)
     }
 
     override fun findByPaymentId(paymentId: Long): List<Tx> =

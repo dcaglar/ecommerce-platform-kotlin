@@ -35,7 +35,7 @@ const SCENARIOS = {
         maxVUs: 500,
         stages: [
             { duration: '2m', target: 80 },   // Warm-up to 80 RPS (~60% of single-pod ceiling)
-            { duration: '50m', target: 80 },   // Maintain 80 RPS
+            { duration: '20m', target: 80 },   // Maintain 80 RPS
             { duration: '2m', target: 0 },     // Cool-down
         ],
         tags: { test_type: 'average_load' },

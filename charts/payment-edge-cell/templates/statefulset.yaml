@@ -8,7 +8,7 @@ spec:
   serviceName: {{ include "payment-edge-cell.fullname" . }}-headless
   updateStrategy:
     type: RollingUpdate
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ if .Values.keda.enabled }}{{ .Values.keda.minReplicaCount }}{{ else }}1{{ end }}
   podManagementPolicy: Parallel
   selector:
     matchLabels:

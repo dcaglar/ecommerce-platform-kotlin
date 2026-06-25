@@ -56,20 +56,22 @@ class CentralOutboxDataSourceConfig {
         return DataSourceTransactionManager(ds).apply { defaultTimeout = 60 }
     }
 
+
+
     @Bean("centralOutboxSqlSessionFactory")
     fun centralOutboxSqlSessionFactory(@Qualifier("centralOutboxDataSource") ds: DataSource): SqlSessionFactory {
         val factoryBean = SqlSessionFactoryBean()
         factoryBean.setDataSource(ds)
-        
+
+        // MyBatis configuration (Global settings)
         val configuration = org.apache.ibatis.session.Configuration()
         configuration.isMapUnderscoreToCamelCase = true
         factoryBean.setConfiguration(configuration)
 
-        val resolver = PathMatchingResourcePatternResolver()
-        factoryBean.setMapperLocations(*resolver.getResources("classpath*:mapper/**/*.xml"))
+        // NO setMapperLocations needed if files are in the same package structure!
         factoryBean.setTypeAliasesPackage("com.dogancaglar.common.db.entity")
         factoryBean.setTypeHandlersPackage("com.dogancaglar.common.db.typehandler")
-        
+
         return factoryBean.`object`!!
     }
 

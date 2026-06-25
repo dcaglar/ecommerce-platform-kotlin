@@ -2,19 +2,23 @@ spring:
   profile: "local"
 topologySpreadConstraints: []
 runPrivilegeGrantJob: true
-autoscaling:
-  enabled: true
-  minReplicas: 1
-  maxReplicas: 1
-  metrics:
-    - type: ContainerResource
-      containerResource:
-        name: cpu
-        container: payment-service
-        target:
-          type: Utilization
-          # Increased to 85% to avoid 'panic' scaling on noise
-          averageUtilization: 85
+replicaCount: 1
+keda:
+  enabled: false
+  minReplicaCount: 1
+  maxReplicaCount: 2
+  pollingInterval: 15
+  cooldownPeriod: 300
+  triggers:
+    metrics:
+      - type: ContainerResource
+        containerResource:
+          name: cpu
+          container: payment-service
+          target:
+            type: Utilization
+            # Increased to 85% to avoid 'panic' scaling on noise
+            averageUtilization: 85
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 300

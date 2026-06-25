@@ -376,7 +376,7 @@ Even under retries, restarts, and network issues, financial outcomes must remain
 # 🟦 Architecture Summary (Non-Functional / Implementation Section)
 
 The platform internally uses:
-- **Event-driven architecture** for asynchronous flows for payments and the ledger
+- **Event-driven architecture** for asynchronous flows for capture,refund,paymentsplits, transfers and the ledger flow
 - **Kafka topics** for execution queuing and PSP results
 - **Idempotent state transitions** to ensure correctness under retries
 - **Double-entry ledger** for immutable financial history
@@ -589,7 +589,7 @@ The platform follows a **Hexagonal (Ports & Adapters)** pattern to separate busi
 - **Traits**: Contains only truly common infrastructure utilities, completely decoupled from database entities or Kafka topics.
 
 ### **4. `payment-service` (API & Edge Cell Inbound Adapter)**
-- **Role**: Composition root and API gateway for the Edge Cell Pod.
+- **Role**: API gateway only talks to external PSP, and save result to local db, and return reesult to shopper in for the Edge Cell Pod.
 - **REST API**: Spring Web MVC controllers exposed to internal checkout/order services for synchronous payments and intents.
 - **Ports & Adapters**: Implements local database storage using `LocalOutboxWriterPort` to guarantee transaction safety.
 - **Wiring**: Manages local Edge Cell lifecycle, thread pools, and local database connection.
@@ -620,9 +620,8 @@ The Edge layer is responsible for synchronous payment acceptance (Stripe integra
 
 **The Edge Components (Strict Co-location Ratio):**
 A single Edge Cell ecosystem runs on an isolated `edgepool` node and consists of separate Pods communicating over the internal cluster network:
-1. **`payment-service` Pod (Web API)**: Handles high-throughput synchronous checkouts and creates `OutboxEvent` records.
-2. **`local-edge-db` (Local State)**: A dedicated PostgreSQL container running within the `payment-edge-cell` Pod, attached to a Persistent Volume (PVC).
-3. **`payment-edge-workers` Pod (Forwarder)**: A background worker running in its own standalone Pod that polls the `edge-db` for `NEW` outbox events and pushes them to the **Central DB**.
+1. **`payment-service and local-edge-db lives in the same pod, local-edge-db- designed as initcointeinr restartpolicy=always` Pod (Web API)**: Handles high-throughput synchronous checkouts and creates `OutboxEvent` record persist local edge dbb
+3. **`payment-edge-workers` Pod (Forwarder)**:  Background worker running in its own standalone Pod that polls the `edge-db` for `NEW` outbox events and pushes them to the **Central DB**.
 
 **Fault Tolerance Hardening:**
 - **Lifecycle Fault Isolation**: Previously, the worker and API shared the same Pod (the Sidecar pattern). However, if the worker crashed or required a restart, Kubernetes would forcefully terminate the entire Pod, bringing down the healthy Web API and Database with it. By separating them into independent Pods, a worker maintenance cycle or crash has zero impact on the synchronous Web API's uptime.

@@ -1,6 +1,7 @@
 package com.dogancaglar.paymentservice.infra.adapter.inbound.scheduler
 
 import com.dogancaglar.common.event.EventEnvelope
+import com.dogancaglar.common.time.Utc
 import com.dogancaglar.paymentservice.application.events.PaymentAuthorized
 import com.dogancaglar.paymentservice.application.events.CaptureRequested
 import com.dogancaglar.paymentservice.application.events.CaptureSubmitted
@@ -16,6 +17,7 @@ import com.dogancaglar.paymentservice.ports.outbound.CentralOutboxRelayPort
 import com.dogancaglar.paymentservice.domain.model.payment.OutboxEvent
 import com.fasterxml.jackson.databind.ObjectMapper
 import java.util.concurrent.CompletableFuture
+import java.util.UUID
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
@@ -26,6 +28,10 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.stereotype.Service
 
+// Required for the cleaner Coroutines approach
+import kotlinx.coroutines.future.await
+import kotlinx.coroutines.runBlocking
+
 @Service
 class OutboxRelayJob(
     private val centralOutboxRepository: CentralOutboxRelayPort,
@@ -33,6 +39,7 @@ class OutboxRelayJob(
     @Qualifier("resilientExecutor") private val executor: ThreadPoolTaskExecutor,
     @Qualifier("myObjectMapper") private val objectMapper: ObjectMapper,
     @Value("\${outbox-relay.batch-size:500}") private val batchSize: Int,
+    @Value("\${app.instance-id:central-relay}") private val appInstanceId: String,
     private val meterRegistry: MeterRegistry
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -55,36 +62,54 @@ class OutboxRelayJob(
     fun poll() {
         val sample = Timer.start(meterRegistry)
         try {
-            val tSafe = centralOutboxRepository.computeTSafe() ?: com.dogancaglar.common.time.Utc.nowInstant()
+            val tSafe = centralOutboxRepository.computeTSafe() ?: Utc.nowInstant()
 
-            val batch = centralOutboxRepository.findEligible(tSafe, batchSize)
+            // Generate a unique worker ID for this specific polling batch lock
+            val workerId = "$appInstanceId-poll-${UUID.randomUUID()}"
+
+            // 1. Use the V2 query that utilizes SKIP LOCKED and claimed_by
+            val batch = centralOutboxRepository.findEligible(tSafe, batchSize, workerId)
             if (batch.isEmpty()) {
                 return
             }
-            
-            logger.debug("Fetched {} eligible events (T_safe = {})", batch.size, tSafe)
+
+            logger.debug("Fetched {} eligible events (T_safe = {}, workerId = {})", batch.size, tSafe, workerId)
 
             val groups = batch.groupBy { it.aggregateId }
 
-            for ((_, events) in groups) {
+            for ((aggregateId, events) in groups) {
+                // Submit the entire aggregate group to a single thread
                 executor.execute {
-                    for (entry in events) {
-                        val future = processEntryAsync(entry)
-                        
-                        future.thenAccept {
-                            logger.info("✅ Marked dispatched outboxevent with ${entry.eventType} and oeid ${entry.oeid}  and status ${entry.status}")
-                            centralOutboxRepository.markDispatched(entry.oeid, com.dogancaglar.common.time.Utc.toInstant(entry.createdAt))
-                            meterRegistry.counter("relay_published_total").increment()
-                        }.exceptionally { exception ->
-                            meterRegistry.counter("relay_publish_failed_total").increment()
-                            logger.error("Failed to publish event oeid=${entry.oeid} for aggregate ${entry.aggregateId}", exception)
-                            null
-                        }
+                    // Bridge the Java Executor Thread to Kotlin Coroutines
+                    runBlocking {
+                        for (entry in events) {
+                            try {
+                                // 2. The .await() suspends this coroutine until Kafka ACKs, guaranteeing order.
+                                processEntryAsync(entry).await()
 
-                        // If the future failed synchronously, break the loop to preserve ordering
-                        if (future.isCompletedExceptionally) {
-                            logger.error("🛑 Breaking group processing for aggregate ${entry.aggregateId} due to synchronous failure")
-                            break
+                                // 3. The Success Path
+                                logger.info("✅ Marked dispatched outboxevent with ${entry.eventType} and oeid ${entry.oeid}")
+                                centralOutboxRepository.markDispatched(
+                                    entry.oeid,
+                                    Utc.toInstant(entry.createdAt)
+                                )
+                                meterRegistry.counter("relay_published_total").increment()
+
+                            } catch (exception: Exception) {
+                                // 4. The Fail-Fast Path
+                                logger.error("🛑 Breaking chain for aggregate $aggregateId at oeid=${entry.oeid}", exception)
+                                meterRegistry.counter("relay_publish_failed_total").increment()
+
+                                try {
+                                    // Immediately release the lock so the next poll cycle can retry it
+                                    centralOutboxRepository.unclaimSpecific(entry.oeid, Utc.toInstant(entry.createdAt),workerId)
+                                } catch (dbEx: Exception) {
+                                    logger.error("Failed to unclaim oeid=${entry.oeid}. Relies on reclaimer.", dbEx)
+                                }
+
+                                // Break the loop. Subsequent events for this aggregate are ignored to preserve order.
+                                break
+                            }
                         }
                     }
                 }
@@ -93,9 +118,16 @@ class OutboxRelayJob(
             sample.stop(meterRegistry.timer("relay_poll_duration"))
         }
     }
-    /*
 
-     */
+    @Scheduled(initialDelay = 60_000, fixedDelay = 120_000)
+    fun reclaimStuck() {
+        // 120 seconds is appropriate assuming Kafka's DELIVERY_TIMEOUT_MS is ~60-90s
+        val reclaimed = centralOutboxRepository.reclaimStuck(staleSeconds = 120)
+        if (reclaimed > 0) {
+            logger.warn("⚠️ Reclaimed {} stuck PROCESSING events back to NEW", reclaimed)
+            meterRegistry.counter("relay_reclaimed_total").increment(reclaimed.toDouble())
+        }
+    }
 
     private fun processEntryAsync(entry: OutboxEvent): CompletableFuture<*> {
         return try {
@@ -118,11 +150,9 @@ class OutboxRelayJob(
         }
     }
 
-
-    // Replace all 6 custom envelope conversion methods with this single robust implementation:
     private fun <T : PaymentBaseEvent> convertToEnvelope(evt: OutboxEvent, clazz: Class<T>): EventEnvelope<T> {
         val envelopeType = objectMapper.typeFactory.constructParametricType(EventEnvelope::class.java, clazz)
-        logger.info("Outboxevent. type is ${evt.eventType} , but EventEnvelopetype Generic Event class is ${clazz.name}" )
+        logger.debug("Outboxevent type is ${evt.eventType}, resolving EventEnvelope generic Event class to ${clazz.name}")
         return objectMapper.readValue(evt.payload, envelopeType) as EventEnvelope<T>
     }
 }

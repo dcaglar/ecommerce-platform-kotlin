@@ -41,3 +41,6 @@ spec:
   ports:
     - name: http
       port: 8080
+    - name: postgres
+      port: 5432
+      targetPort: 5432

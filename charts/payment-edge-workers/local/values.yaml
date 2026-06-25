@@ -3,7 +3,7 @@ spring:
 topologySpreadConstraints: []
 runPrivilegeGrantJob: true
 keda:
-  enabled: true
+  enabled: false
   minReplicaCount: 1
   maxReplicaCount: 1
   pollingInterval: 15

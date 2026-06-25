@@ -7,7 +7,7 @@ metadata:
 spec:
   serviceName: {{ include "payment-consumers.fullname" . }}
   podManagementPolicy: OrderedReady
-  replicas: {{ .Values.replicaCount | default 1 }}
+  replicas: {{if .Values.keda.enabled}}{{.Values.keda.minReplicaCount}}{{else}}1{{ end }}
   selector:
     matchLabels:
       app: {{ include "payment-consumers.fullname" . }}

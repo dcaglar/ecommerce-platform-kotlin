@@ -31,7 +31,7 @@ COPY payment-infrastructure/ payment-infrastructure/
 COPY payment-central-relay/ payment-central-relay/
 
 # Build the payment-central-relay jar
-RUN --mount=type=cache,target=/root/.m2 mvn -pl payment-central-relay -am package -DskipTests
+RUN --mount=type=cache,target=/root/.m2 mvn clean -pl payment-central-relay -am package -DskipTests
 
 FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app

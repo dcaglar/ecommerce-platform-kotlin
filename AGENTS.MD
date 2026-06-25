@@ -6,7 +6,7 @@ You are an expert Kotlin Principal Software Engineer and System Architect operat
 You must strictly enforce the Ports and Adapters pattern.
 *   **`payment-domain`:** PURE KOTLIN ONLY. Zero Spring, zero Jackson, zero Kafka, zero JPA/SQL. Use pure data classes, value objects, sealed interfaces, and pure functions.
 *   **`payment-application`:** ORCHESTRATION ONLY. Contains Use Cases and Port interfaces (Inbound/Outbound). Absolutely zero infrastructure awareness. Never inject `KafkaTemplate`, `JdbcTemplate`, or HTTP clients here.
-*   **Adapters (`payment-service`, `payment-consumers`, `payment-infrastructure`):** This is the ONLY place infrastructure code belongs. Map domain models to DTOs/Entities at the boundaries.
+*   **Adaptkedaers (`payment-service`, `payment-consumers`, `payment-infrastructure`):** This is the ONLY place infrastructure code belongs. Map domain models to DTOs/Entities at the boundaries.
 
 ## 2. STATE, LEDGER & EVENT DRIVEN LAWS
 *   **The Ledger is Immutable:** The system's state and auditability rely entirely on append-only ledger entries. NEVER write code that mutates historical state tables (e.g., no `UPDATE journal_entries SET...`). To fix a state, issue a compensating journal entry.
