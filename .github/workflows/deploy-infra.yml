@@ -46,24 +46,9 @@ jobs:
 
       - name: Display Plan Summary
         run: echo "✅ Terraform plan complete! Review the plan in the next step before approving."
-
-  manual-approval:
-    name: "⏸️ Manual Approval Gate"
-    runs-on: ubuntu-latest
-    needs: terraform-plan
-    environment:
-      name: azure-loadtest
-    steps:
-      - name: Waiting for Your Approval
-        run: |
-          echo "🔍 Review the terraform plan above"
-          echo "✅ Click 'Review deployments' to approve or reject"
-          echo "⏳ Waiting for manual approval..."
-
   deploy-infrastructure:
     name: "Terraform Apply & Helm Deploy"
     runs-on: ubuntu-latest
-    needs: manual-approval
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
