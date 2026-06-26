@@ -36,3 +36,11 @@ service:
   type: ClusterIP
   port: 8080
   portName: http
+
+
+# Add this to charts/payment-edge-cell/values.yaml
+ingress:
+  enabled: false
+  className: "nginx"
+  path: "/"
+  pathType: "Prefix"
