@@ -4,18 +4,14 @@ kind: Ingress
 metadata:
   name: {{ include "payment-edge-cell.fullname" . }}
   labels:
-{{ include "payment-edge-cell.labels" . | nindent 4 }}
-{{- with .Values.ingress.annotations }}
+    {{- include "payment-edge-cell.labels" . | nindent 4 }}
   annotations:
-{{ toYaml . | nindent 4 }}
-{{- end }}
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
 spec:
   ingressClassName: {{ .Values.ingress.className | default "nginx" }}
   rules:
-    - http:
-{{- if .Values.ingress.host }}
-      host: {{ .Values.ingress.host | quote }}
-{{- end }}
+    - host: {{ .Values.ingress.host | default "localhost" | quote }}
+      http:
         paths:
           - path: {{ .Values.ingress.path | default "/" }}
             pathType: {{ .Values.ingress.pathType | default "Prefix" }}
@@ -24,8 +20,8 @@ spec:
                 name: {{ include "payment-edge-cell.fullname" . }}
                 port:
                   number: {{ .Values.service.port | default 8080 }}
-{{- with .Values.ingress.tls }}
-  tls:
-{{ toYaml . | nindent 4 }}
-{{- end }}
-{{- end }}
+  {{- with .Values.ingress.tls }}
+tls:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
