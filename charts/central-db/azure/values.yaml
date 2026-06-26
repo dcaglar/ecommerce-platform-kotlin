@@ -1,32 +1,52 @@
-postgres:
-  config:
-    shared_buffers: 4GB
-    effective_cache_size: 8GB
-    work_mem: 32MB
-    maintenance_work_mem: 512MB
-    max_parallel_workers_per_gather: 4
-    max_parallel_workers: 8
-    max_worker_processes: 8
-    temp_file_limit: 20GB
-    max_connections: 1000
-    checkpoint_timeout: 15min
-    max_wal_size: 10GB
-    min_wal_size: 2GB
-    checkpoint_completion_target: 0.9
-    wal_compression: on
-    jit: off
-    log_min_duration_statement: 1000
-    log_statement: none
-    bgwriter_lru_maxpages: 400
-    bgwriter_lru_multiplier: 2
+postgresql:
+  auth:
+    database: central-db
+    existingSecret: central-db-credentials
+    secretKeys:
+      adminPasswordKey: CENTRAL_DB_POSTGRES_PASSWORD
 
-resources:
-  requests:
-    cpu: 2000m
-    memory: 4Gi
-  limits:
-    cpu: 6000m
-    memory: 12Gi
+  primary:
+    extendedConfiguration: |-
+      shared_buffers=4G
+      effective_cache_size=8G
+      work_mem=32MB
+      maintenance_work_mem=512MB
+      max_parallel_workers_per_gather=4
+      max_parallel_workers=8
+      max_worker_processes=8
+      temp_file_limit=20GB
+      max_connections=1000
+      fsync=on
+      synchronous_commit=on
+
+    extraEnvVarsSecret: central-db-credentials
+    initdb:
+      scriptsConfigMap: central-db-init-configmap
+
+    resources:
+      requests:
+        cpu: 2000m
+        memory: 4Gi
+      limits:
+        cpu: 6000m
+        memory: 12Gi
+
+
+  metrics:
+    enabled: true
+    service:
+      ports:
+        metrics: 9187
+    serviceMonitor:
+      enabled: false
+      namespace: "payment"
+      interval: 10s
+      labels:
+        release: prometheus-stack
+
 
 nodeSelector:
   pool: central
+
+config:
+  CENTRAL_DB_URL: "jdbc:postgresql://central-db-postgresql:5432/central-db?options=-c%20timezone=UTC"
