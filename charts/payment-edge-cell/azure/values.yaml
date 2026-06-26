@@ -6,10 +6,15 @@ keda:
   minReplicaCount: 1
   maxReplicaCount: 2
   triggers:
-    - type: cpu
-      metadata:
-        type: Utilization
-        value: "85"
+    metrics:
+      - type: ContainerResource
+        containerResource:
+          name: cpu
+          container: payment-service
+          target:
+            type: Utilization
+            # Increased to 85% to avoid 'panic' scaling on noise
+            averageUtilization: 85
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 300
@@ -23,6 +28,7 @@ keda:
         - type: Percent
           value: 100
           periodSeconds: 15
+
 
 paymentService:
   image:
