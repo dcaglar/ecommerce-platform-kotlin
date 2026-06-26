@@ -19,9 +19,9 @@ const SCENARIOS = {
     // A. Smoke Test: Minimal load for validating that scripts and APIs work correctly
     smoke: {
         executor: 'constant-arrival-rate',
-        rate: 10,
+        rate: 20,
         timeUnit: '1s',
-        duration: '2m',
+        duration: '40m',
         preAllocatedVUs: 10,
         maxVUs: 40,
         tags: { test_type: 'smoke' },

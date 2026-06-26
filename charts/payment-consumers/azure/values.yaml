@@ -1,0 +1,84 @@
+# charts/payment-consumers/azure/values.yaml
+#
+# Azure profile — Standard_D8ds_v4 centralpool (8 vCPU / 32 GiB)
+# Mirrors charts/payment-consumers/local/values.yaml structure exactly.
+#
+# CPU strategy: low request (200m) so all replicas schedule; burst into idle
+# capacity on the centralpool. KEDA disabled by default — enable for load tests.
+
+spring:
+  profile: azure
+
+image:
+  repository: dcaglar1987/payment-consumers
+  tag: latest
+  pullPolicy: Always
+
+# Azure: sized for centralpool. 60% MaxRAMPercentage on 3Gi limit → ~1.8Gi heap.
+resources:
+  requests: {cpu: "200m", memory: "1536Mi"}
+  limits: {memory: "3Gi"}
+
+jvmOpts: >-
+  -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication
+  -XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=60
+  -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m
+  -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
+
+service:
+  type: ClusterIP
+  portName: http
+  port: 8080
+
+# KEDA disabled by default. Set enabled: true when running load tests.
+keda:
+  enabled: false
+  minReplicaCount: 1
+  maxReplicaCount: 6
+  pollingInterval: 15
+  cooldownPeriod: 300
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: kafka.payment.svc.cluster.local:9092
+        consumerGroup: psp-capture-executor-consumer-group
+        topic: gateway.capture.commands
+        lagThreshold: "2400"
+    - type: kafka
+      metadata:
+        bootstrapServers: kafka.payment.svc.cluster.local:9092
+        consumerGroup: psp-refund-executor-consumer-group
+        topic: gateway.refund.commands
+        lagThreshold: "2400"
+    - type: kafka
+      metadata:
+        bootstrapServers: kafka.payment.svc.cluster.local:9092
+        consumerGroup: psp-result-consumer-group
+        topic: payment.psp.results
+        lagThreshold: "2400"
+
+# Disable until monitoring-stack is deployed on centralpool.
+serviceMonitor:
+  enabled: false
+  path: /actuator/prometheus
+  interval: 15s
+  scrapeTimeout: 10s
+  scheme: http
+  labels:
+    release: prometheus-stack
+
+replicaCount: 1
+
+# Pin to centralpool — shares node with Kafka, Redis, central-db, relay, monitoring.
+nodeSelector:
+  pool: central
+
+redis:
+  url: redis://redis-master:6379
+
+kafka:
+  bootstrapServers: kafka.payment.svc.cluster.local:9092
+
+config:
+  CENTRAL_DB_URL: "jdbc:postgresql://central-db-postgresql.payment.svc.cluster.local:5432/central-db?options=-c%20timezone=UTC"
+  CENTRAL_DB_NAME: "central-db"

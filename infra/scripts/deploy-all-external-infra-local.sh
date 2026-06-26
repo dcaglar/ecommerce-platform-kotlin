@@ -47,9 +47,9 @@ echo "Deployment request of  kafka  was submitted to local helm"
 
 
 
-# 4.keda
+# 4.keda we should not really sent or use keda in local
 echo "Sending a deployment request of  KEDA to  local helm "
-$SCRIPT_DIR/deploy-external-infra.sh keda local
+#$SCRIPT_DIR/deploy-external-infra.sh keda local
 echo "Deployment request of  KEDA was submitted to local helm"
 
 echo ""

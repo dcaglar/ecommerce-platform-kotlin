@@ -10,7 +10,6 @@ postgresql:
     initdb:
       scriptsConfigMap: central-db-init-configmap
 
-    # Girintiler düzeltildi (primary bloğunun altı)
     resources:
       requests:
         cpu: 200m
@@ -31,14 +30,13 @@ postgresql:
       fsync=on
       synchronous_commit=on
 
-  # Metrikler de postgresql bloğunun altına taşındı
   metrics:
     enabled: true
     service:
       ports:
         metrics: 9187
     serviceMonitor:
-      enabled: true
+      enabled: false
       namespace: "payment"
       interval: 10s
       labels:

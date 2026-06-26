@@ -1,0 +1,63 @@
+# charts/payment-central-relay/azure/values.yaml
+#
+# Azure profile — Standard_D8ds_v4 centralpool (8 vCPU / 32 GiB)
+# Mirrors charts/payment-central-relay/local/values.yaml structure exactly.
+#
+# CRITICAL: replicaCount MUST stay at 1. The relay is a strict singleton.
+# Multiple relay instances would race on the T_Safe watermark and cause
+# duplicate Kafka publications. autoscaling and keda must remain disabled.
+
+spring:
+  profile: azure
+
+image:
+  repository: dcaglar1987/payment-central-relay
+  tag: latest
+  pullPolicy: Always
+
+# Azure: sized for centralpool. 60% MaxRAMPercentage on 2Gi limit → ~1.2Gi heap.
+resources:
+  requests: {cpu: "500m", memory: "1Gi"}
+  limits: {memory: "2Gi"}
+
+jvmOpts: >-
+  -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication
+  -XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=60
+  -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m
+  -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
+
+service:
+  type: ClusterIP
+  portName: http
+  port: 8080
+  managementPort: 9000
+
+# Singleton — autoscaling permanently disabled.
+replicaCount: 1
+autoscaling:
+  enabled: false
+
+keda:
+  enabled: false
+
+# Disable until monitoring-stack is deployed on centralpool.
+serviceMonitor:
+  enabled: false
+  path: /actuator/prometheus
+  interval: 30s
+  scrapeTimeout: 10s
+  labels:
+    release: prometheus-stack
+
+# Pin to centralpool.
+nodeSelector:
+  pool: central
+
+redis:
+  url: redis://redis-master:6379
+
+kafka:
+  bootstrapServers: kafka.payment.svc.cluster.local:9092
+
+config:
+  CENTRAL_DB_URL: "jdbc:postgresql://central-db-postgresql.payment.svc.cluster.local:5432/central-db?options=-c%20timezone=UTC"

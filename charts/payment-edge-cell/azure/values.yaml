@@ -137,7 +137,7 @@ ingress:
 # ServiceMonitor disabled: no Prometheus stack deployed in load-test env by default.
 # Enable when monitoring-stack is deployed.
 serviceMonitor:
-  enabled: true
+  enabled: false
   path: /actuator/prometheus
   interval: 15s
   scrapeTimeout: 10s

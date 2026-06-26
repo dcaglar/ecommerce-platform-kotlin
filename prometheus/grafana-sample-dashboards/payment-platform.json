@@ -3,7 +3,7 @@
   "kind": "Dashboard",
   "metadata": {
     "name": "adq5v8d",
-    "generation": 23,
+    "generation": 26,
     "creationTimestamp": "2026-06-25T23:43:16Z",
     "labels": {},
     "annotations": {}
@@ -30,278 +30,6 @@
     "cursorSync": "Off",
     "editable": true,
     "elements": {
-      "p-api-latency": {
-        "kind": "Panel",
-        "spec": {
-          "id": 201,
-          "title": "🌐 Web API — p50/p95/p99 Latency (ms)",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "histogram_quantile(0.50, sum(rate(http_server_requests_seconds_bucket{application=\"payment-service\",uri=~\"/api/v1/payments.*\"}[1m])) by (le,uri)) * 1000",
-                        "legendFormat": "p50 {{uri}}"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{application=\"payment-service\",uri=~\"/api/v1/payments.*\"}[1m])) by (le,uri)) * 1000",
-                        "legendFormat": "p95 {{uri}}"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "B",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{application=\"payment-service\",uri=~\"/api/v1/payments.*\"}[1m])) by (le,uri)) * 1000",
-                        "legendFormat": "p99 {{uri}}"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "C",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "13.1.0",
-            "spec": {
-              "options": {
-                "annotations": {
-                  "clustering": -1,
-                  "multiLane": false
-                },
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "enableFacetedFilter": false,
-                  "overflow": "ellipsis",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "ms",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 10,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 2,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "auto",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "p-api-rps": {
-        "kind": "Panel",
-        "spec": {
-          "id": 200,
-          "title": "🌐 Web API — Request Rate (RPS)",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "sum(rate(http_server_requests_seconds_count{application=\"payment-service\",uri=~\"/api/v1/payments.*\"}[1m])) by (uri, status)",
-                        "legendFormat": "{{uri}} [{{status}}]"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "13.1.0",
-            "spec": {
-              "options": {
-                "annotations": {
-                  "clustering": -1,
-                  "multiLane": false
-                },
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "enableFacetedFilter": false,
-                  "overflow": "ellipsis",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 10,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 2,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "auto",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
       "p-consumer-lag-capture-cmd": {
         "kind": "Panel",
         "spec": {
@@ -1674,966 +1402,6 @@
           }
         }
       },
-      "p-local-outbox-backlog": {
-        "kind": "Panel",
-        "spec": {
-          "id": 210,
-          "title": "⚙️ LocalOutboxStoreAndForwardJob — Backlog",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "local_outbox_backlog_size{application=\"payment-edge-workers\"}",
-                        "legendFormat": "Backlog ({{instance}})"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "13.1.0",
-            "spec": {
-              "options": {
-                "annotations": {
-                  "clustering": -1,
-                  "multiLane": false
-                },
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "enableFacetedFilter": false,
-                  "overflow": "ellipsis",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 10,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 2,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "auto",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "p-local-outbox-duration": {
-        "kind": "Panel",
-        "spec": {
-          "id": 212,
-          "title": "⚙️ LocalOutboxStoreAndForwardJob — Dispatch Duration",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "histogram_quantile(0.95, sum(rate(outbox_dispatcher_duration_seconds_bucket{application=\"payment-edge-workers\"}[1m])) by (le)) * 1000",
-                        "legendFormat": "p95 dispatch (ms)"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "histogram_quantile(0.99, sum(rate(outbox_dispatcher_duration_seconds_bucket{application=\"payment-edge-workers\"}[1m])) by (le)) * 1000",
-                        "legendFormat": "p99 dispatch (ms)"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "B",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "13.1.0",
-            "spec": {
-              "options": {
-                "annotations": {
-                  "clustering": -1,
-                  "multiLane": false
-                },
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "enableFacetedFilter": false,
-                  "overflow": "ellipsis",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "ms",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 10,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 2,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "auto",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "p-local-outbox-throughput": {
-        "kind": "Panel",
-        "spec": {
-          "id": 211,
-          "title": "⚙️ LocalOutboxStoreAndForwardJob — Throughput",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "rate(outbox_dispatched_total{application=\"payment-edge-workers\"}[1m])",
-                        "legendFormat": "Dispatched/s ({{instance}})"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "rate(outbox_dispatch_failed_total{application=\"payment-edge-workers\"}[1m])",
-                        "legendFormat": "Failed/s ({{instance}})"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "B",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "13.1.0",
-            "spec": {
-              "options": {
-                "annotations": {
-                  "clustering": -1,
-                  "multiLane": false
-                },
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "enableFacetedFilter": false,
-                  "overflow": "ellipsis",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      },
-                      {
-                        "value": 1,
-                        "color": "red"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 10,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 2,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "auto",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "p-maintenance-job-errors": {
-        "kind": "Panel",
-        "spec": {
-          "id": 260,
-          "title": "⚙️ Maintenance Jobs — Error Rate",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "rate(maintenance_job_error_total{application=\"payment-central-relay\"}[1m])",
-                        "legendFormat": "Central Errors/s"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "rate(maintenance_job_error_total{application=\"payment-edge-workers\"}[1m])",
-                        "legendFormat": "Edge Errors/s"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "B",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "13.1.0",
-            "spec": {
-              "options": {
-                "annotations": {
-                  "clustering": -1,
-                  "multiLane": false
-                },
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "enableFacetedFilter": false,
-                  "overflow": "ellipsis",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      },
-                      {
-                        "value": 1,
-                        "color": "red"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 10,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 2,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "auto",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "p-psp-calls": {
-        "kind": "Panel",
-        "spec": {
-          "id": 240,
-          "title": "💳 PSP Capture Calls — Results",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "rate(psp_calls_total{application=\"payment-consumers\", result=\"SUCCESS\"}[1m])",
-                        "legendFormat": "SUCCESS/s"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "rate(psp_calls_total{application=\"payment-consumers\", result=\"RETRYABLE\"}[1m])",
-                        "legendFormat": "RETRYABLE/s"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "B",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "rate(psp_calls_total{application=\"payment-consumers\", result=\"DECLINED\"}[1m])",
-                        "legendFormat": "DECLINED/s"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "C",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "13.1.0",
-            "spec": {
-              "options": {
-                "annotations": {
-                  "clustering": -1,
-                  "multiLane": false
-                },
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "enableFacetedFilter": false,
-                  "overflow": "ellipsis",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 10,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 2,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "auto",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "p-redis-retry": {
-        "kind": "Panel",
-        "spec": {
-          "id": 241,
-          "title": "🔁 Redis Retry Queue — Size & Events",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "redis_retry_zset_size{application=\"payment-central-relay\"}",
-                        "legendFormat": "Retry Queue Size"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "rate(redis_retry_events_total{application=\"payment-central-relay\", result=\"processed\"}[1m])",
-                        "legendFormat": "Processed/s"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "B",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "rate(redis_retry_events_total{application=\"payment-central-relay\", result=\"failed\"}[1m])",
-                        "legendFormat": "Failed/s"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "C",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "13.1.0",
-            "spec": {
-              "options": {
-                "annotations": {
-                  "clustering": -1,
-                  "multiLane": false
-                },
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "enableFacetedFilter": false,
-                  "overflow": "ellipsis",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 10,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 2,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "auto",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "p-relay-backlog": {
-        "kind": "Panel",
-        "spec": {
-          "id": 213,
-          "title": "⚙️ OutboxRelayJob — Central Backlog",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "central_outbox_backlog_size{application=\"payment-central-relay\"}",
-                        "legendFormat": "Central Backlog ({{instance}})"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "13.1.0",
-            "spec": {
-              "options": {
-                "annotations": {
-                  "clustering": -1,
-                  "multiLane": false
-                },
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "enableFacetedFilter": false,
-                  "overflow": "ellipsis",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 10,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 2,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "auto",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
       "p-relay-poll-duration": {
         "kind": "Panel",
         "spec": {
@@ -2703,146 +1471,6 @@
                       {
                         "value": 0,
                         "color": "green"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 10,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 2,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "auto",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "p-relay-throughput": {
-        "kind": "Panel",
-        "spec": {
-          "id": 214,
-          "title": "⚙️ OutboxRelayJob — Kafka Publish Throughput",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "rate(relay_published_total{application=\"payment-central-relay\"}[1m])",
-                        "legendFormat": "Published/s ({{instance}})"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "spec": {
-                        "expr": "rate(relay_publish_failed_total{application=\"payment-central-relay\"}[1m])",
-                        "legendFormat": "Failed/s ({{instance}})"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "prometheus-1",
-                        "grafana.app/export-datasource-name": "Prometheus"
-                      }
-                    },
-                    "refId": "B",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "13.1.0",
-            "spec": {
-              "options": {
-                "annotations": {
-                  "clustering": -1,
-                  "multiLane": false
-                },
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "enableFacetedFilter": false,
-                  "overflow": "ellipsis",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      },
-                      {
-                        "value": 1,
-                        "color": "red"
                       }
                     ]
                   },
@@ -5017,49 +3645,6 @@
           }
         }
       },
-      "panel-261": {
-        "kind": "Panel",
-        "spec": {
-          "id": 261,
-          "title": "LocalOutboxStoreAndForwardJob",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "",
-                      "version": "v0",
-                      "spec": {}
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "__unconfigured-panel",
-            "version": "13.1.0",
-            "spec": {
-              "options": {},
-              "fieldConfig": {
-                "defaults": {},
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
       "panel-262": {
         "kind": "Panel",
         "spec": {
@@ -6198,7 +4783,7 @@
             "spec": {
               "x": 0,
               "y": 32,
-              "width": 8,
+              "width": 11,
               "height": 8,
               "element": {
                 "kind": "ElementReference",
@@ -6209,9 +4794,9 @@
           {
             "kind": "GridLayoutItem",
             "spec": {
-              "x": 8,
+              "x": 11,
               "y": 32,
-              "width": 8,
+              "width": 13,
               "height": 8,
               "element": {
                 "kind": "ElementReference",
@@ -6241,7 +4826,20 @@
               "height": 8,
               "element": {
                 "kind": "ElementReference",
-                "name": "panel-8"
+                "name": "panel-18"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 16,
+              "y": 40,
+              "width": 8,
+              "height": 8,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-19"
               }
             }
           },
@@ -6249,19 +4847,6 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 48,
-              "width": 8,
-              "height": 8,
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-23"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "x": 12,
               "y": 48,
               "width": 8,
               "height": 8,
@@ -6275,12 +4860,12 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 8,
-              "y": 56,
+              "y": 48,
               "width": 8,
               "height": 8,
               "element": {
                 "kind": "ElementReference",
-                "name": "panel-18"
+                "name": "panel-8"
               }
             }
           },
@@ -6288,33 +4873,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 16,
-              "y": 56,
-              "width": 8,
-              "height": 8,
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-19"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "x": 8,
-              "y": 64,
-              "width": 8,
-              "height": 8,
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-24"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "x": 16,
-              "y": 64,
+              "y": 48,
               "width": 8,
               "height": 8,
               "element": {
@@ -6327,38 +4886,12 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 72,
-              "width": 12,
-              "height": 9,
-              "element": {
-                "kind": "ElementReference",
-                "name": "p-api-rps"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "x": 12,
-              "y": 72,
-              "width": 12,
-              "height": 9,
-              "element": {
-                "kind": "ElementReference",
-                "name": "p-api-latency"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "x": 0,
-              "y": 81,
+              "y": 56,
               "width": 8,
-              "height": 9,
+              "height": 8,
               "element": {
                 "kind": "ElementReference",
-                "name": "p-local-outbox-backlog"
+                "name": "panel-23"
               }
             }
           },
@@ -6366,12 +4899,12 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 8,
-              "y": 81,
+              "y": 56,
               "width": 8,
-              "height": 9,
+              "height": 8,
               "element": {
                 "kind": "ElementReference",
-                "name": "p-local-outbox-throughput"
+                "name": "panel-24"
               }
             }
           },
@@ -6379,48 +4912,9 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 16,
-              "y": 81,
+              "y": 56,
               "width": 8,
-              "height": 9,
-              "element": {
-                "kind": "ElementReference",
-                "name": "p-local-outbox-duration"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "x": 0,
-              "y": 90,
-              "width": 8,
-              "height": 9,
-              "element": {
-                "kind": "ElementReference",
-                "name": "p-relay-backlog"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "x": 8,
-              "y": 90,
-              "width": 8,
-              "height": 9,
-              "element": {
-                "kind": "ElementReference",
-                "name": "p-relay-throughput"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "x": 16,
-              "y": 90,
-              "width": 8,
-              "height": 9,
+              "height": 7,
               "element": {
                 "kind": "ElementReference",
                 "name": "p-relay-poll-duration"
@@ -6430,8 +4924,21 @@
           {
             "kind": "GridLayoutItem",
             "spec": {
+              "x": 16,
+              "y": 63,
+              "width": 8,
+              "height": 10,
+              "element": {
+                "kind": "ElementReference",
+                "name": "p-consumer-lag-capture-submitted"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
               "x": 0,
-              "y": 99,
+              "y": 64,
               "width": 8,
               "height": 9,
               "element": {
@@ -6444,7 +4951,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 8,
-              "y": 99,
+              "y": 64,
               "width": 8,
               "height": 9,
               "element": {
@@ -6456,21 +4963,8 @@
           {
             "kind": "GridLayoutItem",
             "spec": {
-              "x": 16,
-              "y": 99,
-              "width": 8,
-              "height": 9,
-              "element": {
-                "kind": "ElementReference",
-                "name": "p-consumer-lag-capture-submitted"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
               "x": 0,
-              "y": 108,
+              "y": 73,
               "width": 12,
               "height": 9,
               "element": {
@@ -6483,7 +4977,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 12,
-              "y": 108,
+              "y": 73,
               "width": 12,
               "height": 9,
               "element": {
@@ -6496,7 +4990,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 117,
+              "y": 82,
               "width": 6,
               "height": 9,
               "element": {
@@ -6509,7 +5003,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 6,
-              "y": 117,
+              "y": 82,
               "width": 6,
               "height": 9,
               "element": {
@@ -6522,7 +5016,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 12,
-              "y": 117,
+              "y": 82,
               "width": 6,
               "height": 9,
               "element": {
@@ -6535,7 +5029,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 18,
-              "y": 117,
+              "y": 82,
               "width": 6,
               "height": 9,
               "element": {
@@ -6548,33 +5042,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 126,
-              "width": 12,
-              "height": 9,
-              "element": {
-                "kind": "ElementReference",
-                "name": "p-psp-calls"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "x": 12,
-              "y": 126,
-              "width": 12,
-              "height": 9,
-              "element": {
-                "kind": "ElementReference",
-                "name": "p-redis-retry"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "x": 0,
-              "y": 135,
+              "y": 91,
               "width": 8,
               "height": 9,
               "element": {
@@ -6587,7 +5055,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 8,
-              "y": 135,
+              "y": 91,
               "width": 8,
               "height": 9,
               "element": {
@@ -6600,7 +5068,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 16,
-              "y": 135,
+              "y": 91,
               "width": 8,
               "height": 9,
               "element": {
@@ -6613,7 +5081,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 0,
-              "y": 144,
+              "y": 100,
               "width": 8,
               "height": 9,
               "element": {
@@ -6626,7 +5094,7 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 8,
-              "y": 144,
+              "y": 100,
               "width": 8,
               "height": 9,
               "element": {
@@ -6639,38 +5107,12 @@
             "kind": "GridLayoutItem",
             "spec": {
               "x": 16,
-              "y": 144,
+              "y": 100,
               "width": 8,
               "height": 9,
               "element": {
                 "kind": "ElementReference",
                 "name": "p-db-central-tps"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "x": 0,
-              "y": 153,
-              "width": 12,
-              "height": 9,
-              "element": {
-                "kind": "ElementReference",
-                "name": "p-maintenance-job-errors"
-              }
-            }
-          },
-          {
-            "kind": "GridLayoutItem",
-            "spec": {
-              "x": 12,
-              "y": 153,
-              "width": 12,
-              "height": 9,
-              "element": {
-                "kind": "ElementReference",
-                "name": "panel-261"
               }
             }
           }
@@ -6688,7 +5130,7 @@
       "timezone": "browser",
       "from": "now-6h",
       "to": "now",
-      "autoRefresh": "5s",
+      "autoRefresh": "30s",
       "autoRefreshIntervals": [
         "5s",
         "10s",

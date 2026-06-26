@@ -1,12 +1,32 @@
 app:
   instance-id: ${POD_NAME:${HOSTNAME:${random.value}}}
   datasource:
+    # ─── 1. CORE TRANSACTIONAL DATABASE POOL ─────────────────────────────────
+    # Matches application-local.yml: app.datasource.central-outbox namespace.
+    # Azure: 20 connections (vs 10 local) to saturate the relay's resilientExecutor
+    # thread pool under sustained outbox publishing load.
+    central-outbox:
+      jdbc-url: ${CENTRAL_DB_URL}
+      username: ${CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME}
+      password: ${CENTRAL_DB_PAYMENT_CENTRAL_RELAY_PASSWORD}
+      pool-name: ${spring.application.name}-central-outbox-pool
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 15000
+      validation-timeout: 15000
+      idle-timeout: 600000
+      max-lifetime: 1740000
+      keepalive-time: 300000
+      leak-detection-threshold: 60000
+
+    # ─── 2. MAINTENANCE POOL ──────────────────────────────────────────────────
+    # Low-throughput pool for the CentralOutboxMaintenanceJob (cleanup sweeps).
     maintenance:
-      jdbc-url: ${SPRING_DATASOURCE_URL}
-      username: ${SPRING_DATASOURCE_MAINTENANCE_USERNAME}
-      password: ${SPRING_DATASOURCE_MAINTENANCE_PASSWORD}
+      jdbc-url: ${CENTRAL_DB_URL}
+      username: ${CENTRAL_DB_DUTY_USERNAME}
+      password: ${CENTRAL_DB_DUTY_PASSWORD}
       pool-name: ${spring.application.name}-central-maint-pool
-      maximum-pool-size: 1
+      maximum-pool-size: 2
       minimum-idle: 0
       connection-timeout: 15000
       validation-timeout: 15000
@@ -14,24 +34,14 @@ app:
       max-lifetime: 1800000
 
 spring:
-  datasource:
-    url: ${SPRING_DATASOURCE_CENTRAL_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
-    hikari:
-      maximum-pool-size: 50
-      minimum-idle: 10
-      connection-timeout: 15000
-      validation-timeout: 15000
-      idle-timeout: 600000
-      max-lifetime: 1740000
-      keepalive-time: 300000
-      leak-detection-threshold: 60000
   data:
     redis:
       url: ${SPRING_DATA_REDIS_URL}
 
 outbox-relay:
+  # Azure: high-throughput settings.
+  # batch-size 2000: saturates Kafka at load-test throughput without OOM.
+  # poll-interval 200ms: tight polling loop — relay is sole reader so no contention.
   batch-size: 2000
   poll-interval: 200
 

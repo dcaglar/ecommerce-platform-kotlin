@@ -67,7 +67,7 @@ open class ProcessPspResultProcessingService(
         val paymentIdValue = idGeneratorPort.generateId()
         val txIdValue = idGeneratorPort.generateId()
 
-        // 1. Generate Payment
+        // 1. Generate Payment main record
         val splits = event.splits.map { it.toDomain() }
         val payment = Payment.initializeFromAuthEvent(
             paymentId = PaymentId(paymentIdValue),
@@ -79,7 +79,7 @@ open class ProcessPspResultProcessingService(
             splits = splits
         )
 
-        // 2. Generate AuthorizationTx
+        // 2. Generate AuthorizationTx(representsing )
         val transaction = Tx.createAuthTx(
             txId = TxId(txIdValue),
             paymentId = PaymentId(paymentIdValue),
