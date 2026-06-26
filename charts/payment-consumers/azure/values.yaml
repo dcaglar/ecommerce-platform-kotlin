@@ -32,7 +32,7 @@ service:
 
 # KEDA disabled by default. Set enabled: true when running load tests.
 keda:
-  enabled: false
+  enabled: true
   minReplicaCount: 1
   maxReplicaCount: 6
   pollingInterval: 15

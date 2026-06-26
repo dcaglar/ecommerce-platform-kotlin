@@ -134,12 +134,9 @@ jobs:
       - name: Deploy Azure Environment
         run: |
           # We execute your exact bash scripts, just pointing to the Azure versions!
-          ./infra/scripts/deploy-external-infra.sh ingress-controller azure
-          ./infra/scripts/deploy.sh payment-edge-cell azure
-          ./infra/scripts/deploy.sh payment-edge-workers azure
-          ./infra/scripts/deploy.sh central-db azure
-          ./infra/scripts/deploy.sh payment-consumers azure
-          ./infra/scripts/deploy.sh payment-central-relay azure
+          ./infra/scripts/deploy-all-external-infra-azure.sh
+          ./infra/scripts/deploy-monitoring-stack-azure.sh 
+          ./infra/scripts/deploy-payment-platform-services-azure.sh  
 
       - name: ✅ Deployment Complete
         run: echo "Infrastructure and applications deployed successfully!"
