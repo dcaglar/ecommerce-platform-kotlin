@@ -89,7 +89,7 @@ helm repo update
 
 echo "📦 Deploying $RELEASE_NAME into namespace $NAMESPACE..."
 # Note: we are passing HELM_ARGS and EXTRA_ARGS unquoted intentionally so they expand
-helm upgrade --install "$RELEASE_NAME" "$CHART" \
+helm secrets upgrade --install "$RELEASE_NAME" "$CHART" \
   -n "$NAMESPACE" --create-namespace \
   $HELM_ARGS \
   $EXTRA_ARGS \
