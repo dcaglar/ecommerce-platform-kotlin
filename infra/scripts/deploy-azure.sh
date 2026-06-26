@@ -5,13 +5,13 @@ set -euo pipefail
 
 usage() {
   echo "Usage: $0 <service-name> <environment>"
-  echo "Example: $0 payment-central-relay local"
+  echo "Example: $0 payment-central-relay azure"
   echo "Example: $0 payment-edge-cell azure"
   exit 1
 }
 
 SERVICE_NAME=${1:-}
-ENV=${2:-}
+ENV=azure
 
 if [ -z "$SERVICE_NAME" ] || [ -z "$ENV" ]; then
   usage
@@ -48,7 +48,7 @@ fi
 
 echo "🚀 Deploying $SERVICE_NAME to $ENV environment..."
 
-if [[ "$ENV" == "local" ]]; then
+if [[ "$ENV" == "azure" ]]; then
   # Some services like keycloak, redis, kafka might not be in the 'charts' directory in the same way,
   # but they are usually handled by their own scripts or helm repos. We will assume for now this handles the custom charts.
   if [ ! -d "$CHART_ROOT" ]; then
@@ -57,12 +57,12 @@ if [[ "$ENV" == "local" ]]; then
   fi
   
   echo "📦 Updating helm dependencies..."
-  helm dependency update "$CHART_ROOT/$SERVICE_NAME"
+  helm dependency update "$CHART_ROOT"
   
-  $HELM_CMD --install "$SERVICE_NAME" "$CHART_ROOT" \
+  $HELM_CMD "$SERVICE_NAME" "$CHART_ROOT" \
     -n payment --create-namespace \
     -f "$CHART_ROOT/values.yaml" \
-    -f "$CHART_ROOT/$ENV/values.yaml" \
+    -f "$CHART_ROOT/azure/values.yaml" \
     $SECRET_ARGS
     
   # Clean up the downloaded .tgz dependencies so they don't pollute the IDE/codebase

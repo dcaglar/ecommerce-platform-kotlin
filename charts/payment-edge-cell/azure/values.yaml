@@ -2,32 +2,34 @@ spring:
   profile: "azure"
 
 keda:
-  enabled: true
+  enabled: false
   minReplicaCount: 1
   maxReplicaCount: 2
+  pollingInterval: 15
+  cooldownPeriod: 300
   triggers:
-    metrics:
-      - type: ContainerResource
-        containerResource:
-          name: cpu
-          container: payment-service
-          target:
-            type: Utilization
-            # Increased to 85% to avoid 'panic' scaling on noise
-            averageUtilization: 85
+    - type: cpu # <--- Direct item in the array
+      metricType: Utilization
+      metadata:
+        value: "85"
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 300
+      selectPolicy: Max
       policies:
         - type: Pods
-          value: 1
-          periodSeconds: 45
+          value: 1 # Add 1 pod at a time
+          periodSeconds: 45 # Wait 45s between steps to allow JIT/warmup
     scaleDown:
+      # "The Patience Window": Keep pods for 5 mins after load drops.
+      # Prevents killing pods during small traffic dips.
       stabilizationWindowSeconds: 300
+      selectPolicy: Max
       policies:
         - type: Percent
           value: 100
           periodSeconds: 15
+
 
 
 paymentService:

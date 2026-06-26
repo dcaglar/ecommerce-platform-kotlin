@@ -29,26 +29,13 @@ spec:
         - name: edge-db
           image: postgres:15
           restartPolicy: Always   # <--- K8s 1.28
-          readinessProbe:
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            exec:
-                command:
-                  - psql
-                  - -U
-                  - postgres
-                  - -d
-                  - edge-db
-                  - -tAc
-                  - "SELECT 1 FROM databasechangelog WHERE id = '20260208-optimize-idempotency-vacuum' AND author = 'dogancaglar' AND exectype = 'EXECUTED';"
           volumeMounts:
             - name: db-init-scripts
               mountPath: /docker-entrypoint-initdb.d
+
           envFrom:
-            - secretRef:
-              name: edge-cell-credentials
             - configMapRef:
-              name: edge-cell-config
+                name: edge-cell-config
           env:
             - name: POSTGRES_DB
               valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_NAME}}
@@ -56,30 +43,40 @@ spec:
               value: postgres
             - name: POSTGRES_PASSWORD
               valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_POSTGRES_PASSWORD}}
-            - name: EDGE_DB_NAME
-              valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_NAME}}
-            - name: EDGE_DB_URL
+            - name: EDGE_DB_PAYMENT_SERVICE_USERNAME
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_SERVICE_USERNAME}}
+            - name: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_SERVICE_PASSWORD}}
+
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME}}
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD}}
+            - name: EDGE_DB_DUTY_USERNAME
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_DUTY_USERNAME}}
+            - name: EDGE_DB_DUTY_PASSWORD
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_DUTY_PASSWORD}}
+
+
+            - name: LIQUIBASE_COMMAND_URL
               valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_URL}}
-            - name: SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
-              valueFrom: {configMapKeyRef: {name: edge-cell-config, key: KEYCLOAK_ISSUER_URL}}
-        - name: liquibase-migration
-          image: liquibase/liquibase:4.24.0 # <--- The official vanilla image
-          env:
-              - name: LIQUIBASE_COMMAND_URL
-                valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_URL}}
-              - name: LIQUIBASE_COMMAND_USERNAME
-                valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_SERVICE_USERNAME}}
-              - name: LIQUIBASE_COMMAND_PASSWORD
-                valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_SERVICE_PASSWORD}}
-            # Point Liquibase at the extracted files on the shared volume
+            - name: LIQUIBASE_COMMAND_USERNAME
+              value: 'postgres'
+            - name: LIQUIBASE_COMMAND_PASSWORD
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_POSTGRES_PASSWORD}}
           args: ["--search-path=/shared-workspace", "update", "--changelog-file=changelog.edge.xml"]
+        - name: liquibase-migration
+          image: liquibase/liquibase:4.24.0
+
+          args:
+
           volumeMounts:
             - name: liquibase-workspace
               mountPath: /shared-workspace
       containers:
         - name: payment-service
           image: "{{ .Values.paymentService.image.repository }}:{{ .Values.paymentService.image.tag }}"
-          imagePullPolicy: {{ .Values.paymentService.image.pullPolicy | default "Always" }}
+          imagePullPolicy: {{.Values.paymentService.image.pullPolicy | default "Always"}}
           ports:
             - name: http
               containerPort: 8080
@@ -90,8 +87,10 @@ spec:
               value: "{{ .Values.spring.profile | default "local" }}"
             - name: SPRING_DATA_REDIS_URL
               value: "{{ .Values.redis.url | default "redis://localhost:6379" }}"
+
+
           resources:
-            {{- toYaml .Values.paymentService.resources | nindent 12 }}
+            {{- toYaml .Values.paymentService.resources | nindent 12}}
       volumes:
         - name: db-init-scripts
           configMap:

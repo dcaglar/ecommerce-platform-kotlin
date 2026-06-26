@@ -1,21 +1,17 @@
-{{- if (and .Values.keda (default false .Values.keda.enabled)) }}
+{{- if .Values.keda.enabled }}
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
   name: {{ include "payment-edge-cell.fullname" . }}
-  namespace: {{ .Release.Namespace }}
 spec:
   scaleTargetRef:
     name: {{ include "payment-edge-cell.fullname" . }}
-    kind: StatefulSet   # <--- THIS IS THE MISSING KEY
-  minReplicaCount: {{ .Values.keda.minReplicaCount | default 1 }}
-  maxReplicaCount: {{ .Values.keda.maxReplicaCount | default 2 }}
+  minReplicaCount: {{ .Values.keda.minReplicaCount }}
+  maxReplicaCount: {{ .Values.keda.maxReplicaCount }}
   triggers:
-    {{- toYaml .Values.keda.triggers | nindent 4 }}
+    {{- toYaml .Values.keda.triggers.metrics | nindent 4 }}
   advanced:
     horizontalPodAutoscalerConfig:
       behavior:
         {{- toYaml .Values.keda.behavior | nindent 8 }}
-{{- end }}
-
-
+  {{- end }}

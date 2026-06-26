@@ -14,20 +14,20 @@ service:
   portName: http
   port: 8080
 keda:
-    enabled: true # Ensure this is set to true to enable scaling
-    minReplicaCount: 1
-    maxReplicaCount: 6
-    pollingInterval: 15
-    cooldownPeriod: 300
-    triggers:
-      - type: kafka
-        metadata:
-          bootstrapServers: kafka.payment.svc.cluster.local:9092
-          consumerGroup: psp-capture-executor-consumer-group
-          topic: gateway.capture.commands
-          lagThreshold: "2400"
-          # Ensure you are using the latest version-compliant metadata
-          offsetResetPolicy: latest
+  enabled: true # Ensure this is set to true to enable scaling
+  minReplicaCount: 1
+  maxReplicaCount: 6
+  pollingInterval: 15
+  cooldownPeriod: 300
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: kafka.payment.svc.cluster.local:9092
+        consumerGroup: psp-capture-executor-consumer-group
+        topic: gateway.capture.commands
+        lagThreshold: "2400"
+        # Ensure you are using the latest version-compliant metadata
+        offsetResetPolicy: latest
 serviceMonitor:
   enabled: true
   path: /actuator/prometheus

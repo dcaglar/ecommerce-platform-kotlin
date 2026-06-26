@@ -1,6 +1,11 @@
 app:
   cache:
     ttl-seconds: 3600  # 1 hour redis TTL for PSP result cache
+  kafka:
+    concurrency:
+      journal-entries: 3
+      capture-commands: 3
+      capture-submitted: 3
 
 
 server:
