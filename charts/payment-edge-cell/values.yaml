@@ -36,8 +36,3 @@ service:
   type: ClusterIP
   port: 8080
   portName: http
-ingress:
-  enabled: false
-  className: nginx
-  path: /
-  pathType: Prefix
