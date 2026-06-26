@@ -130,6 +130,9 @@ jobs:
           chmod 700 get_helm.sh
           ./get_helm.sh
           helm plugin install https://github.com/jkroepke/helm-secrets
+          
+          curl -L https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64 -o /usr/local/bin/sops
+          chmod +x /usr/local/bin/sops
 
       - name: Deploy Azure Environment
         env:
