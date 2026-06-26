@@ -28,11 +28,6 @@ spec:
       initContainers:
         - name: edge-db
           image: postgres:15
-          readinessProbe:
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            exec:
-              command: ["psql", "-U", "postgres", "-d", "edge-db", "-tAc", "SELECT 1;"]
           volumeMounts:
             - name: db-init-scripts
               mountPath: /docker-entrypoint-initdb.d
