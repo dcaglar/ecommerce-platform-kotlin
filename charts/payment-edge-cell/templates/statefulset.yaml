@@ -56,6 +56,12 @@ spec:
               value: postgres
             - name: POSTGRES_PASSWORD
               valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_POSTGRES_PASSWORD}}
+            - name: EDGE_DB_NAME
+              valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_NAME}}
+            - name: EDGE_DB_URL
+              valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_URL}}
+            - name: SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
+              valueFrom: {configMapKeyRef: {name: edge-cell-config, key: KEYCLOAK_ISSUER_URL}}
         - name: liquibase-migration
           image: liquibase/liquibase:4.24.0 # <--- The official vanilla image
           env:
