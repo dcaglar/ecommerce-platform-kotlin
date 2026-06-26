@@ -132,6 +132,8 @@ jobs:
           helm plugin install https://github.com/jkroepke/helm-secrets
 
       - name: Deploy Azure Environment
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
         run: |
           # We execute your exact bash scripts, just pointing to the Azure versions!
           ./infra/scripts/deploy-all-external-infra-azure.sh
