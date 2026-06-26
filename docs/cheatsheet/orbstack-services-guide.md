@@ -9,8 +9,8 @@ Here is your standardized cheat sheet for reaching all infrastructure components
 ## 📊 1. Observability (Prometheus & Grafana)
 
 ### Grafana
-- **URL**: [http://prometheus-stack-grafana.monitoring.svc.cluster.local](http://prometheus-stack-grafana.monitoring.svc.cluster.local)
-- **Default Credentials**: `admin` / `prom-operator`
+- **URL**: [http://localhost:32000](http://localhost:32000)
+- **Default Credentials**: `admin` / `admin`
 
 ### Prometheus
 - **URL**: [http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090](http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090)
@@ -41,18 +41,6 @@ The Edge DB runs alongside the payment application logic.
   ```bash
   psql -h payment-edge-cell.payment.svc.cluster.local -p 5432 -U payment -d payment_db
   ```
-
-### Yugabyte DB
-- **Master UI (Cluster Status)**: [http://yb-master-ui.payment.svc.cluster.local:7000](http://yb-master-ui.payment.svc.cluster.local:7000)
-- **TServer UI**: [http://yb-tservers.payment.svc.cluster.local:9000](http://yb-tservers.payment.svc.cluster.local:9000)
-- **Yugabyte SQL (YSQL)**:
-  - **Host**: `yb-tserver-service.payment.svc.cluster.local`
-  - **Port**: `5433`
-  - **CLI Connection**:
-    ```bash
-    ysqlsh -h yb-tserver-service.payment.svc.cluster.local -p 5433 -U yugabyte
-    ```
-
 ---
 
 ## 📨 3. Kafka (Event Streaming)
@@ -63,29 +51,29 @@ The Edge DB runs alongside the payment application logic.
 
 **List all topics:**
 ```bash
-kafka-topics.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 --list
+kafka-topics --bootstrap-server kafka.payment.svc.cluster.local:9092 --list
 ```
 
 **Describe a specific topic (e.g., DLQs):**
 ```bash
-kafka-topics.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 \
+kafka-topics --bootstrap-server kafka.payment.svc.cluster.local:9092 \
   --topic payment_order_capture_request_queue_topic --describe
 ```
 
 **List consumer groups:**
 ```bash
-kafka-consumer-groups.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 --list
+kafka-consumer-groups --bootstrap-server kafka.payment.svc.cluster.local:9092 --list
 ```
 
 **Check Consumer Lag (Crucial for monitoring throughput):**
 ```bash
-kafka-consumer-groups.sh --bootstrap-server kafka.payment.svc.cluster.local:9092 \
+kafka-consumer-groups --bootstrap-server kafka.payment.svc.cluster.local:9092 \
   --group payment-order-capture-executor-consumer-group --describe
 ```
 
 **Watch DLQ Messages live (without advancing offsets):**
 ```bash
-kafka-console-consumer.sh \
+kafka-console-consumer \
   --bootstrap-server kafka.payment.svc.cluster.local:9092 \
   --topic payment_order_psp_call_requested_topic.DLQ \
   --property print.headers=true \

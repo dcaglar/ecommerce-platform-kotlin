@@ -37,7 +37,7 @@ management:
     tags:
       application: payment-edge-workers
     enable:
-      all: false
+      all: true
       hikaricp.connections: true
       hikaricp.connections.acquire: true
       process.cpu.usage: true
@@ -50,6 +50,7 @@ management:
       outbox_event_backlog: true
       outbox_dispatcher_duration: true
       local_outbox_backlog_size: true
+      maintenance_job_error_total: true
     distribution:
       percentiles-histogram:
         outbox_dispatcher_duration: true
@@ -65,10 +66,10 @@ app:
   datasource:
     outbox:
       driver-class-name: org.postgresql.Driver
-      pool-name: edge-outbox-pool
+      pool-name: ${spring.application.name}-edge-outbox-pool
     maintenance:
       driver-class-name: org.postgresql.Driver
-      pool-name: edge-maint-pool
+      pool-name: ${spring.application.name}-edge-maint-pool
     central:
       driver-class-name: org.postgresql.Driver
-      pool-name: central-writer-pool
+      pool-name: ${spring.application.name}-central-writer-pool

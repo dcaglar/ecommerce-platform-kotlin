@@ -18,28 +18,68 @@
     </resultMap>
 
     <select id="findEligible" resultMap="CentralOutboxResultMap">
+        WITH claimed AS (
         UPDATE outbox_event
-        SET status = 'PROCESSING', updated_at = now() AT TIME ZONE 'UTC'
+        SET status = 'PROCESSING',
+        claimed_at = (now() AT TIME ZONE 'UTC'),
+        claimed_by = #{workerId}
         WHERE (oeid, created_at) IN (
-            SELECT oeid, created_at FROM outbox_event
-            WHERE status = 'NEW'
-              AND created_at &lt;= #{tSafe, typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
-            ORDER BY created_at
-            LIMIT #{batchSize}
+        SELECT oeid, created_at
+        FROM outbox_event
+        WHERE status = 'NEW'
+        AND created_at &lt;= #{tSafe, typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
+        ORDER BY created_at
+        LIMIT #{batchSize}
+        FOR UPDATE SKIP LOCKED
         )
-        RETURNING *;
+        RETURNING *
+        )
+        SELECT * FROM claimed
     </select>
 
+
+
+    <update id="reclaimStuckClaims" parameterType="int">
+        UPDATE outbox_event
+        SET status = 'NEW',
+        claimed_at = NULL,
+        claimed_by = NULL
+        WHERE status = 'PROCESSING'
+        AND claimed_at &lt; ((now() AT TIME ZONE 'UTC') - (#{olderThanSeconds} || ' seconds')::interval)
+    </update>
+
+
     <select id="countEligible" resultType="long">
-        SELECT COUNT(*) FROM outbox_event
-        WHERE status = 'NEW'
-          AND created_at &lt;= #{tSafe, typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
+        SELECT COUNT(*) FROM (
+            SELECT 1 FROM outbox_event
+            WHERE status = 'NEW'
+              AND created_at &lt;= #{tSafe, typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
+            LIMIT 10000
+        ) sub
     </select>
+
+
 
     <update id="markDispatched">
         UPDATE outbox_event
-        SET status = 'SENT', updated_at = now() AT TIME ZONE 'UTC'
-        WHERE oeid = #{oeid} AND created_at = #{createdAt, typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
+        SET status = 'SENT',
+        updated_at = now() AT TIME ZONE 'UTC',
+        claimed_at = NULL,
+        claimed_by = NULL
+        WHERE oeid = #{oeid}
+        AND created_at = #{createdAt, typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
+    </update>
+
+
+    <update id="unclaimSpecific">
+        UPDATE outbox_event
+        SET status = 'NEW',
+        claimed_at = NULL,
+        claimed_by = NULL,
+        updated_at = now() AT TIME ZONE 'UTC'
+        WHERE oeid = #{oeid}
+        AND created_at = #{createdAt, typeHandler=com.dogancaglar.common.db.typehandler.InstantTypeHandler}
+        AND claimed_by = #{workerId}
     </update>
 
     <!-- Edge Watermark Operations -->
@@ -51,5 +91,6 @@
     <delete id="deleteWatermark" parameterType="string">
         DELETE FROM edge_watermarks WHERE edge_node_id = #{edgeNodeId}
     </delete>
+
 
 </mapper>

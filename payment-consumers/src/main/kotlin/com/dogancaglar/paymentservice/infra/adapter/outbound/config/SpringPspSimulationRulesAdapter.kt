@@ -15,7 +15,7 @@ class SpringPspSimulationRulesAdapter : PspSimulationRulesPort {
 
     override fun isSimulationTarget(merchantAccount: String): Boolean {
         // Fallback Step 1: Architectural structural prefix naming convention rule
-        if (merchantAccount.startsWith("SIMULATOR_", ignoreCase = true)) {
+        if (merchantAccount.startsWith("MARKETPLACE-5", ignoreCase = true)) {
             return true
         }
         

@@ -44,7 +44,7 @@ class LocalOutboxStoreAndForwardJob(
         }.register(meterRegistry)
     }
 
-    @Scheduled(initialDelay = 30000, fixedDelay = 5000)
+    @Scheduled(initialDelay = 30000, fixedDelay = 500)
     fun dispatchBatches() {
         if(centralOutboxRepository.isSchemaReady()) {
             repeat(threadCount) { workerIdx ->
@@ -121,29 +121,35 @@ class LocalOutboxStoreAndForwardJob(
         val threadName = Thread.currentThread().name
         val workerId = "$appInstanceId:$threadName"
 
-        val events = claimBatch(batchSize, workerId)
-        if (events.isEmpty()) {
-            centralOutboxRepository.updateWatermark(appInstanceId, Utc.nowInstant())
-            sample.stop(meterRegistry.timer("outbox_dispatcher_duration"))
-            return
-        }
-
-        val success = forwardBatch(events)
-        if (success) {
-            persistResults(events.map { it.markAsSent() })
-            logger.info("Forwarded ok={} on {}", events.size, threadName)
-            meterRegistry.counter("outbox_dispatched_total").increment(events.size.toDouble())
-        } else {
-            try {
-                unclaimFailedNow(workerId, events)
-            } catch (t: Throwable) {
-                logger.warn("Unclaim failed for {} rows (worker={}) – will rely on reclaimer",
-                    events.size, workerId, t)
+        try {
+            val events = claimBatch(batchSize, workerId)
+            if (events.isEmpty()) {
+                centralOutboxRepository.updateWatermark(appInstanceId, Utc.nowInstant())
+                sample.stop(meterRegistry.timer("outbox_dispatcher_duration"))
+                return
             }
-            logger.info("Forwarded failed={} on {}", events.size, threadName)
-            meterRegistry.counter("outbox_dispatch_failed_total").increment(events.size.toDouble())
+
+            val success = forwardBatch(events)
+            if (success) {
+                persistResults(events.map { it.markAsSent() })
+                logger.info("Forwarded ok={} on {}", events.size, threadName)
+                meterRegistry.counter("outbox_dispatched_total").increment(events.size.toDouble())
+            } else {
+                try {
+                    unclaimFailedNow(workerId, events)
+                } catch (t: Throwable) {
+                    logger.warn("Unclaim failed for {} rows (worker={}) – will rely on reclaimer",
+                        events.size, workerId, t)
+                }
+                logger.info("Forwarded failed={} on {}", events.size, threadName)
+                meterRegistry.counter("outbox_dispatch_failed_total").increment(events.size.toDouble())
+            }
+        } catch (t: Throwable) {
+            meterRegistry.counter("outbox_dispatch_failed_total").increment()
+            throw t
+        } finally {
+            sample.stop(meterRegistry.timer("outbox_dispatcher_duration"))
         }
-        sample.stop(meterRegistry.timer("outbox_dispatcher_duration"))
     }
 
     @jakarta.annotation.PreDestroy

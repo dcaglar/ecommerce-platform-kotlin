@@ -12,7 +12,7 @@ import java.util.concurrent.ThreadPoolExecutor
 
 
 @Configuration
-class ConsumerThreadPoolConfig(private val meterRegistry: MeterRegistry, private val decorator: MdcTaskDecorator) {
+class CentralOutboxRelayJobThreadPoolConfig(private val meterRegistry: MeterRegistry, private val decorator: MdcTaskDecorator) {
 
 
     @Bean("pspExecutionPool")

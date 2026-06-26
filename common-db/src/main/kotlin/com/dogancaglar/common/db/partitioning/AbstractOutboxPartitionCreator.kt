@@ -111,10 +111,10 @@ abstract class AbstractOutboxPartitionCreator(
             if (partitionName == currPartitionName || partitionName == nextPartitionName) continue
 
             val newCount: Int? = jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM $partitionName WHERE status = 'NEW'", Int::class.java
+                "SELECT count(*) FROM $partitionName WHERE status IN ('NEW', 'PROCESSING')", Int::class.java
             )
             if ((newCount ?: 0) > 0) {
-                logger.debug("VACUUM: $partitionName ($newCount NEW rows remaining)")
+                logger.debug("VACUUM: $partitionName ($newCount NEW/PROCESSING rows remaining)")
                 try {
                     jdbcTemplate.execute("VACUUM $partitionName")
                 } catch (ex: Exception) {

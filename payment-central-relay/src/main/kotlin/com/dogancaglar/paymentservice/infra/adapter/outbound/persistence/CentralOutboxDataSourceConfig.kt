@@ -29,6 +29,7 @@ class CentralOutboxDataSourceConfig {
         @Value("\${app.datasource.central-outbox.jdbc-url}") jdbcUrl: String,
         @Value("\${app.datasource.central-outbox.username}") username: String,
         @Value("\${app.datasource.central-outbox.password}") password: String,
+        @Value("\${app.datasource.central-outbox.pool-name:\${spring.application.name}-central-outbox-pool}") poolName: String,
         @Value("\${app.datasource.central-outbox.maximum-pool-size:5}") maxPoolSize: Int,
         @Value("\${app.datasource.central-outbox.minimum-idle:2}") minIdle: Int,
         @Value("\${app.datasource.central-outbox.connection-timeout:15000}") cTimeout: Long,
@@ -37,7 +38,7 @@ class CentralOutboxDataSourceConfig {
         @Value("\${app.datasource.central-outbox.max-lifetime:180000}") mLife: Long
     ): HikariDataSource {
         return HikariDataSource().apply {
-            this.poolName = "central-outbox-pool"
+            this.poolName = poolName
             this.jdbcUrl = jdbcUrl
             this.username = username
             this.password = password
@@ -55,20 +56,22 @@ class CentralOutboxDataSourceConfig {
         return DataSourceTransactionManager(ds).apply { defaultTimeout = 60 }
     }
 
+
+
     @Bean("centralOutboxSqlSessionFactory")
     fun centralOutboxSqlSessionFactory(@Qualifier("centralOutboxDataSource") ds: DataSource): SqlSessionFactory {
         val factoryBean = SqlSessionFactoryBean()
         factoryBean.setDataSource(ds)
-        
+
+        // MyBatis configuration (Global settings)
         val configuration = org.apache.ibatis.session.Configuration()
         configuration.isMapUnderscoreToCamelCase = true
         factoryBean.setConfiguration(configuration)
 
-        val resolver = PathMatchingResourcePatternResolver()
-        factoryBean.setMapperLocations(*resolver.getResources("classpath*:mapper/**/*.xml"))
+        // NO setMapperLocations needed if files are in the same package structure!
         factoryBean.setTypeAliasesPackage("com.dogancaglar.common.db.entity")
         factoryBean.setTypeHandlersPackage("com.dogancaglar.common.db.typehandler")
-        
+
         return factoryBean.`object`!!
     }
 
@@ -81,6 +84,7 @@ class CentralOutboxDataSourceConfig {
         @Value("\${app.datasource.maintenance.jdbc-url}") jdbcUrl: String,
         @Value("\${app.datasource.maintenance.username}") username: String,
         @Value("\${app.datasource.maintenance.password}") password: String,
+        @Value("\${app.datasource.maintenance.pool-name:\${spring.application.name}-central-maintenance-pool}") poolName: String,
         @Value("\${app.datasource.maintenance.maximum-pool-size:2}") maxPoolSize: Int,
         @Value("\${app.datasource.maintenance.minimum-idle:0}") minIdle: Int,
         @Value("\${app.datasource.maintenance.connection-timeout:15000}") cTimeout: Long,
@@ -89,7 +93,7 @@ class CentralOutboxDataSourceConfig {
         @Value("\${app.datasource.maintenance.max-lifetime:180000}") mLife: Long
     ): HikariDataSource {
         return HikariDataSource().apply {
-            this.poolName = "central-maintenance-pool"
+            this.poolName = poolName
             this.jdbcUrl = jdbcUrl
             this.username = username
             this.password = password

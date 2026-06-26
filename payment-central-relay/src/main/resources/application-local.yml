@@ -6,7 +6,8 @@ app:
       jdbc-url: ${CENTRAL_DB_URL}
       username: ${CENTRAL_DB_PAYMENT_CENTRAL_RELAY_USERNAME}
       password: ${CENTRAL_DB_PAYMENT_CENTRAL_RELAY_PASSWORD}
-      maximum-pool-size: 5
+      pool-name: ${spring.application.name}-central-outbox-pool
+      maximum-pool-size: 10
       minimum-idle: 2
 
     # ─── 2. MAINTENANCE POOL ───
@@ -14,8 +15,9 @@ app:
       jdbc-url: ${CENTRAL_DB_URL}
       username: ${CENTRAL_DB_DUTY_USERNAME}
       password: ${CENTRAL_DB_DUTY_PASSWORD}
+      pool-name: ${spring.application.name}-central-maint-pool
       maximum-pool-size: 2
-      minimum-idle: 0
+      minimum-idle: 1
 
 outbox-relay:
   batch-size: 500

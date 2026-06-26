@@ -1,6 +1,46 @@
 payment platform context diafram
 ```mermaid
 graph TD
+    classDef pod fill:#e6f3ff,stroke:#0066cc,stroke-width:2px,color:#333
+    classDef container fill:#fff,stroke:#666,stroke-width:1px,color:#333
+    classDef db fill:#e2f0d9,stroke:#70ad47,stroke-width:2px,color:#333
+    classDef external fill:#fff2cc,stroke:#ffc000,stroke-width:2px,color:#333
+
+    subgraph EdgeNode["Physical Azure VM (Standard_D8ds_v6)"]
+        direction TB
+        
+        subgraph PodEdgeCell["Pod: payment-edge-cell"]
+            direction TB
+            API["Container: payment-service<br/>(Spring Boot REST API)"]
+            DB[("Container: edge-db<br/>(PostgreSQL)")]
+        end
+        
+        subgraph PodEdgeWorkers["Pod: payment-edge-workers"]
+            Worker["Container: edge-worker<br/>(LocalOutboxForwarderJob)"]
+        end
+    end
+    
+    Proxy["Internal Gateway / Proxy"]
+    Stripe["Stripe PSP API"]
+    CentralDB[("Central Consolidated DB<br/>(PostgreSQL)")]
+    
+    Proxy == "1. POST /api/v1/payments" ==> API
+    API -. "2. Check Idempotency & Save Intent" .-> DB
+    API == "3. Synchronous Auth" ==> Stripe
+    API -. "4. Write OutboxEvent" .-> DB
+    
+    Worker -. "5. Poll NEW OutboxEvents" .-> DB
+    Worker == "6. Forward to Central Outbox" ==> CentralDB
+
+    class PodEdgeCell,PodEdgeWorkers pod
+    class API,Worker container
+    class DB,CentralDB db
+    class Proxy,Stripe external
+```
+
+### Full System Context Diagram
+```mermaid
+graph TD
     %% Styles
     classDef edgeCell fill:#fff0f0,stroke:#ffbaba,stroke-width:2px,color:#333
     classDef internalHost fill:#f0f8ff,stroke:#baddff,stroke-width:2px,color:#333
@@ -13,36 +53,48 @@ graph TD
     subgraph ExternalLayer["EXTERNAL HOSTS (Edge Layer)"]
         direction LR
         
-        subgraph Edge1["Edge Cell 1"]
+        subgraph Edge1["Edge Node 1 (edgepool)"]
             direction TB
-            API1["Payment Acceptance Service"]
-            IdemDB1[("Idempotency DB<br/>IdempotencyRecord")]
-            EdgeDB1[("Edge Local DB<br/>PaymentIntent<br/>OutboxEvents")]
-            Fwd1[["LocalOutboxStoreAndForwardJob"]]
+            subgraph PodEdgeCell1["Pod: payment-edge-cell"]
+                direction TB
+                API1["Payment Acceptance Service"]
+                EdgeDB1[("Edge Local DB (PostgreSQL)<br/>IdempotencyRecord<br/>PaymentIntent<br/>OutboxEvents")]
+            end
+            
+            subgraph PodEdgeWorkers1["Pod: payment-edge-workers"]
+                Fwd1[["LocalOutboxStoreAndForwardJob"]]
+            end
+            
             PSP_Edge1["External PSP API<br/>(Synchronous Auth)"]
             
             %% Flow Splits inside Edge
-            API1 -.->|1. Idempotency Check| IdemDB1
+            API1 -.->|1. Idempotency Check| EdgeDB1
             API1 ===>|2a. Synchronous Auth Pass<br/>Shopper Present| PSP_Edge1
             PSP_Edge1 ===>|2b. Persist Auth Response to local Outbox  as  EventEnvelope &lt;PaymentAuthorized&gt; | EdgeDB1
             API1 -->|3.  Capture / Refund received from merchant <br/>Persisted to Outbox as  EventEnvelope &lt;CaptureRequested&gt; in edge db  without any psp interaction| EdgeDB1
-            EdgeDB1 --> Fwd1
+            Fwd1 -.->|Polls local DB| EdgeDB1
         end
 
-        subgraph Edge2["Edge Cell 2"]
+        subgraph Edge2["Edge Node 2 (edgepool2)"]
             direction TB
-            API2["Payment Acceptance Service"]
-            IdemDB2[("Idempotency DB<br/>IdempotencyRecord")]
-            EdgeDB2[("Edge Local DB<br/>PaymentIntent<br/>OutboxEvents")]
-            Fwd2[["LocalOutboxStoreAndForwardJob"]]
+            subgraph PodEdgeCell2["Pod: payment-edge-cell"]
+                direction TB
+                API2["Payment Acceptance Service"]
+                EdgeDB2[("Edge Local DB (PostgreSQL)<br/>IdempotencyRecord<br/>PaymentIntent<br/>OutboxEvents")]
+            end
+            
+            subgraph PodEdgeWorkers2["Pod: payment-edge-workers"]
+                Fwd2[["LocalOutboxStoreAndForwardJob"]]
+            end
+            
             PSP_Edge2["External PSP API<br/>(Synchronous Auth)"]
             
             %% Flow Splits inside Edge
-            API2 -.->|1. Idempotency Check| IdemDB2
+            API2 -.->|1. Idempotency Check| EdgeDB2
             API2 ===>|2a. Synchronous Auth Pass<br/>Shopper Present| PSP_Edge2
             PSP_Edge2 ===>|2b. Persist Auth Response to local Outbox  as  EventEnvelope &lt;PaymentAuthorized&gt; | EdgeDB2
             API2 -->|3.  Capture / Refund received from merchant <br/>Persisted to  local Outbox as  EventEnvelope &lt;CaptureRequested&gt; in edge db  without any psp interaction| EdgeDB2
-            EdgeDB2 --> Fwd2
+            Fwd2 -.->|Polls local DB| EdgeDB2
         end
     end
 
@@ -130,7 +182,7 @@ sequenceDiagram
 
     box rgb(255, 244, 225) "Payment Edge Cell"
         participant PaymentSvc as payment-service<br/>(REST API)
-        participant IdemSvc as IdempotencyService
+        participant EdgeDB as edge-db<br/>(PostgreSQL)
     end
 
     box rgb(255, 235, 238) "External Systems"
@@ -149,11 +201,11 @@ sequenceDiagram
     Proxy->>PaymentSvc: POST /api/v1/payments<br/>(with JWT & Idempotency-Key)
     
     %% --- IDEMPOTENCY FLOW ---
-    PaymentSvc->>IdemSvc: checkKey(idempotencyKey)
+    PaymentSvc->>EdgeDB: SELECT response FROM idempotency_keys
     alt First Request (Key is new)
-        IdemSvc->>PaymentSvc: Proceed
+        EdgeDB-->>PaymentSvc: Not Found
         PaymentSvc->>PaymentSvc: Create PaymentIntent (status=CREATED_PENDING)
-        note right of PaymentSvc: DB: INSERT payment_intents
+        PaymentSvc->>EdgeDB: INSERT INTO payment_intents
         
         par Async Stripe Call
             PaymentSvc->>Stripe: Create PaymentIntent (API Call)
@@ -164,7 +216,7 @@ sequenceDiagram
         alt Stripe Responds < 3s
             Stripe-->>PaymentSvc: Return { id, clientSecret }
             PaymentSvc->>PaymentSvc: Update PaymentIntent (status=CREATED)
-            PaymentSvc->>IdemSvc: storeResponse(key, response)
+            PaymentSvc->>EdgeDB: INSERT response INTO idempotency_keys
             PaymentSvc-->>Proxy: 201 Created<br/>{ paymentIntentId, clientSecret }
         else Timeout (> 3s)
             PaymentSvc-->>Proxy: 202 Accepted (Retry-After: 2s)<br/>{ paymentIntentId, clientSecret: null }
@@ -182,8 +234,7 @@ sequenceDiagram
         end
 
     else Retry (Key already processed)
-        IdemSvc->>PaymentSvc: Return stored response
-        note right of IdemSvc: DB: SELECT response FROM idempotency_keys
+        EdgeDB-->>PaymentSvc: Return stored JSON response
         PaymentSvc-->>Proxy: 200 OK (Replayed)<br/>{ paymentIntentId, clientSecret }
     end
     %% --- END IDEMPOTENCY FLOW ---

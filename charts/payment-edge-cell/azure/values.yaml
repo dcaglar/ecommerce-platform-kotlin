@@ -14,31 +14,34 @@ topologySpreadConstraints:
       matchLabels:
         app: payment-edge-cell
 
-# ── Autoscaler ────────────────────────────────────────────────────────────────
-# HPA target: 70% CPU on payment-service. Lower than local (85%) for faster
-# scale-up trigger during load test — we want pods ready before latency spikes.
-autoscaling:
+keda:
   enabled: true
-  minReplicas: 1
-  maxReplicas: 2  # matches edgepool + edgepool2 total capacity in Terraform
-  metrics:
-    - type: ContainerResource
-      containerResource:
-        name: cpu
-        container: payment-service
-        target:
-          type: Utilization
-          averageUtilization: 70
+  minReplicaCount: 1
+  maxReplicaCount: 2
+  pollingInterval: 15
+  cooldownPeriod: 300
+  triggers:
+    metrics:
+      - type: ContainerResource
+        containerResource:
+          name: cpu
+          container: payment-service
+          target:
+            type: Utilization
+            # Increased to 85% to avoid 'panic' scaling on noise
+            averageUtilization: 85
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 300
       selectPolicy: Max
       policies:
         - type: Pods
-          value: 1          # add 1 pod at a time
-          periodSeconds: 45 # 45s between steps — allow JIT warmup before next
+          value: 1 # Add 1 pod at a time
+          periodSeconds: 45 # Wait 45s between steps to allow JIT/warmup
     scaleDown:
-      stabilizationWindowSeconds: 300  # "Patience window" — no scale-down during brief dips
+      # "The Patience Window": Keep pods for 5 mins after load drops.
+      # Prevents killing pods during small traffic dips.
+      stabilizationWindowSeconds: 300
       selectPolicy: Max
       policies:
         - type: Percent

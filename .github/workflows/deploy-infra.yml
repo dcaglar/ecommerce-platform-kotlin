@@ -36,7 +36,7 @@ jobs:
           ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-        run: terraform plan -out=tfplan
+        run: terraform plan -var-file="aks-loadtest.tfvars" -out=tfplan
 
       - name: Save Plan Artifact
         uses: actions/upload-artifact@v4
@@ -108,10 +108,10 @@ jobs:
         env:
           DOCKER_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-          ./infra/scripts/build-and-push-payment-service-docker-repo.sh ${{ secrets.DOCKERHUB_USERNAME }} latest
-          ./infra/scripts/build-and-push-payment-edge-workers-docker-repo.sh ${{ secrets.DOCKERHUB_USERNAME }} latest
-          ./infra/scripts/build-and-push-payment-consumers-docker-repo.sh ${{ secrets.DOCKERHUB_USERNAME }} latest
-          ./infra/scripts/build-and-push-payment-central-relay-docker-repo.sh ${{ secrets.DOCKERHUB_USERNAME }} latest
+          ./infra/scripts/build-and-push.sh payment-service ${{ secrets.DOCKERHUB_USERNAME }} latest
+          ./infra/scripts/build-and-push.sh payment-edge-workers ${{ secrets.DOCKERHUB_USERNAME }} latest
+          ./infra/scripts/build-and-push.sh payment-consumers ${{ secrets.DOCKERHUB_USERNAME }} latest
+          ./infra/scripts/build-and-push.sh payment-central-relay ${{ secrets.DOCKERHUB_USERNAME }} latest
 
       # ---------- PHASE 3: HELM DEPLOYMENT ----------
       - name: Get AKS Credentials
@@ -134,7 +134,9 @@ jobs:
       - name: Deploy Azure Environment
         run: |
           # We execute your exact bash scripts, just pointing to the Azure versions!
-          ./infra/scripts/deploy-all-azure.sh
+          ./infra/scripts/deploy-all-external-infra-azure.sh
+          ./infra/scripts/deploy-monitoring-stack-azure.sh 
+          ./infra/scripts/deploy-payment-platform-services-azure.sh  
 
       - name: ✅ Deployment Complete
         run: echo "Infrastructure and applications deployed successfully!"

@@ -12,8 +12,10 @@ class CentralOutboxRelayAdapter(
     private val mapper: CentralOutboxRelayMapper
 ) : CentralOutboxRelayPort {
 
-    override fun findEligible(tSafe: Instant, batchSize: Int): List<OutboxEvent> {
-        val entities = mapper.findEligible(tSafe, batchSize)
+
+
+    override fun findEligible(tSafe: Instant, batchSize: Int, workerId: String): List<OutboxEvent> {
+        val entities = mapper.findEligible(tSafe, batchSize, workerId)
         return entities.map {
             OutboxEvent.rehydrate(
                 oeid = it.oeid,
@@ -35,11 +37,20 @@ class CentralOutboxRelayAdapter(
         return mapper.countEligible(tSafe)
     }
 
+    // 2. ADDED implementation for unclaimSpecific
+    override fun unclaimSpecific(oeid: Long, createdAt: Instant,workerId: String) {
+        mapper.unclaimSpecific(oeid, createdAt,workerId)
+    }
+
     override fun computeTSafe(): Instant? {
         return mapper.computeTSafe()
     }
 
     override fun deleteWatermark(edgeNodeId: String) {
         mapper.deleteWatermark(edgeNodeId)
+    }
+
+    override fun reclaimStuck(staleSeconds: Int): Int {
+        return mapper.reclaimStuckClaims(staleSeconds)
     }
 }

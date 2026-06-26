@@ -2,22 +2,16 @@ edgeWorker:
   image:
     repository: dcaglar1987/payment-edge-workers
     tag: "latest"
-
 serviceMonitor:
-  enabled: false
+  enabled: true
   labels:
     release: prometheus-stack
-
-
 runPrivilegeGrantJob: true
-
-
 edgeDb:
   image:
     repository: postgres
     tag: "15-alpine"
     pullPolicy: Always
-
 topologySpreadConstraints:
   - maxSkew: 1
     topologyKey: "topology.kubernetes.io/zone"

@@ -17,7 +17,7 @@ service:
   portName: http
   port: 8080
 keda:
-  enabled: true
+  enabled: false
   minReplicaCount: 1
   maxReplicaCount: 6
   pollingInterval: 15

@@ -18,10 +18,7 @@ spec:
       port: 9000
       targetPort: 9000
       protocol: TCP
-    - name: mgmt-worker
-      port: 9001
-      targetPort: 9001
-      protocol: TCP
+
     - name: postgres
       port: 5432
       targetPort: 5432
@@ -44,3 +41,6 @@ spec:
   ports:
     - name: http
       port: 8080
+    - name: postgres
+      port: 5432
+      targetPort: 5432

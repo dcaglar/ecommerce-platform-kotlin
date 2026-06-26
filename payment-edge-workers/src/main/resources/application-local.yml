@@ -12,7 +12,7 @@ app:
       validation-timeout: 15000
       idle-timeout: 600000
       max-lifetime: 1800000
-      maximum-pool-size: 20
+      maximum-pool-size: 8
     maintenance:
       username: ${EDGE_DB_DUTY_USERNAME}
       password: ${EDGE_DB_DUTY_PASSWORD}
@@ -30,7 +30,7 @@ app:
       validation-timeout: 15000
       idle-timeout: 600000
       max-lifetime: 1800000
-      maximum-pool-size: 10
+      maximum-pool-size: 8
 
 spring:
   data:
@@ -45,12 +45,12 @@ spring:
           max-wait: 5000ms
 
 outbox-dispatcher:
-  thread-count: 4
-  batch-size: 500
-  pool-size: 4
+  thread-count: 2
+  batch-size: 100
+  pool-size: 1
 
 db:
   outbox:
-    statement-timeout-ms: 2000
-    lock-timeout-ms: 200
+    statement-timeout-ms: 4000
+    lock-timeout-ms: 400
     idle-in-tx-timeout-ms: 0

@@ -1,18 +1,21 @@
 app:
   kafka:
+    # Azure: higher partition count than local (replication factor 3 for durability).
     specs:
-      payment.psp.results:                        { partitions: 24, replicas: 3, createDlq: true }
-      journal.entries.recorded:                   { partitions: 48, replicas: 3, createDlq: true }
-      gateway.capture.commands:                   { partitions: 24, replicas: 3, createDlq: true }
-      gateway.capture.submitted:                  { partitions: 24, replicas: 3, createDlq: true }
+      payment.psp.results:      { partitions: 24, replicas: 3, createDlq: true }
+      journal.entries.recorded: { partitions: 48, replicas: 3, createDlq: true }
+      gateway.capture.commands: { partitions: 24, replicas: 3, createDlq: true }
+      gateway.capture.submitted: { partitions: 24, replicas: 3, createDlq: true }
 
 spring:
   datasource:
     payment-consumers:
-      url: ${SPRING_DATASOURCE_CENTRAL_URL}
-      username: ${SPRING_DATASOURCE_USERNAME}
-      password: ${SPRING_DATASOURCE_PASSWORD}
+      # Env vars match secret injection from central-db-sops-secrets.yaml.
+      url: ${CENTRAL_DB_URL}
+      username: ${CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME}
+      password: ${CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD}
       hikari:
+        # Azure: 40 connections (vs 20 local) to handle parallel consumer threads.
         maximum-pool-size: 40
         minimum-idle: 5
         connection-timeout: 15000
@@ -22,9 +25,9 @@ spring:
         keepalive-time: 300000
         leak-detection-threshold: 60000
     account-snapshot-job:
-      url: ${SPRING_DATASOURCE_CENTRAL_URL}
-      username: ${SPRING_DATASOURCE_USERNAME}
-      password: ${SPRING_DATASOURCE_PASSWORD}
+      url: ${CENTRAL_DB_URL}
+      username: ${CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME}
+      password: ${CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD}
       hikari:
         maximum-pool-size: 20
         minimum-idle: 2
@@ -34,6 +37,7 @@ spring:
         max-lifetime: 1740000
         keepalive-time: 300000
         leak-detection-threshold: 60000
+
   data:
     redis:
       url: ${SPRING_DATA_REDIS_URL}
@@ -44,10 +48,12 @@ spring:
           max-idle: 32
           min-idle: 16
           max-wait: 5000ms
+
   kafka:
     consumer:
       isolation-level: read_committed
       enable-auto-commit: false
+      # Azure: larger batches for throughput. 500 records (vs 120 local).
       max-poll-records: 500
       max-poll-interval: 300000
       fetch-min-bytes: 1048576

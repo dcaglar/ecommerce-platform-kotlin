@@ -4,7 +4,7 @@
 **ADR-001: Ephemeral Load Testing Infrastructure on Azure Kubernetes Service (AKS)**
 
 ## 2. Context
-We have built a high-performance, cell-based payment processing system. The local environment is heavily customized via Bash scripts and Helm value files. We need to port this exact architecture to Azure without breaking the existing local developer workflow.
+We have built a high-performance, cell-based payment processing system. Originally customized via numerous imperative Bash scripts, the local environment has since been fully refactored into a declarative Infrastructure as Code (IaC) model. We need to port this exact declarative architecture to Azure without breaking the local developer workflow.
 
 ## 3. Decision
 We will clone and parameterize your existing bash scripts to create an identical, sibling deployment track for Azure. **The GitHub Actions pipeline will boot up a temporary Linux server in the cloud to execute your existing bash scripts on your behalf.**
@@ -47,9 +47,9 @@ graph TD
         direction TB
         GH -->|2. Downloads Code| Runner(("GitHub Runner (Ubuntu VM)"))
         
-        Runner -->|3. Runs Terraform| TF["terraform apply"]
-        Runner -->|4. Runs Build Scripts| Build["infra/scripts/build-and-push-*.sh"]
-        Runner -->|5. Runs Deploy Script| Deploy["infra/scripts/deploy-all-azure.sh"]
+        Runner -->|3. Runs Terraform| TF["terraform apply<br/>(aks-loadtest.tfvars)"]
+        Runner -->|4. Runs Build Scripts| Build["infra/scripts/build-and-push.sh"]
+        Runner -->|5. Runs Deploy Scripts| Deploy["infra/scripts/deploy.sh"]
     end
     
     TF -->|Creates Cluster| AKS["Azure AKS Cluster"]

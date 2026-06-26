@@ -17,6 +17,7 @@ spec:
     metadata:
       labels:
         app: {{ include "payment-edge-workers.fullname" . }}
+        {{- include "payment-edge-workers.selectorLabels" . | nindent 8 }}
       annotations:
         rollout/reboot: "{{ now | unixEpoch }}"
     spec:

@@ -68,20 +68,25 @@ if [[ "$ENV" == "local" ]]; then
   # Clean up the downloaded .tgz dependencies so they don't pollute the IDE/codebase
   rm -rf "$CHART_ROOT/charts"
   rm -f "$CHART_ROOT/Chart.lock"
+  
+  echo "🔄 Forcing pod restart to pull the latest image..."
+  kubectl rollout restart deployment "$SERVICE_NAME" -n payment 2>/dev/null || true
+  kubectl rollout restart statefulset "$SERVICE_NAME" -n payment 2>/dev/null || true
+
 elif [[ "$ENV" == "azure" ]]; then
   if [ ! -d "$CHART_ROOT" ]; then
     echo "❌ Error: Chart directory $CHART_ROOT does not exist."
     exit 1
   fi
-  
+
   echo "📦 Updating helm dependencies..."
   helm dependency update "$CHART_ROOT"
-  
+
   $HELM_CMD --install "$SERVICE_NAME" "$CHART_ROOT" \
     -n payment --create-namespace \
-    -f "$REPO_ROOT/infra/helm-values/${SERVICE_NAME}-azure.yaml" \
+    -f "$CHART_ROOT/azure/values.yaml" \
     $SECRET_ARGS
-    
+
   # Clean up the downloaded .tgz dependencies so they don't pollute the IDE/codebase
   rm -rf "$CHART_ROOT/charts"
   rm -f "$CHART_ROOT/Chart.lock"

@@ -4,14 +4,19 @@ import com.dogancaglar.common.db.entity.OutboxEventEntity
 import org.apache.ibatis.annotations.Mapper
 import java.time.Instant
 
-import com.dogancaglar.common.db.entity.EdgeWatermarkEntity
+import org.apache.ibatis.annotations.Param
 
 @Mapper
 interface CentralOutboxRelayMapper {
-    fun findEligible(tSafe: Instant, batchSize: Int): List<OutboxEventEntity>
+    fun findEligible(@Param("tSafe") tSafe: Instant, @Param("batchSize") batchSize: Int, @Param("workerId") workerId: String
+    ): List<OutboxEventEntity>
     fun countEligible(tSafe: Instant): Long
-    fun markDispatched(@org.apache.ibatis.annotations.Param("oeid") oeid: Long, @org.apache.ibatis.annotations.Param("createdAt") createdAt: Instant)
-    
+    fun markDispatched(@Param("oeid") oeid: Long, @Param("createdAt") createdAt: Instant)
+
+
+    // 2. ADDED unclaimSpecific
+    fun unclaimSpecific(@Param("oeid") oeid: Long, @Param("createdAt") createdAt: Instant, @Param("workerId") workerId: String)
+    fun reclaimStuckClaims(@Param("olderThanSeconds") olderThanSeconds: Int): Int
     // Edge Watermark operations (consolidated into outbox mapper)
     fun computeTSafe(): Instant?
     fun deleteWatermark(edgeNodeId: String)

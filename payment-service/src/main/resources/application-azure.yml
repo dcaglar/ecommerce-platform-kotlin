@@ -7,13 +7,13 @@ server:
     accept-count: 500
     connection-timeout: 20000
 
-#app:
 spring:
   datasource:
     edge:
-      jdbc-url: ${EDGE_DB_URL}
-      username: ${EDGE_DB_USERNAME}
-      password: ${EDGE_DB_PASSWORD}
+      # Single HikariCP pool — YugabyteDB removed (Phase 15). Idempotency in edge-db.
+      url: ${EDGE_DB_URL}
+      username: ${EDGE_DB_PAYMENT_SERVICE_USERNAME}
+      password: ${EDGE_DB_PAYMENT_SERVICE_PASSWORD}
       maximum-pool-size: 60
       minimum-idle: 10
       connection-timeout: 5000
@@ -22,19 +22,6 @@ spring:
       max-lifetime: 1800000
       leak-detection-threshold: 60000
       connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
-    yugabyte:
-      jdbc-url: ${YUGABYTE_DB_URL:jdbc:postgresql://yb-tserver.payment.svc.cluster.local:5433/yugabyte}
-      username: ${YUGABYTE_DB_USERNAME:yugabyte}
-      password: ${YUGABYTE_DB_PASSWORD:yugabyte}
-      maximum-pool-size: 60
-      minimum-idle: 10
-      connection-timeout: 5000
-      validation-timeout: 1000
-      idle-timeout: 600000
-      max-lifetime: 1800000
-      leak-detection-threshold: 60000
-      connection-init-sql: "SET statement_timeout = '500ms'; SET lock_timeout = '250ms';"
-
 
   data:
     redis:
@@ -46,16 +33,12 @@ spring:
           max-idle: 32
           min-idle: 16
           max-wait: 5000ms
+
   security:
     oauth2:
       resourceserver:
         jwt:
           issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}
-
-outbox-dispatcher:
-  thread-count: 8
-  batch-size: 1000
-  pool-size: 8
 
 db:
   web:
@@ -71,7 +54,7 @@ stripe:
 
 psp:
   gateway:
-    type: STRIPE
+    type: SIMULATED
 
 logging:
   level:

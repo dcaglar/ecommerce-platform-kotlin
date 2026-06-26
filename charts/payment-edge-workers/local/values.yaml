@@ -2,42 +2,25 @@ spring:
   profile: "local"
 topologySpreadConstraints: []
 runPrivilegeGrantJob: true
-autoscaling:
-  enabled: true
-  minReplicas: 1
-  maxReplicas: 1
-  metrics:
-    - type: ContainerResource
-      containerResource:
-        name: cpu
-        container: payment-edge-workers
-        target:
-          type: Utilization
-          # Increased to 85% to avoid 'panic' scaling on noise
-          averageUtilization: 85
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 300
-      selectPolicy: Max
-      policies:
-        - type: Pods
-          value: 1 # Add 1 pod at a time
-          periodSeconds: 45 # Wait 45s between steps to allow JIT/warmup
-    scaleDown:
-      # "The Patience Window": Keep pods for 5 mins after load drops.
-      # Prevents killing pods during small traffic dips.
-      stabilizationWindowSeconds: 300
-      selectPolicy: Max
-      policies:
-        - type: Percent
-          value: 100
-          periodSeconds: 15
+keda:
+  enabled: false
+  minReplicaCount: 1
+  maxReplicaCount: 1
+  pollingInterval: 15
+  cooldownPeriod: 300
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090
+        metricName: kube_pod_info
+        query: sum(kube_statefulset_replicas{statefulset="payment-edge-cell"})
+        threshold: "1"
 edgeWorker:
   image:
     pullPolicy: Always
   resources:
-    requests: {cpu: "250m", memory: "512Mi"}
-    limits: {cpu: "500m", memory: "768Mi"}
+    requests: {cpu: "150m", memory: "500Mi"}
+    limits: {memory: "500Mi"}
   jvmOpts: >-
     -XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication -XX:MaxRAMPercentage=45 -XX:InitialRAMPercentage=45 -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30
 service:
@@ -52,9 +35,8 @@ postgresExporter:
   resources:
     requests:
       cpu: 50m
-      memory: 64Mi
+      memory: 128Mi
     limits:
-      cpu: 100m
       memory: 128Mi
 
 

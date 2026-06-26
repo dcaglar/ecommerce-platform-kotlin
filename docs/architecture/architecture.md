@@ -9,7 +9,168 @@ The platform manages the **full payment lifecycle**: synchronous authorization, 
 
 # 🟦   High Level Plaform Arhictecture 
 
-![Architecture](https://github.com/dcaglar/ecommerce-platform-kotlin/blob/25b863edd5fc15647c14b70f55703e3494bf6e91/docs/architecture/high-level-context-full-architecture.png)
+### Edge Cell Physical Topology
+```mermaid
+graph TD
+    classDef pod fill:#e6f3ff,stroke:#0066cc,stroke-width:2px,color:#333
+    classDef container fill:#fff,stroke:#666,stroke-width:1px,color:#333
+    classDef db fill:#e2f0d9,stroke:#70ad47,stroke-width:2px,color:#333
+    classDef external fill:#fff2cc,stroke:#ffc000,stroke-width:2px,color:#333
+
+    subgraph EdgeNode["Physical Azure VM (Standard_D8ds_v6)"]
+        direction TB
+        
+        subgraph PodEdgeCell["Pod: payment-edge-cell"]
+            direction TB
+            API["Container: payment-service<br/>(Spring Boot REST API)"]
+            DB[("Container: edge-db<br/>(PostgreSQL)")]
+        end
+        
+        subgraph PodEdgeWorkers["Pod: payment-edge-workers"]
+            Worker["Container: edge-worker<br/>(LocalOutboxForwarderJob)"]
+        end
+    end
+    
+    Proxy["Internal Gateway / Proxy"]
+    Stripe["Stripe PSP API"]
+    CentralDB[("Central Consolidated DB<br/>(PostgreSQL)")]
+    
+    Proxy == "1. POST /api/v1/payments" ==> API
+    API -. "2. Check Idempotency & Save Intent" .-> DB
+    API == "3. Synchronous Auth" ==> Stripe
+    API -. "4. Write OutboxEvent" .-> DB
+    
+    Worker -. "5. Poll NEW OutboxEvents" .-> DB
+    Worker == "6. Forward to Central Outbox" ==> CentralDB
+
+    class PodEdgeCell,PodEdgeWorkers pod
+    class API,Worker container
+    class DB,CentralDB db
+    class Proxy,Stripe external
+```
+
+### Full System Context Diagram
+```mermaid
+graph TD
+    %% Styles
+    classDef edgeCell fill:#fff0f0,stroke:#ffbaba,stroke-width:2px,color:#333
+    classDef internalHost fill:#f0f8ff,stroke:#baddff,stroke-width:2px,color:#333
+    classDef db fill:#e2f0d9,stroke:#70ad47,stroke-width:2px,color:#333
+    classDef service fill:#fff2cc,stroke:#ffc000,stroke-width:2px,color:#333
+    classDef job fill:#e1dfdd,stroke:#a6a6a6,stroke-width:2px,color:#333
+    classDef topic fill:#e8d1ff,stroke:#b160ff,stroke-width:2px,color:#333
+    classDef consumer fill:#ffe6cc,stroke:#f4b183,stroke-width:2px,color:#333
+
+    subgraph ExternalLayer["EXTERNAL HOSTS (Edge Layer)"]
+        direction LR
+        
+        subgraph Edge1["Edge Node 1 (edgepool)"]
+            direction TB
+            subgraph PodEdgeCell1["Pod: payment-edge-cell"]
+                direction TB
+                API1["Payment Acceptance Service"]
+                EdgeDB1[("Edge Local DB (PostgreSQL)<br/>IdempotencyRecord<br/>PaymentIntent<br/>OutboxEvents")]
+            end
+            
+            subgraph PodEdgeWorkers1["Pod: payment-edge-workers"]
+                Fwd1[["LocalOutboxStoreAndForwardJob"]]
+            end
+            
+            PSP_Edge1["External PSP API<br/>(Synchronous Auth)"]
+            
+            %% Flow Splits inside Edge
+            API1 -.->|1. Idempotency Check| EdgeDB1
+            API1 ===>|2a. Synchronous Auth Pass<br/>Shopper Present| PSP_Edge1
+            PSP_Edge1 ===>|2b. Persist Auth Response to local Outbox  as  EventEnvelope &lt;PaymentAuthorized&gt; | EdgeDB1
+            API1 -->|3.  Capture / Refund received from merchant <br/>Persisted to Outbox as  EventEnvelope &lt;CaptureRequested&gt; in edge db  without any psp interaction| EdgeDB1
+            Fwd1 -.->|Polls local DB| EdgeDB1
+        end
+
+        subgraph Edge2["Edge Node 2 (edgepool2)"]
+            direction TB
+            subgraph PodEdgeCell2["Pod: payment-edge-cell"]
+                direction TB
+                API2["Payment Acceptance Service"]
+                EdgeDB2[("Edge Local DB (PostgreSQL)<br/>IdempotencyRecord<br/>PaymentIntent<br/>OutboxEvents")]
+            end
+            
+            subgraph PodEdgeWorkers2["Pod: payment-edge-workers"]
+                Fwd2[["LocalOutboxStoreAndForwardJob"]]
+            end
+            
+            PSP_Edge2["External PSP API<br/>(Synchronous Auth)"]
+            
+            %% Flow Splits inside Edge
+            API2 -.->|1. Idempotency Check| EdgeDB2
+            API2 ===>|2a. Synchronous Auth Pass<br/>Shopper Present| PSP_Edge2
+            PSP_Edge2 ===>|2b. Persist Auth Response to local Outbox  as  EventEnvelope &lt;PaymentAuthorized&gt; | EdgeDB2
+            API2 -->|3.  Capture / Refund received from merchant <br/>Persisted to  local Outbox as  EventEnvelope &lt;CaptureRequested&gt; in edge db  without any psp interaction| EdgeDB2
+            Fwd2 -.->|Polls local DB| EdgeDB2
+        end
+    end
+
+    subgraph InternalLayer["INTERNAL HOST (Central Cluster)"]
+        direction TB
+        
+        CentralDB[("Central DB<br/>OutboxEvent, Payment, PaymentTx,<br/>LedgerEntry, JournalEntry, Postings")]
+        
+        Relay[["OutboxRelayJob<br/>(payment-central-relay)"]]
+        
+        subgraph Topics["Kafka Topics"]
+            direction LR
+            CAPTURE_COMMANDS_TOPIC>"gateway.capture.commands<br/>(Accepted: EventEnvelope &lt;CaptureRequested&gt;)"]
+            JOURNAL_ENTRIES_RECORDED_TOPIC>"journal.entries.recorded<br/>(Accepted: EventEnvelope &lt;JournalEntriesRecorded&gt;)"]
+            CAPTURE_SUBMITTED_ACKS_TOPIC>"gateway.capture.submitted<br/>(Accepted: EventEnvelope &lt;CaptureSubmitted&gt;)"]
+            PSP_RESULTS_TOPIC>"payment.psp.results<br/>(Accepted: EventEnvelope &lt;PaymentAuthorized&gt;, &lt;CaptureConfirmed&gt;, &lt;InternalTransferCommand&gt;)"]
+        end
+        
+        CentralDB -->|Polls OutboxEvents| Relay
+        
+        Relay -->|EventEnvelope &lt;CaptureRequested&gt;| CAPTURE_COMMANDS_TOPIC
+        Relay -->|EventEnvelope &lt;CaptureSubmitted&gt;| CAPTURE_SUBMITTED_ACKS_TOPIC
+        Relay -->|EventEnvelope &lt;PaymentAuthorized&gt;| PSP_RESULTS_TOPIC
+        Relay -->|EventEnvelope &lt;CaptureConfirmed&gt;| PSP_RESULTS_TOPIC
+        Relay -->|EventEnvelope &lt;JournalEntriesRecorded&gt;| JOURNAL_ENTRIES_RECORDED_TOPIC
+        Relay -->|EventEnvelope &lt;InternalTransferCommand&gt;| PSP_RESULTS_TOPIC
+
+        
+        subgraph Consumers["Payment Consumers (payment-consumers)"]
+            direction TB
+            CaptureCommandExecutor("CaptureCommandExecutor<br/> Consumes EventEnvelope &lt;CaptureRequested&gt;<br/>Calls psp.capture() async endpoint<br/>Stores OutboxEvent EventEnvelope&lt;CaptureSubmitted&gt;")
+            GrossCaptureAllocationConsumer("GrossCaptureAllocationConsumer<br/> Consumes EventEnvelope &lt;JournalEntriesRecorded&gt;<br/>Checks for CAPTURE entries, and creates an OutboxEvent EventEnvelope &lt;InternalTransferCommand&gt; for splits")
+            AccountBalanceConsumer("AccountBalanceConsumer<br/> Consumes EventEnvelope &lt;JournalEntriesRecorded&gt;<br/>Updates account balances in Redis caching layer")
+            CapturePspPerformedConsumer("CapturePspPerformedConsumer<br/> Consumes EventEnvelope &lt;CaptureSubmitted&gt;")
+     
+            PspResultConsumer("PspResultConsumer<br/> Consumes &lt;PaymentAuthorized&gt;, &lt;CaptureConfirmed&gt; and &lt;InternalTransferCommand&gt;<br/><b>if &lt;PaymentAuthorized&gt;</b> -> creates Payment, AuthTx, JournalEntry (AuthHold), appends &lt;JournalEntriesRecorded&gt;<br/><b>if &lt;CaptureConfirmed&gt;</b> -> updates to CAPTURED, updates CaptureTx, JournalEntry (Capture), appends &lt;JournalEntriesRecorded&gt;<br/><b>if &lt;InternalTransferCommand&gt;</b> -> updates InternalTransferTx, JournalEntry (InternalTransfer)")
+        end
+        
+        CAPTURE_COMMANDS_TOPIC --> CaptureCommandExecutor
+        CAPTURE_SUBMITTED_ACKS_TOPIC --> CapturePspPerformedConsumer
+        JOURNAL_ENTRIES_RECORDED_TOPIC --> GrossCaptureAllocationConsumer 
+        JOURNAL_ENTRIES_RECORDED_TOPIC --> AccountBalanceConsumer 
+        PSP_RESULTS_TOPIC --> PspResultConsumer
+        
+        CaptureCommandExecutor -->|Calls external async psp capture, Writes Outbox EventEnvelope &lt;CaptureSubmitted&gt; | CentralDB
+        GrossCaptureAllocationConsumer -->|Writes Outbox EventEnvelope &lt;InternalTransferCommand&gt;| CentralDB
+        AccountBalanceConsumer -.->|Updates Cache| CentralDB
+        PspResultConsumer -->|Upserts Txs & JournalEntries, appends Outbox EventEnvelope &lt;JournalEntriesRecorded&gt; | CentralDB
+        CapturePspPerformedConsumer -->|Writes Result State| CentralDB
+
+    end
+
+    %% Network Links
+    Fwd1 ===>|Forwards OutboxEvents Asynchronously| CentralDB
+    Fwd2 ===>|Forwards OutboxEvents Asynchronously| CentralDB
+
+    %% Assign Classes
+    class Edge1,Edge2 edgeCell
+    class InternalLayer internalHost
+    class IdemDB1,EdgeDB1,IdemDB2,EdgeDB2,CentralDB db
+    class API1,API2 service
+    class Fwd1,Fwd2,Relay job
+    class CapTopic,TransTopic,ResTopic topic
+    class CapCons,TransCons,ResCons consumer
+```
 
 
 # 🟩 Key Clarifications (MoR Model)
@@ -50,7 +211,117 @@ PaymentIntent is just a domain entity living in edge layer and edge db so its no
 
 
 Authorization Flow
-![Architecture](https://github.com/dcaglar/ecommerce-platform-kotlin/blob/25b863edd5fc15647c14b70f55703e3494bf6e91/docs/architecture/idempotency-sequence-diagram.png)
+```mermaid
+sequenceDiagram
+    autonumber
+
+    box rgb(240, 248, 255) "Client Layer"
+        actor Shopper
+        participant Browser as Shopper's Browser<br/>(React App)
+    end
+
+    box rgb(255, 240, 245) "Gateway Layer"
+        participant Proxy as Backend Proxy<br/>(Node.js)
+        participant Keycloak
+    end
+
+    box rgb(255, 244, 225) "Payment Edge Cell"
+        participant PaymentSvc as payment-service<br/>(REST API)
+        participant EdgeDB as edge-db<br/>(PostgreSQL)
+    end
+
+    box rgb(255, 235, 238) "External Systems"
+        participant Stripe
+    end
+
+    %% Step 1: Create Payment Intent
+    Note over Shopper, Stripe: Phase 1: Create Payment Intent & Prepare Checkout Form
+
+    Shopper->>Browser: Fills cart details, clicks "Proceed to Checkout"
+    Browser->>Proxy: POST /api/checkout/process-payment<br/>(with cart data & Idempotency-Key)
+    
+    Proxy->>Keycloak: Request service token (client_credentials)
+    Keycloak-->>Proxy: Return JWT Access Token
+
+    Proxy->>PaymentSvc: POST /api/v1/payments<br/>(with JWT & Idempotency-Key)
+    
+    %% --- IDEMPOTENCY FLOW ---
+    PaymentSvc->>EdgeDB: SELECT response FROM idempotency_keys
+    alt First Request (Key is new)
+        EdgeDB-->>PaymentSvc: Not Found
+        PaymentSvc->>PaymentSvc: Create PaymentIntent (status=CREATED_PENDING)
+        PaymentSvc->>EdgeDB: INSERT INTO payment_intents
+        
+        par Async Stripe Call
+            PaymentSvc->>Stripe: Create PaymentIntent (API Call)
+        and Wait for Result
+            PaymentSvc->>PaymentSvc: Wait up to 3 seconds
+        end
+
+        alt Stripe Responds < 3s
+            Stripe-->>PaymentSvc: Return { id, clientSecret }
+            PaymentSvc->>PaymentSvc: Update PaymentIntent (status=CREATED)
+            PaymentSvc->>EdgeDB: INSERT response INTO idempotency_keys
+            PaymentSvc-->>Proxy: 201 Created<br/>{ paymentIntentId, clientSecret }
+        else Timeout (> 3s)
+            PaymentSvc-->>Proxy: 202 Accepted (Retry-After: 2s)<br/>{ paymentIntentId, clientSecret: null }
+            
+            Note over Proxy, PaymentSvc: Client enters polling loop
+            
+            loop Polling
+                Proxy->>PaymentSvc: GET /payments/{id}
+                PaymentSvc-->>Proxy: 200 OK { ... }
+            end
+
+            Note right of PaymentSvc: Background Thread
+            Stripe-->>PaymentSvc: Return { id, clientSecret } (Delayed)
+            PaymentSvc->>PaymentSvc: Update PaymentIntent (status=CREATED)
+        end
+
+    else Retry (Key already processed)
+        EdgeDB-->>PaymentSvc: Return stored JSON response
+        PaymentSvc-->>Proxy: 200 OK (Replayed)<br/>{ paymentIntentId, clientSecret }
+    end
+    %% --- END IDEMPOTENCY FLOW ---
+
+    Proxy-->>Browser: Return { clientSecret }
+
+    %% Step 2: Collect Card Details via Stripe Element
+    Note over Shopper, Stripe: Phase 2: Securely Collect Card Details
+
+    Browser->>Stripe: Stripe.js initializes Payment Element using clientSecret
+    Stripe-->>Browser: Renders secure card input form (iframe)
+    
+    Shopper->>Browser: Enters card details into Stripe's form
+    Note right of Shopper: Card data goes directly to Stripe,<br/>never touching any of our servers.
+
+    %% Step 3: Confirm Payment with Stripe and Authorize Internally
+    Note over Shopper, Stripe: Phase 3: Confirm Payment & Finalize State
+
+    Shopper->>Browser: Clicks "Pay Now"
+    Browser->>Stripe: elements.submit() (Tokenize & Associate)
+    Note right of Browser: Stripe JS sends card data,<br/>creates PaymentMethod,<br/>links it to PaymentIntent
+    Stripe-->>Browser: Validation OK
+    Browser->>Proxy: POST /api/checkout/authorize-payment/{paymentId}
+    
+    Proxy->>Keycloak: Request service token (can be cached)
+    Keycloak-->>Proxy: Return JWT Access Token
+
+    Proxy->>PaymentSvc: POST /api/v1/payments/{paymentId}/authorize
+    
+    PaymentSvc->>Stripe: paymentIntents.confirm(id)
+    Stripe-->>PaymentSvc: SUCCEEDED
+
+    rect rgb(230, 240, 255)
+        note over PaymentSvc: @Transactional
+        PaymentSvc->>PaymentSvc: Update PaymentIntent status to AUTHORIZED
+        PaymentSvc->>PaymentSvc: Save PaymentAuthorized to Outbox table
+    end
+
+    PaymentSvc-->>Proxy: 200 OK { status: 'AUTHORIZED' }
+    Proxy-->>Browser: Return final success status
+    Browser->>Shopper: Display "Payment Successful" message
+```
 
 ## **For Sellers**
 
@@ -105,7 +376,7 @@ Even under retries, restarts, and network issues, financial outcomes must remain
 # 🟦 Architecture Summary (Non-Functional / Implementation Section)
 
 The platform internally uses:
-- **Event-driven architecture** for asynchronous flows for payments and the ledger
+- **Event-driven architecture** for asynchronous flows for capture,refund,paymentsplits, transfers and the ledger flow
 - **Kafka topics** for execution queuing and PSP results
 - **Idempotent state transitions** to ensure correctness under retries
 - **Double-entry ledger** for immutable financial history
@@ -318,15 +589,15 @@ The platform follows a **Hexagonal (Ports & Adapters)** pattern to separate busi
 - **Traits**: Contains only truly common infrastructure utilities, completely decoupled from database entities or Kafka topics.
 
 ### **4. `payment-service` (API & Edge Cell Inbound Adapter)**
-- **Role**: Composition root and API gateway for the Edge Cell Pod.
+- **Role**: API gateway only talks to external PSP, and save result to local db, and return reesult to shopper in for the Edge Cell Pod.
 - **REST API**: Spring Web MVC controllers exposed to internal checkout/order services for synchronous payments and intents.
 - **Ports & Adapters**: Implements local database storage using `LocalOutboxWriterPort` to guarantee transaction safety.
 - **Wiring**: Manages local Edge Cell lifecycle, thread pools, and local database connection.
 
-### **5. `payment-edge-workers` (Local Sidecar Forwarder)**
-- **Role**: Background sidecar runner that bridges the Edge Cell to the Central Node.
+### **5. `payment-edge-workers` (Standalone Outbox Forwarder)**
+- **Role**: Background worker that bridges the Edge Cell to the Central Node.
 - **Outbox Forwarding**: Runs `LocalOutboxForwarderJob` asynchronously to claim local outbox events using `LocalOutboxEdgePort` and forward them to the Central consolidated DB using `CentralOutboxEdgePort`.
-- **Fault Isolation**: Runs in its own container within the Edge Cell Pod, ensuring that outbox forwarding never steals API resources or gets blocked by network latency.
+- **Fault Isolation**: Deployed in its own isolated Pod on the same edge node. If the worker encounters issues, crashes, or requires maintenance, it can be restarted by Kubernetes without taking down the entire synchronous Web API and local database.
 
 ### **6. `payment-central-relay` (Central Outbox Publisher)**
 - **Role**: Centralized high-performance scheduler that publishes events to Kafka.
@@ -343,19 +614,18 @@ The platform follows a **Hexagonal (Ports & Adapters)** pattern to separate busi
 
 The system uses a **Two-Stage Transactional Outbox Pattern** to ensure reliable event publishing from distributed stateless edge nodes to a highly available central relay, which ultimately publishes to Kafka.
 
-### **Stage 1: Edge Node (The Atomic "Machine" Edge Cell)**
+### **Stage 1: Edge Node (The Edge Cell Topology)**
 
-The Edge layer is responsible for synchronous payment acceptance (Stripe integration, intent creation) and local outbox creation. To achieve zero-latency communication and perfectly linear horizontal scaling (akin to a bare-metal "Machine" model), the Edge layer is deployed using the **Kubernetes Sidecar Pattern**.
+The Edge layer is responsible for synchronous payment acceptance (Stripe integration, intent creation) and local outbox creation. To achieve low-latency communication and perfectly linear horizontal scaling, the Edge layer components are scheduled together using strict **Kubernetes Node Affinity**, but deployed as **separate Pods** for lifecycle fault isolation.
 
-**The Edge Cell Pod (Strict 1:1:1 Ratio):**
-A single Edge Cell is represented as a single Kubernetes Pod containing exactly three isolated containers:
-1. **`payment-service` (Web API)**: Handles high-throughput synchronous checkouts and creates `OutboxEvent` records.
-2. **`local-edge-db` (Local State)**: A dedicated, isolated PostgreSQL container attached to a Persistent Volume (PVC) so data is never lost during a Pod restart.
-3. **`payment-edge-workers` (Local Forwarder)**: A background worker that polls the local DB for `NEW` outbox events and pushes them to the **Central DB**.
+**The Edge Components (Strict Co-location Ratio):**
+A single Edge Cell ecosystem runs on an isolated `edgepool` node and consists of separate Pods communicating over the internal cluster network:
+1. **`payment-service and local-edge-db lives in the same pod, local-edge-db- designed as initcointeinr restartpolicy=always` Pod (Web API)**: Handles high-throughput synchronous checkouts and creates `OutboxEvent` record persist local edge dbb
+3. **`payment-edge-workers` Pod (Forwarder)**:  Background worker running in its own standalone Pod that polls the `edge-db` for `NEW` outbox events and pushes them to the **Central DB**.
 
 **Fault Tolerance Hardening:**
-- **Zero Latency**: Because they share a Pod, the API and Worker connect to the database via `localhost:5432`.
-- **Guaranteed QoS (Noisy Neighbor Prevention)**: In Kubernetes, simply setting a "CPU Limit" does not reserve CPU; it only caps it. If containers have `requests` lower than `limits`, they fight over unreserved CPU cycles (the `Burstable` QoS class). By setting `requests` **exactly equal** to `limits` for all three containers, Kubernetes elevates the Pod to the `Guaranteed` QoS class. This physically isolates and reserves dedicated CPU cores exclusively for the database, preventing the Web API from stealing its CPU cycles during traffic spikes.
+- **Lifecycle Fault Isolation**: Previously, the worker and API shared the same Pod (the Sidecar pattern). However, if the worker crashed or required a restart, Kubernetes would forcefully terminate the entire Pod, bringing down the healthy Web API and Database with it. By separating them into independent Pods, a worker maintenance cycle or crash has zero impact on the synchronous Web API's uptime.
+- **Co-Located Scheduling**: Even though they are separate Pods, strict `nodeSelector` rules force them to land on the exact same physical `edgepool` Virtual Machine, minimizing network latency while maximizing fault isolation.
 - **Topology Spread Constraints**: The Edge Cells are mathematically forced to spread evenly across Cloud Availability Zones to survive datacenter outages.
 
 ### **Stage 2: Central Node (payment-central-relay & payment-consumers)**

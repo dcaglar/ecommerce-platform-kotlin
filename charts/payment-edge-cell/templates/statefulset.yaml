@@ -8,7 +8,7 @@ spec:
   serviceName: {{ include "payment-edge-cell.fullname" . }}-headless
   updateStrategy:
     type: RollingUpdate
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ if .Values.keda.enabled }}{{ .Values.keda.minReplicaCount }}{{ else }}1{{ end }}
   podManagementPolicy: Parallel
   selector:
     matchLabels:
@@ -113,6 +113,24 @@ spec:
               valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_SERVICE_PASSWORD}}
             - name: SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
               valueFrom: {configMapKeyRef: {name: edge-cell-config, key: KEYCLOAK_ISSUER_URL}}
+        - name: postgres-exporter
+          image: "quay.io/prometheuscommunity/postgres-exporter:v0.19.1"
+          imagePullPolicy: Always
+          ports:
+            - name: metrics
+              containerPort: 9187
+              protocol: TCP
+          env:
+            - name: DATA_SOURCE_URI
+              value: "localhost:5432/edge-db?sslmode=disable"
+            - name: DATA_SOURCE_USER
+              value: "postgres"
+            - name: DATA_SOURCE_PASS
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_POSTGRES_PASSWORD}}
+          {{- if .Values.postgresExporter.resources }}
+          resources:
+            {{- toYaml .Values.postgresExporter.resources | nindent 12 }}
+          {{- end }}
       volumes:
         - name: db-init-scripts
           configMap:
