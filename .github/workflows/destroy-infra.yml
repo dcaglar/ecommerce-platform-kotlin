@@ -47,24 +47,9 @@ jobs:
       - name: Display Plan Summary
         run: echo "⚠️ DESTROY plan complete! Review carefully - this will DELETE all infrastructure and STOP BILLING."
 
-  manual-approval:
-    name: "⏸️ Manual Approval Gate (DESTRUCTIVE)"
-    runs-on: ubuntu-latest
-    needs: terraform-plan-destroy
-    environment:
-      name: azure-loadtest
-    steps:
-      - name: Waiting for Your Approval
-        run: |
-          echo "⚠️  WARNING: This will DESTROY the entire infrastructure!"
-          echo "🔍 Review the destroy plan above"
-          echo "✅ Click 'Review deployments' to approve or reject"
-          echo "⏳ Waiting for manual approval..."
-
   destroy-infrastructure:
     name: "Terraform Destroy"
     runs-on: ubuntu-latest
-    needs: manual-approval
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
