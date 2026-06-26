@@ -39,3 +39,9 @@ redis:
 
 ingress:
   enabled: true
+
+
+config:
+  KEYCLOAK_ISSUER_URL: "http://keycloak:8080/realms/ecommerce-platform"
+  EDGE_DB_URL: "jdbc:postgresql://localhost:5432/edge-db?options=-c%20timezone=UTC"
+  EDGE_DB_NAME: "edge-db"
