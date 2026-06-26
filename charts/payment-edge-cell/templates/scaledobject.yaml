@@ -1,4 +1,4 @@
-{{- if .Values.keda.enabled }}
+{{- if (and .Values.keda (default false .Values.keda.enabled)) }}
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
@@ -6,10 +6,10 @@ metadata:
 spec:
   scaleTargetRef:
     name: {{ include "payment-edge-cell.fullname" . }}
-  minReplicaCount: {{ .Values.keda.minReplicaCount }}
-  maxReplicaCount: {{ .Values.keda.maxReplicaCount }}
+  minReplicaCount: {{ .Values.keda.minReplicaCount | default 1 }}
+  maxReplicaCount: {{ .Values.keda.maxReplicaCount | default 2 }}
   triggers:
-    {{- toYaml .Values.keda.triggers.metrics | nindent 4 }}
+    {{- toYaml .Values.keda.triggers | nindent 4 }}
   advanced:
     horizontalPodAutoscalerConfig:
       behavior:

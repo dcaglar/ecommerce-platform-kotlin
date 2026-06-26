@@ -10,18 +10,19 @@ metadata:
 spec:
   ingressClassName: {{ .Values.ingress.className | default "nginx" }}
   rules:
-    - host: {{ .Values.ingress.host | default "localhost" | quote }}
-      http:
-        paths:
-          - path: {{ .Values.ingress.path | default "/" }}
-            pathType: {{ .Values.ingress.pathType | default "Prefix" }}
-            backend:
-              service:
-                name: {{ include "payment-edge-cell.fullname" . }}
-                port:
-                  number: {{ .Values.service.port | default 8080 }}
+    - {{ if .Values.ingress.host }}host: {{ .Values.ingress.host | quote }}
+      {{ end -}}
+                                           http:
+                                             paths:
+                                               - path: {{ .Values.ingress.path | default "/" }}
+                                                 pathType: {{ .Values.ingress.pathType | default "Prefix" }}
+                                                 backend:
+                                                   service:
+                                                     name: {{ include "payment-edge-cell.fullname" . }}
+                                                     port:
+                                                       number: {{ .Values.service.port | default 8080 }}
   {{- with .Values.ingress.tls }}
-tls:
-  {{- toYaml . | nindent 4 }}
+  tls:
+    {{- toYaml . | nindent 4 }}
   {{- end }}
   {{- end }}

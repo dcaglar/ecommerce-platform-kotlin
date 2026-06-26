@@ -4,21 +4,20 @@ metadata:
   name: {{ include "payment-edge-cell.fullname" . }}
   labels:
     app: {{ include "payment-edge-cell.fullname" . }}
-     {{- include "payment-edge-cell.labels" . | nindent 4 }}
+    {{- include "payment-edge-cell.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type | default "ClusterIP" }}
   selector:
     app: {{ include "payment-edge-cell.fullname" . }}
   ports:
-    - name: {{.Values.service.portName | default "http"}}
-      port: {{.Values.service.port | default 8080}}
-      targetPort: {{.Values.service.portName | default "http"}}
+    - name: {{ .Values.service.portName | default "http" }}
+      port: {{ .Values.service.port | default 8080 }}
+      targetPort: 8080
       protocol: TCP
     - name: mgmt
       port: 9000
       targetPort: 9000
       protocol: TCP
-
     - name: postgres
       port: 5432
       targetPort: 5432
@@ -28,19 +27,19 @@ spec:
       targetPort: 9187
       protocol: TCP
 
-
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "payment-edge-cell.fullname" . }}-headless
 spec:
-  clusterIP: None # This is the magic "headless" flag
+  clusterIP: None
   selector:
     app: {{ include "payment-edge-cell.fullname" . }}
   ports:
     - name: http
       port: 8080
+      targetPort: 8080
     - name: postgres
       port: 5432
       targetPort: 5432

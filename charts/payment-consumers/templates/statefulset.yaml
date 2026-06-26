@@ -7,7 +7,7 @@ metadata:
 spec:
   serviceName: {{ include "payment-consumers.fullname" . }}
   podManagementPolicy: OrderedReady
-  replicas: {{if .Values.keda.enabled}}{{.Values.keda.minReplicaCount}}{{else}}1{{ end }}
+  replicas: {{ if (and .Values.keda (default false .Values.keda.enabled)) }}{{ .Values.keda.minReplicaCount | default 1 }}{{ else }}1{{ end }}
   selector:
     matchLabels:
       app: {{ include "payment-consumers.fullname" . }}
@@ -30,13 +30,10 @@ spec:
                       values:
                         - payment-central-relay
                 topologyKey: "kubernetes.io/hostname"
-
-
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-
       containers:
         - name: payment-consumers
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -44,43 +41,20 @@ spec:
           ports:
             - name: http
               containerPort: 8080
-            - name: mgmt
-              containerPort: 9000
           env:
             - name: JAVA_TOOL_OPTIONS
               value: "{{ .Values.jvmOpts }}"
             - name: SPRING_PROFILES_ACTIVE
               value: "{{ .Values.spring.profile }}"
             - name: SPRING_DATA_REDIS_URL
-              value: "{{ .Values.redis.url }}"
+              value: "{{ .Values.redis.url | default "redis://localhost:6379" }}"
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-              value: "{{ .Values.kafka.bootstrapServers }}"
+              value: "{{ .Values.kafka.bootstrapServers | default "localhost:9092" }}"
             - name: CENTRAL_DB_URL
               valueFrom: { configMapKeyRef: { name: central-db-config, key: CENTRAL_DB_URL } }
             - name: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: central-db-credentials
-                  key: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME
+              valueFrom: { secretKeyRef: { name: central-db-credentials, key: CENTRAL_DB_PAYMENT_CONSUMERS_USERNAME } }
             - name: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: central-db-credentials
-                  key: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD
-          startupProbe:
-            httpGet: {path: /actuator/health/liveness, port: mgmt}
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            failureThreshold: 60
-          readinessProbe:
-            httpGet: {path: /actuator/health/readiness, port: mgmt}
-            periodSeconds: 10
-            failureThreshold: 3
-            timeoutSeconds: 3
-          livenessProbe:
-            httpGet: {path: /actuator/health/liveness, port: mgmt}
-            periodSeconds: 15
-            failureThreshold: 4
-            timeoutSeconds: 5
+              valueFrom: { secretKeyRef: { name: central-db-credentials, key: CENTRAL_DB_PAYMENT_CONSUMERS_PASSWORD } }
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
