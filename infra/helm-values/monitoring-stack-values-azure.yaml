@@ -85,6 +85,9 @@ alertmanager:
 
 # ── Grafana ────────────────────────────────────────────────────────────────────
 grafana:
+  service:
+    type: LoadBalancer
+    port: 80
   nodeSelector:
     pool: central
 
