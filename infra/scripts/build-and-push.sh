@@ -32,7 +32,7 @@ if [ ! -d "$MODULE_NAME" ]; then
 fi
 
 echo "Building $MODULE_NAME..."
-docker build  --no-cache -f "$MODULE_NAME/Dockerfile" -t "$DOCKERHUB_USER/$MODULE_NAME:$TAG" .
+docker build   -f "$MODULE_NAME/Dockerfile" -t "$DOCKERHUB_USER/$MODULE_NAME:$TAG" .
 
 echo "Pushing $DOCKERHUB_USER/$MODULE_NAME:$TAG to Docker Hub..."
 docker push "$DOCKERHUB_USER/$MODULE_NAME:$TAG"
