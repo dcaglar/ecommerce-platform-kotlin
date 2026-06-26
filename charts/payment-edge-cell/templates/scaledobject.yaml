@@ -3,9 +3,11 @@ apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
   name: {{ include "payment-edge-cell.fullname" . }}
+  namespace: {{ .Release.Namespace }}
 spec:
   scaleTargetRef:
     name: {{ include "payment-edge-cell.fullname" . }}
+    kind: StatefulSet   # <--- THIS IS THE MISSING KEY
   minReplicaCount: {{ .Values.keda.minReplicaCount | default 1 }}
   maxReplicaCount: {{ .Values.keda.maxReplicaCount | default 2 }}
   triggers:
@@ -14,4 +16,6 @@ spec:
     horizontalPodAutoscalerConfig:
       behavior:
         {{- toYaml .Values.keda.behavior | nindent 8 }}
-  {{- end }}
+{{- end }}
+
+
