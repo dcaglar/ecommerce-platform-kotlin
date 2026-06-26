@@ -1,25 +1,38 @@
+spring:
+  profile: "local"
+
 paymentService:
   image:
-    repository: dcaglar1987/payment-service
+    repository: "dcaglar1987/payment-service"
     tag: "latest"
+    pullPolicy: "Always"
+  jvmOpts: "-Xmx512m"
+  resources:
+    requests: {cpu: "100m", memory: "256Mi"}
+    limits: {cpu: "500m", memory: "512Mi"}
+
+redis:
+  url: "redis://localhost:6379"
+
+keda:
+  enabled: false
+  minReplicaCount: 1
+  maxReplicaCount: 2
+  triggers: []
+  behavior: {}
+
+topologySpreadConstraints: []
 
 serviceMonitor:
   enabled: false
+  path: /actuator/prometheus
+  interval: 15s
+  scrapeTimeout: 10s
+  scheme: http
   labels:
     release: prometheus-stack
 
-
-runPrivilegeGrantJob: true
-edgeDb:
-  image:
-    repository: postgres
-    tag: "15-alpine"
-    pullPolicy: Always
-
-topologySpreadConstraints:
-  - maxSkew: 1
-    topologyKey: "topology.kubernetes.io/zone"
-    whenUnsatisfiable: DoNotSchedule
-    labelSelector:
-      matchLabels:
-        app: payment-edge-cell
+service:
+  type: ClusterIP
+  port: 8080
+  portName: http

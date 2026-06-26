@@ -1,4 +1,4 @@
-{{- if .Values.keda.enabled }}
+{{- if (and .Values.keda (default false .Values.keda.enabled)) }}
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
@@ -13,6 +13,10 @@ spec:
   maxReplicaCount: {{ .Values.keda.maxReplicaCount | default 6 }}
   pollingInterval: {{ .Values.keda.pollingInterval | default 15 }}
   cooldownPeriod: {{ .Values.keda.cooldownPeriod | default 300 }}
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        {{- toYaml .Values.keda.behavior | nindent 8 }}
   triggers:
     {{- toYaml .Values.keda.triggers | nindent 4 }}
-{{- end }}
+  {{- end }}
