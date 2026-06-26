@@ -11,13 +11,15 @@ cd "$REPO_ROOT"
 
 echo "🛡️  Checking Kubernetes context..."
 CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "none")
-if [[ "$CURRENT_CONTEXT" == "orbstack" ]]; then
-  echo "❌ Current context is 'orbstack' — refusing to deploy azure workloads to local cluster."
+
+# If the context is NOT the one we expect, then abort!
+if [[ "$CURRENT_CONTEXT" != "aks-payment-loadtest" ]]; then
+  echo "❌ Current context is '$CURRENT_CONTEXT'. Refusing to deploy to the wrong cluster!"
   echo "💡 Run: az aks get-credentials --resource-group rg-payment-platform-loadtest --name aks-payment-loadtest"
   exit 1
 fi
-echo "ℹ️  Deploying to context: $CURRENT_CONTEXT"
 
+echo "ℹ️  Deploying to verified context: $CURRENT_CONTEXT"
 echo "🚀 Deploying all external infrastructure (Keycloak, Redis, Kafka, KEDA) to Azure..."
 
 # 1. Keycloak
