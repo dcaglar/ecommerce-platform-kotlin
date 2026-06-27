@@ -86,10 +86,7 @@ jobs:
 
       - name: Build & Push Images
         run: |
-          ./infra/scripts/build-and-push.sh payment-service 
-          ./infra/scripts/build-and-push.sh payment-edge-workers 
-          ./infra/scripts/build-and-push.sh payment-consumers 
-          ./infra/scripts/build-and-push.sh payment-central-relay
+          ./infra/scripts/build-all-payment-platform-images-and-push.sh
 
       - name: Deploy Azure Environment
         env:

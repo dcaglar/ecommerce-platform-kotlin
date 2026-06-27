@@ -32,7 +32,7 @@ yq -i '.controller.metrics.serviceMonitor.enabled = true' "$REPO_ROOT/infra/helm
 yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-edge-cell/azure/values.yaml"
 yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-consumers/azure/values.yaml"
 yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-central-relay/azure/values.yaml"
-yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-edge-workers/values.yaml"
+yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-edge-workers/azure/values.yaml"
 echo "✅ Monitoring switched ON! Applications will now deploy with metrics enabled."
 
 
