@@ -97,7 +97,7 @@ class GrossCaptureAllocationConsumer(
                         AccountType.MARKETPLACE_DIRECT_REVENUE_BALANCE_ACCOUNT,
                         masterAccountCode
                     )
-                        // A1. Move 100% of funds from suspense to direct merchant revenue
+                    // A1. Move 100% of funds from suspense to direct merchant revenue
                     recordInternalTransferSubmissionUseCase.recordSubmission(
                         paymentId = payment.paymentId,
                         paymentIntentId = paymentIntentId,
