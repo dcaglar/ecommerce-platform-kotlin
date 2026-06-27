@@ -63,6 +63,7 @@ if [[ "$ENV" == "local" ]]; then
   helm dependency update "$CHART_ROOT"
   
   $HELM_CMD --install "$SERVICE_NAME" "$CHART_ROOT" \
+    --wait --atomic --timeout 10m \
     -n payment --create-namespace \
     -f "$CHART_ROOT/values.yaml" \
     -f "$CHART_ROOT/$ENV/values.yaml" \
@@ -86,6 +87,7 @@ elif [[ "$ENV" == "azure" ]]; then
   helm dependency update "$CHART_ROOT"
 
   $HELM_CMD --install "$SERVICE_NAME" "$CHART_ROOT" \
+    --wait --atomic --timeout 10m \
     -n payment --create-namespace \
     -f "$CHART_ROOT/azure/values.yaml" \
     $SECRET_ARGS
