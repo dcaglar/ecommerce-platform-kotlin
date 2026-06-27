@@ -78,7 +78,7 @@ class GrossCaptureAllocationConsumer(
                 }
 
                 val txs = paymentTxPort.findByPaymentId(payment.paymentId.value)
-                val captureTx = txs.find { it.txType == com.dogancaglar.paymentservice.domain.model.ledger.JournalType.CAPTURE.name && it.status == TxStatus.SUCCESS }
+                val captureTx = txs.find { it.txType == JournalType.CAPTURE && it.status == TxStatus.SUCCESS }
                     ?: throw IllegalStateException("Successful CaptureTx record missing for paymentId=${payment.paymentId.value}")
 
                 // 1. Resolve Global Platform Accounts
