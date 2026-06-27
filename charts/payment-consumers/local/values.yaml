@@ -14,7 +14,7 @@ service:
   portName: http
   port: 8080
 keda:
-  enabled: true # Ensure this is set to true to enable scaling
+  enabled: false
   minReplicaCount: 1
   maxReplicaCount: 6
   pollingInterval: 15
@@ -29,7 +29,7 @@ keda:
         # Ensure you are using the latest version-compliant metadata
         offsetResetPolicy: latest
 serviceMonitor:
-  enabled: true
+  enabled: false
   path: /actuator/prometheus
   interval: 15s
   scrapeTimeout: 10s

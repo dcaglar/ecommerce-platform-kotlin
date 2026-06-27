@@ -57,7 +57,7 @@ if [[ "$ENV" == "local" ]]; then
   fi
   
   echo "📦 Updating helm dependencies..."
-  helm dependency update "$CHART_ROOT/$SERVICE_NAME"
+  helm dependency update "$CHART_ROOT"
   
   $HELM_CMD --install "$SERVICE_NAME" "$CHART_ROOT" \
     -n payment --create-namespace \

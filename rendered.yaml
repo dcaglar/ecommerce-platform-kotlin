@@ -14,13 +14,83 @@ stringData:
   EDGE_DB_DUTY_PASSWORD: 
   EDGE_DB_POSTGRES_PASSWORD:
 ---
+# Source: payment-edge-cell/templates/edge-db-init-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: edge-db-init-secret
+  namespace: payment
+type: Opaque
+stringData:
+  init-edge-db.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "🔌 Enabling required extensions..."
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS btree_gin;"
+    
+    echo "🏗️ Phase 1: Creating Pre-Defined Group Roles..."
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+        -- SuperNPA Group (Full Admin for Apps/Jobs)
+        DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'SuperNPA') THEN
+            CREATE ROLE "SuperNPA" NOLOGIN SUPERUSER;
+        END IF; END \$\$;
+
+        -- Duty Group (Full Admin for Humans)
+        DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'Duty') THEN
+            CREATE ROLE "Duty" NOLOGIN SUPERUSER;
+        END IF; END \$\$;
+
+        -- Owner Group (Read/Write Data, No DDL)
+        DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'Owner') THEN
+            CREATE ROLE "Owner" NOLOGIN;
+        END IF; END \$\$;
+        
+        -- Base Schema Privileges for Owner
+        GRANT USAGE ON SCHEMA public TO "Owner";
+        
+        -- Configure default privileges for future tables created by the root 'postgres' user (which Liquibase uses)
+        -- This guarantees that 'Owner' group automatically gets DML access to newly migrated tables.
+        ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO "Owner";
+        ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO "Owner";
+    EOSQL
+
+    echo "👤 Phase 2: Creating Users and Assigning to Group Roles..."
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+        
+        -- 1. Payment Service -> Owner Role
+        DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$EDGE_DB_PAYMENT_SERVICE_USERNAME') THEN
+            CREATE USER "$EDGE_DB_PAYMENT_SERVICE_USERNAME" WITH PASSWORD '$EDGE_DB_PAYMENT_SERVICE_PASSWORD';
+        END IF; END \$\$;
+        GRANT "Owner" TO "$EDGE_DB_PAYMENT_SERVICE_USERNAME";
+
+        -- 2. Edge Workers -> Owner Role
+        DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME') THEN
+            CREATE USER "$EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME" WITH PASSWORD '$EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD';
+        END IF; END \$\$;
+        GRANT "Owner" TO "$EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME";
+
+        -- 3. Human Duty Operator -> Duty Role
+        DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$EDGE_DB_DUTY_USERNAME') THEN
+            CREATE USER "$EDGE_DB_DUTY_USERNAME" WITH PASSWORD '$EDGE_DB_DUTY_PASSWORD';
+        END IF; END \$\$;
+        GRANT "Duty" TO "$EDGE_DB_DUTY_USERNAME";
+        
+    EOSQL
+
+    echo "✅ Edge DB RBAC strictly initialized."
+---
 # Source: payment-edge-cell/templates/edge-cell-configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: edge-cell-config
 data:
-  null
+  EDGE_DB_NAME: edge-db
+  EDGE_DB_URL: jdbc:postgresql://localhost:5432/edge-db?options=-c%20timezone=UTC
+  KEYCLOAK_ISSUER_URL: http://keycloak:8080/realms/ecommerce-platform
 ---
 # Source: payment-edge-cell/templates/edge-db-changelog-configmap.yaml
 apiVersion: v1
@@ -310,7 +380,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: edge-db-init-configmap
-  namespace: default
+  namespace: payment
 data:
   init-edge-db.sh: |
     #!/bin/bash
@@ -320,7 +390,7 @@ data:
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS btree_gin;"
-
+    /// INSTEAD OF ADDING INIT-EDE-DB OCONFIGMAP, LETS ADD IT DO EDGE-DB.SECRET , SO IT WOULD BE SERCRET AND SEMORE SECURE
     echo "Creating payment_service user..."
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
         DO \$\$
@@ -339,6 +409,7 @@ data:
     echo "Creating edge_workers user..."
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
         DO \$\$
+    //1-do creaate a new role with this namee , for this users wtih those password i define here.
         BEGIN
             IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME') THEN
                 CREATE USER "$EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME" WITH PASSWORD '$EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD';
@@ -350,7 +421,6 @@ data:
         GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "$EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME";
         GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "$EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME";
     EOSQL
-
     echo "Creating duty user..."
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
         DO \$\$
@@ -366,7 +436,6 @@ data:
         GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "$EDGE_DB_DUTY_USERNAME";
         GRANT "$EDGE_DB_PAYMENT_SERVICE_USERNAME" TO "$EDGE_DB_DUTY_USERNAME";
     EOSQL
-
     echo "Configuring default privileges for future tables..."
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
         -- When payment_service creates tables/sequences (via Liquibase), automatically grant access to edge_workers and duty
@@ -455,20 +524,20 @@ spec:
       labels:
         app: payment-edge-cell
       annotations:
-        rollout/reboot: "1782458318"
+        rollout/reboot: "1782514205"
     spec:
       terminationGracePeriodSeconds: 120
       initContainers:
         - name: edge-db
           image: postgres:15
-          readinessProbe:
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            exec:
-              command: ["psql", "-U", "postgres", "-d", "edge-db", "-tAc", "SELECT 1;"]
+          restartPolicy: Always   # <--- K8s 1.28
           volumeMounts:
             - name: db-init-scripts
               mountPath: /docker-entrypoint-initdb.d
+
+          envFrom:
+            - configMapRef:
+              name: edge-cell-config
           env:
             - name: POSTGRES_DB
               valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_NAME}}
@@ -476,9 +545,44 @@ spec:
               value: postgres
             - name: POSTGRES_PASSWORD
               valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_POSTGRES_PASSWORD}}
+            - name: EDGE_DB_PAYMENT_SERVICE_USERNAME
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_SERVICE_USERNAME}}
+            - name: EDGE_DB_PAYMENT_SERVICE_PASSWORD
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_SERVICE_PASSWORD}}
+
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_EDGE_WORKERS_USERNAME}}
+            - name: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_EDGE_WORKERS_PASSWORD}}
+            - name: EDGE_DB_DUTY_USERNAME
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_DUTY_USERNAME}}
+            - name: EDGE_DB_DUTY_PASSWORD
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_DUTY_PASSWORD}}
+
+          args: ["-c", "listen_addresses=*"]
+          startupProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 2
+            periodSeconds: 2
+            failureThreshold: 15
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 2
+            periodSeconds: 2
+            failureThreshold: 3
         - name: liquibase-migration
           image: liquibase/liquibase:4.24.0
+          env:
+            - name: LIQUIBASE_COMMAND_URL
+              valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_URL}}
+            - name: LIQUIBASE_COMMAND_USERNAME
+              value: 'postgres'
+            - name: LIQUIBASE_COMMAND_PASSWORD
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_POSTGRES_PASSWORD}}
           args: ["--search-path=/shared-workspace", "update", "--changelog-file=changelog.edge.xml"]
+
           volumeMounts:
             - name: liquibase-workspace
               mountPath: /shared-workspace
@@ -491,22 +595,37 @@ spec:
               containerPort: 8080
           env:
             - name: JAVA_TOOL_OPTIONS
-              value: "-XX:+UseG1GC -XX:MaxRAMPercentage=60"
+              value: "-XX:+UseG1GC -XX:+AlwaysActAsServerClassMachine -XX:+UseStringDeduplication -XX:MaxRAMPercentage=45 -XX:InitialRAMPercentage=45 -XX:MaxMetaspaceSize=128m -XX:MaxDirectMemorySize=128m -XX:ThreadStackSize=512 -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=30"
             - name: SPRING_PROFILES_ACTIVE
-              value: "azure"
+              value: "local"
             - name: SPRING_DATA_REDIS_URL
               value: "redis://redis-master:6379"
+          startupProbe:
+            httpGet: {path: /actuator/health/liveness, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: http}
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: http}
+            periodSeconds: 15
+            failureThreshold: 4
+            timeoutSeconds: 5
           resources:
             limits:
-              cpu: 2500m
-              memory: 3Gi
+              cpu: 500m
+              memory: 768Mi
             requests:
-              cpu: 1500m
-              memory: 2Gi
+              cpu: 200m
+              memory: 768Mi
       volumes:
         - name: db-init-scripts
-          configMap:
-            name: edge-db-init-configmap
+          secret:
+            secretName: edge-db-init-secret
         - name: liquibase-workspace
           configMap:
             name: edge-db-changelog-configmap
@@ -515,58 +634,32 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: payment-edge-cell
+  name: payment-edge-cell-ingress
+  namespace: payment  # Explicitly defined
   labels:
-    helm.sh/chart: payment-edge-cell-0.1.0
     app.kubernetes.io/name: payment-edge-cell
     app.kubernetes.io/instance: payment-edge-cell
     app.kubernetes.io/version: "1.0.0"
     app.kubernetes.io/managed-by: Helm
   annotations:
-    null
+    nginx.ingress.kubernetes.io/limit-connections: "350"
+    nginx.ingress.kubernetes.io/load-balance: ewma
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
+    nginx.ingress.kubernetes.io/upstream-keepalive-connections: "200"
+    nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "120"
 spec:
   ingressClassName: nginx
   rules:
     - http:
-                                             paths:
-                                               - path: /
-                                                 pathType: Prefix
-                                                 backend:
-                                                   service:
-                                                     name: payment-edge-cell
-                                                     port:
-                                                       number: 8080
+       paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                 name: payment-edge-cell
+                 port:
+                 number: 8080
 ---
 # Source: payment-edge-cell/templates/service-monitor.yaml
 # templates/servicemonitor.yaml
----
-# Source: payment-edge-cell/templates/scaledobject.yaml
-apiVersion: keda.sh/v1alpha1
-kind: ScaledObject
-metadata:
-  name: payment-edge-cell
-spec:
-  scaleTargetRef:
-    name: payment-edge-cell
-  minReplicaCount: 1
-  maxReplicaCount: 2
-  triggers:
-    - metadata:
-        type: Utilization
-        value: "85"
-      type: cpu
-  advanced:
-    horizontalPodAutoscalerConfig:
-      behavior:
-        scaleDown:
-          policies:
-          - periodSeconds: 15
-            type: Percent
-            value: 100
-          stabilizationWindowSeconds: 300
-        scaleUp:
-          policies:
-          - periodSeconds: 45
-            type: Pods
-            value: 1
-          stabilizationWindowSeconds: 300

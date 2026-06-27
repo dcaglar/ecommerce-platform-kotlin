@@ -57,7 +57,22 @@ spec:
             - name: EDGE_DB_DUTY_PASSWORD
               valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_DUTY_PASSWORD}}
 
-
+          args: ["-c", "listen_addresses=*"]
+          startupProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 2
+            periodSeconds: 2
+            failureThreshold: 15
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 2
+            periodSeconds: 2
+            failureThreshold: 3
+        - name: liquibase-migration
+          image: liquibase/liquibase:4.24.0
+          env:
             - name: LIQUIBASE_COMMAND_URL
               valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_URL}}
             - name: LIQUIBASE_COMMAND_USERNAME
@@ -65,10 +80,6 @@ spec:
             - name: LIQUIBASE_COMMAND_PASSWORD
               valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_POSTGRES_PASSWORD}}
           args: ["--search-path=/shared-workspace", "update", "--changelog-file=changelog.edge.xml"]
-        - name: liquibase-migration
-          image: liquibase/liquibase:4.24.0
-
-          args:
 
           volumeMounts:
             - name: liquibase-workspace
@@ -87,14 +98,27 @@ spec:
               value: "{{ .Values.spring.profile | default "local" }}"
             - name: SPRING_DATA_REDIS_URL
               value: "{{ .Values.redis.url | default "redis://localhost:6379" }}"
-
-
+          startupProbe:
+            httpGet: {path: /actuator/health/liveness, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: http}
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: http}
+            periodSeconds: 15
+            failureThreshold: 4
+            timeoutSeconds: 5
           resources:
             {{- toYaml .Values.paymentService.resources | nindent 12}}
       volumes:
         - name: db-init-scripts
-          configMap:
-            name: edge-db-init-configmap
+          secret:
+            secretName: edge-db-init-secret
         - name: liquibase-workspace
           configMap:
             name: edge-db-changelog-configmap

@@ -16,6 +16,7 @@ import org.apache.kafka.clients.producer.ProducerRecord
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -54,7 +55,10 @@ import java.io.StringWriter
 @Configuration
 class KafkaTypedConsumerFactoryConfig(
     private val bootKafkaProps: KafkaProperties,
-    private val meterRegistry: MeterRegistry
+    private val meterRegistry: MeterRegistry,
+    @Value("\${app.kafka.concurrency.journal-entries:3}") private val journalEntriesConcurrency: Int,
+    @Value("\${app.kafka.concurrency.capture-commands:3}") private val captureCommandsConcurrency: Int,
+    @Value("\${app.kafka.concurrency.capture-submitted:3}") private val captureSubmittedConcurrency: Int
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(KafkaTypedConsumerFactoryConfig::class.java)
@@ -284,7 +288,7 @@ class KafkaTypedConsumerFactoryConfig(
     ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<Event>> {
         return createFactory(
             clientId = "journal-entries-consumer",
-            concurrency = 3,
+            concurrency = journalEntriesConcurrency,
             interceptor = interceptor,
             consumerFactory = customFactory,
             errorHandler = errorHandler,
@@ -304,7 +308,7 @@ class KafkaTypedConsumerFactoryConfig(
     ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<Event>> {
         return createFactory(
             clientId = "capture-command-executor",
-            concurrency = 3,
+            concurrency = captureCommandsConcurrency,
             interceptor = interceptor,
             consumerFactory = customFactory,
             errorHandler = errorHandler,
@@ -321,7 +325,7 @@ class KafkaTypedConsumerFactoryConfig(
     ): ConcurrentKafkaListenerContainerFactory<String, EventEnvelope<Event>> {
         return createFactory(
             clientId = "capture-psp-performed-consumer",
-            concurrency = 3,
+            concurrency = captureSubmittedConcurrency,
             interceptor = interceptor,
             consumerFactory = customFactory,
             errorHandler = errorHandler,

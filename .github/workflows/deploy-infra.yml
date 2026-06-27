@@ -86,10 +86,10 @@ jobs:
 
       - name: Build & Push Images
         run: |
-          ./infra/scripts/build-and-push.sh payment-service ${{ secrets.DOCKERHUB_USERNAME }} latest
-          ./infra/scripts/build-and-push.sh payment-edge-workers ${{ secrets.DOCKERHUB_USERNAME }} latest
-          ./infra/scripts/build-and-push.sh payment-consumers ${{ secrets.DOCKERHUB_USERNAME }} latest
-          ./infra/scripts/build-and-push.sh payment-central-relay ${{ secrets.DOCKERHUB_USERNAME }} latest
+          ./infra/scripts/build-and-push.sh payment-service 
+          ./infra/scripts/build-and-push.sh payment-edge-workers 
+          ./infra/scripts/build-and-push.sh payment-consumers 
+          ./infra/scripts/build-and-push.sh payment-central-relay
 
       - name: Deploy Azure Environment
         env:
