@@ -12,11 +12,11 @@ echo "🛡️  Checking Kubernetes context..."
 CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "none")
 if [[ "$CURRENT_CONTEXT" != "orbstack" ]]; then
   echo "⚠️  Current context is '$CURRENT_CONTEXT', but this script requires 'orbstack'."
-  if kubectl config get-contexts orbstack >/dev/null 2>&1; then
-    echo "🔄 Switching context to 'orbstack'..."
-    kubectl config use-context orbstack
+  if kubectl config get-contexts $NS >/dev/null 2>&1; then
+    echo "🔄 Switching context to 'payment'..."
+    kubectl config use-context payment
   else
-    echo "❌ OrbStack context not found! Is OrbStack running with Kubernetes enabled?"
+    echo "❌ Payment context not found! Is OrbStack running with Kubernetes enabled?"
     exit 1
   fi
 fi
@@ -49,7 +49,7 @@ echo "Deployment request of  kafka  was submitted to local helm"
 
 # 4.keda we should not really sent or use keda in local
 echo "Sending a deployment request of  KEDA to  local helm "
-#$SCRIPT_DIR/deploy-external-infra.sh keda local
+#"$SCRIPT_DIR/deploy-external-infra.sh" keda local
 echo "Deployment request of  KEDA was submitted to local helm"
 
 echo ""

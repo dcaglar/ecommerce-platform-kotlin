@@ -1,5 +1,9 @@
 app:
   kafka:
+    concurrency:
+      journal-entries: 16
+      capture-commands: 8
+      capture-submitted: 8
     # Azure: higher partition count than local (replication factor 3 for durability).
     specs:
       payment.psp.results:      { partitions: 24, replicas: 3, createDlq: true }

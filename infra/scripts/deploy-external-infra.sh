@@ -12,7 +12,7 @@ usage() {
 }
 
 SERVICE_NAME=${1:-}
-ENV=${2:-}
+ENV=${2:-LOCAL}
 
 if [ -z "$SERVICE_NAME" ] || [ -z "$ENV" ]; then
   usage
@@ -44,6 +44,7 @@ case "$SERVICE_NAME" in
   keycloak)
     helm repo add bitnami https://charts.bitnami.com/bitnami
     CHART="bitnami/keycloak"
+        NAMESPACE="payment",
     EXTRA_ARGS="--version 20.0.0 --set global.imageRegistry=docker.io --set image.registry=docker.io --set image.repository=bitnamilegacy/keycloak --set image.tag=23.0.7 --set postgresql.enabled=true --set postgresql.image.registry=docker.io --set postgresql.image.repository=bitnamilegacy/postgresql --set postgresql.image.tag=16.4.0-debian-12-r0"
     ;;
 
@@ -51,22 +52,25 @@ case "$SERVICE_NAME" in
     helm repo add bitnami https://charts.bitnami.com/bitnami
     CHART="bitnami/kafka"
     EXTRA_ARGS="--version 32.3.14"
-    ;;
+        NAMESPACE="payment";;
   kafka-exporter)
     helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-    CHART="prometheus-community/prometheus-kafka-exporter"
+    CHART="prometheus-community/prometheus-kafka-exporter",
+        NAMESPACE="payment"
     ;;
   postgresql-exporter)
     helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-    CHART="prometheus-community/prometheus-postgres-exporter"
+    CHART="prometheus-community/prometheus-postgres-exporter",
+        NAMESPACE="payment"
     ;;
   redis)
     helm repo add bitnami https://charts.bitnami.com/bitnami
-    CHART="bitnami/redis"
+    CHART="bitnami/redis",
+    NAMESPACE="payment"
     ;;
   keda)
     helm repo add kedacore https://kedacore.github.io/charts
-    CHART="kedacore/keda"
+    CHART="kedacore/keda",
     NAMESPACE="keda"
     if [[ "$ENV" == "azure" ]]; then
       EXTRA_ARGS="--set nodeSelector.pool=central"

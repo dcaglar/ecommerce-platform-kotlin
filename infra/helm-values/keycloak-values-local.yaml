@@ -38,10 +38,10 @@ extraEnvVars:
 
 resources:
   requests:
-    memory: 400Mi
+    memory: 512Mi
     cpu: 200m
   limits:
-    memory: 400Mi
+    memory: 1Gi
 
 livenessProbe:
   enabled: true

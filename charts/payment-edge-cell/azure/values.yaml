@@ -8,10 +8,11 @@ keda:
   pollingInterval: 15
   cooldownPeriod: 300
   triggers:
-    - type: cpu # <--- Direct item in the array
+    - type: cpu
       metricType: Utilization
       metadata:
         value: "85"
+        containerName: "payment-service"
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 300

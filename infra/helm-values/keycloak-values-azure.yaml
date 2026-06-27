@@ -18,6 +18,7 @@ service:
     http: 8080
   nodePorts:
     http: 32080
+    namespace: payment
 # single-node cache; also blank out KC_CACHE_STACK so no jdbc-ping surprise
 extraEnvVars:
   - name: KC_CACHE
@@ -39,6 +40,7 @@ extraEnvVars:
   - name: KEYCLOAK_ADMIN_PASSWORD
     value: "adminpassword"
 resources:
+  namespace: payment
   requests:
     memory: 1Gi
     cpu: 1000m

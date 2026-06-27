@@ -29,9 +29,9 @@ echo "Deployment request of  POSTGRESQL exporter was submitted to azure helm"
 
 echo "🚀 Toggling ServiceMonitors to 'true' in application Helm values..."
 yq -i '.controller.metrics.serviceMonitor.enabled = true' "$REPO_ROOT/infra/helm-values/ingress-controller-values-azure.yaml"
-yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-edge-cell/local/values.yaml"
-yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-consumers/local/values.yaml"
-yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-central-relay/local/values.yaml"
+yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-edge-cell/azure/values.yaml"
+yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-consumers/azure/values.yaml"
+yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-central-relay/azure/values.yaml"
 yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-edge-workers/values.yaml"
 echo "✅ Monitoring switched ON! Applications will now deploy with metrics enabled."
 

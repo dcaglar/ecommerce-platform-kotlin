@@ -3,6 +3,10 @@ app:
   payment-service:
     api-key: secretpaymentapikey12345
   kafka:
+    concurrency:
+      journal-entries: 3
+      capture-commands: 3
+      capture-submitted: 3
     specs:
       payment.psp.results:                        { partitions: 12, replicas: 1, createDlq: true }
       journal.entries.recorded:                   { partitions: 24, replicas: 1, createDlq: true }
