@@ -5,6 +5,7 @@
 # Usage: ./deploy-payment-platform-services-azure.sh
 set -euo pipefail
 
+trap 'echo "❌ Azure payment platform services deployment failed on line $LINENO. Command: $BASH_COMMAND"' ERR
 NS="payment"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR/../.."

@@ -4,6 +4,8 @@
 # Example: ./deploy.sh payment-edge-cell local
 set -euo pipefail
 
+trap 'echo "❌ Deployment script failed on line $LINENO. Command: $BASH_COMMAND"' ERR
+
 usage() {
   echo "Usage: $0 <service-name> <environment>"
   echo "Example: $0 payment-central-relay local"
@@ -58,7 +60,7 @@ if [[ "$ENV" == "local" ]]; then
   fi
   
   echo "📦 Updating helm dependencies..."
-  helm dependency update "$CHART_ROOT/$SERVICE_NAME"
+  helm dependency update "$CHART_ROOT"
   
   $HELM_CMD --install "$SERVICE_NAME" "$CHART_ROOT" \
     -n payment --create-namespace \

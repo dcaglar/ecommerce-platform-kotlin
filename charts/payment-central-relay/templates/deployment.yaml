@@ -74,6 +74,16 @@ spec:
                 secretKeyRef:
                   name: payment-central-relay-job-credentials
                   key: CENTRAL_DB_DUTY_PASSWORD
+            - name: CENTRAL_DB_MAINTENANCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: payment-central-relay-job-credentials
+                  key: CENTRAL_DB_MAINTENANCE_USERNAME
+            - name: CENTRAL_DB_MAINTENANCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-central-relay-job-credentials
+                  key: CENTRAL_DB_MAINTENANCE_PASSWORD
           startupProbe:
             httpGet: {path: /actuator/health/liveness, port: management}
             initialDelaySeconds: 10

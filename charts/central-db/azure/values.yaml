@@ -20,6 +20,11 @@ postgresql:
       synchronous_commit=on
 
     extraEnvVarsSecret: central-db-credentials
+    extraEnvVars:
+      - name: POSTGRESQL_INIT_MAX_TIMEOUT
+        value: "300"
+      - name: PGCTLTIMEOUT
+        value: "300"
     initdb:
       scriptsConfigMap: central-db-init-configmap
 

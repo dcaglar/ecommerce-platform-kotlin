@@ -5,6 +5,7 @@
 # Usage: ./deploy-all-external-infra-azure.sh
 set -euo pipefail
 
+trap 'echo "❌ Azure external infra deployment failed on line $LINENO. Command: $BASH_COMMAND"' ERR
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR/../.."
 cd "$REPO_ROOT"

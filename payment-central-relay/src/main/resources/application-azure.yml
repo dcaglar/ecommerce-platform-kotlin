@@ -23,8 +23,8 @@ app:
     # Low-throughput pool for the CentralOutboxMaintenanceJob (cleanup sweeps).
     maintenance:
       jdbc-url: ${CENTRAL_DB_URL}
-      username: ${CENTRAL_DB_DUTY_USERNAME}
-      password: ${CENTRAL_DB_DUTY_PASSWORD}
+      username: ${CENTRAL_DB_MAINTENANCE_USERNAME}
+      password: ${CENTRAL_DB_MAINTENANCE_PASSWORD}
       pool-name: ${spring.application.name}-central-maint-pool
       maximum-pool-size: 2
       minimum-idle: 0

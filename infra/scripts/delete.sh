@@ -18,6 +18,5 @@ fi
 
 echo "🗑️ Deleting $SERVICE_NAME from $ENV environment..."
 
-helm uninstall -n payment "$SERVICE_NAME" --ignore-not-found
-
+helm uninstall -n payment "$SERVICE_NAME" --ignore-not-found || echo "⚠️ Could not uninstall $SERVICE_NAME. Is the cluster reachable?"
 echo "✅ Deletion of $SERVICE_NAME complete."

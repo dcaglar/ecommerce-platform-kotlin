@@ -56,6 +56,10 @@ spec:
               valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_DUTY_USERNAME}}
             - name: EDGE_DB_DUTY_PASSWORD
               valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_DUTY_PASSWORD}}
+            - name: EDGE_DB_MAINTENANCE_USERNAME
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_MAINTENANCE_USERNAME}}
+            - name: EDGE_DB_MAINTENANCE_PASSWORD
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_MAINTENANCE_PASSWORD}}
 
           args: ["-c", "listen_addresses=*"]
           startupProbe:
@@ -76,9 +80,9 @@ spec:
             - name: LIQUIBASE_COMMAND_URL
               valueFrom: {configMapKeyRef: {name: edge-cell-config, key: EDGE_DB_URL}}
             - name: LIQUIBASE_COMMAND_USERNAME
-              value: 'postgres'
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_SERVICE_USERNAME}}
             - name: LIQUIBASE_COMMAND_PASSWORD
-              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_POSTGRES_PASSWORD}}
+              valueFrom: {secretKeyRef: {name: edge-cell-credentials, key: EDGE_DB_PAYMENT_SERVICE_PASSWORD}}
           args: ["--search-path=/shared-workspace", "update", "--changelog-file=changelog.edge.xml"]
 
           volumeMounts:

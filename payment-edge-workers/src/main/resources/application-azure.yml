@@ -14,8 +14,8 @@ app:
       idle-timeout: 600000
       max-lifetime: 1800000
     maintenance:
-      username: ${EDGE_DB_DUTY_USERNAME}
-      password: ${EDGE_DB_DUTY_PASSWORD}
+      username: ${EDGE_DB_MAINTENANCE_USERNAME}
+      password: ${EDGE_DB_MAINTENANCE_PASSWORD}
       maximum-pool-size: 1
       minimum-idle: 0
       connection-timeout: 15000

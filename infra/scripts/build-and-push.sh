@@ -1,7 +1,10 @@
 #!/bin/bash
 # Usage: build-and-push.sh <module-name> [dockerhub-username] [tag]
 # Example: ./build-and-push.sh payment-service dcaglar1987 latest
-set -e
+set -euo pipefail
+
+trap 'echo "❌ Build script failed on line $LINENO. Command: $BASH_COMMAND"' ERR
+
 export DOCKER_BUILDKIT=1
 
 # Arguments
@@ -18,7 +21,9 @@ fi
 # If DOCKER_TOKEN is set, use it to log in. Otherwise, assume the user is already logged in.
 if [ -n "${DOCKER_TOKEN:-}" ]; then
   echo "Logging in to Docker Hub using DOCKER_TOKEN..."
-  echo "$DOCKER_TOKEN" | docker login --username "$DOCKERHUB_USER" --password-stdin
+  # Use || true here because on macOS, docker-credential-osxkeychain often crashes with (-25299) 
+  # if an entry already exists, even though the login actually succeeded.
+  echo "$DOCKER_TOKEN" | docker login --username "$DOCKERHUB_USER" --password-stdin || echo "⚠️ docker login threw an error (likely a macOS keychain bug), ignoring and continuing..."
 else
   echo "DOCKER_TOKEN is not set. Assuming you are already logged in to Docker Hub..."
 fi

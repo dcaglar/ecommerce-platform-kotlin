@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+trap 'echo "❌ Local payment platform services deployment failed on line $LINENO. Command: $BASH_COMMAND"' ERR
 NS="payment"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR/../.."

@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
+trap 'echo "❌ Local monitoring stack deployment failed on line $LINENO. Command: $BASH_COMMAND"' ERR
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR/../.."
 cd "$REPO_ROOT"
