@@ -12,7 +12,7 @@ cd "$REPO_ROOT"
 echo "🛡️  Checking Kubernetes context..."
 CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "none")
 
-# If the context is NOT the one we expect, then abort!
+# If the context is NOT the one we expect(aks-payment-loadtest, then abort!)
 if [[ "$CURRENT_CONTEXT" != "aks-payment-loadtest" ]]; then
   echo "❌ Current context is '$CURRENT_CONTEXT'. Refusing to deploy to the wrong cluster!"
   echo "💡 Run: az aks get-credentials --resource-group rg-payment-platform-loadtest --name aks-payment-loadtest"

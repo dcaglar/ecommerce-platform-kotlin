@@ -1,6 +1,7 @@
 #!/bin/bash
 # Usage: deploy.sh <service-name> <environment>
 # Example: ./deploy.sh payment-central-relay local
+# Example: ./deploy.sh payment-edge-cell local
 set -euo pipefail
 
 usage() {
