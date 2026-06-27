@@ -44,7 +44,7 @@ jobs:
   deploy-infrastructure:
     name: "Terraform Apply & Helm Deploy"
     runs-on: ubuntu-latest
-    needs: terraform-plan # <--- FIX: Ensures this job waits for the artifact
+    needs: terraform-plan
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -86,7 +86,7 @@ jobs:
         run: |
           ./infra/scripts/build-all-payment-platform-images-and-push.sh
 
-      - name: Deploy Azure Environment
+      - name: Setup Helm & Tools
         env:
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -101,7 +101,10 @@ jobs:
           helm plugin install https://github.com/jkroepke/helm-secrets
           curl -L https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64 -o /usr/local/bin/sops && chmod +x /usr/local/bin/sops
 
-
+      - name: Deploy Services
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: |
           ./infra/scripts/deploy-all-external-infra-azure.sh
           ./infra/scripts/deploy-monitoring-stack-azure.sh 
           ./infra/scripts/deploy-payment-platform-services-azure.sh
