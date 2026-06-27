@@ -21,6 +21,7 @@ import io.micrometer.core.instrument.Timer
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.context.annotation.Profile
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.stereotype.Component
 import java.net.SocketTimeoutException
@@ -29,6 +30,7 @@ import kotlin.random.Random
 
 @Component
 @ConditionalOnProperty(name = ["psp.gateway.type"], havingValue = "STRIPE", matchIfMissing = true)
+@Profile("Test")
 class StripePspAuthorizationGatewayAdapter(
     private val stripeClient: StripeClient,
     private val simulator: AuthorizationNetworkSimulator,

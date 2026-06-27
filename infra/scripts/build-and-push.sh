@@ -49,8 +49,8 @@ if [ ! -d "$MODULE_NAME" ]; then
   exit 1
 fi
 
-echo "Building $MODULE_NAME..."
-docker build   -f "$MODULE_NAME/Dockerfile" -t "$DOCKERHUB_USER/$MODULE_NAME:$TAG" .
+echo "Building $MODULE_NAME for linux/amd64..."
+docker build --platform linux/amd64 -f "$MODULE_NAME/Dockerfile" -t "$DOCKERHUB_USER/$MODULE_NAME:$TAG" .
 
 echo "Pushing $DOCKERHUB_USER/$MODULE_NAME:$TAG to Docker Hub..."
 docker push "$DOCKERHUB_USER/$MODULE_NAME:$TAG"
