@@ -2,10 +2,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+kubectl config use-context orbstack || echo "⚠️ Could not switch to orbstack context. Continuing anyway..."
+
 
 
 echo "🚀 Helm uninstall keycloak..."
-helm uninstall -n payment  keycloak  --ignore-not-found
+helm uninstall -n payment  keycloak  --ignore-not-found || echo "⚠️ Could not uninstall keycloak"
 
 
 echo "🚀 Helm uninstall kafka..."
@@ -18,7 +20,7 @@ helm uninstall -n payment  kafka-exporter  || true
 
 
 echo "🚀 Helm uninstall redis..."
-helm uninstall -n payment  redis  --ignore-not-found
+helm uninstall -n payment  redis  --ignore-not-found || echo "⚠️ Could not uninstall redis"
 
 
 
@@ -41,7 +43,7 @@ echo "🚀 Deleting ALL PVCs in namespace payment (dev wipe)"
 kubectl get pvc -n payment -o name | xargs -r kubectl delete -n payment || true
 
 echo "🚀 Deleting PVs orphaned from namespace payment"
-PVS=$(kubectl get pv -o jsonpath='{range .items[?(@.spec.claimRef.namespace=="payment")]}{.metadata.name}{"\n"}{end}')
+PVS=$(kubectl get pv -o jsonpath='{range .items[?(@.spec.claimRef.namespace=="payment")]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
 if [ -n "$PVS" ]; then
   for pv in $PVS; do
     echo "🧹 Deleting PV $pv"
@@ -54,10 +56,10 @@ if [ -n "$PVS" ]; then
   echo "✅ No PVs found for namespace payment"
 fi
 
+echo "🚀 Removing Helm repositories..."
+helm repo remove bitnami 2>/dev/null || echo "ℹ️ bitnami repo already removed"
+helm repo remove prometheus-community 2>/dev/null || echo "ℹ️ prometheus-community repo already removed"
+helm repo remove kedacore 2>/dev/null || echo "ℹ️ kedacore repo already removed"
+helm repo remove ingress-nginx 2>/dev/null || echo "ℹ️ ingress-nginx repo already removed"
 
-
-
-
-
-
-
+echo "✅ All local resources deleted."

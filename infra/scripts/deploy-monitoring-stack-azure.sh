@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+trap 'echo "❌ Azure monitoring stack deployment failed on line $LINENO. Command: $BASH_COMMAND"' ERR
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR/../.."
 cd "$REPO_ROOT"
@@ -28,11 +30,11 @@ echo "Sending a deployment request of  POSTGRESQL exporter to  azure helm "
 echo "Deployment request of  POSTGRESQL exporter was submitted to azure helm"
 
 echo "🚀 Toggling ServiceMonitors to 'true' in application Helm values..."
-yq -i '.controller.metrics.serviceMonitor.enabled = true' "$REPO_ROOT/infra/helm-values/ingress-controller-values-azure.yaml"
-yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-edge-cell/azure/values.yaml"
-yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-consumers/azure/values.yaml"
-yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-central-relay/azure/values.yaml"
-yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-edge-workers/azure/values.yaml"
+yq -i '.controller.metrics.serviceMonitor.enabled = true' "$REPO_ROOT/infra/helm-values/ingress-controller-values-azure.yaml" || true
+yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-edge-cell/azure/values.yaml" || true
+yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-consumers/azure/values.yaml" || true
+yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-central-relay/azure/values.yaml" || true
+yq -i '.serviceMonitor.enabled = true' "$REPO_ROOT/charts/payment-edge-workers/azure/values.yaml" || true
 echo "✅ Monitoring switched ON! Applications will now deploy with metrics enabled."
 
 

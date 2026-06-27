@@ -5,6 +5,7 @@
 
 set -euo pipefail
 
+trap 'echo "❌ External infra deployment failed on line $LINENO. Command: $BASH_COMMAND"' ERR
 usage() {
   echo "Usage: $0 <service-name> <environment>"
   echo "Example: $0 keycloak local"

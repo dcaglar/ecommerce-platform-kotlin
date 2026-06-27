@@ -78,7 +78,7 @@ class GrossCaptureAllocationConsumer(
                 }
 
                 val txs = paymentTxPort.findByPaymentId(payment.paymentId.value)
-                val captureTx = txs.find { it.txType == com.dogancaglar.paymentservice.domain.model.ledger.JournalType.CAPTURE.name && it.status == TxStatus.SUCCESS }
+                val captureTx = txs.find { it.txType == JournalType.CAPTURE && it.status == TxStatus.SUCCESS }
                     ?: throw IllegalStateException("Successful CaptureTx record missing for paymentId=${payment.paymentId.value}")
 
                 // 1. Resolve Global Platform Accounts
@@ -97,7 +97,7 @@ class GrossCaptureAllocationConsumer(
                         AccountType.MARKETPLACE_DIRECT_REVENUE_BALANCE_ACCOUNT,
                         masterAccountCode
                     )
-                        // A1. Move 100% of funds from suspense to direct merchant revenue
+                    // A1. Move 100% of funds from suspense to direct merchant revenue
                     recordInternalTransferSubmissionUseCase.recordSubmission(
                         paymentId = payment.paymentId,
                         paymentIntentId = paymentIntentId,

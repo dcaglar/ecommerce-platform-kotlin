@@ -1,22 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+trap 'echo "❌ Local external infra deployment failed on line $LINENO. Command: $BASH_COMMAND"' ERR
 NS="payment"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR/../.."
 cd "$REPO_ROOT"
 
 
+kubectl config set-context orbstack
 
 echo "🛡️  Checking Kubernetes context..."
 CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "none")
 if [[ "$CURRENT_CONTEXT" != "orbstack" ]]; then
   echo "⚠️  Current context is '$CURRENT_CONTEXT', but this script requires 'orbstack'."
   if kubectl config get-contexts $NS >/dev/null 2>&1; then
-    echo "🔄 Switching context to 'payment'..."
-    kubectl config use-context payment
+    echo "🔄 Switching context to 'orbstack'..."
+    kubectl config use-context orbstack
   else
-    echo "❌ Payment context not found! Is OrbStack running with Kubernetes enabled?"
+    echo "❌ orbstack context not found! Is OrbStack running with Kubernetes enabled?"
     exit 1
   fi
 fi

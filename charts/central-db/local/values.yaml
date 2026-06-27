@@ -8,7 +8,7 @@ postgresql:
   primary:
     extraEnvVarsSecret: central-db-credentials
     initdb:
-      scriptsConfigMap: central-db-init-configmap
+      scriptsSecret: central-db-init-secret
 
     resources:
       requests:
