@@ -95,6 +95,8 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+            - name: management
+              containerPort: 9000
           envFrom:
             - configMapRef:
                 name: edge-cell-config
@@ -107,18 +109,23 @@ spec:
               value: "{{ .Values.spring.profile | default "local" }}"
             - name: SPRING_DATA_REDIS_URL
               value: "{{ .Values.redis.url | default "redis://localhost:6379" }}"
+            - name: KEYCLOAK_ISSUER_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: edge-cell-config
+                  key: KEYCLOAK_ISSUER_URL
           startupProbe:
-            httpGet: {path: /actuator/health/liveness, port: http}
+            httpGet: {path: /actuator/health/liveness, port: management}
             initialDelaySeconds: 10
             periodSeconds: 5
             failureThreshold: 60
           readinessProbe:
-            httpGet: {path: /actuator/health/readiness, port: http}
+            httpGet: {path: /actuator/health/readiness, port: management}
             periodSeconds: 10
             failureThreshold: 3
             timeoutSeconds: 3
           livenessProbe:
-            httpGet: {path: /actuator/health/liveness, port: http}
+            httpGet: {path: /actuator/health/liveness, port: management}
             periodSeconds: 15
             failureThreshold: 4
             timeoutSeconds: 5

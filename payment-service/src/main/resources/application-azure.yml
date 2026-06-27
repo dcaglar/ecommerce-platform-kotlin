@@ -38,7 +38,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}
+          issuer-uri: ${KEYCLOAK_ISSUER_URL}
 
 db:
   web:
@@ -48,7 +48,7 @@ db:
 
 stripe:
   api:
-    api-key: ${STRIPE_API_KEY}
+    api-key: ${STRIPE_API_KEY}:test
     connect-timeout: 5000
     read-timeout: 30000
 

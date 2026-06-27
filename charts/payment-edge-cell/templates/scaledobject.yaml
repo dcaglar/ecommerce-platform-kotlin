@@ -6,6 +6,7 @@ metadata:
 spec:
   scaleTargetRef:
     name: {{ include "payment-edge-cell.fullname" . }}
+    kind: StatefulSet
   minReplicaCount: {{ .Values.keda.minReplicaCount }}
   maxReplicaCount: {{ .Values.keda.maxReplicaCount }}
   triggers:

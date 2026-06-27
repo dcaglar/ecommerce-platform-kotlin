@@ -26,7 +26,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI:http://localhost:8180/realms/payment}
+          issuer-uri: ${KEYCLOAK_ISSUER_URL:http://localhost:8180/realms/payment}
 
   datasource:
     edge:

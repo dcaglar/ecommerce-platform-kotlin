@@ -16,11 +16,12 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Profile
 
 @Configuration
 class PaymentServiceConfig {
 
-    @Bean
+    @Profile("test")
     fun stripeClient(
         @Value("\${stripe.api.api-key}") apiKey: String,
         @Value("\${stripe.api.connect-timeout:5000}") connectTimeout: Int,
