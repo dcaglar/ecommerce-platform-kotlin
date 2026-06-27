@@ -91,6 +91,11 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: edge-cell-config
+            - secretRef:
+                name: edge-cell-credentials
           env:
             - name: JAVA_TOOL_OPTIONS
               value: "{{ .Values.paymentService.jvmOpts }}"
