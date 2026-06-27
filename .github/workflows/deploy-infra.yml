@@ -103,6 +103,14 @@ jobs:
           helm plugin install https://github.com/jkroepke/helm-secrets
           curl -L https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64 -o /usr/local/bin/sops && chmod +x /usr/local/bin/sops
 
+<<<<<<< HEAD
+=======
+      - name: Deploy Azure Environment
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: |
+          # We execute your exact bash scripts, just pointing to the Azure versions!
+>>>>>>> da97f46 (update azure dpeloyment rresource anad architecture)
           ./infra/scripts/deploy-all-external-infra-azure.sh
           ./infra/scripts/deploy-monitoring-stack-azure.sh 
           ./infra/scripts/deploy-payment-platform-services-azure.sh
