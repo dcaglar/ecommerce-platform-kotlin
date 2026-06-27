@@ -100,7 +100,6 @@ log "   Using Keycloak URL: $KEYCLOAK_URL"
 if ! curl -sf --max-time 5 "$KEYCLOAK_URL/realms/master" >/dev/null 2>&1; then
   log "❌ Cannot reach Keycloak at $KEYCLOAK_URL"
   log "   Make sure Keycloak is running and accessible."
-  log "   If using port-forwarding, ensure it's active."
   log "   You can override with: KEYCLOAK_URL=<your-url> ./keycloak/provision-keycloak.sh"
   exit 1
 fi
@@ -116,7 +115,7 @@ KC_TOKEN=$(curl -f -s --max-time 10 \
 
 if [[ -z "$KC_TOKEN" || "$KC_TOKEN" == "null" ]]; then
   log "❌ Failed to get admin token."
-  log "   Check that Keycloak is running, credentials are correct, and port-forwarding is active."
+  log "   Check that Keycloak is running and credentials are correct."
   exit 1
 fi
 

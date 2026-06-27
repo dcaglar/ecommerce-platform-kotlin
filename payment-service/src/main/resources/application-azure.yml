@@ -55,6 +55,32 @@ stripe:
 psp:
   gateway:
     type: SIMULATED
+  authorization:
+    simulation:
+      currentScenario: NORMAL
+      scenarios:
+        NORMAL:
+          timeouts:
+            enabled: true
+            probability: 0
+          latency:
+            fast:
+              probability: 0
+              minMs: 100
+              maxMs: 300
+            moderate:
+              probability: 100
+              minMs: 300
+              maxMs: 500
+            slow:
+              probability: 0
+              minMs: 1000
+              maxMs: 2000
+          response:
+            successful: 100
+            retryable: 0
+            statusCheck: 0
+            nonRetryable: 0
 
 logging:
   level:

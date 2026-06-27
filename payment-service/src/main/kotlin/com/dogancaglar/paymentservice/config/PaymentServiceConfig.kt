@@ -22,6 +22,7 @@ import org.springframework.context.annotation.Profile
 class PaymentServiceConfig {
 
     @Profile("test")
+    @Bean
     fun stripeClient(
         @Value("\${stripe.api.api-key}") apiKey: String,
         @Value("\${stripe.api.connect-timeout:5000}") connectTimeout: Int,
