@@ -38,7 +38,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}
+          issuer-uri: ${KEYCLOAK_ISSUER_URL}
 
 db:
   web:

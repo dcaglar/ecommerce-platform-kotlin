@@ -9,6 +9,7 @@ metadata:
 spec:
   scaleTargetRef:
     name: {{ include "payment-edge-workers.fullname" . }}
+    kind: StatefulSet
   minReplicaCount: {{ .Values.keda.minReplicaCount | default 1 }}
   maxReplicaCount: {{ .Values.keda.maxReplicaCount | default 2 }}
   pollingInterval: {{ .Values.keda.pollingInterval | default 15 }}

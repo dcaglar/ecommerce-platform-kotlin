@@ -23,7 +23,7 @@ When working on or extending this system, the following rules are absolute and m
    - Any worker interacting with the outside world (e.g., `CaptureCommandExecutor` calling the PSP) must do exactly one thing: execute the network call and append the result to the Outbox. It must not touch the ledger or alter core Payment domains.
 
 ---
-
+ LOCAL ORB CLUSTER
 ## 0️⃣ Start the infrastructure and services
 
 Pre-step: switch to the project root directory and make scripts executable
