@@ -41,3 +41,21 @@ Scope: Always verify you are targeting the PayAsYouGo_Dogan subscription before 
 KEDA/Monitoring: Deleting the resource group will automatically remove the AKS cluster and all KEDA components, as they are part of that Azure resource stack. You do not need to delete them manually.
 
 Local vs. Remote: Remember, kubectl works on the Kubernetes API level, while az cli works on the Azure infrastructure level. If you delete the resource group, kubectl get nodes will stop working almost i
+
+
+To fix it, I just ran terraform init locally to connect to your Azure backend, and then ran: 
+terraform force-unlock -force e18fab39-2ae7-6a59-0b2c-329b5eab7fdf
+
+
+
+rror: Error acquiring the state lock
+│
+│ Error message: state blob is already locked
+│ Lock Info:
+│   ID:        e18fab39-2ae7-6a59-0b2c-329b5eab7fdf
+│   Path:      tfstate/loadtest.terraform.tfstate
+│   Operation: OperationTypePlan
+│   Who:       runner@runnervmmklqx
+│   Version:   1.15.7
+│   Created:   2026-06-27 18:05:46.472971511 +0000 UTC
+│   Info:      
