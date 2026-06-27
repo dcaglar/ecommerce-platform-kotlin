@@ -8,6 +8,7 @@ REPO_ROOT="$SCRIPT_DIR/../.."
 cd "$REPO_ROOT"
 
 
+kubectl config set-context orbstack
 
 echo "🛡️  Checking Kubernetes context..."
 CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "none")

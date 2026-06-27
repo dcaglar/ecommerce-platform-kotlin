@@ -8,7 +8,7 @@ usage() {
   echo "Example: $0 payment-central-relay local"
   exit 1
 }
-
+kubectl config set-context orbstack
 SERVICE_NAME=${1:-}
 ENV=${2:-}
 

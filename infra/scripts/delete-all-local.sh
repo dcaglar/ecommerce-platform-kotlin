@@ -2,6 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+kubectl config use-context orbstack || echo "⚠️ Could not switch to orbstack context. Continuing anyway..."
+
 
 
 echo "🚀 Helm uninstall keycloak..."
@@ -41,7 +43,7 @@ echo "🚀 Deleting ALL PVCs in namespace payment (dev wipe)"
 kubectl get pvc -n payment -o name | xargs -r kubectl delete -n payment || true
 
 echo "🚀 Deleting PVs orphaned from namespace payment"
-PVS=$(kubectl get pv -o jsonpath='{range .items[?(@.spec.claimRef.namespace=="payment")]}{.metadata.name}{"\n"}{end}')
+PVS=$(kubectl get pv -o jsonpath='{range .items[?(@.spec.claimRef.namespace=="payment")]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
 if [ -n "$PVS" ]; then
   for pv in $PVS; do
     echo "🧹 Deleting PV $pv"

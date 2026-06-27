@@ -26,7 +26,7 @@ postgresql:
       - name: PGCTLTIMEOUT
         value: "300"
     initdb:
-      scriptsConfigMap: central-db-init-configmap
+      scriptsSecret: central-db-init-secret
 
     resources:
       requests:

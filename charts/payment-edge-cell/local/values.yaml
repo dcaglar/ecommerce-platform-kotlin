@@ -104,7 +104,7 @@ ingress:
     nginx.ingress.kubernetes.io/limit-connections: "350"
   tls: [] # HTTP for minikube
 serviceMonitor:
-  enabled: false
+  enabled: true
   path: /actuator/prometheus
   interval: 15s
   scrapeTimeout: 10s
