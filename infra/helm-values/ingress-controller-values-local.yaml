@@ -9,13 +9,11 @@ controller:
       additionalLabels:
         release: prometheus-stack # Match the label your operator looks for
   service:
-    namespace: payment
     type: LoadBalancer
     ports:
       http: 80
       https: 443
   resources:
-    namespaces: payment
     requests:
       cpu: 100m
       memory: 400Mi
