@@ -27,7 +27,7 @@ These are the public external endpoints currently provisioned in Azure.
 
 *   **📊 Grafana Load Test Dashboard**: [http://4.175.208.51](http://4.175.208.51)
 *   **🔥 Prometheus UI**: [http://20.31.203.163:9090](http://20.31.203.163:9090)
-*   **🔑 Keycloak Authorization Server**: [http://4.175.112.183:8080](http://4.175.112.183:8080)
+*   **🔑 Keycloak Authorization Server**: `http://<NGINX_IP>/auth` (routed via NGINX ingress — same IP as payment API)
 *   **💳 Payment Service API (k6 Target)**: `http://20.8.218.64`
 
 ---
@@ -49,10 +49,13 @@ The payment API is routed through the NGINX Ingress Controller. Run this command
 kubectl get ingress -n payment payment-edge-cell -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 ```
 
-### C. Command to Find the Keycloak IP
-To fetch the public IP specifically for Keycloak:
+### C. Command to Find the Keycloak / Payment API IP
+Keycloak is now behind the NGINX Ingress Controller — it no longer has its own LoadBalancer IP. The single NGINX IP serves both `/auth` (Keycloak) and `/api/v1/payments` (payment-service):
 ```bash
-kubectl get svc -n payment keycloak -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+# This single IP serves both Keycloak and the Payment API:
+kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+# Or equivalently via the Ingress object:
+kubectl get ingress -n payment payment-edge-cell -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 ```
 
 ### D. Command to Find the Grafana IP
@@ -115,7 +118,8 @@ kubectl port-forward -n payment svc/kafka 9092:9092
 ```bash
 IDEMPOTENCY_KEY=$(printf '%08x-%04x-7%03x-8%03x-%04x%08x' $((RANDOM*RANDOM)) $((RANDOM)) $((RANDOM%4096)) $((RANDOM%4096)) $((RANDOM)) $((RANDOM*RANDOM)))
 echo "Using Idempotency-Key=$IDEMPOTENCY_KEY"
-curl -i -X POST  http://20.82.38.15/api/v1/payments \
+NGINX_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+curl -i -X POST  http://${NGINX_IP}/api/v1/payments \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
   -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
@@ -151,7 +155,7 @@ curl -i -X POST  http://20.82.38.15/api/v1/payments \
 
 ```bash
 # Step 2: Authorize the payment intent
-curl -i -X POST "http://20.8.218.64/api/v1/payments/pi_ArQ0QuWCAAA/authorize" \
+curl -i -X POST "http://${NGINX_IP}/api/v1/payments/pi_ArQ0QuWCAAA/authorize" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
   -d '{}'
