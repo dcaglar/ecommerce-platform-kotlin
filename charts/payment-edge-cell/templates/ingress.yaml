@@ -1,28 +1,34 @@
-{{- if .Values.ingress.enabled }}
+{{- if .Values.ingress.enabled -}}
+{{- $fullName := include "payment-edge-cell.fullname" . -}}
+{{- $svcPort := .Values.service.port | default 8080 -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "payment-edge-cell.fullname" . }}
+  name: {{ $fullName }}
   labels:
     {{- include "payment-edge-cell.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
   annotations:
-    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className | default "nginx" }}
   rules:
     - {{ if .Values.ingress.host }}host: {{ .Values.ingress.host | quote }}
       {{ end -}}
-                                           http:
-                                             paths:
-                                               - path: {{ .Values.ingress.path | default "/" }}
-                                                 pathType: {{ .Values.ingress.pathType | default "Prefix" }}
-                                                 backend:
-                                                   service:
-                                                     name: {{ include "payment-edge-cell.fullname" . }}
-                                                     port:
-                                                       number: {{ .Values.service.port | default 8080 }}
+      http:
+        paths:
+          {{- range .Values.ingress.paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ $svcPort }}
+          {{- end }}
   {{- with .Values.ingress.tls }}
   tls:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{- end }}
+{{- end }}

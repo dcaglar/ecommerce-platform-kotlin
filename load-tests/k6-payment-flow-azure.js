@@ -229,7 +229,7 @@ function generateRandomOrder(sellerPool) {
 
 // --- 4. Main User Journey ---
 export default function () {
-    const baseUrl = __ENV.BASE_URL || "http://20.8.218.64";
+    const baseUrl = __ENV.BASE_URL || "http://20.82.38.15";
 
     // Pick a random marketplace (and its scoped seller pool) for this iteration
     const marketplace = pickRandomMarketplace();

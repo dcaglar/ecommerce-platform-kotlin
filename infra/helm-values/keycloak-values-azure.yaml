@@ -13,7 +13,7 @@ postgresql:
       enabled: true
       size: 50Gi
 service:
-  type: LoadBalancer
+  type: ClusterIP
   ports:
     http: 8080
 # single-node cache; also blank out KC_CACHE_STACK so no jdbc-ping surprise
@@ -24,6 +24,8 @@ extraEnvVars:
     value: "kubernetes"
   - name: KC_PROXY
     value: "edge"
+  - name: KC_HTTP_RELATIVE_PATH
+    value: "/auth"
   # Configure hostname to use cluster-internal DNS so JWT issuer matches payment service config
   # This ensures tokens have issuer: http://keycloak:8080/realms/ecommerce-platform
   - name: KC_HOSTNAME
@@ -57,3 +59,18 @@ readinessProbe:
   failureThreshold: 6
 nodeSelector:
   pool: central
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  pathType: ImplementationSpecific
+  hostname: "${INGRESS_HOST}"
+  path: "/auth(/|$)(.*)"
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/load-balance: "ewma"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
+    nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "120"
+    nginx.ingress.kubernetes.io/upstream-keepalive-connections: "200"
+    nginx.ingress.kubernetes.io/limit-connections: "350"

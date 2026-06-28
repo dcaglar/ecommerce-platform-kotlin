@@ -31,25 +31,27 @@ echo "🚀 Deployin all external infrasracture(Redis,Keycloak,Kafka) locally"
 
 
 
-# 1. Keycloak
-echo "Sending a deployment request of  KEYCLOAK to  local helm "
+# 1. Ingress Controller (Nginx) — required for local routing
+echo "Sending a deployment request of  ingress LOAD BALANCER controller to local helm "
+"$SCRIPT_DIR/deploy-external-infra.sh" ingress-controller local
+echo "Deployment request of  ingress LOAD BALANCER controller was submitted to local helm"
 
+# 2. Keycloak
+echo "Sending a deployment request of  KEYCLOAK to  local helm "
 "$SCRIPT_DIR/deploy-external-infra.sh" keycloak local
 echo "Deployment request of  KEYCLOAK was submitted to local helm"
 
-# 2.Redis
+# 3. Redis
 echo "Sending a deployment request of  REDIS to  local helm "
 "$SCRIPT_DIR/deploy-external-infra.sh" redis local
 echo "Deployment request of  REDIS was submitted to local helm"
 
-# 3.Kafka
+# 4. Kafka
 echo "Sending a deployment request of  KAFKA to  local helm "
 "$SCRIPT_DIR/deploy-external-infra.sh" kafka local
 echo "Deployment request of  kafka  was submitted to local helm"
 
-
-
-# 4.keda we should not really sent or use keda in local
+# 5. KEDA — we should not really send or use keda in local
 echo "Sending a deployment request of  KEDA to  local helm "
 #"$SCRIPT_DIR/deploy-external-infra.sh" keda local
 echo "Deployment request of  KEDA was submitted to local helm"

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+ #!/usr/bin/env bash
 # Deploys all external infrastructure (Keycloak, Redis, Kafka, KEDA) to Azure AKS.
 # Mirrors deploy-all-external-infra-local.sh exactly — azure environment argument only.
 #
@@ -23,22 +23,27 @@ fi
 echo "ℹ️  Deploying to verified context: $CURRENT_CONTEXT"
 echo "🚀 Deploying all external infrastructure (Keycloak, Redis, Kafka, KEDA) to Azure..."
 
-# 1. Keycloak
-echo "Sending a deployment request of KEYCLOAK to Azure helm..."
+# 1. Ingress Controller (Nginx) — required for public routing
+echo "Sending a deployment request of ingress LOAD BALANCER controller to Azure helm..."
+"$SCRIPT_DIR/deploy-external-infra.sh" ingress-controller azure
+echo "Deployment request of ingress LOAD BALANCER controller was submitted to Azure helm."
+
+# 2. Keycloak
+echo "Sending a deployment request of  KEYCLOAK to Azure helm..."
 "$SCRIPT_DIR/deploy-external-infra.sh" keycloak azure
-echo "Deployment request of KEYCLOAK submitted to Azure helm."
+echo "Deployment request of  KEYCLOAK was submitted to Azure helm."
 
-# 2. Redis
-echo "Sending a deployment request of REDIS to Azure helm..."
+# 3. Redis
+echo "Sending a deployment request of  REDIS to Azure helm..."
 "$SCRIPT_DIR/deploy-external-infra.sh" redis azure
-echo "Deployment request of REDIS submitted to Azure helm."
+echo "Deployment request of  REDIS was submitted to Azure helm."
 
-# 3. Kafka
-echo "Sending a deployment request of KAFKA to Azure helm..."
+# 4. Kafka
+echo "Sending a deployment request of  KAFKA to Azure helm..."
 "$SCRIPT_DIR/deploy-external-infra.sh" kafka azure
-echo "Deployment request of KAFKA submitted to Azure helm."
+echo "Deployment request of  KAFKA was submitted to Azure helm."
 
-# 4. KEDA — required on Azure for payment-consumers autoscaling
+# 5. KEDA — required on Azure for payment-consumers autoscaling
 echo "Sending a deployment request of KEDA to Azure helm..."
 "$SCRIPT_DIR/deploy-external-infra.sh" keda azure
 echo "Deployment request of KEDA submitted to Azure helm."

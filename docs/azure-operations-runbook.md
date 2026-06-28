@@ -62,7 +62,7 @@ kubectl get svc -n monitoring prometheus-stack-grafana -o jsonpath='{.status.loa
 ```
 To fetch defaul username/password
 ```bash
-kubectl get svc -n monitoring prometheus-stack-grafana -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+ kubectl get secret --namespace monitoring prometheus-stack-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
 ```
 
 
@@ -106,4 +106,53 @@ kubectl port-forward -n payment statefulset/payment-edge-cell 5433:5432
 Run this command, then connect your local Kafka tools to `localhost:9092`:
 ```bash
 kubectl port-forward -n payment svc/kafka 9092:9092
+```
+
+
+
+**Step 1: Create Payment Intent**
+
+```bash
+IDEMPOTENCY_KEY=$(printf '%08x-%04x-7%03x-8%03x-%04x%08x' $((RANDOM*RANDOM)) $((RANDOM)) $((RANDOM%4096)) $((RANDOM%4096)) $((RANDOM)) $((RANDOM*RANDOM)))
+echo "Using Idempotency-Key=$IDEMPOTENCY_KEY"
+curl -i -X POST  http://20.82.38.15/api/v1/payments \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
+  -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -d '{
+    "orderId": "ORDER-1450",
+    "buyerId": "BUYER-1450",
+    "merchantAccount": "MARKETPLACE-5",
+    "processingModel": "MARKETPLACE",
+    "totalAmount": { "quantity": 3000, "currency": "EUR" },
+    "splits": [
+      { "type": "BalanceAccount", "account": "SELLER-5-1", "amount": { "quantity": 1400, "currency": "EUR" }},
+      { "type": "Commission", "amount": { "quantity": 100, "currency": "EUR" }},
+      { "type": "BalanceAccount", "account": "SELLER-5-2", "amount": { "quantity": 1400, "currency": "EUR" }},
+      { "type": "Commission", "amount": { "quantity": 100, "currency": "EUR" }}
+    ]
+  }'
+```
+
+**Expected Response (200 OK):**
+```json
+{
+  "paymentIntentId": "pi_AcqzYyHCcAA",
+  "clientSecret": "pi_AcqzYyHCcAA_secret_xyz123",
+  "status": "CREATED"
+}
+```
+
+> **Note on Idempotency-Key**: The header is required for all payment intent creation requests. Use the same key for retries of the same payment request to ensure idempotent behavior. Generate a unique UUID for each new payment request.
+
+**Step 2: Authorize Payment Intent**
+
+> **Note**: In production, payment details are collected by Stripe Payment Element (browser → Stripe). The authorize endpoint doesn't require payment method details - it uses the stored PaymentIntent ID. For testing with curl, you can send an empty body or omit paymentMethod:
+
+```bash
+# Step 2: Authorize the payment intent
+curl -i -X POST "http://20.8.218.64/api/v1/payments/pi_ArQ0QuWCAAA/authorize" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
+  -d '{}'
 ```
