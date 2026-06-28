@@ -43,14 +43,23 @@ const SCENARIOS = {
     // C. Stress Test: Push system past average limits to see how resources handle pressure (RPS)
     stress: {
         executor: 'ramping-arrival-rate',
-        startRate: 0,
+        startRate: 100,
         timeUnit: '1s',
-        preAllocatedVUs: 100,
-        maxVUs: 1500,
+        preAllocatedVUs: 200,
+        maxVUs: 3000,
         stages: [
-            { duration: '3m', target: 150 },  // Ramp to ~100% of single-pod ceiling
-            { duration: '10m', target: 150 },  // Sustained — should trigger HPA
-            { duration: '2m', target: 0 },     // Cool-down
+            { duration: '2m', target: 300 },  // Ramp to ~100% of single-pod ceiling
+            { duration: '5m', target: 300 },  // Sustained — should trigger HPA
+            { duration: '2m', target: 500 },     // Cool-down
+            { duration: '5m', target: 500 },  // Sustained — should trigger HPA
+            { duration: '2m', target: 700 },     // Cool-down
+            { duration: '5m', target: 700 },  // Sustained — should trigger HPA
+            { duration: '2m', target: 1000 },     // Cool-down
+            { duration: '5m', target: 1000 },  // Sustained — should trigger HPA
+            { duration: '2m', target: 1500 },     // Cool-down
+           { duration: '5m', target: 1500 },  // Sustained — should trigger HPA                      { duration: '5m', target: 350 },  // Sustained — should trigger HPA
+  { duration: '2m', target: 500 },     // Cool-down
+           { duration: '5m', target: 0 },  // Sustained — should trigger HPA
         ],
         tags: { test_type: 'stress' },
     },
@@ -59,7 +68,7 @@ const SCENARIOS = {
         executor: 'constant-arrival-rate',
         rate: 80,
         timeUnit: '1s',
-        duration: '30m',
+        duration: '15m',
         preAllocatedVUs: 50,
         maxVUs: 500,
         tags: { test_type: 'soak' },
@@ -187,17 +196,17 @@ function generateRandomOrder(sellerPool) {
     const totalQuantity = Math.floor(Math.random() * 9000) + 1000;
     const numSellers = Math.floor(Math.random() * 3) + 2;
     const sellers = getUniqueSellers(sellerPool, numSellers);
-    
+
     const splits = [];
     let remaining = totalQuantity;
-    
+
     if (Math.random() > 0.5) {
         const commissionPct = (Math.floor(Math.random() * 8) + 2) / 100;
         const commissionAmt = Math.floor(totalQuantity * commissionPct);
         splits.push({ type: "Commission", amount: { quantity: commissionAmt, currency: "EUR" } });
         remaining -= commissionAmt;
     }
-    
+
     for (let i = 0; i < numSellers; i++) {
         if (i === numSellers - 1) {
             splits.push({ type: "BalanceAccount", account: sellers[i], amount: { quantity: remaining, currency: "EUR" } });
@@ -206,12 +215,12 @@ function generateRandomOrder(sellerPool) {
             let maxChunk = remaining - (numSellers - 1 - i);
             let chunk = Math.floor(Math.random() * (maxChunk * 0.6));
             if (chunk < 1) chunk = 1;
-            
+
             splits.push({ type: "BalanceAccount", account: sellers[i], amount: { quantity: chunk, currency: "EUR" } });
             remaining -= chunk;
         }
     }
-    
+
     return {
         totalAmount: { quantity: totalQuantity, currency: "EUR" },
         splits: splits
@@ -249,7 +258,7 @@ export default function () {
     };
 
     const createRes = http.post(createUrl, createPayload, createParams);
-    
+
     // Detailed metrics for Create
     createBlocked.add(createRes.timings.blocked);
     createConnecting.add(createRes.timings.connecting);
@@ -281,7 +290,7 @@ export default function () {
         };
 
         const authRes = http.post(authUrl, authPayload, authParams);
-        
+
         // Detailed metrics for Auth
         authBlocked.add(authRes.timings.blocked);
         authConnecting.add(authRes.timings.connecting);

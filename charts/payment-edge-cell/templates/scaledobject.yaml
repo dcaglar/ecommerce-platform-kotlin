@@ -10,7 +10,7 @@ spec:
   minReplicaCount: {{ .Values.keda.minReplicaCount }}
   maxReplicaCount: {{ .Values.keda.maxReplicaCount }}
   triggers:
-    {{- toYaml .Values.keda.triggers.metrics | nindent 4 }}
+    {{- toYaml .Values.keda.triggers | nindent 4 }}
   advanced:
     horizontalPodAutoscalerConfig:
       behavior:

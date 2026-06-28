@@ -22,8 +22,8 @@
       "id": 1,
       "targets": [
         {
-          "expr": "sum(rate(http_server_requests_seconds_count{application=\"payment-service\"}[1m]))",
-          "legendFormat": "RPS"
+          "expr": "sum(rate(http_server_requests_seconds_count{application=\"payment-service\"}[1m])) by (uri, pod)",
+          "legendFormat": "{{uri}} - {{pod}}"
         }
       ]
     },
@@ -38,12 +38,12 @@
       "id": 2,
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{application=\"payment-service\"}[1m])) by (le))",
-          "legendFormat": "P95"
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{application=\"payment-service\"}[1m])) by (le, uri, pod))",
+          "legendFormat": "P95 - {{uri}} - {{pod}}"
         },
         {
-          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{application=\"payment-service\"}[1m])) by (le))",
-          "legendFormat": "P99"
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{application=\"payment-service\"}[1m])) by (le, uri, pod))",
+          "legendFormat": "P99 - {{uri}} - {{pod}}"
         }
       ]
     },
@@ -58,8 +58,8 @@
       "id": 3,
       "targets": [
         {
-          "expr": "sum(rate(http_server_requests_seconds_count{application=\"payment-service\", status=~\"5..\"}[1m])) / sum(rate(http_server_requests_seconds_count{application=\"payment-service\"}[1m]))",
-          "legendFormat": "Error Rate"
+          "expr": "sum(rate(http_server_requests_seconds_count{application=\"payment-service\", status=~\"5..\"}[1m])) by (uri, pod) / sum(rate(http_server_requests_seconds_count{application=\"payment-service\"}[1m])) by (uri, pod)",
+          "legendFormat": "Error Rate - {{uri}} - {{pod}}"
         }
       ]
     },
@@ -80,8 +80,8 @@
       "id": 4,
       "targets": [
         {
-          "expr": "sum(rate(outbox_dispatched_total[1m])) by (application)",
-          "legendFormat": "{{application}}"
+          "expr": "sum(rate(outbox_dispatched_total[1m])) by (application, pod)",
+          "legendFormat": "{{application}} - {{pod}}"
         }
       ]
     },
@@ -96,8 +96,8 @@
       "id": 5,
       "targets": [
         {
-          "expr": "sum(rate(relay_published_total[1m])) by (application)",
-          "legendFormat": "{{application}}"
+          "expr": "sum(rate(relay_published_total[1m])) by (application, pod)",
+          "legendFormat": "{{application}} - {{pod}}"
         }
       ]
     },
@@ -112,12 +112,12 @@
       "id": 6,
       "targets": [
         {
-          "expr": "sum(rate(outbox_dispatch_failed_total[1m])) by (application)",
-          "legendFormat": "Local Outbox Errors"
+          "expr": "sum(rate(outbox_dispatch_failed_total[1m])) by (application, pod)",
+          "legendFormat": "Outbox Errors - {{pod}}"
         },
         {
-          "expr": "sum(rate(relay_publish_failed_total[1m])) by (application)",
-          "legendFormat": "Relay Publish Errors"
+          "expr": "sum(rate(relay_publish_failed_total[1m])) by (application, pod)",
+          "legendFormat": "Relay Errors - {{pod}}"
         }
       ]
     },
@@ -132,8 +132,8 @@
       "id": 7,
       "targets": [
         {
-          "expr": "sum(rate(maintenance_job_error_total[1m])) by (job)",
-          "legendFormat": "{{job}}"
+          "expr": "sum(rate(maintenance_job_error_total[1m])) by (job, pod)",
+          "legendFormat": "{{job}} - {{pod}}"
         }
       ]
     },
@@ -186,12 +186,12 @@
       "id": 10,
       "targets": [
         {
-          "expr": "sum(rate(psp_calls_total[1m])) by (result)",
-          "legendFormat": "Capture - {{result}}"
+          "expr": "sum(rate(psp_calls_total[1m])) by (result, pod)",
+          "legendFormat": "Capture - {{result}} - {{pod}}"
         },
         {
-          "expr": "sum(rate(psp_refund_calls_total[1m])) by (result)",
-          "legendFormat": "Refund - {{result}}"
+          "expr": "sum(rate(psp_refund_calls_total[1m])) by (result, pod)",
+          "legendFormat": "Refund - {{result}} - {{pod}}"
         }
       ]
     },
@@ -212,8 +212,8 @@
       "id": 11,
       "targets": [
         {
-          "expr": "sum(hikaricp_connections_active) by (application)",
-          "legendFormat": "{{application}}"
+          "expr": "sum(hikaricp_connections_active) by (application, pod)",
+          "legendFormat": "{{application}} - {{pod}}"
         }
       ]
     },
@@ -228,8 +228,8 @@
       "id": 12,
       "targets": [
         {
-          "expr": "sum(hikaricp_connections_pending) by (application)",
-          "legendFormat": "{{application}}"
+          "expr": "sum(hikaricp_connections_pending) by (application, pod)",
+          "legendFormat": "{{application}} - {{pod}}"
         }
       ]
     },

@@ -8,7 +8,7 @@ If you need credentials for 'admin' user grafana dashboard then;
 
 app:
 instance-id: ${POD_NAME:${HOSTNAME:${random.value}}}
-cache:
+cache:k
 ttl-seconds: 3600
 payment-service:
 api-key: secretpaymentapikey12345

@@ -36,7 +36,7 @@ Before pushing the system, you must prove that the infrastructure is correctly w
 
 1. **Run the Command:** 
    ```bash
-   k6 run -e PROFILE=smoke load-tests/k6-payment-flow.js
+   k6 run -e PROFILE=single load-tests/k6-payment-flow.js
    ```
    
 new->    k6 run -e PROFILE=smoke load-tests/k6-payment-flow-azure.js
