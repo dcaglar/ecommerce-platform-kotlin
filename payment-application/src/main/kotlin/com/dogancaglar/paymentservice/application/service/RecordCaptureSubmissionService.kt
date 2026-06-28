@@ -61,7 +61,7 @@ open class RecordCaptureSubmissionService(
         //TODO simulation ,here also just create one Outbox<CaptureConfirmed> for simulator purposes.
         val outboxEvents = mutableListOf<OutboxEvent>()
         if (pspSimulationRulesPort.isSimulationTarget(event.merchantAccount)) {
-            logger.info("Simulation target profile verified for merchant=${event.merchantAccount}. Generating automatic Stage 2 loopback confirmation.")
+            logger.debug("Simulation target profile verified for merchant=${event.merchantAccount}. Generating automatic Stage 2 loopback confirmation.")
             val captureConfirmed = CaptureConfirmed(
                 paymentIntentId = event.paymentIntentId,
                 publicPaymentIntentId = event.publicPaymentIntentId,
@@ -87,7 +87,7 @@ open class RecordCaptureSubmissionService(
         }
 
         // 5. Commit atomic units through outbound database gateways
-        logger.info("Atomically persisting pending state modifications and transaction outbox event for track ref=${event.pspReference}")
+        logger.debug("Atomically persisting pending state modifications and transaction outbox event for track ref=${event.pspReference}")
         centralDbTransactionalFacadePort.recordPaymentOperationInLedger(updatedPayment, captureTx, emptyList(), outboxEvents)
     }
 }

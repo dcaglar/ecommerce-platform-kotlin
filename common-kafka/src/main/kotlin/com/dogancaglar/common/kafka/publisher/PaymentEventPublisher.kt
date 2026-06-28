@@ -74,11 +74,11 @@ class PaymentEventPublisher(
         val eventMetaData = eventMetaDataRegistry.metadataForEvent(envelope.data)
         val record = buildRecord(eventMetaData, envelope)
 
-        logger.info("🚀 PaymentEventPublisher: IS GOING TO SEND an RECORD with event type ${record.value().eventType} to Topic  ${record.topic()}")
+        logger.debug("🚀 PaymentEventPublisher: IS GOING TO SEND an RECORD with event type ${record.value().eventType} to Topic  ${record.topic()}")
         
         return kafkaTemplate.send(record)
             .thenApply { _ ->
-                logger.info("🚀 PaymentEventPublisher: JUSST SENT an RECORD with event type ${record.value().eventType} to Topic  ${record.topic()}")
+                logger.debug("🚀 PaymentEventPublisher: JUSST SENT an RECORD with event type ${record.value().eventType} to Topic  ${record.topic()}")
                 envelope
             }
             .exceptionally { ex ->

@@ -53,7 +53,7 @@ class AccountBalanceConsumer(
         val allLedgerEntriesDomain = newRecords
             .flatMap { it.value().data.ledgerEntries }
             .map {
-                logger.info(
+                logger.debug(
                     "🎬 Processing  journal ${it.journalType.name} with journal entry id ${it.journalEntryId}  tx id ${it.txId} ")
                 LedgerDomainEventEntityMapper.toDomain(it) }
         // idempotenct update Process batch with idempotency check
@@ -61,6 +61,8 @@ class AccountBalanceConsumer(
         
         // Mark processed events
         newRecords.forEach { dedupe.markProcessed(it.value().eventId, 3600) }
+
+        logger.info("Account balance consumer executed successfully for batch size=${records.size}")
     }
 }
 

@@ -39,7 +39,7 @@ class GetPaymentIntentService(
                     )
                     
                     if (clientSecret.isNotEmpty()) {
-                        logger.info("Retrieved clientSecret from Stripe for paymentIntentId={}", cmd.paymentIntentId.value)
+                        logger.debug("Retrieved clientSecret from Stripe for paymentIntentId={}", cmd.paymentIntentId.value)
                         paymentIntent.withClientSecret(clientSecret)
                     } else {
                         paymentIntent

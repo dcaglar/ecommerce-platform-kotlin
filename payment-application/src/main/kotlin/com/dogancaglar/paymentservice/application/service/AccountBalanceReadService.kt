@@ -50,7 +50,7 @@ class AccountBalanceReadService(
 
             // 4️⃣ Persist (UPSERT guarded by last_applied_entry_id)
             snapshotPort.saveSnapshot(updated)
-            logger.info("Strong merge applied for {}: Δ{} new balance={} watermark={}", accountCode, delta, newBalance, newWatermark)
+            logger.debug("Strong merge applied for {}: Δ{} new balance={} watermark={}", accountCode, delta, newBalance, newWatermark)
             return newBalance
         }
 

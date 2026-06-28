@@ -16,7 +16,7 @@ class UpdatePaymentIntentService(
 
     override fun processUpdate(cmd: ProcessPaymentIntentUpdateCommand): PaymentIntent {
 
-        logger.info("Processing payment intent update: id={}, status={}", cmd.paymentIntentId.value, cmd.status)
+        logger.debug("Processing payment intent update: id={}, status={}", cmd.paymentIntentId.value, cmd.status)
 
         val paymentIntent = paymentIntentRepository.findById(cmd.paymentIntentId)
             ?: throw PaymentIntentNotFoundException("PaymentIntent ${cmd.paymentIntentId.value} not found")
@@ -29,7 +29,7 @@ class UpdatePaymentIntentService(
                         clientSecret = cmd.clientSecret ?: ""
                     )
                     paymentIntentRepository.updatePaymentIntent(updated)
-                    logger.info("Updated PaymentIntent to CREATED: {}", cmd.paymentIntentId.value)
+                    logger.debug("Updated PaymentIntent to CREATED: {}", cmd.paymentIntentId.value)
                     updated
                 } else {
                     logger.warn("Ignoring invalid transition from CREATED_PENDING to {}", cmd.status)
@@ -39,7 +39,7 @@ class UpdatePaymentIntentService(
             PaymentIntentStatus.CREATED -> {
                 // If we receive another CREATED event, just return existing (idempotency)
                 if (cmd.status == PaymentIntentStatus.CREATED) {
-                    logger.info("PaymentIntent already CREATED: {}", cmd.paymentIntentId.value)
+                    logger.debug("PaymentIntent already CREATED: {}", cmd.paymentIntentId.value)
                     paymentIntent
                 } else {
                     // Handle other transitions if needed (e.g. directly to AUTHORIZED? unlikely without PENDING_AUTH)
@@ -48,7 +48,7 @@ class UpdatePaymentIntentService(
                 }
             }
             else -> {
-                logger.info("PaymentIntent already in state {}, ignoring update to {}", paymentIntent.status, cmd.status)
+                logger.debug("PaymentIntent already in state {}, ignoring update to {}", paymentIntent.status, cmd.status)
                 paymentIntent
             }
         }

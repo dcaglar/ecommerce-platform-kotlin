@@ -403,7 +403,7 @@ open class ProcessPspResultProcessingService(
         )
 
         // 5. Persist the fully validated units safely through outbound ports
-        logger.info("Committing balanced reconciliation tracking state indices atomically for paymentId=${payment.paymentId.value}")
+        logger.debug("Committing balanced reconciliation tracking state indices atomically for paymentId=${payment.paymentId.value}")
         centralDbTransactionalFacadePort.recordPaymentOperationInLedger(
             payment = updatedPayment,
             tx = settlementTxRecord,

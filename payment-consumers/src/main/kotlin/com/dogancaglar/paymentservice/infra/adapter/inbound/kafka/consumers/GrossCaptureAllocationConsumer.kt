@@ -56,7 +56,7 @@ class GrossCaptureAllocationConsumer(
             }
 
             val event = envelope.data
-            logger.info("🎬 Initiating ledger allocation clearing loop for paymentIntentId: ${event.publicPaymentIntentId}")
+            logger.debug("🎬 Initiating ledger allocation clearing loop for paymentIntentId: ${event.publicPaymentIntentId}")
 
             try {
                 // 1. Verify a successful CAPTURE journal entry exists in this ledger batch
@@ -64,6 +64,7 @@ class GrossCaptureAllocationConsumer(
                 if (captureEntry == null) {
                     logger.debug("No CAPTURE journal entry found in this batch. No clearing allocation required.")
                     dedupe.markProcessed(eventId, 3600)
+                    logger.info("Gross capture allocation consumer executed successfully for paymentIntentId=${event.publicPaymentIntentId}")
                     return@with
                 }
 
@@ -151,6 +152,7 @@ class GrossCaptureAllocationConsumer(
 
                 logger.info("💾 Suspense account cleanly cleared. Staged split ledger allocations across all ${payment.splits.size} distribution paths.")
                 dedupe.markProcessed(eventId, 3600)
+                logger.info("Gross capture allocation consumer executed successfully for paymentIntentId=${event.publicPaymentIntentId}")
 
             } catch (e: Exception) {
                 logger.error("❌ Failed to clean and allocate gross capture suspense for paymentIntentId: ${event.publicPaymentIntentId}", e)

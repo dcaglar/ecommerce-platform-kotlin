@@ -54,23 +54,23 @@ class PspResultConsumer(
                 //default if it ist auth+capture
                 when (event) {
                     is PaymentAuthorized -> {
-                        logger.info("🎬 Processing PaymentAuthorized event for paymentIntentId: ${event.paymentIntentId}")
+                        logger.debug("🎬 Processing PaymentAuthorized event for paymentIntentId: ${event.paymentIntentId}")
                         processPspResultUseCase.processAuthorized(event)
 
                     }
 
                     is CaptureConfirmed -> {
-                        logger.info("🎬 Processing CaptureConfirmed event for paymentIntentId: ${event.publicPaymentIntentId}")
+                        logger.debug("🎬 Processing CaptureConfirmed event for paymentIntentId: ${event.publicPaymentIntentId}")
                         processPspResultUseCase.processCaptureConfirmed(event)
                     }
 
                     is InternalTransferCommand -> {
-                        logger.info("🎬 Processing InternalTransferCommand event for target: ${event.targetAccount}")
+                        logger.debug("🎬 Processing InternalTransferCommand event for target: ${event.targetAccount}")
                         processPspResultUseCase.processInternalTransferCommand(event)
                     }
 
                     is SettlementReceived -> {
-                        logger.info("🎬 Processing SettlementReceived event from simulated SDR line for paymentIntentId: ${event.publicPaymentIntentId}")
+                        logger.debug("🎬 Processing SettlementReceived event from simulated SDR line for paymentIntentId: ${event.publicPaymentIntentId}")
                         processPspResultUseCase.processSettlementLineReconciled(event)
                     }
 
@@ -79,6 +79,7 @@ class PspResultConsumer(
                     }
                 }
 
+                logger.info("PSP result consumer executed successfully for event type=${event.javaClass.simpleName}")
                 dedupe.markProcessed(eventId, 3600)
             } catch (e: Exception) {
                 logger.error(

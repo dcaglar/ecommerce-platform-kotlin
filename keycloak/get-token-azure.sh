@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-KEYCLOAK_URL="http://20.126.207.47:8080"
+KEYCLOAK_IP=$(kubectl get svc -n payment keycloak -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+KEYCLOAK_URL="http://${KEYCLOAK_IP}:8080"
 bash "$(dirname "$0")/get-token.sh" "$KEYCLOAK_URL" "$@"

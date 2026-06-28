@@ -25,7 +25,7 @@ class CreatePaymentIntentService(
 
     override fun create(cmd: CreatePaymentIntentCommand): PaymentIntent {
         // 1. Generate ID and create PaymentIntent
-        logger.info("CreatePaymentIntentService.create took started")
+        logger.debug("CreatePaymentIntentService.create took started")
         val paymentIntentId = PaymentIntentId(idGeneratorPort.generateId())
         val paymentIntent = PaymentIntent.createNew(
             paymentIntentId = paymentIntentId,
@@ -41,7 +41,7 @@ class CreatePaymentIntentService(
         val startSave = System.currentTimeMillis()
         paymentIntentRepository.save(paymentIntent)
         val finishSave = System.currentTimeMillis()
-        logger.info("paymentIntentRepository.savePaymentIntent TOOK {} MS", finishSave - startSave)
+        logger.debug("paymentIntentRepository.savePaymentIntent TOOK {} MS", finishSave - startSave)
 
         // 3. Create async task to be executed(actual stripe call
         /*
@@ -70,11 +70,11 @@ class CreatePaymentIntentService(
                 onBackgroundFailure = { error -> handleBackgroundFailure(paymentIntent, error) }
             )
             val finishSPspCall = System.currentTimeMillis()
-           logger.info("Stripe createPaymentIntent tTOOK  {} MS", finishSPspCall - startPspCall)
+           logger.debug("Stripe createPaymentIntent tTOOK  {} MS", finishSPspCall - startPspCall)
             val startUpdatePaymentIntent = System.currentTimeMillis()
             paymentIntentRepository.updatePaymentIntent(createdPaymentIntent)
             val finishUpdatePaymentIntent = System.currentTimeMillis()
-                logger.info("db.updatePaymentIntent TOOK {} MS", finishUpdatePaymentIntent - startUpdatePaymentIntent)
+                logger.debug("db.updatePaymentIntent TOOK {} MS", finishUpdatePaymentIntent - startUpdatePaymentIntent)
             createdPaymentIntent
         } catch (e: Exception){
             handleImmediateFailure(paymentIntent,e)
@@ -83,11 +83,11 @@ class CreatePaymentIntentService(
 
     //a callable
     private fun handleBackgroundPaymentIntentCreationSuccess(successfulPaymentIntent: PaymentIntent) {
-        logger.info("Background payment intent creation succesful for ${successfulPaymentIntent.paymentIntentId.value}, promooting to status created and psp reference from stripe:${successfulPaymentIntent.pspReferenceOrThrow()}")
+        logger.debug("Background payment intent creation succesful for ${successfulPaymentIntent.paymentIntentId.value}, promooting to status created and psp reference from stripe:${successfulPaymentIntent.pspReferenceOrThrow()}")
         val startUpdate = System.currentTimeMillis()
         paymentIntentRepository.updatePaymentIntent(successfulPaymentIntent)
         val finishUpdate = System.currentTimeMillis()
-        logger.info("db.updatePaymentIntent (success) TOOK  {} MS", finishUpdate - startUpdate)
+        logger.debug("db.updatePaymentIntent (success) TOOK  {} MS", finishUpdate - startUpdate)
     }
 
 
@@ -99,7 +99,7 @@ class CreatePaymentIntentService(
             val startUpdate = System.currentTimeMillis()
             paymentIntentRepository.updatePaymentIntent(canceledPaymentIntent)
             val finishUpdate = System.currentTimeMillis()
-            logger.info("paymentIntentRepository.updatePaymentIntent (failure) TOOK {} MS", finishUpdate - startUpdate)
+            logger.debug("paymentIntentRepository.updatePaymentIntent (failure) TOOK {} MS", finishUpdate - startUpdate)
         }
     }
 
@@ -121,7 +121,7 @@ class CreatePaymentIntentService(
                 val startUpdate = System.currentTimeMillis()
                 paymentIntentRepository.updatePaymentIntent(cancelled)
                 val finishUpdate = System.currentTimeMillis()
-                logger.info("db.updatePaymentIntent (immediate failure) TOOK {} MS", finishUpdate - startUpdate)
+                logger.debug("db.updatePaymentIntent (immediate failure) TOOK {} MS", finishUpdate - startUpdate)
                 cancelled
             }
             else -> {

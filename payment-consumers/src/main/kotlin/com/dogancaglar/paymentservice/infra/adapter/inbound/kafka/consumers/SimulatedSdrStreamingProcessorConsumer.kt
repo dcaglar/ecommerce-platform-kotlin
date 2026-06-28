@@ -55,7 +55,7 @@ class SimulatedSdrStreamingProcessorConsumer(
         if (!pspSimulationRulesPort.isSimulationTarget(merchantAccount)) return@with
 
 
-            logger.info("Reactive SDR Matcher captured a CAPTURE journal event for simulated merchant=\$merchantAccount. Synthesizing batch clearing line item.")
+            logger.debug("Reactive SDR Matcher captured a CAPTURE journal event for simulated merchant=\$merchantAccount. Synthesizing batch clearing line item.")
 
             // Leverage structural push-driven data extraction out of the event envelope map arrays
             val grossAmountValue = ledgerEvent.amountValue
@@ -90,7 +90,8 @@ class SimulatedSdrStreamingProcessorConsumer(
             )
 
             centralOutboxWriterPort.save(outboxRecord)
-            logger.info("Successfully queued synthetic SDR settlement loopback event into central outbox for paymentId=\${ledgerEvent.paymentIntentId}")
+            logger.debug("Successfully queued synthetic SDR settlement loopback event into central outbox for paymentId=\${ledgerEvent.paymentIntentId}")
+            logger.info("Simulated SDR streaming processor consumer executed successfully for paymentId=${ledgerEvent.paymentIntentId}")
         }
     }
 }

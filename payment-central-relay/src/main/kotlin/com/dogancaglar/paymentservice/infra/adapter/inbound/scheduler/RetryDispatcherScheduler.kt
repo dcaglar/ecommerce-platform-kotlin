@@ -136,7 +136,7 @@ class RetryDispatcherScheduler(
 
         batchSample.stop(batchTimer)
         if(ok >0 || fail >0 || due.size>0) {
-            logger.info("RetryDispatcher: batch done ok={} fail={} polled={}", ok, fail, due.size)
+            logger.debug("RetryDispatcher: batch done ok={} fail={} polled={}", ok, fail, due.size)
         }
     }
 
