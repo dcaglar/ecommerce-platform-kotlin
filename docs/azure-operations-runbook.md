@@ -118,8 +118,7 @@ kubectl port-forward -n payment svc/kafka 9092:9092
 ```bash
 IDEMPOTENCY_KEY=$(printf '%08x-%04x-7%03x-8%03x-%04x%08x' $((RANDOM*RANDOM)) $((RANDOM)) $((RANDOM%4096)) $((RANDOM%4096)) $((RANDOM)) $((RANDOM*RANDOM)))
 echo "Using Idempotency-Key=$IDEMPOTENCY_KEY"
-NGINX_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-curl -i -X POST  http://${NGINX_IP}/api/v1/payments \
+curl -i -X POST  http://20.82.38.15/api/v1/payments \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(cat ./keycloak/output/jwt/payment-service.token)" \
   -H "Idempotency-Key: $IDEMPOTENCY_KEY" \

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 export KEYCLOAK_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-export KEYCLOAK_URL="http://${KEYCLOAK_IP}/auth"
+export KEYCLOAK_URL="http://20.82.38.15/auth"
 echo "🎯 Connecting to Keycloak LoadBalancer at: $KEYCLOAK_URL"
 
 echo "⏳ Waiting for Keycloak to boot up and accept connections..."
