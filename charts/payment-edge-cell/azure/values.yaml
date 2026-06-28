@@ -43,7 +43,7 @@ redis:
 ingress:
   enabled: true
   className: "nginx"
-  host: "${INGRESS_HOST}"
+  # No hostname — NGINX routes by path, not by host. Matches all incoming hosts.
   annotations:
     nginx.ingress.kubernetes.io/load-balance: "ewma"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "30"

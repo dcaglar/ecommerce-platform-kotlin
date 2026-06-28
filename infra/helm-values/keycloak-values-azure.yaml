@@ -64,8 +64,11 @@ ingress:
   enabled: true
   ingressClassName: nginx
   pathType: ImplementationSpecific
-  hostname: "${INGRESS_HOST}"
-  path: "/auth(/|$)(.*)"
+  # hostname is mandatory in the Bitnami chart — set to placeholder to satisfy the template.
+  # The actual routing is done by extraRules below (catch-all, no host restriction).
+  hostname: "placeholder.local"
+  # Disable the default path rule rendered from hostname above
+  path: "/this-path-will-never-match"
   annotations:
     nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/load-balance: "ewma"
@@ -74,3 +77,14 @@ ingress:
     nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "120"
     nginx.ingress.kubernetes.io/upstream-keepalive-connections: "200"
     nginx.ingress.kubernetes.io/limit-connections: "350"
+  # Catch-all rule — routes /auth regardless of Host header (raw IP access or any DNS name)
+  extraRules:
+    - http:
+        paths:
+          - path: "/auth(/|$)(.*)"
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: keycloak
+                port:
+                  number: 80
