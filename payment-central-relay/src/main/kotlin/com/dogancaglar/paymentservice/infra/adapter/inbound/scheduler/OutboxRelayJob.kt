@@ -88,7 +88,7 @@ class OutboxRelayJob(
                                 processEntryAsync(entry).await()
 
                                 // 3. The Success Path
-                                logger.info("✅ Marked dispatched outboxevent with ${entry.eventType} and oeid ${entry.oeid}")
+                                logger.debug("✅ Marked dispatched outboxevent with ${entry.eventType} and oeid ${entry.oeid}")
                                 centralOutboxRepository.markDispatched(
                                     entry.oeid,
                                     Utc.toInstant(entry.createdAt)
@@ -131,7 +131,7 @@ class OutboxRelayJob(
 
     private fun processEntryAsync(entry: OutboxEvent): CompletableFuture<*> {
         return try {
-            logger.info("🚀 OutboxRelayJob: Processing outbox event oeid={} of type={}", entry.oeid, entry.eventType)
+            logger.debug("🚀 OutboxRelayJob: Processing outbox event oeid={} of type={}", entry.oeid, entry.eventType)
             when (OutboxEventTypes.from(entry.eventType)) {
                 OutboxEventTypes.PAYMENT_AUTHORIZED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, PaymentAuthorized::class.java))
                 OutboxEventTypes.CAPTURE_REQUESTED -> kafkaPublisher.publishAsync(convertToEnvelope(entry, CaptureRequested::class.java))

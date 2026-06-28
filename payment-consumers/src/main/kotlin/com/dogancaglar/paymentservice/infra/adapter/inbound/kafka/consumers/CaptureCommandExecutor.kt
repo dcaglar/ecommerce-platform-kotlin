@@ -42,6 +42,7 @@ class CaptureCommandExecutor(
             try {
                 executeCaptureUseCase.execute(captureRequested)
                 dedupe.markProcessed(eventId, 3600)
+                logger.info("Capture command executor executed successfully for paymentIntentId=${captureRequested.publicPaymentIntentId}")
             } catch (e: Exception) {
                 logger.error("❌ Failed to process capture command for paymentIntentId: \${captureRequested.publicPaymentIntentId}", e)
                 throw e

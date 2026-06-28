@@ -4,7 +4,7 @@ topologySpreadConstraints: []
 runPrivilegeGrantJob: true
 replicaCount: 1
 keda:
-  enabled: false
+  enabled: true
   minReplicaCount: 1
   maxReplicaCount: 2
   pollingInterval: 15

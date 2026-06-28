@@ -34,7 +34,7 @@ open class ProcessCaptureService(
     }
 
     override fun execute(captureRequested: CaptureRequested) {
-        logger.info("Executing network capture execution for paymentIntentId: \${captureRequested.publicPaymentIntentId}")
+        logger.debug("Executing network capture execution for paymentIntentId: \${captureRequested.publicPaymentIntentId}")
 
         try {
             val payment = paymentRepository.findByPaymentIntentId(PaymentIntentId(captureRequested.paymentIntentId.toLong()))
@@ -49,7 +49,7 @@ open class ProcessCaptureService(
             val outboxEvent = toOutboxCaptureSubmittedEvent(captureRequested, pspResponse)
             centralOutboxWriterPort.save(outboxEvent)
 
-            logger.info("Capture transaction state and outbox events safely persisted atomically.")
+            logger.debug("Capture transaction state and outbox events safely persisted atomically.")
 
         } catch (e: Exception) {
             val actualCause = e.cause ?: e

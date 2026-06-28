@@ -13,11 +13,9 @@ postgresql:
       enabled: true
       size: 50Gi
 service:
-  type: NodePort
+  type: LoadBalancer
   ports:
     http: 8080
-  nodePorts:
-    http: 32080
 # single-node cache; also blank out KC_CACHE_STACK so no jdbc-ping surprise
 extraEnvVars:
   - name: KC_CACHE

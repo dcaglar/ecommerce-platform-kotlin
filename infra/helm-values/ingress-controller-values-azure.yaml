@@ -10,6 +10,8 @@ controller:
         release: prometheus-stack # Match the label your operator looks for
   service:
     type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: "/healthz"
     ports:
       http: 80
       https: 443

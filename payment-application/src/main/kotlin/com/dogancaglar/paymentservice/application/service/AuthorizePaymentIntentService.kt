@@ -29,13 +29,13 @@ class AuthorizePaymentIntentService(
 
     private val logger = LoggerFactory.getLogger(javaClass)
     override fun authorize(cmd: AuthorizePaymentIntentCommand): PaymentIntent {
-        logger.info("AuthorizePaymentIntentService.authorize  started for long numeric paymentintentid ,${cmd.paymentIntentId.value}")
+        logger.debug("AuthorizePaymentIntentService.authorize  started for long numeric paymentintentid ,${cmd.paymentIntentId.value}")
         val start = System.currentTimeMillis()
         val paymentIntent = paymentIntentRepository.findById(cmd.paymentIntentId)
             ?: error("PaymentIntent ${cmd.paymentIntentId.value} not found")
         val finish = System.currentTimeMillis()
         // 1) Idempotent behavior first (NO domain transition before this)
-        logger.info("AuthorizePaymentIntentService.findbyId(${cmd.paymentIntentId.value} TOOK ${finish-start} MSreturned a $paymentIntent)")
+        logger.debug("AuthorizePaymentIntentService.findbyId(${cmd.paymentIntentId.value} TOOK ${finish-start} MSreturned a $paymentIntent)")
         when (paymentIntent.status) {
             PaymentIntentStatus.CREATED_PENDING -> {
                 // Payment not ready for authorization yet
@@ -57,14 +57,14 @@ class AuthorizePaymentIntentService(
         val start2 = System.currentTimeMillis()
         val won = paymentIntentRepository.tryMarkPendingAuth(cmd.paymentIntentId, now)
         val end2 = System.currentTimeMillis()
-        logger.info("What is win returns $won and paymentIntentRepository.tryMarkPendingAuth( TOOK ${end2 - start2} MS")
+        logger.debug("What is win returns $won and paymentIntentRepository.tryMarkPendingAuth( TOOK ${end2 - start2} MS")
         if (!won) {
             // someone else started authorization; return latest state
             val start1 = System.currentTimeMillis()
             return paymentIntentRepository.findById(cmd.paymentIntentId)
                 ?: error("PaymentIntent not found ${cmd.paymentIntentId.value}")
             val end1 = System.currentTimeMillis()
-            logger.info("paymentIntentRepositoryRepository.findByI TOOK ${end1 - start1}  MS")
+            logger.debug("paymentIntentRepositoryRepository.findByI TOOK ${end1 - start1}  MS")
 
 
 
@@ -78,7 +78,7 @@ class AuthorizePaymentIntentService(
         // For Stripe Payment Element, paymentMethod is optional - payment method is already attached to PaymentIntent
         return try {
             val startPspCall = System.currentTimeMillis()
-            logger.info("📡 [AuthorizeService] Initiating resilient PSP authorization for ${cmd.paymentIntentId.value}")
+            logger.debug("📡 [AuthorizeService] Initiating resilient PSP authorization for ${cmd.paymentIntentId.value}")
             val finalPaymentIntent = resilientExecutionPort.executeWithTimeoutAndBackgroundFallback(
                 primaryTask = pspAuthGatewayPort.authorizePaymentIntent(authPendingPaymentIntent,cmd.paymentMethod), // tsk to be run aysnc by thread pool passed
                 timeoutMs = 3000,
@@ -97,7 +97,7 @@ class AuthorizePaymentIntentService(
                 onBackgroundFailure = { error -> handleBackgroundFailure(paymentIntent, error) }
             )
             val finishPspCall = System.currentTimeMillis()
-            logger.info("Authorize took {} ms", finishPspCall - startPspCall)
+            logger.debug("Authorize took {} ms", finishPspCall - startPspCall)
             if (finalPaymentIntent.status == PaymentIntentStatus.AUTHORIZED) {
                 handleAuthorizedPaymentResult(finalPaymentIntent)
             }
@@ -110,7 +110,7 @@ class AuthorizePaymentIntentService(
 
 
     private fun handleBackgroundPaymentIntentAuthorizationSuccess(authorizedPaymentIntent: PaymentIntent) {
-        logger.info("Background payment intent authorization successful for ${authorizedPaymentIntent.paymentIntentId.value}, promoting to status authorized and generating orders")
+        logger.debug("Background payment intent authorization successful for ${authorizedPaymentIntent.paymentIntentId.value}, promoting to status authorized and generating orders")
         handleAuthorizedPaymentResult(authorizedPaymentIntent)
     }
 
@@ -123,7 +123,7 @@ class AuthorizePaymentIntentService(
             val startUpdate = System.currentTimeMillis()
             paymentIntentRepository.updatePaymentIntent(canceledPaymentIntent)
             val finishUpdate = System.currentTimeMillis()
-            logger.info("db.updatePaymentIntent (failure) took {} ms", finishUpdate - startUpdate)
+            logger.debug("db.updatePaymentIntent (failure) took {} ms", finishUpdate - startUpdate)
         }
     }
 
@@ -145,7 +145,7 @@ class AuthorizePaymentIntentService(
                 val startUpdate = System.currentTimeMillis()
                 paymentIntentRepository.updatePaymentIntent(cancelled)
                 val finishUpdate = System.currentTimeMillis()
-                logger.info("db.updatePaymentIntent (immediate failure) TOOK {} MS", finishUpdate - startUpdate)
+                logger.debug("db.updatePaymentIntent (immediate failure) TOOK {} MS", finishUpdate - startUpdate)
                 cancelled
             }
             else -> {
@@ -165,7 +165,7 @@ class AuthorizePaymentIntentService(
             val startUpdate = System.currentTimeMillis()
             paymentTransactionalFacadePort.handleAuthorized(confirmedPaymentIntent,outboxEventPaymentAuthorizedEvent)
             val finishUpdate = System.currentTimeMillis()
-            logger.info("paymentTransactionalFacadePort.handleAuthorize TOOK{} MS", finishUpdate - startUpdate)
+            logger.debug("paymentTransactionalFacadePort.handleAuthorize TOOK{} MS", finishUpdate - startUpdate)
         }
     }
 

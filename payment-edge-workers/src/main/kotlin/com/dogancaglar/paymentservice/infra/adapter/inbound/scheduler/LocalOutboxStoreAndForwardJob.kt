@@ -57,7 +57,7 @@ class LocalOutboxStoreAndForwardJob(
                 )
             }
         } else {
-            logger.warn("FATAL ERROR, EDGE TABLE MOT PRESENT,SHUUTTING DOWN")
+            logger.warn("FATAL ERROR, CENTRAL TABLE NOT PRESENT, SHUTTING DOWN")
         }
 
     }

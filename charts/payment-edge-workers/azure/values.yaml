@@ -52,3 +52,5 @@ config:
   CENTRAL_DB_URL: "jdbc:postgresql://central-db-postgresql.payment.svc.cluster.local:5432/central-db?options=-c%20timezone=UTC"
   EDGE_DB_NAME: "edge-db"
   CENTRAL_DB_NAME: "central-db"
+serviceMonitor:
+  enabled: true

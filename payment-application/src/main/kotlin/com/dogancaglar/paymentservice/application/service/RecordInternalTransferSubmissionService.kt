@@ -85,7 +85,7 @@ class RecordInternalTransferSubmissionService(
         )
 
         // 4. Atomically persist
-        logger.info("Persisting InternalTransfer and Tx for paymentIntentId=$paymentIntentId, transferId=${transferId.value}")
+        logger.debug("Persisting InternalTransfer and Tx for paymentIntentId=$paymentIntentId, transferId=${transferId.value}")
         centralDbTransactionalFacadePort.recordInternalTransferOperationInLedger(
             internalTransfer = internalTransfer,
             tx = internalTransferTx,

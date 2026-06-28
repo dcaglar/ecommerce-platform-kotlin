@@ -48,7 +48,7 @@ class PaymentController(
         @RequestHeader("Idempotency-Key") @ValidUuidV7 idempotencyKey: String,
         @Valid @RequestBody request: CreatePaymentIntentRequestDTO
     ): ResponseEntity<CreatePaymentIntentResponseDTO> {
-        logger.info("📥 Starting payment create intent reqeust")
+        logger.debug("📥 Starting payment create intent reqeust")
 
         val result = idempotencyService.run(
             key = java.util.UUID.fromString(idempotencyKey),
@@ -66,7 +66,7 @@ class PaymentController(
 
         val responseDTO = result.response
         // Return 201/200/202 Created with Location header (best practice for resource creation)
-        logger.info("📥 Received payment request for order: ${responseDTO.orderId}, payment id is ${responseDTO.paymentIntentId}")
+        logger.info("paymentintent ${responseDTO.paymentIntentId} is created successfully")
         return when (result.status) {
 
             IdempotencyExecutionStatus.CREATED -> {
@@ -116,6 +116,7 @@ class PaymentController(
 
         val dto = paymentApiOrchestrator.authorizePayment(publicPaymentIntentId, request)
 
+        logger.info("payment ${publicPaymentIntentId} is authorized successfully")
         return ResponseEntity
             .status(HttpStatus.OK)
             .body(dto)

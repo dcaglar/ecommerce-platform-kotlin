@@ -24,6 +24,9 @@ prometheusOperator:
 
 # ── Prometheus Server ──────────────────────────────────────────────────────────
 prometheus:
+  service:
+    type: LoadBalancer
+    port: 9090
   prometheusSpec:
     nodeSelector:
       pool: central

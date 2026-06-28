@@ -1,8 +1,7 @@
 spring:
   profile: "azure"
-
 keda:
-  enabled: false
+  enabled: true
   minReplicaCount: 1
   maxReplicaCount: 2
   pollingInterval: 15
@@ -30,9 +29,6 @@ keda:
         - type: Percent
           value: 100
           periodSeconds: 15
-
-
-
 paymentService:
   image:
     repository: dcaglar1987/payment-service
@@ -42,15 +38,13 @@ paymentService:
   resources:
     requests: {cpu: "1500m", memory: "2Gi"}
     limits: {cpu: "2500m", memory: "3Gi"}
-
 redis:
   url: "redis://redis-master:6379"
-
 ingress:
   enabled: true
-
-
 config:
   KEYCLOAK_ISSUER_URL: "http://keycloak:8080/realms/ecommerce-platform"
   EDGE_DB_URL: "jdbc:postgresql://localhost:5432/edge-db?options=-c%20timezone=UTC"
   EDGE_DB_NAME: "edge-db"
+serviceMonitor:
+  enabled: true

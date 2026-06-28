@@ -24,7 +24,7 @@ class CapturePaymentService(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     override fun capture(cmd: CapturePaymentCommand): PaymentIntent {
-        logger.info("CapturePaymentService.capture started for paymentIntentId=${cmd.paymentIntentId.value}")
+        logger.debug("CapturePaymentService.capture started for paymentIntentId=${cmd.paymentIntentId.value}")
         
         val paymentIntent = paymentIntentRepository.findById(cmd.paymentIntentId)
             ?: throw IllegalArgumentException("PaymentIntent not found for ${cmd.paymentIntentId.value}")

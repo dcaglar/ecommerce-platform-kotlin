@@ -1,23 +1,18 @@
 spring:
   profile: azure
-
 image:
   repository: dcaglar1987/payment-consumers
   tag: latest
   pullPolicy: Always
-
 resources:
   requests: {cpu: "200m", memory: "1536Mi"}
   limits: {memory: "3Gi"}
-
 jvmOpts: "-XX:+UseG1GC -XX:MaxRAMPercentage=60"
-
 # Required defaults for the linter
 redis:
   url: "redis://redis-master:6379"
 kafka:
   bootstrapServers: "kafka.payment.svc.cluster.local:9092"
-
 keda:
   enabled: true
   minReplicaCount: 1
@@ -44,12 +39,10 @@ keda:
         consumerGroup: psp-capture-executor-consumer-group
         topic: gateway.capture.commands
         lagThreshold: "2400"
-
 nodeSelector:
   pool: central
-
 serviceMonitor:
-  enabled: false
+  enabled: true
   path: /actuator/prometheus
   interval: 15s
   scrapeTimeout: 10s

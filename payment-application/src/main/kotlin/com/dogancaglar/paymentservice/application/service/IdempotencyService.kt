@@ -60,7 +60,7 @@ class IdempotencyService(
         }
 
         // 3. Replay the Result
-        logger.info("🔁 [Idempotency] Scenario 3: Valid retry for key=$key. Replaying cached response.")
+        logger.debug("🔁 [Idempotency] Scenario 3: Valid retry for key=$key. Replaying cached response.")
         val responseObj = serializer.fromJson(record.responsePayload!!, responseClass)
         return IdempotencyResult(responseObj, IdempotencyExecutionStatus.REPLAYED)
     }
