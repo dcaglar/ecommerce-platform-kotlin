@@ -17,7 +17,7 @@ postgresql:
       enabled: true
       size: 50Gi
 service:
-  type: ClusterIP
+  type: LoadBalancer
   ports:
     http: 8080
 # single-node cache; also blank out KC_CACHE_STACK so no jdbc-ping surprise
@@ -28,8 +28,8 @@ extraEnvVars:
     value: "kubernetes"
   - name: KC_PROXY
     value: "edge"
-  # KC_HOSTNAME uses cluster-internal DNS so JWT issuer in tokens matches payment service config
-  # Tokens will have issuer: http://keycloak:8080/realms/ecommerce-platform
+  # Configure hostname to use cluster-internal DNS so JWT issuer matches payment service config
+  # This ensures tokens have issuer: http://keycloak:8080/realms/ecommerce-platform
   - name: KC_HOSTNAME
     value: "keycloak"
   - name: KC_HOSTNAME_PORT
@@ -60,36 +60,3 @@ readinessProbe:
   failureThreshold: 6
 nodeSelector:
   pool: central
-
-ingress:
-  enabled: true
-  ingressClassName: nginx
-  pathType: ImplementationSpecific
-  # hostname is mandatory in the Bitnami chart — set to placeholder to satisfy the template.
-  # The actual routing is done by extraRules below (catch-all, no host restriction).
-  hostname: "placeholder.local"
-  # Disable the default path rule rendered from hostname above
-  path: "/this-path-will-never-match"
-  annotations:
-    # Use rewrite-target to strip /auth prefix before forwarding to Keycloak.
-    # Keycloak serves at its default root path (/). NGINX rewrites:
-    #   GET /auth/realms/master → GET /realms/master (what Keycloak sees)
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
-    nginx.ingress.kubernetes.io/use-regex: "true"
-    nginx.ingress.kubernetes.io/load-balance: "ewma"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
-    nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "120"
-    nginx.ingress.kubernetes.io/upstream-keepalive-connections: "200"
-    nginx.ingress.kubernetes.io/limit-connections: "350"
-  # Catch-all rule — routes /auth regardless of Host header (raw IP access or any DNS name)
-  extraRules:
-    - http:
-        paths:
-          - path: "/auth(/|$)(.*)"
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: keycloak
-                port:
-                  number: 80

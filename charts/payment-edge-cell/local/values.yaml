@@ -101,7 +101,7 @@ ingress:
     - path: /actuator
       pathType: Prefix
 serviceMonitor:
-  enabled: true
+  enabled: false
   path: /actuator/prometheus
   interval: 15s
   scrapeTimeout: 10s

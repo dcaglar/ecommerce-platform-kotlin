@@ -53,4 +53,4 @@ config:
   EDGE_DB_NAME: "edge-db"
   CENTRAL_DB_NAME: "central-db"
 serviceMonitor:
-  enabled: true
+  enabled: false

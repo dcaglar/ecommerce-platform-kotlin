@@ -42,24 +42,6 @@ redis:
   url: "redis://redis-master:6379"
 ingress:
   enabled: true
-  className: "nginx"
-  # No hostname — NGINX routes by path, not by host. Matches all incoming hosts.
-  annotations:
-    nginx.ingress.kubernetes.io/load-balance: "ewma"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
-    nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "120"
-    nginx.ingress.kubernetes.io/upstream-keepalive-connections: "200"
-    nginx.ingress.kubernetes.io/limit-connections: "350"
-  paths:
-    - path: /api/v1/payments
-      pathType: Prefix
-    - path: /swagger-ui
-      pathType: Prefix
-    - path: /v3/api-docs
-      pathType: Prefix
-    - path: /actuator
-      pathType: Prefix
 config:
   KEYCLOAK_ISSUER_URL: "http://keycloak:8080/realms/ecommerce-platform"
   EDGE_DB_URL: "jdbc:postgresql://localhost:5432/edge-db?options=-c%20timezone=UTC"
