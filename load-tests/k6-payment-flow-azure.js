@@ -48,16 +48,22 @@ const SCENARIOS = {
         preAllocatedVUs: 300,
         maxVUs: 8000,
         stages: [
-            { duration: '2m', target: 300 },  // Ramp to ~100% of single-pod ceiling
+             { duration: '2m', target: 100 },  // Ramp to ~100% of single-pod ceiling
+             { duration: '5m', target: 300 },  // Sustained — should trigger HPA
+            { duration: '2m', target: 500 },  // Ramp to ~100% of single-pod ceiling
             { duration: '5m', target: 500 },  // Sustained — should trigger HPA
-            { duration: '2m', target: 700 },     // Cool-down
+            { duration: '2m', target: 700 },  // Ramp to ~100% of single-pod ceiling
             { duration: '5m', target: 700 },  // Sustained — should trigger HPA
-            { duration: '2m', target: 1200 },     // Cool-down
+            { duration: '2m', target: 1200 },  // Ramp to ~100% of single-pod ceiling
             { duration: '5m', target: 1200 },  // Sustained — should trigger HPA
-            { duration: '2m', target: 1600 },     // Cool-down
-            { duration: '5m', target: 1600 },  // Sustained — should trigger HPA
+            { duration: '2m', target: 1500 },     // Cool-down
+            { duration: '5m', target: 1500 },  // Sustained — should trigger HPA
             { duration: '2m', target: 2000 },     // Cool-down
-           { duration: '5m', target: 2000},  // Sustained — should trigger HPA                      { duration: '5m', target: 350 },  // Sustained — should trigger HPA
+            { duration: '5m', target: 2000 },  // Sustained — should trigger HPA
+            { duration: '2m', target: 2500 },     // Cool-down
+            { duration: '5m', target: 2500 },  // Sustained — should trigger HPA
+            { duration: '2m', target: 1000 },     // Cool-down
+           { duration: '5m', target: 100},  // Sustained — should trigger HPA                      { duration: '5m', target: 350 },  // Sustained — should trigger HPA
   { duration: '2m', target: 500 },     // Cool-down
            { duration: '5m', target: 0 },  // Sustained — should trigger HPA
         ],

@@ -18,9 +18,9 @@ controller:
   resources:
     requests:
       cpu: 100m
-      memory: 400Mi
+      memory: 1Gi
     limits:
-      memory: 400Mi
+      memory: 1.5Gi
   admissionWebhooks:
     enabled: false
     patch:

@@ -36,9 +36,9 @@ keda:
     - type: kafka
       metadata:
         bootstrapServers: kafka.payment.svc.cluster.local:9092
-        consumerGroup: psp-capture-executor-consumer-group
-        topic: gateway.capture.commands
-        lagThreshold: "2400"
+        consumerGroup: payment.psp.result.consumer
+        topic: payment.psp.results
+        lagThreshold: "5000"
 nodeSelector:
   pool: central
 serviceMonitor:
