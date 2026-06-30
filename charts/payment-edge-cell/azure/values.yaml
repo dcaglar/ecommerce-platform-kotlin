@@ -42,6 +42,11 @@ redis:
   url: "redis://redis-master:6379"
 ingress:
   enabled: true
+  appPath: "/api/v1/payments"
+  appPort: 8080
+  healthPath: "/healthz"
+  healthPort: 9000
+
   annotations:
     nginx.ingress.kubernetes.io/use-regex: "true"
     # ── Snowflake Cell Router ─────────────────────────────────────────────────
@@ -59,6 +64,9 @@ ingress:
     # Non-matching paths (e.g. POST /api/v1/payments) fall through unchanged.
     # ─────────────────────────────────────────────────────────────────────────
     nginx.ingress.kubernetes.io/configuration-snippet: |
+      if ($uri = "/healthz") {
+        rewrite ^/healthz$ /actuator/health break;
+      }
       set $cell_target "";
       access_by_lua_block {
         local uri = ngx.var.uri
@@ -107,6 +115,8 @@ ingress:
           " node_id=", node_id,
           " target=", ngx.var.cell_target)
       }
+
+
 
 config:
   KEYCLOAK_ISSUER_URL: "http://keycloak:8080/realms/ecommerce-platform"

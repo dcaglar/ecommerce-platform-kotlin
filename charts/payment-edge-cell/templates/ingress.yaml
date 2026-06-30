@@ -1,6 +1,5 @@
 {{- if .Values.ingress.enabled -}}
-{{- $fullName := include "payment-edge-cell.fullname" . -}}
-{{- $svcPort := .Values.service.port | default 8080 -}}
+  {{- $fullName := include "payment-edge-cell.fullname" . -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -14,21 +13,27 @@ metadata:
 spec:
   ingressClassName: {{ .Values.ingress.className | default "nginx" }}
   rules:
-    - {{ if .Values.ingress.host }}host: {{ .Values.ingress.host | quote }}
-      {{ end -}}
-      http:
+    - http:
         paths:
-          {{- range .Values.ingress.paths }}
-          - path: {{ .path }}
-            pathType: {{ .pathType | default "Prefix" }}
+          # 1. Main Business API Routing
+          - path: {{ .Values.ingress.appPath }}
+            pathType: Prefix
             backend:
               service:
                 name: {{ $fullName }}
                 port:
-                  number: {{ $svcPort }}
-          {{- end }}
+                  number: {{ .Values.ingress.appPort }}
+
+          # 2. Management / Health Routing
+          - path: {{ .Values.ingress.healthPath }}
+            pathType: Exact
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ .Values.ingress.healthPort }}
   {{- with .Values.ingress.tls }}
   tls:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-{{- end }}
+  {{- end }}
