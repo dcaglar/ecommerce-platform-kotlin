@@ -14,7 +14,7 @@ redis:
 kafka:
   bootstrapServers: "kafka.payment.svc.cluster.local:9092"
 keda:
-  enabled: true
+  enabled: false
   minReplicaCount: 1
   maxReplicaCount: 6
   pollingInterval: 15
