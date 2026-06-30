@@ -1,0 +1,51 @@
+
+# ingress-controller-values-azure.yaml
+controller:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: ingress-nginx
+      additionalLabels:
+        release: prometheus-stack
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: "/healthz"
+    ports:
+      http: 80
+      https: 443
+  resources:
+    requests:
+      cpu: 100m
+      memory: 400Mi
+    limits:
+      memory: 400Mi
+  admissionWebhooks:
+    enabled: false
+    patch:
+      resources:
+        requests:
+          cpu: 20m
+          memory: 64Mi
+        limits:
+          memory: 64Mi
+    createSecretJob:
+      resources:
+        requests:
+          cpu: 20m
+          memory: 32Mi
+        limits:
+          memory: 64Mi
+
+  # ── Cell Routing: Lua snippet support ──────────────────────────────────────
+  # configuration-snippet is rated "Critical" by ingress-nginx ≥ v1.9.0.
+  # This cluster is single-tenant (we own all Ingress objects), so the risk is
+  # accepted. Without these two flags the annotation is silently dropped.
+  allowSnippetAnnotations: true
+
+  config:
+    # Unlocks "Critical"-rated annotations (configuration-snippet is one of them).
+    annotations-risk-level: "Critical"
+    # 1 MB shared dict for the Snowflake cell-routing Lua block.
+    lua-shared-dicts: "cell_routing: 1m"

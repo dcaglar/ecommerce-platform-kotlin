@@ -34,8 +34,8 @@ const SCENARIOS = {
         preAllocatedVUs: 50,
         maxVUs: 500,
         stages: [
-            { duration: '2m', target: 80 },   // Warm-up to 80 RPS (~60% of single-pod ceiling)
-            { duration: '20m', target: 80 },   // Maintain 80 RPS
+            { duration: '2m', target: 100 },   // Warm-up to 80 RPS (~60% of single-pod ceiling)
+            { duration: '5m', target: 100 },   // Maintain 80 RPS
             { duration: '2m', target: 0 },     // Cool-down
         ],
         tags: { test_type: 'average_load' },
@@ -46,18 +46,18 @@ const SCENARIOS = {
         startRate: 100,
         timeUnit: '1s',
         preAllocatedVUs: 200,
-        maxVUs: 3000,
+        maxVUs: 8000,
         stages: [
             { duration: '2m', target: 300 },  // Ramp to ~100% of single-pod ceiling
-            { duration: '5m', target: 300 },  // Sustained — should trigger HPA
-            { duration: '2m', target: 500 },     // Cool-down
             { duration: '5m', target: 500 },  // Sustained — should trigger HPA
             { duration: '2m', target: 700 },     // Cool-down
             { duration: '5m', target: 700 },  // Sustained — should trigger HPA
-            { duration: '2m', target: 1000 },     // Cool-down
-            { duration: '5m', target: 1000 },  // Sustained — should trigger HPA
-            { duration: '2m', target: 1500 },     // Cool-down
-           { duration: '5m', target: 1500 },  // Sustained — should trigger HPA                      { duration: '5m', target: 350 },  // Sustained — should trigger HPA
+            { duration: '2m', target: 1200 },     // Cool-down
+            { duration: '5m', target: 1200 },  // Sustained — should trigger HPA
+            { duration: '2m', target: 1600 },     // Cool-down
+            { duration: '5m', target: 1600 },  // Sustained — should trigger HPA
+            { duration: '2m', target: 2000 },     // Cool-down
+           { duration: '5m', target: 2000},  // Sustained — should trigger HPA                      { duration: '5m', target: 350 },  // Sustained — should trigger HPA
   { duration: '2m', target: 500 },     // Cool-down
            { duration: '5m', target: 0 },  // Sustained — should trigger HPA
         ],
@@ -229,7 +229,7 @@ function generateRandomOrder(sellerPool) {
 
 // --- 4. Main User Journey ---
 export default function () {
-    const baseUrl = __ENV.BASE_URL || "http://20.82.38.15";
+    const baseUrl = __ENV.BASE_URL || "http://20.54.169.5";
 
     // Pick a random marketplace (and its scoped seller pool) for this iteration
     const marketplace = pickRandomMarketplace();
