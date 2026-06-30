@@ -45,7 +45,7 @@ const SCENARIOS = {
         executor: 'ramping-arrival-rate',
         startRate: 100,
         timeUnit: '1s',
-        preAllocatedVUs: 200,
+        preAllocatedVUs: 300,
         maxVUs: 8000,
         stages: [
             { duration: '2m', target: 300 },  // Ramp to ~100% of single-pod ceiling
@@ -229,7 +229,7 @@ function generateRandomOrder(sellerPool) {
 
 // --- 4. Main User Journey ---
 export default function () {
-    const baseUrl = __ENV.BASE_URL || "http://51.124.14.156";
+    const baseUrl = __ENV.BASE_URL || "http://51.105.254.202";
 
     // Pick a random marketplace (and its scoped seller pool) for this iteration
     const marketplace = pickRandomMarketplace();
